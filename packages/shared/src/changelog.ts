@@ -33,6 +33,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: '0.17.0',
+    date: '2026-10-24',
+    items: [
+      {
+        kind: 'new',
+        text: 'You can try Nautelle with one docker run of an all-in-one image, and every release is also published on Docker Hub.',
+      },
+      {
+        kind: 'improved',
+        text: 'Demo videos of several cards record at the same time, each on a port of its own.',
+      },
+      {
+        kind: 'fixed',
+        text: 'The daily AI digest goes out at the time you set on the day the clocks change.',
+      },
+    ],
+  },
+  {
     version: '0.16.0',
     date: '2026-10-24',
     items: [
