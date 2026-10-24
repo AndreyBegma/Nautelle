@@ -5,6 +5,13 @@ what to do on every machine that runs the runner.
 
 ## Unreleased
 
+## 0.17.0
+
+**Upgrade note — demo configs should use `${PORT}`.** The runner now pins
+DemoFlow 0.6.0 and gives each demo a port of its own. A project whose
+`demoflow.config.json` still names a fixed port records one demo at a time and
+fails a demo when that port is taken.
+
 - **Demos record in parallel on a port of their own.** The runner pins
   DemoFlow 0.6.0 and runs `demoflow run … --port <free port> --fresh-app`, so
   a demo no longer waits for or is refused because the app's port is taken.
