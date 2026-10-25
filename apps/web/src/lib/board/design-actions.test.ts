@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import type { BoardCardView } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   approveAndRun,
@@ -6,8 +7,9 @@ import {
   approveConsequence,
   backWithComment,
   offersApproveAndRun,
+  offersInPlaceApproveAndRun,
 } from './design-actions';
-import { card } from './fixtures';
+import { card, round } from './fixtures';
 import { describeBoardError } from './format';
 
 describe('approveAndRun (#243 D6)', () => {
@@ -181,6 +183,44 @@ describe('the switch', () => {
     expect(offersApproveAndRun(card(1, 'todo'))).toBe(true);
     expect(
       offersApproveAndRun(card(1, 'todo', { continueAfterDesign: true })),
+    ).toBe(false);
+  });
+
+  test('the card sheet offers Approve & run only on a card that could start now', () => {
+    const design: BoardCardView['design'] = {
+      needed: true,
+      suggested: false,
+      suggestionWhy: null,
+      variantCount: 1,
+      status: 'reviewing',
+      approvedRevisionId: null,
+      busySince: null,
+    };
+    expect(offersInPlaceApproveAndRun(card(1, 'todo', { design }))).toBe(true);
+    expect(
+      offersInPlaceApproveAndRun(
+        card(1, 'todo', { design, continueAfterDesign: true }),
+      ),
+    ).toBe(false);
+    expect(
+      offersInPlaceApproveAndRun(
+        card(2, 'todo', {
+          design,
+          source: 'fleet',
+          fleet: {
+            issue: 1,
+            slot: 'i1',
+            stage: null,
+            slotGone: false,
+            detached: false,
+          },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      offersInPlaceApproveAndRun(
+        card(3, 'in_progress', { design, round: round('running') }),
+      ),
     ).toBe(false);
   });
 

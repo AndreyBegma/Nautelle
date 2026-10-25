@@ -25,7 +25,7 @@ import { runCard, updateCard } from '../../lib/board/actions';
 import {
   approveAndRunCard,
   approveConsequence,
-  offersApproveAndRun,
+  offersInPlaceApproveAndRun,
 } from '../../lib/board/design-actions';
 import {
   type ApproveRunOffer,
@@ -166,7 +166,7 @@ function CardDesignReview({
     await actions.approve(body);
     onChanged();
   };
-  const onApproveAndRun = offersApproveAndRun(card)
+  const onApproveAndRun = offersInPlaceApproveAndRun(card)
     ? (revisionId: string) =>
         approveAndRunCard(
           {

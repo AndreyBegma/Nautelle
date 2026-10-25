@@ -1,5 +1,5 @@
 import type { BoardCardView } from '@nautelle/shared';
-import { describeBoardError } from './format';
+import { approveRunOffer, describeBoardError } from './format';
 
 /**
  * A card's design on the board (#243). Approving with "Continue after design"
@@ -96,6 +96,15 @@ export async function backWithComment(
 export const offersApproveAndRun = (
   card: Pick<BoardCardView, 'continueAfterDesign'>,
 ): boolean => !card.continueAfterDesign;
+
+/**
+ * Whether the card sheet's in-place review offers Approve & run (C-394): the
+ * switch is off and the card could start now — the same gate as the sheet
+ * header's offer, so a fleet card, a card with a live session or a running
+ * round gets Approve only.
+ */
+export const offersInPlaceApproveAndRun = (card: BoardCardView): boolean =>
+  offersApproveAndRun(card) && approveRunOffer(card)?.enabled === true;
 
 /** What the approve dialog says happens next. */
 export function approveConsequence(continueAfterDesign: boolean): string {
