@@ -1018,5 +1018,87 @@ describe('action requests (e2e)', () => {
         'pending',
       );
     });
+
+    it('offers the rule buttons in Telegram, and a press remembers the rule', async () => {
+      const CHAT = 4343;
+      await ctx.prisma.telegramLink.create({
+        data: { userId: approverId, chatId: BigInt(CHAT) },
+      });
+      const press = (data: string) =>
+        telegram.handleCallback({
+          id: 'cb-2',
+          from: { id: CHAT },
+          message: { message_id: 1, chat: { id: CHAT, type: 'private' } },
+          data,
+        });
+      const notificationFor = async (requestId: string) =>
+        ctx.prisma.notification.findFirstOrThrow({
+          where: { userId: approverId, link: { contains: requestId } },
+        });
+
+      const first = await call(
+        sessionA,
+        { command: 'npm test' },
+        { suggestions: [NPM_TEST] },
+      );
+      const notification = await notificationFor(first.id);
+      const offer = await telegram.offer(notification.id);
+      const target = `${notification.id}:${first.id}`;
+      expect(offer?.inline_keyboard).toEqual([
+        [
+          { text: 'Approve', callback_data: `x:${target}` },
+          { text: 'Deny', callback_data: `y:${target}` },
+        ],
+        [
+          {
+            text: 'Allow similar in this session',
+            callback_data: `xs:${target}`,
+          },
+        ],
+        [
+          {
+            text: 'Always allow in this project',
+            callback_data: `xp:${target}`,
+          },
+        ],
+      ]);
+      const answer = await press(`xs:${target}`);
+      expect(answer.text).toBe(
+        'Approved. Similar calls in this session are allowed from now on.',
+      );
+      expect(await ctx.prisma.toolUseRule.findFirst()).toMatchObject({
+        scope: 'session',
+        sessionId: sessionA,
+        createdById: approverId,
+      });
+      expect((await call(sessionA, { command: 'npm test -- -u' })).status).toBe(
+        'approved',
+      );
+
+      // A call with no session can only be allowed for the project.
+      const sessionless = await call(
+        null,
+        { command: 'npm test' },
+        { suggestions: [NPM_TEST] },
+      );
+      const sessionlessOffer = await telegram.offer(
+        (await notificationFor(sessionless.id)).id,
+      );
+      expect(
+        sessionlessOffer?.inline_keyboard.map((row) =>
+          row.map((button) => button.text),
+        ),
+      ).toEqual([['Approve', 'Deny'], ['Always allow in this project']]);
+
+      // A dangerous call is never offered a rule, and a forged press is refused.
+      const push = await call(sessionA, { command: 'git push origin main' });
+      const pushNotification = await notificationFor(push.id);
+      expect(
+        (await telegram.offer(pushNotification.id))?.inline_keyboard,
+      ).toHaveLength(1);
+      const refused = await press(`xp:${pushNotification.id}:${push.id}`);
+      expect(refused.text).toContain('cannot be remembered');
+      expect((await rowOf(push.id)).status).toBe('pending');
+    });
   });
 });
