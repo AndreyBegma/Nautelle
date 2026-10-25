@@ -20,7 +20,13 @@ describe('CardSignals (C-392)', () => {
       ciFixAttempts: 1,
       round: round('running'),
       source: 'fleet',
-      fleet: { issue: 12, slot: 'i12-web', stage: 'pr_open', slotGone: true, detached: false },
+      fleet: {
+        issue: 12,
+        slot: 'i12-web',
+        stage: 'pr_open',
+        slotGone: true,
+        detached: false,
+      },
     });
     expect(html).toContain('Auto-run');
     expect(html).toContain('resumed session');
