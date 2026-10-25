@@ -35,7 +35,7 @@ export const DEMO_RUNNER_ID = 'demo-runner';
 export const DEMO_PROJECT_ID = 'demo-project';
 
 /**
- * C-398 (ADR-0101): the demo Board runs one card worker at a time, so the
+ * C-398 (ADR-0102): the demo Board runs one card worker at a time, so the
  * running card fills it and the queued cards wait for a slot.
  */
 export const DEMO_MAX_RUNNING = 1;
@@ -46,10 +46,15 @@ export const DEMO_CARDS: ReadonlyArray<{
   column: BoardColumn;
   kind: 'feature' | 'bug';
   /**
-   * C-359: round 1 launched with this model and effort, finished unless
-   * `running` (C-398: a worker still at it).
+   * C-359: round 1 launched with this model and effort. It finished, or
+   * (C-399) a hard budget paused it, or (C-398) a worker is still at it.
    */
-  round?: { model: string; effort: CardEffort; running?: true };
+  round?: {
+    model: string;
+    effort: CardEffort;
+    paused?: true;
+    running?: true;
+  };
   /** C-398: Run was pressed on a full Board; the card waits for a slot. */
   queued?: true;
   /**
@@ -92,6 +97,12 @@ export const DEMO_CARDS: ReadonlyArray<{
     column: 'finished',
     kind: 'feature',
     mergedPr: 42,
+  },
+  {
+    title: 'Import products from a CSV file',
+    column: 'in_progress',
+    kind: 'feature',
+    round: { model: 'claude-sonnet-5-5', effort: 'medium', paused: true },
   },
 ];
 
@@ -198,6 +209,13 @@ export const seedDemo = async (
         createdById: admin.id,
         movedById: admin.id,
         movedAt: now,
+        // C-399: a paused card keeps its worktree branch and its session.
+        ...(card.round?.paused
+          ? {
+              branch: `card/c${number}-import-products-from-a-csv-file`,
+              sessionId: '0000c399-0000-4000-8000-000000000007',
+            }
+          : {}),
         ...(card.mergedPr === undefined
           ? {}
           : {
@@ -223,6 +241,7 @@ export const seedDemo = async (
     }
     if (card.round) {
       const running = card.round.running === true;
+      const paused = card.round.paused === true;
       const runId = `demo-run-${number}`;
       const startedAt = new Date(now.getTime() - 20 * 60_000);
       await prisma.run.upsert({
@@ -236,7 +255,8 @@ export const seedDemo = async (
           runtime: 'claude',
           model: card.round.model,
           args: { card: number, round: 1, trigger: 'run' },
-          status: running ? 'running' : 'succeeded',
+          status: running ? 'running' : paused ? 'abandoned' : 'succeeded',
+          ...(paused ? { outcome: 'Paused: a hard budget was reached' } : {}),
           triggeredByType: 'user',
           triggeredById: admin.id,
           startedAt,
@@ -256,18 +276,20 @@ export const seedDemo = async (
           cardBody: '',
           cardKind: card.kind,
           authorId: admin.id,
+          ...(running
+            ? { phase: 'running' }
+            : paused
+              ? { phase: 'cancelled', pausedFor: 'budget' }
+              : {
+                  phase: 'finished',
+                  finishedBy: 'worker',
+                  summary: 'Added a Retry collect button to the card.',
+                  finishedAt: now,
+                  endedAt: now,
+                }),
           model: card.round.model,
           effort: card.round.effort,
           startedAt,
-          ...(running
-            ? { phase: 'running' }
-            : {
-                phase: 'finished',
-                finishedBy: 'worker',
-                summary: 'Added a Retry collect button to the card.',
-                finishedAt: now,
-                endedAt: now,
-              }),
         },
       });
     }

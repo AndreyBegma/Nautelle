@@ -1,4 +1,4 @@
-# ADR-0101: Run at the agent limit queues the card, and the queue starts cards in To Do order
+# ADR-0102: Run at the agent limit queues the card, and the queue starts cards in To Do order
 
 Status: accepted · Date: 2026-10-25 · Amends
 [ADR-0067](0067-run-stack-queues-a-stacks-cards-within-the-agent-limit.md) ·

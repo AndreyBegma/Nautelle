@@ -18,7 +18,7 @@ const queueOf = (prisma: PrismaService, projectId: string) =>
   });
 
 /**
- * C-398 (ADR-0101): the run queue's chip of each card — its state and its
+ * C-398 (ADR-0102): the run queue's chip of each card — its state and its
  * place among the project's queued cards.
  */
 export const queueFactsFor = async (

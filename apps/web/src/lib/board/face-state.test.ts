@@ -115,6 +115,12 @@ describe('faceState (C-392)', () => {
     });
   });
 
+  test('a round a hard budget paused reads Paused: budget (C-399)', () => {
+    expect(
+      state({ round: round('cancelled', { pausedFor: 'budget' }) }),
+    ).toMatchObject({ status: 'blocked', label: 'Paused: budget' });
+  });
+
   test('failed beats needs you beats a question beats running', () => {
     const running = round('running');
     expect(

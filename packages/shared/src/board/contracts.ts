@@ -7,6 +7,7 @@ import type {
   CardWorkClass,
 } from '../assess/limits';
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
+import type { BudgetScope } from '../budgets/contracts';
 import type { CardDemoBrief } from '../demos/contracts';
 import type { TaskDesignSummary, TaskDesignView } from '../design';
 import type { DesignTemplateChoice } from '../design/templates';
@@ -54,6 +55,7 @@ import type {
   CardFinishedBy,
   CardMergePolicy,
   CardNeedsPersonReason,
+  CardPauseReason,
   CardPrState,
   CardRoundPhase,
   CardRoundTrigger,
@@ -137,6 +139,12 @@ export interface CardRoundBrief {
    * so older fixtures stay valid.
    */
   quotaWait?: { limit: QuotaLimit; resetsAt: string | null } | null;
+  /**
+   * C-399 (ADR-0101): why Nautelle paused this `cancelled` round — the card
+   * shows "Paused: budget" and Run reads Resume; `null` for any other round.
+   * Optional so older fixtures stay valid.
+   */
+  pausedFor?: CardPauseReason | null;
 }
 
 /**
@@ -315,7 +323,7 @@ export interface BoardCardView {
    */
   stack?: CardStackRef | null;
   /**
-   * C-398 (ADR-0101): the card's place in the run queue — "Waiting for a
+   * C-398 (ADR-0102): the card's place in the run queue — "Waiting for a
    * slot". Optional like `stack`; absent or `null` when it is not queued.
    */
   queue?: CardQueueView | null;
@@ -379,7 +387,7 @@ export interface BoardCardView {
 }
 
 /**
- * C-398 (ADR-0101): a To Do card in the run queue. Run at `maxRunning`, or
+ * C-398 (ADR-0102): a To Do card in the run queue. Run at `maxRunning`, or
  * Run stack, puts it there; when a slot frees, the topmost queued card in To
  * Do order starts. Stop takes it out.
  */
@@ -472,7 +480,7 @@ export interface BoardView {
   /** Active rounds now, against `settings.maxRunning`. */
   running: number;
   /**
-   * C-398 (ADR-0101): To Do cards in the run queue — the header's "3 waiting
+   * C-398 (ADR-0102): To Do cards in the run queue — the header's "3 waiting
    * for a slot". Optional so older fixtures stay valid; absent reads as 0.
    */
   queued?: number;
@@ -503,6 +511,8 @@ export interface CardRoundView {
   finishRefused?: LocalErrorCode | null;
   /** #624: as on `CardRoundBrief`. Optional so older fixtures stay valid. */
   blockingDialog?: PaneDialog | null;
+  /** C-399: as on `CardRoundBrief`. Optional so older fixtures stay valid. */
+  pausedFor?: CardPauseReason | null;
   /** The person's text, for a `feedback` round. */
   feedback: string | null;
   author: BoardUserRef | null;
@@ -1357,6 +1367,28 @@ export interface CardBackgroundStalledEventData {
   title: string;
   round: number;
   minutes: number;
+}
+
+/**
+ * C-399 (ADR-0101): Nautelle paused a running round — it stopped the
+ * session and kept the worktree and the Claude session, so Resume continues
+ * it. With `reason: 'budget'`, the hard budget that was reached and when its
+ * period resets (ISO-8601).
+ */
+export const CARD_PAUSED_EVENT = 'card.paused';
+
+export interface CardPausedEventData {
+  cardId: string;
+  number: number;
+  title: string;
+  round: number;
+  reason: CardPauseReason;
+  budget: {
+    id: string;
+    scope: BudgetScope;
+    limitUsd: string;
+    resetsAt: string;
+  };
 }
 
 /**

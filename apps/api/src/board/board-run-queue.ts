@@ -128,7 +128,7 @@ const optionsOf = (options: Prisma.JsonValue): RunBoardCardDto =>
     : {};
 
 /**
- * The Board's run queue (#652, C-398 — ADR-0067, ADR-0101). Two things put a
+ * The Board's run queue (#652, C-398 — ADR-0067, ADR-0102). Two things put a
  * card in it (`board_run_queue`): Run stack, which queues the stack's To Do
  * cards under the stack's run, and a Run refused with `max_running`, which
  * queues that To Do card on its own (`BoardRoundsService.run`). On every card

@@ -15,7 +15,7 @@ import { BoardWorld } from './testing/board-e2e';
  * as they become ready — in parallel within `maxRunning`, stage 2 after its
  * dependency under the stacked-branch rules. A `max_running` refusal keeps
  * a card queued; any other refusal or a failed round pauses the run. Stop
- * removes the queue and leaves running cards alone. C-398 (ADR-0101): the
+ * removes the queue and leaves running cards alone. C-398 (ADR-0102): the
  * queue is the Board's run queue, and it starts cards in To Do order.
  */
 describe('Run stack (e2e, #652)', () => {
@@ -65,7 +65,7 @@ describe('Run stack (e2e, #652)', () => {
   };
 
   /**
-   * `count` new cards, each moved to the bottom of To Do: C-398 (ADR-0101)
+   * `count` new cards, each moved to the bottom of To Do: C-398 (ADR-0102)
    * starts queued cards in To Do order, so that order is the order they were
    * made in.
    */

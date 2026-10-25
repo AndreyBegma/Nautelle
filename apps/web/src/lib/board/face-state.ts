@@ -107,7 +107,7 @@ export function faceState(card: BoardCardView): FaceState | null {
     return { status: 'running', label: 'In review', title: badge.label };
   }
   if (card.queue) {
-    // C-398 (ADR-0101): in the run queue; it starts when a slot frees.
+    // C-398 (ADR-0102): in the run queue; it starts when a slot frees.
     return {
       status: 'idle',
       label: cardQueueText(card.queue),

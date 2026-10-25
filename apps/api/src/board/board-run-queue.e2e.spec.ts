@@ -9,7 +9,7 @@ import { BoardWorld } from './testing/board-e2e';
 
 /**
  * C-398 (docs/specs/card-398-run-queue-at-the-worker-limit-a-card-wai.md,
- * ADR-0101): Run on a full Board puts a To Do card in the run queue instead
+ * ADR-0102): Run on a full Board puts a To Do card in the run queue instead
  * of refusing it. When a slot frees, the topmost queued card in To Do order
  * starts; dragging a card reorders the queue. A queued card whose dependency
  * is not ready waits without holding the others, and Stop takes a card out.

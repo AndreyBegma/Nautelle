@@ -1,4 +1,4 @@
--- C-398 (ADR-0101): the stack run queue becomes the Board's run queue — a
+-- C-398 (ADR-0102): the stack run queue becomes the Board's run queue — a
 -- card a Run at `maxRunning` left waiting for a slot sits in it beside the
 -- cards of stack runs (#652). Renamed, so queued stack cards are kept.
 -- AlterEnum

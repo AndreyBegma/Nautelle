@@ -1422,7 +1422,7 @@ export class BoardService implements OnModuleInit {
     const project = await this.work.project(projectId);
     const card = await this.work.card(projectId, number);
     if (!isActiveRoundPhase(card.rounds[0]?.phase)) {
-      // C-398 (ADR-0101): Stop on a queued card takes it out of the run queue.
+      // C-398 (ADR-0102): Stop on a queued card takes it out of the run queue.
       const removed = await this.prisma.boardRunQueueCard.deleteMany({
         where: { cardId: card.id, status: { in: ['queued', 'waiting'] } },
       });

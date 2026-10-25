@@ -13,7 +13,7 @@ import { boardCardHref } from '../board/href';
  * C-397 (ADR-0098): who works on the project right now, read off the Board —
  * the card workers Nautelle runs, the orchestrator's slots and the people's
  * own sessions. Every row is a card, so every row links to it. C-398
- * (ADR-0101): after them, the cards in the run queue, in the order they start.
+ * (ADR-0102): after them, the cards in the run queue, in the order they start.
  */
 export type WorkingKind = 'worker' | 'slot' | 'session' | 'queued';
 
