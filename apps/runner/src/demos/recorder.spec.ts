@@ -349,7 +349,7 @@ describe('DemoRecorder', () => {
     let wt = '';
     const DEV_TYPES = 'import "./.next/dev/types/routes.d.ts";\n';
     const BUILD_TYPES = 'import "./.next/types/routes.d.ts";\n';
-    let atUpload: string | null = null;
+    const atUpload: string[] = [];
     const { recorder, args, events, worktree } = setup({
       exec,
       // `next dev` rewrites next-env.d.ts; the worker's own change and an
@@ -362,7 +362,7 @@ describe('DemoRecorder', () => {
       },
       answers: [
         () => {
-          atUpload = readFileSync(join(wt, 'next-env.d.ts'), 'utf8');
+          atUpload.push(readFileSync(join(wt, 'next-env.d.ts'), 'utf8'));
           return new Response(null, { status: 201 });
         },
       ],
@@ -379,7 +379,7 @@ describe('DemoRecorder', () => {
     await recorder.idle();
 
     expect(statuses(events)).toEqual(['recording']);
-    expect(atUpload).toBe(BUILD_TYPES);
+    expect(atUpload).toEqual([BUILD_TYPES]);
     expect(await git(wt, 'status', '--porcelain')).toBe(
       ' M notes.md\n?? app.log\n',
     );
