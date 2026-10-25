@@ -53,10 +53,19 @@
     },
     {
       "action": "assertVisible",
-      "target": { "text": "Run queue" },
+      "target": {
+        "css": "li:has-text(\"Run queue\"):has-text(\"Waiting for a slot · #1\")"
+      },
       "timeoutMs": 30000,
       "zoom": true,
       "caption": "After the running work, the cards waiting for a slot, in order"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "li:has-text(\"Run queue\"):has-text(\"Waiting for a slot · #2\")"
+      },
+      "caption": "The second card in the queue starts after the first"
     },
     { "action": "screenshot", "name": "fleet-run-queue" },
     { "action": "wait", "ms": 1500 },
