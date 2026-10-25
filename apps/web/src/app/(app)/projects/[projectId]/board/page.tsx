@@ -384,6 +384,7 @@ function BoardScreen() {
               ? {
                   workers: view.running,
                   maxWorkers: view.settings.maxRunning,
+                  queued: view.queued ?? 0,
                   cards: meta.shown,
                   filtering: isFiltering(url.filters),
                   running: meta.running,

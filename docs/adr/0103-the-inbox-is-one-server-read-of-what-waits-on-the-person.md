@@ -1,4 +1,4 @@
-# ADR-0102: The Inbox is one server read of what waits on the person
+# ADR-0103: The Inbox is one server read of what waits on the person
 
 Status: accepted · Date: 2026-10-25 · Card: C-390 ·
 Spec: [`docs/specs/card-390-inbox-one-page-for-everything-that-waits.md`](../specs/card-390-inbox-one-page-for-everything-that-waits.md) ·

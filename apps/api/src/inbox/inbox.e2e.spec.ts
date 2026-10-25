@@ -15,7 +15,7 @@ const QUESTION: PendingQuestion = {
   other: true,
 };
 
-/** `GET /inbox` (C-390, ADR-0102): what waits on the caller, across projects. */
+/** `GET /inbox` (C-390, ADR-0103): what waits on the caller, across projects. */
 describe('inbox (e2e)', () => {
   const w = new WorkWorld();
   const inbox = async (session: Session): Promise<InboxView> => {

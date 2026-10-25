@@ -6,7 +6,7 @@ import type { DesignRevisionView } from '../design/contracts';
 import type { ReadinessBlocker } from '../readiness/readiness';
 
 /**
- * The Inbox (C-390, ADR-0102): one workspace page with everything that waits
+ * The Inbox (C-390, ADR-0103): one workspace page with everything that waits
  * for a decision of the caller, across every project where they are operator
  * or higher, each with its action. `GET /inbox` builds it on the server, so
  * the page, the rail badge and Overview's preview count the same items.

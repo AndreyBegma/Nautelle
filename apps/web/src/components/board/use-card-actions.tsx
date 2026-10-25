@@ -28,6 +28,7 @@ import {
 import {
   type CardConfirmation,
   cardConfirmCopy,
+  stopLeavesQueue,
 } from '../../lib/board/card-confirm';
 import { runWaitsFor } from '../../lib/board/dependencies';
 import { describeBoardError } from '../../lib/board/format';
@@ -163,7 +164,9 @@ export function useCardActions({
     if (kind === 'stop') {
       await perform(
         () => stopCard(projectId, card.number),
-        `Stopped the worker of ${card.label}.`,
+        stopLeavesQueue(card)
+          ? `Took ${card.label} out of the run queue.`
+          : `Stopped the worker of ${card.label}.`,
       );
     } else {
       await perform(async () => {
@@ -186,10 +189,23 @@ export function useCardActions({
       toast.error(`${card.label} cannot run yet. ${waits}.`);
       return false;
     }
-    return perform(
-      () => runCard(projectId, card.number, request),
-      `Started a worker on ${card.label}.`,
-    );
+    // C-398 (ADR-0102): a full Board queues the card instead of refusing it.
+    setBusy(true);
+    try {
+      const done = await runCard(projectId, card.number, request);
+      toast.success(
+        done.queue
+          ? `${card.label} is waiting for a slot.`
+          : `Started a worker on ${card.label}.`,
+      );
+      return true;
+    } catch (err) {
+      toast.error(describeBoardError(err, runnerName));
+      return false;
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
   };
 
   return {

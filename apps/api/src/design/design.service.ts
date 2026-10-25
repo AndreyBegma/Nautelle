@@ -1207,6 +1207,8 @@ export class DesignService implements OnModuleInit {
         {},
         actor,
       );
+      // C-398: a full Board queues the card; it starts when a slot frees.
+      if (detail.queue) return { status: 'queued' };
       return { status: 'started', round: detail.round?.round ?? 1 };
     } catch (error) {
       const { code, message } = autoRunFailureOf(error);

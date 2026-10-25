@@ -4,7 +4,7 @@ import { type AuthUser, CurrentUser } from '../auth';
 import { InboxService } from './inbox.service';
 
 /**
- * The Inbox (C-390, ADR-0102): what waits on the caller across their
+ * The Inbox (C-390, ADR-0103): what waits on the caller across their
  * projects. Any signed-in user; a project contributes only where they are
  * operator or higher.
  */

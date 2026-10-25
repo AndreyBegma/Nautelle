@@ -15,7 +15,7 @@ import { formatAge } from '../fleet/format';
 import { approvalsHref } from '../queue/tabs';
 
 /**
- * The Inbox page (C-390, ADR-0102): what `GET /inbox` returned, filtered,
+ * The Inbox page (C-390, ADR-0103): what `GET /inbox` returned, filtered,
  * grouped and worded. Pure, so the rules are tested without a page.
  */
 

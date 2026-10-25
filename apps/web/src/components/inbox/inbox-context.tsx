@@ -43,7 +43,7 @@ export const EMPTY_INBOX: InboxView = {
 };
 
 /**
- * `GET /inbox` (C-390, ADR-0102) for the whole shell: one read, so the rail
+ * `GET /inbox` (C-390, ADR-0103) for the whole shell: one read, so the rail
  * badge, More's "Needs you", Overview's preview and the page count the same
  * items, and a handled item leaves all of them at once. A viewer operates
  * nothing and reads nothing.

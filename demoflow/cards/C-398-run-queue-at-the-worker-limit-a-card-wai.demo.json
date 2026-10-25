@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "name": "Run at the worker limit waits for a slot",
+  "description": "C-398 (ADR-0102): on a full Board, Run puts a To Do card in the run queue instead of refusing it; the Board header, the card faces and Fleet show the queue, and Remove from queue takes a card out.",
+  "steps": [
+    { "action": "marker", "title": "Sign in" },
+    { "action": "navigate", "path": "/login?next=/projects/demo-project" },
+    { "action": "wait", "ms": 3000 },
+    {
+      "action": "fill",
+      "target": { "label": "Email" },
+      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+    },
+    {
+      "action": "fill",
+      "target": { "label": "Password" },
+      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
+    },
+    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
+    {
+      "action": "waitFor",
+      "target": { "role": "link", "name": "Board", "exact": true },
+      "timeoutMs": 30000
+    },
+    { "action": "marker", "title": "A full Board queues the cards" },
+    { "action": "navigate", "path": "/projects/demo-project/board" },
+    {
+      "action": "assertVisible",
+      "target": { "css": "[data-stat=\"queued\"]" },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "One worker slot is taken; two cards wait for it"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "text": "Waiting for a slot · #1", "exact": true },
+      "zoom": true,
+      "caption": "The topmost queued card in To Do starts first"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "text": "Waiting for a slot · #2", "exact": true },
+      "caption": "The next one waits behind it"
+    },
+    { "action": "screenshot", "name": "board-run-queue" },
+    { "action": "wait", "ms": 1500 },
+    { "action": "marker", "title": "Fleet lists the run queue" },
+    { "action": "navigate", "path": "/projects/demo-project/fleet" },
+    {
+      "action": "assertVisible",
+      "target": { "role": "heading", "name": "Working now" },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "li:has-text(\"Run queue\"):has-text(\"Waiting for a slot · #1\")"
+      },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "After the running work, the cards waiting for a slot, in order"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "li:has-text(\"Run queue\"):has-text(\"Waiting for a slot · #2\")"
+      },
+      "caption": "The second card in the queue starts after the first"
+    },
+    { "action": "screenshot", "name": "fleet-run-queue" },
+    { "action": "wait", "ms": 1500 },
+    { "action": "marker", "title": "Remove a card from the queue" },
+    { "action": "navigate", "path": "/projects/demo-project/board/cards/1" },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Remove from queue" },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "A queued card has no worker; Stop takes it out of the queue"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "role": "dialog" },
+      "caption": "The card stays in To Do and can run again"
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "[role=dialog] button:has-text(\"Remove from queue\")"
+      }
+    },
+    { "action": "wait", "ms": 1500 },
+    { "action": "navigate", "path": "/projects/demo-project/board" },
+    {
+      "action": "assertVisible",
+      "target": { "text": "Waiting for a slot · #1", "exact": true },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "The other card moves up to first in the queue"
+    },
+    {
+      "action": "waitFor",
+      "state": "hidden",
+      "target": { "text": "Waiting for a slot · #2", "exact": true }
+    },
+    { "action": "screenshot", "name": "board-run-queue-after-remove" },
+    { "action": "wait", "ms": 1500 }
+  ]
+}
