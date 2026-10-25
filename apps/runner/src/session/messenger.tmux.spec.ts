@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SessionMessageInput } from '@nautelle/shared';
+import { readQuestion } from '../cards/question';
 import type { CardRecord } from '../cards/record';
 import { createExec } from '../detect/exec';
 import { FakeClock } from '../testing/fake-clock';
@@ -15,17 +16,30 @@ setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS * 2);
 /**
  * #489 against a real tmux on a private server: a pane shows a captured
  * Claude Code screen, and a script records every byte the session receives
- * in raw mode — the keys `session.message` sent, exactly.
+ * in raw mode — the keys `session.message` sent, exactly. #967: each Enter
+ * the session receives draws the next captured screen, as Claude Code moves
+ * through a form; with none left, the screen stays.
  */
 const tmuxInstalled = Bun.which('tmux') !== null;
 const FIXTURES = join(import.meta.dir, '..', 'cards', '__fixtures__');
 const SESSION = 'nautelle-card-ab12cd34';
+const fixturePath = (name: string): string => join(FIXTURES, `${name}.txt`);
 
-// Shows the screen, then records raw input until the session is killed.
+// Shows the first screen, records raw input byte by byte, and shows the next
+// screen on every Enter, until the session is killed.
 const SCREEN = `#!/bin/sh
-printf '\\033[2J\\033[H'; cat "$1"
-stty raw -echo
-exec cat > "$2"
+keys="$1"; shift
+show() { printf '\\033[2J\\033[H'; cat "$1"; }
+show "$1"; shift
+: > "$keys"
+stty raw -echo opost onlcr
+cr=$(printf '\\r')
+while :; do
+  c=$(dd bs=1 count=1 2>/dev/null)
+  [ -z "$c" ] && continue
+  printf '%s' "$c" >> "$keys"
+  if [ "$c" = "$cr" ] && [ $# -gt 0 ]; then show "$1"; shift; fi
+done
 `;
 
 const BUSY_SCREEN = `
@@ -44,7 +58,7 @@ afterEach(async () => {
   teardown = [];
 });
 
-const setup = async (screenFile: string) => {
+const setup = async (...screenFiles: string[]) => {
   const t = tempDir();
   const server = `agentdock-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const tmuxServer = ['-L', server];
@@ -68,8 +82,8 @@ const setup = async (screenFile: string) => {
     '-y',
     '50',
     script,
-    screenFile,
     keys,
+    ...screenFiles,
   );
   const record = {
     cardId: 'card_1',
@@ -100,10 +114,11 @@ const setup = async (screenFile: string) => {
       target: { kind: 'card_round', cardId: 'card_1', runId: 'run_1' },
       message,
     });
-  /** The bytes the session received, once they end in Enter (`\r`). */
-  const received = async (): Promise<string> => {
+  /** The bytes the session received, once they hold `enters` Enters (`\r`). */
+  const received = async (enters = 1): Promise<string> => {
     const read = () => (existsSync(keys) ? readFileSync(keys, 'latin1') : '');
-    for (let i = 0; i < 400 && !read().endsWith('\r'); i++) {
+    const count = () => read().split('\r').length - 1;
+    for (let i = 0; i < 400 && count() < enters; i++) {
       await Bun.sleep(25);
     }
     return read();
@@ -120,7 +135,10 @@ const UP = '\u001b[A';
 
 describe.skipIf(!tmuxInstalled)('session.message on a real pane (#489)', () => {
   it('M4: option 2 moves the cursor down once and presses Enter', async () => {
-    const t = await setup(join(FIXTURES, 'ask-user-question.txt'));
+    const t = await setup(
+      fixturePath('ask-user-question'),
+      fixturePath('ask-user-question-answered'),
+    );
     const { readQuestion } = await import('../cards/question');
     const key = readQuestion(
       readFileSync(join(FIXTURES, 'ask-user-question.txt'), 'utf8'),
@@ -133,7 +151,10 @@ describe.skipIf(!tmuxInstalled)('session.message on a real pane (#489)', () => {
   });
 
   it('M4: with the cursor on option 2, option 1 moves up', async () => {
-    const t = await setup(join(FIXTURES, 'ask-user-question-moved.txt'));
+    const t = await setup(
+      fixturePath('ask-user-question-moved'),
+      fixturePath('ask-user-question-answered'),
+    );
     const { readQuestion } = await import('../cards/question');
     const key = readQuestion(
       readFileSync(join(FIXTURES, 'ask-user-question-moved.txt'), 'utf8'),
@@ -146,7 +167,10 @@ describe.skipIf(!tmuxInstalled)('session.message on a real pane (#489)', () => {
   });
 
   it('M4: "Other" moves to "Type something.", types the text and presses Enter', async () => {
-    const t = await setup(join(FIXTURES, 'ask-user-question.txt'));
+    const t = await setup(
+      fixturePath('ask-user-question'),
+      fixturePath('ask-user-question-answered'),
+    );
     const { readQuestion } = await import('../cards/question');
     const key = readQuestion(
       readFileSync(join(FIXTURES, 'ask-user-question.txt'), 'utf8'),
@@ -159,7 +183,7 @@ describe.skipIf(!tmuxInstalled)('session.message on a real pane (#489)', () => {
   });
 
   it('sends nothing for an answer to a screen the pane no longer shows, or text over a selector', async () => {
-    const t = await setup(join(FIXTURES, 'ask-user-question.txt'));
+    const t = await setup(fixturePath('ask-user-question'));
     expect(
       await t.send({
         kind: 'option',
@@ -200,3 +224,96 @@ describe.skipIf(!tmuxInstalled)('session.message on a real pane (#489)', () => {
     expect(await t.receivedNothing()).toBe('');
   });
 });
+
+const keyOf = (name: string): string => {
+  const key = readQuestion(readFileSync(fixturePath(name), 'utf8'))?.question
+    .key;
+  if (!key) throw new Error(`${name} shows no question`);
+  return key;
+};
+
+describe.skipIf(!tmuxInstalled)(
+  'a form of several questions on a real pane (#967)',
+  () => {
+    it('answers a two-question form end to end: Other on tab 1, an option on tab 2, then Submit', async () => {
+      const t = await setup(
+        fixturePath('ask-user-questions-80x24-tab1'),
+        fixturePath('ask-user-questions-80x24-tab2'),
+        fixturePath('ask-user-questions-80x24-review'),
+        fixturePath('ask-user-question-answered'),
+      );
+      expect(
+        await t.send({
+          kind: 'other',
+          questionKey: keyOf('ask-user-questions-80x24-tab1'),
+          text: 'At noon, in #team',
+        }),
+      ).toEqual({ outcome: 'answered' });
+      expect(
+        await t.send({
+          kind: 'option',
+          questionKey: keyOf('ask-user-questions-80x24-tab2'),
+          index: 2,
+        }),
+      ).toEqual({ outcome: 'answered' });
+      expect(
+        await t.send({
+          kind: 'option',
+          questionKey: keyOf('ask-user-questions-80x24-review'),
+          index: 1,
+        }),
+      ).toEqual({ outcome: 'answered' });
+      expect(await t.received(3)).toBe(
+        `${DOWN}${DOWN}At noon, in #team\r${DOWN}\r\r`,
+      );
+    });
+
+    it('presses Enter once more when typed Other text stays in its field', async () => {
+      // The first Enter leaves the text typed in the field (C-404).
+      const t = await setup(
+        fixturePath('ask-user-questions-80x24-tab1'),
+        fixturePath('ask-user-questions-80x24-typed'),
+        fixturePath('ask-user-questions-80x24-tab2'),
+      );
+      expect(
+        await t.send({
+          kind: 'other',
+          questionKey: keyOf('ask-user-questions-80x24-tab1'),
+          text: 'At noon, in #team',
+        }),
+      ).toEqual({ outcome: 'answered' });
+      expect(await t.received(2)).toBe(`${DOWN}${DOWN}At noon, in #team\r\r`);
+    });
+
+    it('is not_at_input when the selector stays on the question', async () => {
+      const t = await setup(
+        fixturePath('ask-user-questions-80x24-tab1'),
+        fixturePath('ask-user-questions-80x24-typed'),
+      );
+      expect(
+        await t.send({
+          kind: 'other',
+          questionKey: keyOf('ask-user-questions-80x24-tab1'),
+          text: 'At noon, in #team',
+        }),
+      ).toEqual({ outcome: 'not_at_input' });
+      expect(await t.received(2)).toBe(`${DOWN}${DOWN}At noon, in #team\r\r`);
+    });
+
+    it('ticks a multi-select option and moves to the next tab with Next', async () => {
+      const t = await setup(
+        fixturePath('ask-user-questions-multi-first'),
+        fixturePath('ask-user-questions-multi-first'),
+        fixturePath('ask-user-questions-multi-second'),
+      );
+      expect(
+        await t.send({
+          kind: 'option',
+          questionKey: keyOf('ask-user-questions-multi-first'),
+          index: 2,
+        }),
+      ).toEqual({ outcome: 'answered' });
+      expect(await t.received(2)).toBe(`${DOWN}\r${DOWN}${DOWN}\r`);
+    });
+  },
+);

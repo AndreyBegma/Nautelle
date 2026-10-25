@@ -133,7 +133,7 @@ const OUTCOMES: Record<SessionMessageOutcome, string> = {
   question_changed:
     'The question has changed or is gone; nothing was sent. Answer in Nautelle.',
   not_at_input:
-    'The session shows a dialog or a permission prompt; nothing was sent.',
+    'The session did not take it: a dialog or a permission prompt is up, or the question stayed on screen.',
   no_option: 'That option is not offered any more; nothing was sent.',
 };
 

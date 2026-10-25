@@ -13,6 +13,8 @@ import {
   type BoardCardKind,
   type BoardColumn,
   type BoardSearchRequest,
+  QUICK_CARD_TEXT_MAX,
+  type QuickCardDraftRequest,
   TRIAGE_HINTS,
   type TriageHint,
   type TriageHintRequest,
@@ -44,6 +46,15 @@ export class BoardAskDto implements BoardAskRequest {
   @MinLength(1)
   @MaxLength(BOARD_ASK_QUESTION_MAX)
   question!: string;
+}
+
+/** `POST /projects/:id/board/cards/draft` (C-391). */
+export class QuickCardDraftDto implements QuickCardDraftRequest {
+  @Transform(trim)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(QUICK_CARD_TEXT_MAX)
+  text!: string;
 }
 
 /** `POST …/triage/dismiss` and `…/triage/apply`. */
