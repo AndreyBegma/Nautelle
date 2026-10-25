@@ -43,6 +43,21 @@ export const quickCardReady = (
 ): boolean => input.text.trim() !== '' && !uploading;
 
 /**
+ * The title and kind to save: a field the person wrote wins, otherwise the
+ * model's draft (when one arrived), otherwise what the form holds.
+ */
+export function mergeQuickDraft(
+  fields: Pick<QuickCardInput, 'title' | 'kind'>,
+  touched: { title: boolean; kind: boolean },
+  draft: Pick<QuickCardDraft, 'title' | 'kind'> | null,
+): Pick<QuickCardInput, 'title' | 'kind'> {
+  return {
+    title: touched.title || !draft ? fields.title : draft.title,
+    kind: touched.kind || !draft ? fields.kind : draft.kind,
+  };
+}
+
+/**
  * The card's request. A blank title falls back to the text's first line, so
  * Enter on a fast typist is never blocked by the model; the kind is the
  * person's (or the model's) pick, so it counts as set.

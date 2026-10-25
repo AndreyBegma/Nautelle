@@ -10,6 +10,7 @@ import {
   BOARD_CARD_TITLE_MAX,
   type BoardCardKind,
   cardLabel,
+  type QuickCardDraft,
 } from '@nautelle/shared';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../lib/api';
@@ -18,6 +19,7 @@ import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploa
 import { describeBoardError } from '../../lib/board/format';
 import {
   draftQuickCard,
+  mergeQuickDraft,
   QUICK_CARD_TEXT_MAX,
   QUICK_DRAFT_DEBOUNCE_MS,
   QUICK_DRAFT_MIN_CHARS,
@@ -77,7 +79,10 @@ export function QuickCardDialog({
   const uploads = useAttachmentUploads(projectId);
   // A field the person wrote is theirs: a later suggestion does not replace it.
   const touched = useRef({ title: false, kind: false });
-  const pending = useRef<Promise<void>>(Promise.resolve());
+  const pending = useRef<{
+    text: string;
+    draft: Promise<QuickCardDraft | null>;
+  } | null>(null);
   const asked = useRef(0);
 
   useEffect(() => {
@@ -88,23 +93,28 @@ export function QuickCardDialog({
     setRunNow(false);
     setError(undefined);
     touched.current = { title: false, kind: false };
+    pending.current = null;
   }, [open, initialText]);
 
-  const suggest = (value: string): Promise<void> => {
+  const suggest = (value: string): Promise<QuickCardDraft | null> => {
     const ticket = ++asked.current;
     setDrafting(true);
-    return draftQuickCard(projectId, value)
-      .then((draft) => {
-        if (ticket !== asked.current) return;
-        if (!touched.current.title) setTitle(draft.title);
-        if (!touched.current.kind) setKind(draft.kind);
+    const draft = draftQuickCard(projectId, value)
+      .then((answer): QuickCardDraft | null => {
+        if (ticket !== asked.current) return null;
+        if (!touched.current.title) setTitle(answer.title);
+        if (!touched.current.kind) setKind(answer.kind);
+        return answer;
       })
       .catch(() => {
         // Best effort: the title falls back to the text's first line on save.
+        return null;
       })
       .finally(() => {
         if (ticket === asked.current) setDrafting(false);
       });
+    pending.current = { text: value, draft };
+    return draft;
   };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: suggest reads only refs and setters
@@ -112,7 +122,7 @@ export function QuickCardDialog({
     if (!open || touched.current.title) return;
     if (text.trim().length < QUICK_DRAFT_MIN_CHARS) return;
     const timer = setTimeout(() => {
-      pending.current = suggest(text.trim());
+      void suggest(text.trim());
     }, QUICK_DRAFT_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [open, text, projectId]);
@@ -124,12 +134,21 @@ export function QuickCardDialog({
     setBusy(true);
     setError(undefined);
     try {
-      // A suggestion on its way is worth the moment; its failure is not.
-      if (drafting) await pending.current;
+      // A suggestion on its way, or one the debounce has not asked for yet, is
+      // worth the moment; its failure is not. The fields below are the render's,
+      // so the draft is merged in by hand rather than read back from state.
+      const value = text.trim();
+      const bothTouched = touched.current.title && touched.current.kind;
+      let request = pending.current?.text === value ? pending.current : null;
+      if (!request && !bothTouched && value.length >= QUICK_DRAFT_MIN_CHARS) {
+        void suggest(value);
+        request = pending.current;
+      }
+      const draft = request ? await request.draft : null;
+      const fields = mergeQuickDraft({ title, kind }, touched.current, draft);
       const result = await saveQuickCard(projectId, {
         text,
-        title,
-        kind,
+        ...fields,
         runNow,
         attachmentIds: uploads.done.map((d) => d.view.id),
       });

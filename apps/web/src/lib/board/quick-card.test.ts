@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { BOARD_CARD_TITLE_MAX, type BoardCardView } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
+  mergeQuickDraft,
   type QuickCardInput,
   quickCardReady,
   quickCardRequest,
@@ -110,5 +111,32 @@ describe('saveQuickCard', () => {
     );
     expect(result.card).toBe(card);
     expect(result.run.state).toBe('refused');
+  });
+});
+
+describe('mergeQuickDraft', () => {
+  const fields = { title: '', kind: 'feature' as const };
+  const draft = { title: 'Fix footer link', kind: 'bug' as const };
+
+  it('saves the drafted title and kind when Enter waited for the draft', () => {
+    expect(
+      mergeQuickDraft(fields, { title: false, kind: false }, draft),
+    ).toEqual(draft);
+  });
+
+  it('keeps a field the person wrote', () => {
+    expect(
+      mergeQuickDraft(
+        { title: 'Mine', kind: 'feature' },
+        { title: true, kind: false },
+        draft,
+      ),
+    ).toEqual({ title: 'Mine', kind: 'bug' });
+  });
+
+  it('keeps the form when no draft arrived', () => {
+    expect(
+      mergeQuickDraft(fields, { title: false, kind: false }, null),
+    ).toEqual(fields);
   });
 });
