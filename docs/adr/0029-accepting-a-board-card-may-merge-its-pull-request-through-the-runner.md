@@ -3,7 +3,7 @@
 Status: accepted · Date: 2026-10-15 · Amends
 [ADR-0024](0024-board-cards-and-dedicated-card-workers.md) §6 ·
 Issue: [#273](https://github.com/AndreyBegma/AgentDock/issues/273) ·
-Amended by [ADR-0099](0099-a-merged-card-completes-itself-and-needs-you-clears-itself.md) (a merge on GitHub completes the card too)
+Amended by [ADR-0100](0100-a-merged-card-completes-itself-and-needs-you-clears-itself.md) (a merge on GitHub completes the card too)
 
 ## Context
 

@@ -182,7 +182,7 @@ export interface LivePr {
 }
 
 /**
- * C-389 (ADR-0099): the cards a merge completes — a card worker's card in
+ * C-389 (ADR-0100): the cards a merge completes — a card worker's card in
  * In progress or Finished whose PR merged into the project base. The sweep's
  * query; `completesOnMerge` also wants no round running.
  */
@@ -527,7 +527,7 @@ export class BoardWork implements OnModuleInit {
       });
     }
     if (effects.includes('accept')) {
-      // C-389 (ADR-0099): a merge completes the card; no one accepted it.
+      // C-389 (ADR-0100): a merge completes the card; no one accepted it.
       const merged = request.source === 'merged';
       await this.audit.record({
         ...actor.ctx,
@@ -930,7 +930,7 @@ export class BoardWork implements OnModuleInit {
    * branch it went into and when. A stacked PR that went into the project
    * base itself (GitHub moved it there) is no longer stacked; one that went
    * into its dependency's branch after that branch's own PR merged is
-   * carried forward (`retarget`). C-389 (ADR-0099): a card whose work is in
+   * carried forward (`retarget`). C-389 (ADR-0100): a card whose work is in
    * the base now is Completed (`completeMerged`), unless `complete` is false.
    */
   async markMerged(
@@ -969,7 +969,7 @@ export class BoardWork implements OnModuleInit {
   }
 
   /**
-   * C-389 (ADR-0099): a card whose PR merged into the project base moves to
+   * C-389 (ADR-0100): a card whose PR merged into the project base moves to
    * Completed — the merge was the person's decision, on GitHub, through
    * Accept or by the auto-merge they turned on. Completed cleans up as
    * Accept does. A card stays where it is while a round runs on it (the PR

@@ -6,7 +6,7 @@ const BASE = 'develop';
 const MERGED = '2026-10-24T10:00:00.000Z';
 
 /**
- * C-389 (ADR-0099): a card whose PR merged into the project base moves to
+ * C-389 (ADR-0100): a card whose PR merged into the project base moves to
  * Completed by itself — merged on GitHub, by auto-merge or through Accept —
  * and the cards Finished held merged before this change are swept there.
  * Auto-merge and Accept are covered in board-ships and board-accept.

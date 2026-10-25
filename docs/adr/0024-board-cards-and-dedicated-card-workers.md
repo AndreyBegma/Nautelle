@@ -4,7 +4,7 @@ Status: accepted · Date: 2026-10-14 ·
 Issue: [#242](https://github.com/AndreyBegma/AgentDock/issues/242) ·
 Amends [ADR-0004](0004-github-issues-are-the-task-queue.md) · scopes
 [ADR-0005](0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md) ·
-Amended by [ADR-0099](0099-a-merged-card-completes-itself-and-needs-you-clears-itself.md) (§6: a merge also moves a card to Completed)
+Amended by [ADR-0100](0100-a-merged-card-completes-itself-and-needs-you-clears-itself.md) (§6: a merge also moves a card to Completed)
 
 ## Context
 

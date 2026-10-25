@@ -183,7 +183,7 @@ export const CARD_CI_FIX_ATTEMPTS_MAX = 3;
 export const CARD_CI_POLL_MS = 60_000;
 
 /**
- * C-389 (ADR-0099): how often the API reads the PR of a Finished card that
+ * C-389 (ADR-0100): how often the API reads the PR of a Finished card that
  * nothing else reads — auto-merge off, a protected path, a card that needs a
  * person — so a merge on GitHub completes the card.
  */

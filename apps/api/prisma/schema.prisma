@@ -3733,6 +3733,12 @@ model BoardCardRound {
   ciState             CardCiState?
   ciPassed            Int?
   ciTotal             Int?
+  /// C-359: the model the round launched with — the `card.run` command's
+  /// resolved value, defaults included; `null` for a round recorded before.
+  model               String?
+  /// C-359: the effort the round launched with; `null` for a round recorded
+  /// before, or when the runner takes no effort (the CLI's default).
+  effort              CardEffort?
 
   card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)

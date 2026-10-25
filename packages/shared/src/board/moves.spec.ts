@@ -156,7 +156,7 @@ describe('boardMoveRule', () => {
     });
   });
 
-  describe('a merge completes a card (C-389, ADR-0099)', () => {
+  describe('a merge completes a card (C-389, ADR-0100)', () => {
     for (const from of ['in_progress', 'finished'] as const) {
       it(`completes a ${from} card whose round is over`, () => {
         expect(

@@ -15,7 +15,7 @@ import {
  * - `person` — a drag, or a button that moves the card (Accept, Mark finished);
  * - `automatic` — the work moving it: Run → In progress, done → Finished;
  * - `merged` — the card's pull request merged into the project base (C-389,
- *   ADR-0099): In progress or Finished → Completed. The merge was a person's
+ *   ADR-0100): In progress or Finished → Completed. The merge was a person's
  *   decision — on GitHub, through Accept, or by turning auto-merge on.
  */
 export type BoardMoveSource = 'person' | 'automatic' | 'merged';
