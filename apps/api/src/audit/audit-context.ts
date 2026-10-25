@@ -8,10 +8,14 @@ import {
   userActor,
 } from './audit.types';
 
-export const requestOrigin = (request: Request): RequestOrigin => ({
-  ip: request.ip,
-  userAgent: request.get('user-agent'),
-});
+export const requestOrigin = (request: Request): RequestOrigin => {
+  const token = getAuth(request)?.apiToken;
+  return {
+    ip: request.ip,
+    userAgent: request.get('user-agent'),
+    ...(token ? { apiToken: { id: token.id, name: token.name } } : {}),
+  };
+};
 
 export const auditContextOf = (request: Request): AuditContext => {
   const auth = getAuth(request);
@@ -23,7 +27,8 @@ export const auditContextOf = (request: Request): AuditContext => {
 
 /**
  * The caller as the audit log names it: the signed-in user, else anonymous,
- * with the request's IP and user agent (spec D9).
+ * with the request's IP and user agent (spec D9) and, for a personal API
+ * token, which one (C-403).
  */
 export const AuditCtx = createParamDecorator(
   (_data: unknown, context: ExecutionContext): AuditContext =>

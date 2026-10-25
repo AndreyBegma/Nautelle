@@ -1,5 +1,10 @@
 import {
+  API_TOKEN_MAX_PROJECTS,
+  API_TOKEN_NAME_MAX_LENGTH,
+  API_TOKEN_SCOPES,
+  type ApiTokenScope,
   type ChangePasswordRequest,
+  type CreateApiTokenRequest,
   type LoginRequest,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
@@ -11,8 +16,12 @@ import {
 } from '@nautelle/shared';
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEmail,
+  IsIn,
+  IsISO8601,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -110,4 +119,27 @@ export class TwoFactorConfirmDto implements TwoFactorConfirmRequest {
 export class TwoFactorPolicyDto implements TwoFactorPolicy {
   @IsBoolean()
   requiredForAdmins!: boolean;
+}
+
+/** C-403: `POST /auth/api-tokens`. */
+export class CreateApiTokenDto implements CreateApiTokenRequest {
+  @Transform(({ value }) => trim(value))
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(API_TOKEN_NAME_MAX_LENGTH)
+  name!: string;
+
+  @IsIn(API_TOKEN_SCOPES)
+  scope!: ApiTokenScope;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(API_TOKEN_MAX_PROJECTS)
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  projectIds?: string[];
+
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  expiresAt?: string | null;
 }
