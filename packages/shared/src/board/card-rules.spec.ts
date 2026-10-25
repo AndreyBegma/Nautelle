@@ -101,6 +101,13 @@ describe('card action rules', () => {
     );
   });
 
+  it('C-398: a card in the run queue offers Stop, not Run', () => {
+    const queued = card({ queue: { state: 'queued', place: 1, stack: null } });
+    expect(canStop(queued)).toBe(true);
+    expect(canRun(queued)).toBe(false);
+    expect(canStop(card({ queue: null }))).toBe(false);
+  });
+
   it('words every refusal of the move rule', () => {
     for (const column of BOARD_COLUMNS) {
       const decision = boardMoveRule({

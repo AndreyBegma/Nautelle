@@ -6,11 +6,11 @@ import type {
 } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import { BoardDependencies } from '../board/board-dependencies.service';
+import { BoardRunQueue } from '../board/board-run-queue';
 import {
   localDesignBriefOf,
   localStackOf,
 } from '../board/board-session.service';
-import { BoardStackRuns } from '../board/board-stack-runs';
 import { BoardStacks } from '../board/board-stacks';
 import { DesignService } from '../design/design.service';
 import type { PlanActor } from '../planner/plan.service';
@@ -128,7 +128,7 @@ const commentedRevisionOf = (view: TaskDesignView): string => {
 export class LocalStackHandlers {
   constructor(
     private readonly stacks: BoardStacks,
-    private readonly runs: BoardStackRuns,
+    private readonly runs: BoardRunQueue,
     private readonly dependencies: BoardDependencies,
     private readonly designs: DesignService,
     private readonly gate: LocalManualGate,

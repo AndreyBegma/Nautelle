@@ -120,7 +120,7 @@ export type CardSatisfiedHook = (
 
 /**
  * #652: what follows any change of a card — Run stack re-evaluates its
- * queue. `BoardStackRuns` registers it; `BoardWork` cannot depend on it (it
+ * queue. `BoardRunQueue` registers it; `BoardWork` cannot depend on it (it
  * starts rounds, which move cards through here). It must not throw.
  */
 export type CardChangedHook = (projectId: string, cardId: string) => void;
@@ -634,7 +634,7 @@ export class BoardWork implements OnModuleInit {
     this.cardSatisfied = hook;
   }
 
-  /** #652: `BoardStackRuns` registers what follows any change of a card. */
+  /** #652: `BoardRunQueue` registers what follows any change of a card. */
   onChanged(hook: CardChangedHook): void {
     this.cardChanged = hook;
   }
