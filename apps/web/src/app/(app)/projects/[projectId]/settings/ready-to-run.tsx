@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useState } from 'react';
+import { useCurrentUser } from '../../../../../components/shell/user-context';
 import { api } from '../../../../../lib/api';
 import { describeProjectError } from '../../../../../lib/projects/format';
 import {
@@ -47,7 +48,8 @@ const STATE_LABEL: Record<ReadyState, string> = {
  * C-395: the top of project Settings — what a card needs to run here, each
  * row green or with the one place that fixes it. Refresh re-inspects the
  * project on its runner, for the facts only the runner can see (the DemoFlow
- * config); push access is C-396's push check, run here in place.
+ * config); push access is C-396's push check, run here in place by a global
+ * admin, since its route is global-admin only.
  */
 export function ReadyToRun({
   project,
@@ -69,6 +71,7 @@ export function ReadyToRun({
     () => api<DemoSettingsView>(`/projects/${project.id}/demos/settings`),
     [project.id],
   );
+  const isGlobalAdmin = useCurrentUser().role === 'admin';
   const [busy, setBusy] = useState(false);
   const showError = useErrorToast();
 
@@ -78,6 +81,7 @@ export function ReadyToRun({
     terminalSetup: setup.data ?? null,
     demos: demos.data ?? null,
     isAdmin,
+    isGlobalAdmin,
     now: Date.now(),
   });
   const summary = readySummary(checks);
@@ -123,13 +127,7 @@ export function ReadyToRun({
         <span className="flex items-center gap-2">
           <Badge
             size="md"
-            tone={
-              summary.blocked
-                ? 'danger'
-                : summary.ready < summary.total
-                  ? 'warn'
-                  : 'ok'
-            }
+            tone={summary.tone}
             label={`${summary.ready} of ${summary.total}`}
           />
           {canOperate ? (

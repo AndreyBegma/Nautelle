@@ -76,6 +76,7 @@ const facts = (overrides: Partial<ReadyFacts> = {}): ReadyFacts => ({
   terminalSetup: setup([plugin('done')]),
   demos: { enabled: true, uiPaths: [], telegram: false },
   isAdmin: true,
+  isGlobalAdmin: true,
   now: Date.parse('2026-10-25T00:00:00Z'),
   ...overrides,
 });
@@ -98,6 +99,8 @@ describe('Ready to run (C-395)', () => {
       ready: 6,
       total: 6,
       blocked: false,
+      unverified: false,
+      tone: 'ok',
       headline: 'Everything a card needs is in place.',
     });
   });
@@ -113,7 +116,12 @@ describe('Ready to run (C-395)', () => {
       }),
     );
     const summary = readySummary(checks);
-    expect(summary).toMatchObject({ ready: 4, total: 6, blocked: true });
+    expect(summary).toMatchObject({
+      ready: 4,
+      total: 6,
+      blocked: true,
+      tone: 'danger',
+    });
     expect(summary.headline).toBe(
       'Cards cannot run here yet: runner online, runtime profile.',
     );
@@ -194,9 +202,41 @@ describe('Ready to run (C-395)', () => {
       detail: 'Passed 17 days ago; run it again to be sure.',
       run: { label: 'Check again' },
     });
-    const member = byId(facts({ isAdmin: false, project: failed })).push;
+    const member = byId(
+      facts({ isAdmin: false, isGlobalAdmin: false, project: failed }),
+    ).push;
     expect(member?.run).toBeUndefined();
     expect(member?.detail).toContain('Ask an admin');
+  });
+
+  test('a project admin who is not a global admin cannot run the push check or open Runners', () => {
+    const checks = byId(
+      facts({
+        isAdmin: true,
+        isGlobalAdmin: false,
+        project: project({ runnerStatus: 'offline', pushCheck: null }),
+      }),
+    );
+    expect(checks.push?.run).toBeUndefined();
+    expect(checks.push?.detail).toBe(
+      'No push check has run on this checkout yet. Ask an admin to run the push check.',
+    );
+    expect(checks.runner?.fix).toBeUndefined();
+    expect(checks.runner?.detail).toContain('Ask an admin');
+  });
+
+  test('a push check that never ran is not verified, never “in place”', () => {
+    const summary = readySummary(
+      readyChecks(facts({ project: project({ pushCheck: null }) })),
+    );
+    expect(summary).toEqual({
+      ready: 5,
+      total: 6,
+      blocked: false,
+      unverified: true,
+      tone: 'warn',
+      headline: 'Not verified yet: push access.',
+    });
   });
 
   test('the plugin: a missing profile names it and links Sessions', () => {
@@ -231,7 +271,7 @@ describe('Ready to run (C-395)', () => {
     const summary = readySummary(
       readyChecks(facts({ project: project({ hasDemoflowConfig: false }) })),
     );
-    expect(summary).toMatchObject({ ready: 5, blocked: false });
+    expect(summary).toMatchObject({ ready: 5, blocked: false, tone: 'warn' });
   });
 
   test('not loaded yet reads as checking, never as a gap', () => {
@@ -241,5 +281,23 @@ describe('Ready to run (C-395)', () => {
     expect(checks.profile?.state).toBe('unknown');
     expect(checks.plugin?.state).toBe('unknown');
     expect(checks.demos?.state).toBe('unknown');
+    const summary = readySummary(
+      readyChecks(facts({ readiness: null, terminalSetup: null, demos: null })),
+    );
+    expect(summary).toMatchObject({
+      ready: 3,
+      blocked: false,
+      unverified: true,
+      tone: 'warn',
+      headline: 'Not verified yet: runtime profile.',
+    });
+    expect(
+      readySummary(readyChecks(facts({ terminalSetup: null, demos: null }))),
+    ).toMatchObject({
+      ready: 4,
+      unverified: false,
+      tone: 'warn',
+      headline: 'Cards can run; some checks have not run yet.',
+    });
   });
 });

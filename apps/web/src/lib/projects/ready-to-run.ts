@@ -45,7 +45,13 @@ export interface ReadyFacts {
   readiness: ProjectReadinessView | null;
   terminalSetup: TerminalSetupView | null;
   demos: DemoSettingsView | null;
+  /** The caller's project role is admin: edits project settings. */
   isAdmin: boolean;
+  /**
+   * The caller's global role is admin: opens Runners and runs the push check,
+   * whose routes are global-admin only.
+   */
+  isGlobalAdmin: boolean;
   /** Epoch ms, to tell a stale push check. */
   now: number;
 }
@@ -56,8 +62,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 const REFRESH_HINT = 'Refresh the project once its runner reports it.';
 
-function runnerCheck({ project, readiness, isAdmin }: ReadyFacts): ReadyCheck {
-  const runners = isAdmin
+function runnerCheck({
+  project,
+  readiness,
+  isGlobalAdmin,
+}: ReadyFacts): ReadyCheck {
+  const runners = isGlobalAdmin
     ? { fix: { label: 'Open Runners', href: RUNNERS_PAGE } }
     : {};
   const base = {
@@ -69,7 +79,7 @@ function runnerCheck({ project, readiness, isAdmin }: ReadyFacts): ReadyCheck {
     return {
       ...base,
       state: 'gap',
-      detail: `${project.runnerName} is ${project.runnerStatus}, so nothing can run.`,
+      detail: `${project.runnerName} is ${project.runnerStatus}, so nothing can run.${isGlobalAdmin ? '' : ' Ask an admin to bring it back.'}`,
       ...runners,
     };
   }
@@ -81,7 +91,7 @@ function runnerCheck({ project, readiness, isAdmin }: ReadyFacts): ReadyCheck {
       ...base,
       state: 'gap',
       detail: readinessCopy(outdated, {
-        isAdmin,
+        isAdmin: isGlobalAdmin,
         projectId: project.id,
         suggestion: null,
       }).text,
@@ -158,12 +168,12 @@ function baseCheck({ project, isAdmin }: ReadyFacts): ReadyCheck {
  * Push access is C-396's push check: `git push --dry-run` on the runner with
  * the credentials a card worker pushes with, kept per runner and path.
  */
-function pushCheck({ project, isAdmin, now }: ReadyFacts): ReadyCheck {
+function pushCheck({ project, isGlobalAdmin, now }: ReadyFacts): ReadyCheck {
   const base = { id: 'push', label: 'Push access', blocking: true } as const;
   const check = project.pushCheck;
   const run = (label: string) =>
-    isAdmin ? { run: { kind: 'push_check', label } as const } : {};
-  const askAdmin = isAdmin ? '' : ' Ask an admin to run the push check.';
+    isGlobalAdmin ? { run: { kind: 'push_check', label } as const } : {};
+  const askAdmin = isGlobalAdmin ? '' : ' Ask an admin to run the push check.';
   if (!check) {
     return {
       ...base,
@@ -282,28 +292,45 @@ export function readyChecks(facts: ReadyFacts): ReadyCheck[] {
 }
 
 export interface ReadySummary {
-  /** Checks that are not a gap: `ok`, `off` and `unknown`. */
+  /** Checks that are settled: `ok` and `off`; `unknown` is not ready. */
   ready: number;
   total: number;
   /** A blocking gap: cards cannot run. */
   blocked: boolean;
+  /** No blocking gap, but a blocking check has not been verified. */
+  unverified: boolean;
+  /** The badge tone: `ok` only when every check is settled. */
+  tone: 'ok' | 'warn' | 'danger';
   /** One line for the top of the block. */
   headline: string;
 }
 
+const labels = (checks: readonly ReadyCheck[]) =>
+  checks.map((check) => check.label.toLowerCase()).join(', ');
+
 export function readySummary(checks: readonly ReadyCheck[]): ReadySummary {
   const gaps = checks.filter((check) => check.state === 'gap');
+  const unknown = checks.filter((check) => check.state === 'unknown');
   const blocking = gaps.filter((check) => check.blocking);
+  const unverified = unknown.filter((check) => check.blocking);
   const headline =
     blocking.length > 0
-      ? `Cards cannot run here yet: ${blocking.map((check) => check.label.toLowerCase()).join(', ')}.`
-      : gaps.length > 0
-        ? 'Cards can run; the marked rows still need a look.'
-        : 'Everything a card needs is in place.';
+      ? `Cards cannot run here yet: ${labels(blocking)}.`
+      : unverified.length > 0
+        ? `Not verified yet: ${labels(unverified)}.`
+        : gaps.length > 0
+          ? 'Cards can run; the marked rows still need a look.'
+          : unknown.length > 0
+            ? 'Cards can run; some checks have not run yet.'
+            : 'Everything a card needs is in place.';
+  const ready = checks.length - gaps.length - unknown.length;
   return {
-    ready: checks.length - gaps.length,
+    ready,
     total: checks.length,
     blocked: blocking.length > 0,
+    unverified: blocking.length === 0 && unverified.length > 0,
+    tone:
+      blocking.length > 0 ? 'danger' : ready < checks.length ? 'warn' : 'ok',
     headline,
   };
 }
