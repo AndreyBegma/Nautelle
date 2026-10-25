@@ -63,4 +63,17 @@ describe('actorLabel', () => {
       ),
     ).toBe('runner build-box');
   });
+
+  test('a user acting through a personal API token, by the token name', () => {
+    expect(
+      actorLabel(
+        record({
+          actorType: 'user',
+          actorUserId: 'u_2',
+          actorEmail: 'a@example.com',
+          meta: { apiToken: { id: 'tk_1', name: 'ci' }, ip: '10.0.0.1' },
+        }),
+      ),
+    ).toBe('a@example.com via token ci');
+  });
 });
