@@ -121,8 +121,10 @@ steps; `valueFrom.env` reads a Demo env secret:
 
 A feature card records as soon as its pull request's head turns green, before
 its review steps run, so a card the review holds or hands to you has its video
-too; each new head records its own. A card that changes no UI path, a bug card,
-and a head that conflicts with its base record none, and the API's log says why.
+too; each new head records its own. A fix round the review asks for waits for
+the recording, at most 15 minutes, because it changes the worktree the video is
+recorded from. A card that changes no UI path, a bug card, and a head that
+conflicts with its base record none, and the API's log says why.
 
 Run one by hand with `npx demoflow@0.6.0 run <scenario>`. A demo that fails or
 is skipped shows its reason on the card; it never holds up Finished or a merge.

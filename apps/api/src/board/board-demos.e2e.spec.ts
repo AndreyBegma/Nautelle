@@ -389,6 +389,9 @@ describe('demo videos of green cards (e2e, C-370)', () => {
       await ended();
       await polled();
       await blocked();
+      const [demo] = await demos();
+      await demoStatus(demo.id, 'failed', 'readyUrl never answered');
+      await polled();
       const card = await w.card(1);
       expect(card.rounds.map((r) => r.trigger)).toEqual(['run', 'review_fix']);
       expect(await demos()).toHaveLength(1);
@@ -396,8 +399,48 @@ describe('demo videos of green cards (e2e, C-370)', () => {
       checksAnswer({ headSha: NEXT_HEAD });
       await roundEnded();
       const [old, next] = await demos();
-      expect(old).toMatchObject({ headSha: HEAD_SHA, status: 'skipped' });
+      expect(old).toMatchObject({ headSha: HEAD_SHA, status: 'failed' });
       expect(next).toMatchObject({ headSha: NEXT_HEAD, status: 'queued' });
+    });
+
+    it('a review_fix round waits for the demo in flight, which records the worktree it edits', async () => {
+      await enableDemos();
+      await reviewOn();
+      await ended();
+      await polled();
+      await blocked();
+      await polled();
+      const rounds = async () => (await w.card(1)).rounds.map((r) => r.trigger);
+      expect(await rounds()).toEqual(['run']);
+      expect(await demos()).toEqual([
+        expect.objectContaining({ headSha: HEAD_SHA, status: 'queued' }),
+      ]);
+      expect(await w.card(1)).toMatchObject({
+        column: 'in_progress',
+        needsPerson: false,
+      });
+
+      // The demo ends: the next check starts the fix round.
+      const [demo] = await demos();
+      await demoStatus(demo.id, 'skipped', 'No UI change');
+      await polled();
+      expect(await rounds()).toEqual(['run', 'review_fix']);
+    });
+
+    it(`a review_fix round waits for the demo at most ${DEMO_MERGE_WAIT_MS / 60_000} minutes`, async () => {
+      await enableDemos();
+      await reviewOn();
+      await ended();
+      await polled();
+      await blocked();
+      expect((await w.card(1)).rounds).toHaveLength(1);
+
+      await w.ctx.prisma.cardDemo.updateMany({
+        data: { createdAt: new Date(Date.now() - DEMO_MERGE_WAIT_MS - 1_000) },
+      });
+      await polled();
+      const card = await w.card(1);
+      expect(card.rounds.map((r) => r.trigger)).toEqual(['run', 'review_fix']);
     });
 
     it('a card the review hands to a person still has its demo', async () => {

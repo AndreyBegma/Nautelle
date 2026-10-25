@@ -162,7 +162,8 @@ const clipReason = (reason: string): string =>
  * C-370 (ADR-0095): the Board records a feature card's green head that
  * touches the project's UI paths (`autoRecord`), once per head; a newer head
  * supersedes a demo in flight; auto-merge waits for a demo in flight, at most
- * `DEMO_MERGE_WAIT_MS` (`holdsMerge`). A demo ready or failed is an activity
+ * `DEMO_MERGE_WAIT_MS` (`holds`), and so does a `review_fix` round (#946).
+ * A demo ready or failed is an activity
  * entry and never sets the card's `needsPerson`.
  */
 @Injectable()
@@ -444,10 +445,11 @@ export class CardDemosService {
   }
 
   /**
-   * C-370: whether auto-merge waits for the card's demo — one is queued or
-   * recording, and was asked for less than `DEMO_MERGE_WAIT_MS` ago.
+   * C-370: whether auto-merge — and, #946, a `review_fix` round, which edits
+   * the worktree the demo records — waits for the card's demo: one is queued
+   * or recording, and was asked for less than `DEMO_MERGE_WAIT_MS` ago.
    */
-  async holdsMerge(cardId: string, now: number = Date.now()): Promise<boolean> {
+  async holds(cardId: string, now: number = Date.now()): Promise<boolean> {
     const inFlight = await this.prisma.cardDemo.count({
       where: {
         cardId,

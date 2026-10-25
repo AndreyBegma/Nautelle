@@ -33,6 +33,10 @@ fresh worktree does not have.
    own (one per head, ADR-0095 §3). A Finished card still gets its demo once its
    head reads green. A head that conflicts with the base is not recorded: the
    fix round replaces it, and it would edit the worktree under the recording.
+   For the same reason, a `review_fix` round the review steps ask for waits
+   while the card's demo is queued or recording, at most the 15-minute cap of
+   ADR-0095 §6, as auto-merge does: the runner records `card.demo` in the
+   card's worktree, which the fix round's worker edits.
 2. **Every skip says why (amends ADR-0095 §2).** A head the Board does not
    record is logged once, with the card, the head and the reason: a bug card,
    demo videos off, a PR that changes no UI path (with the globs), a card that
@@ -53,6 +57,8 @@ fresh worktree does not have.
 
 - With review steps on, a demo is recorded while the review runs; with
   auto-merge on, the merge after the review still waits for it while it is in flight, within the 15-minute cap (ADR-0095 §6).
+- A card the review blocks starts its `review_fix` round once its demo ends,
+  up to 15 minutes later than before.
 - A head the review blocks costs one recording that no merge uses; a card a
   review sends back three times records up to four heads.
 - `pr.inspect` runs on the first green read of a head, not the last.
@@ -68,3 +74,5 @@ fresh worktree does not have.
     "Demo skipped" on every card that changes no UI.
   - **Recording a conflicting head.** Its fix round would change the worktree
     while DemoFlow records it, and the head would be superseded anyway.
+  - **Superseding the demo when a `review_fix` round starts.** The head a
+    person most needs to see, the one the review blocked, would lose its demo.

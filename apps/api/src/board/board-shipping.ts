@@ -960,7 +960,7 @@ export class BoardShipping
     }
     // C-370 (ADR-0095): the merge waits for a demo in flight — at most
     // `DEMO_MERGE_WAIT_MS`; the demo's end, or the poll, asks again.
-    if (await this.demos.holdsMerge(card.id)) return;
+    if (await this.demos.holds(card.id)) return;
     try {
       await this.work.mergePr(project, card, headSha, true, BOARD_SYSTEM_ACTOR);
     } catch (error) {
