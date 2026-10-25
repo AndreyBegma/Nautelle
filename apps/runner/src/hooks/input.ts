@@ -39,7 +39,13 @@ export const postToolUseFailureInputSchema = toolInputSchema.extend({
   error: z.unknown().optional(),
 });
 
-export const permissionRequestInputSchema = toolInputSchema;
+/**
+ * C-401: `permission_suggestions` are the "always allow" choices the local
+ * dialog would offer; their `addRules` allows ride on the request.
+ */
+export const permissionRequestInputSchema = toolInputSchema.extend({
+  permission_suggestions: z.unknown().optional(),
+});
 
 export const notificationInputSchema = z.looseObject({
   ...common,

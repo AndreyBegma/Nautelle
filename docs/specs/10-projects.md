@@ -120,6 +120,8 @@ Migration directory: `apps/api/prisma/migrations/20261011000000_projects/`. All 
 | PATCH | `/projects/:projectId` | admin | D13 fields. `defaultProfileId` must be on the project's runner (422 `profile_not_on_runner`) |
 | POST | `/projects/:projectId/refresh` | member (operator+) | `project.refresh`. Updates the stored inspection and the docs source, unless the docs source is `manual` |
 | PUT | `/projects/:projectId/docs-source` | admin | manual override: `{ kind, localPath?, repo? }` sets `manual: true`. `DELETE` restores detection |
+| GET | `/projects/:projectId/move` | admin | C-400: `{ running, worktrees }` — what a move would meet |
+| POST | `/projects/:projectId/move` | admin | C-400, [ADR-0107](../adr/0107-a-project-moves-to-another-runner-and-its-sessions-start-fresh.md): `{ runnerId, path, defaultProfileId? }` → `{ project, from, worktrees }`. Errors: 422 `same_runner`, `different_repository`, `unsupported_forge`, `profile_not_on_runner`; 409 `work_running`, `not_main_checkout`, `runner_offline`, `already_connected` |
 | GET | `/projects/:projectId/members` | member (viewer+) | members with their effective roles |
 | POST | `/projects/:projectId/members` | admin | `{ userId, roleOverride? }`. The user must be `active` |
 | PATCH / DELETE | `/projects/:projectId/members/:userId` | admin | change the override / remove the member |

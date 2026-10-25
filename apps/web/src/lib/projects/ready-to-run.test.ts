@@ -41,6 +41,7 @@ const project = (overrides: Partial<ProjectDetail> = {}): ProjectDetail => ({
   updatedAt: '2026-10-25T00:00:00Z',
   docsSource: null,
   runnerCommands: null,
+  toolUseTimeoutMinutes: null,
   ...overrides,
 });
 

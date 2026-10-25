@@ -9,6 +9,7 @@ import {
   type PrApproveBoundArgs,
   prDiffUrl,
   shortHeadSha,
+  type ToolRuleScope,
 } from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 
@@ -191,6 +192,8 @@ export function describeActionRequestError(error: unknown): string {
       return 'You cannot approve your own request. Another operator or an admin has to.';
     case 'not_found':
       return 'This request no longer exists.';
+    case 'not_rememberable':
+      return 'This call cannot be remembered. Approve it once instead.';
     default:
       break;
   }
@@ -202,3 +205,30 @@ export function describeActionRequestError(error: unknown): string {
   }
   return describeError(error);
 }
+
+/**
+ * C-401: what a `tool_use` approval may also remember — the scopes to offer
+ * (a session rule needs the session the call came from), the rules that
+ * would be stored, or why nothing may be. Null for any other request.
+ */
+export function rememberOptions(request: ActionRequestSummary): {
+  scopes: ToolRuleScope[];
+  rules: string[];
+  reason: string | null;
+} | null {
+  if (request.kind !== 'tool_use' || !request.remember) return null;
+  if (!request.remember.ok) {
+    return { scopes: [], rules: [], reason: request.remember.reason };
+  }
+  return {
+    scopes: request.sessionId ? ['session', 'project'] : ['project'],
+    rules: request.remember.rules,
+    reason: null,
+  };
+}
+
+/** The toast after an approval that stored a rule. */
+export const REMEMBERED_TOAST: Record<ToolRuleScope, string> = {
+  session: 'Approved. Similar calls in this session are allowed from now on.',
+  project: 'Approved. Similar calls in this project are allowed from now on.',
+};

@@ -1,8 +1,11 @@
 import {
   ACTION_REQUEST_HOOK_WAIT_MS,
   ACTION_REQUEST_POLL_MS,
+  ACTION_REQUEST_SLOW_POLL_MS,
   ACTION_REQUEST_SUMMARY_MAX,
   type ActionRequestSummary,
+  PERMISSION_HOOK_TIMEOUT_S,
+  type ToolRule,
 } from '@nautelle/shared';
 import type { LocalErrorCode } from '@nautelle/shared/protocol';
 import type { LocalClient } from '../local/client';
@@ -42,6 +45,8 @@ export interface PermissionDeps {
   toolName: string;
   /** The raw tool input; the daemon redacts it and keeps head and tail (C-114). */
   toolInput?: string;
+  /** C-401: Claude Code's `addRules` allows for this call, if it made any. */
+  suggestions?: readonly ToolRule[];
   sleep: (ms: number) => Promise<void>;
   now: () => number;
 }
@@ -67,6 +72,23 @@ export const clipToolInput = (
     `\n… [${omitted} characters omitted by the hook] …\n`;
   const half = Math.floor((max - marker(raw.length).length) / 2);
   return `${raw.slice(0, half)}${marker(raw.length - 2 * half)}${raw.slice(raw.length - half)}`;
+};
+
+/**
+ * The longest the hook polls one request: its hook timeout less a minute, so
+ * it answers before Claude Code kills it.
+ */
+export const PERMISSION_WAIT_MAX_MS = (PERMISSION_HOOK_TIMEOUT_S - 60) * 1000;
+
+/**
+ * How long a request waits (C-401): until it expires, read off the API's
+ * own clock — `createdAt` to `expiresAt` — so a skewed local clock neither
+ * cuts the wait short nor stretches it. The default without either.
+ */
+export const waitMsOf = (request: ActionRequestSummary): number => {
+  const ttl = Date.parse(request.expiresAt) - Date.parse(request.createdAt);
+  if (!Number.isFinite(ttl) || ttl <= 0) return ACTION_REQUEST_HOOK_WAIT_MS;
+  return Math.min(ttl, PERMISSION_WAIT_MAX_MS);
 };
 
 const summaryFor = (toolName: string): string =>
@@ -97,8 +119,10 @@ const decisionOf = (
 
 /**
  * Away mode (D17): files a `tool_use` action request and polls its status
- * every `ACTION_REQUEST_POLL_MS` for up to `ACTION_REQUEST_HOOK_WAIT_MS`.
- * Approved → allow; denied → deny with the note; expired, offline, or no
+ * until it expires — every `ACTION_REQUEST_POLL_MS` for the first
+ * `ACTION_REQUEST_HOOK_WAIT_MS`, every `ACTION_REQUEST_SLOW_POLL_MS` after
+ * (C-401: a project may wait hours). Approved — by a person or a stored
+ * rule — → allow; denied → deny with the note; expired, offline, or no
  * answer in time → null, and the local dialog shows.
  */
 export const awaitRemoteDecision = async (
@@ -116,6 +140,9 @@ export const awaitRemoteDecision = async (
       args: {
         toolName: deps.toolName,
         ...(deps.toolInput ? { input: clipToolInput(deps.toolInput) } : {}),
+        ...(deps.suggestions?.length
+          ? { suggestions: [...deps.suggestions] }
+          : {}),
       },
       summary: summaryFor(deps.toolName),
     },
@@ -125,10 +152,15 @@ export const awaitRemoteDecision = async (
   const first = decisionOf(created.data);
   if (first !== 'wait') return first;
 
-  const deadline = deps.now() + ACTION_REQUEST_HOOK_WAIT_MS;
+  const start = deps.now();
+  const deadline = start + waitMsOf(created.data);
+  const interval = () =>
+    deps.now() - start < ACTION_REQUEST_HOOK_WAIT_MS
+      ? ACTION_REQUEST_POLL_MS
+      : ACTION_REQUEST_SLOW_POLL_MS;
   let failures = 0;
-  while (deps.now() + ACTION_REQUEST_POLL_MS <= deadline) {
-    await deps.sleep(ACTION_REQUEST_POLL_MS);
+  while (deps.now() + interval() <= deadline) {
+    await deps.sleep(interval());
     const status = await deps.client.request(
       'action.status',
       { id: created.data.id },

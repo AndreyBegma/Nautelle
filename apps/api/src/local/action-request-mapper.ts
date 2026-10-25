@@ -9,6 +9,7 @@ import {
   type PrApproveBoundArgs,
   prDiffUrl,
   shortHeadSha,
+  toolUseRememberOf,
 } from '@nautelle/shared';
 import type { ActionRequest } from '@prisma/client';
 
@@ -59,6 +60,8 @@ export const toActionRequestSummary = (
   note: row.note,
   expiresAt: row.expiresAt.toISOString(),
   createdAt: row.createdAt.toISOString(),
+  ruleId: row.ruleId,
+  remember: toolUseRememberOf(row),
 });
 
 export const toActionRequestView = (row: ActionRequest): ActionRequestView => {

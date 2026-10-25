@@ -136,9 +136,9 @@ describe('track-work skill (#282)', () => {
     expect(skill).toContain('take_card');
   });
 
-  test('plugin version is bumped for the board skill (#845, C-377)', () => {
+  test('plugin version is bumped for the 12-hour permission hook (C-401)', () => {
     const p = readJson(join(pluginDir, '.claude-plugin/plugin.json'));
-    expect(p.version).toBe('0.7.0');
+    expect(p.version).toBe('0.8.0');
   });
 });
 
@@ -221,7 +221,9 @@ describe('hooks.json shape', () => {
       expect(h.command).toBe(hookCommand(arg));
       if (sync) {
         expect(h.async).toBeUndefined();
-        expect(h.timeout).toBe(event === 'SessionStart' ? 10 : 300);
+        // C-401: PermissionRequest waits up to 12 hours plus five minutes
+        // (`PERMISSION_HOOK_TIMEOUT_S` in packages/shared).
+        expect(h.timeout).toBe(event === 'SessionStart' ? 10 : 43_500);
       } else {
         expect(h.async).toBe(true);
       }

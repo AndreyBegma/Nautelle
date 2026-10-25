@@ -127,6 +127,7 @@ export const toProjectDetail = (
   readyLabelOverride: project.readyLabelOverride,
   defaultProfileId: project.defaultProfileId,
   mergeApproval: project.mergeApproval,
+  toolUseTimeoutMinutes: project.toolUseTimeoutMinutes,
   codeSentinelConfig:
     project.codeSentinelConfig === null
       ? null

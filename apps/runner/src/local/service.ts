@@ -1,4 +1,9 @@
 import {
+  TOOL_USE_SUGGESTIONS_MAX,
+  type ToolRule,
+  toolRuleSchema,
+} from '@nautelle/shared';
+import {
   cardRunFinishRefusedDataSchema,
   EVENT_SCHEMA_VERSION,
   HOOK_SESSION_ENDED_EVENT,
@@ -19,7 +24,7 @@ import { ARTIFACT_INCOMPLETE, FinishGuard } from '../cards/finish-guard';
 import type { CardRecord } from '../cards/record';
 import { errorMessage, type Logger } from '../log';
 import type { EnvelopeProject } from '../otlp/map';
-import { toHookContent, toToolInputPreview } from './redact';
+import { redactText, toHookContent, toToolInputPreview } from './redact';
 import {
   cwdWithin,
   type SessionBinding,
@@ -121,8 +126,28 @@ const toolUseArgsSchema = z.looseObject({
     fullLength: z.unknown().optional(),
     sha256: z.unknown().optional(),
     preview: z.unknown().optional(),
+    suggestions: z.unknown().optional(),
   }),
 });
+
+/**
+ * C-401: the suggested rules a `tool_use` request carries, each checked and
+ * its content redacted like the input, so a rule holds what the preview
+ * holds; anything else is dropped.
+ */
+const redactedSuggestions = (raw: unknown): ToolRule[] => {
+  if (!Array.isArray(raw)) return [];
+  const rules: ToolRule[] = [];
+  for (const entry of raw.slice(0, TOOL_USE_SUGGESTIONS_MAX)) {
+    const rule = toolRuleSchema.safeParse(entry);
+    if (!rule.success) continue;
+    const { toolName, ruleContent } = rule.data;
+    const redacted =
+      ruleContent === undefined ? undefined : redactText(ruleContent);
+    rules.push(redacted ? { toolName, ruleContent: redacted } : { toolName });
+  }
+  return rules;
+};
 
 /** A caller the daemon will not act for (#113). */
 const refused = (
@@ -532,13 +557,22 @@ export class LocalService {
       fullLength: _fullLength,
       sha256: _sha256,
       preview: _preview,
+      suggestions: rawSuggestions,
       ...rest
     } = toolUse.data.args;
     const preview =
       typeof raw === 'string' && raw.length > 0
         ? toToolInputPreview(raw)
         : { preview: 'none' as const };
-    return { ...toolUse.data, args: { ...rest, ...preview } };
+    const suggestions = redactedSuggestions(rawSuggestions);
+    return {
+      ...toolUse.data,
+      args: {
+        ...rest,
+        ...preview,
+        ...(suggestions.length > 0 ? { suggestions } : {}),
+      },
+    };
   }
 }
 

@@ -36,14 +36,14 @@ import {
   toProjectSummary,
 } from './project-mapper';
 
-const withRelations = {
+export const withRelations = {
   runner: {
     select: { id: true, name: true, revokedAt: true, capabilities: true },
   },
   docsSource: true,
 } as const;
 
-const isUniqueViolation = (error: unknown): boolean =>
+export const isUniqueViolation = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError &&
   error.code === 'P2002';
 
@@ -80,7 +80,7 @@ export const inspectedDefaultBranch = (
       : null;
 
 /** The columns an inspection sets on a project, at connect and on refresh. */
-const inspectionData = (inspection: ProjectInspection) => ({
+export const inspectionData = (inspection: ProjectInspection) => ({
   baseBranch: inspection.baseBranch,
   baseSource: inspection.baseSource,
   defaultBranch: inspectedDefaultBranch(inspection),
@@ -340,6 +340,7 @@ export class ProjectsService {
       'mergeApproval',
       'shipSessionContent',
       'sessionContentRetentionDays',
+      'toolUseTimeoutMinutes',
     ] as const;
     const before: Record<string, unknown> = {};
     const after: Record<string, unknown> = {};
@@ -522,7 +523,7 @@ export class ProjectsService {
   }
 }
 
-const docsSummary = (docs: {
+export const docsSummary = (docs: {
   kind: string;
   localPath: string | null;
   repo: string | null;

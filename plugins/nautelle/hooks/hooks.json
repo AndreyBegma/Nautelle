@@ -17,7 +17,7 @@
           {
             "type": "command",
             "command": "r=$NAUTELLE_RUNNER_BIN; case $r in /*) [ -x \"$r\" ] ;; *) false ;; esac || r=$(command -v nautelle-runner) || exit 0; \"$r\" hook permission-request || true",
-            "timeout": 300
+            "timeout": 43500
           }
         ]
       }
