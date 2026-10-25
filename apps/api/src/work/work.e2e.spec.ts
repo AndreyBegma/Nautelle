@@ -189,6 +189,17 @@ describe('work list (e2e)', () => {
       expect(ids((await list({ q: '#41' })).items)).toEqual(['t2']);
     });
 
+    it('finds a card by its pull request number (C-393)', async () => {
+      await w.card({
+        project: w.a,
+        number: 5,
+        title: 'Has a pull request',
+        prNumber: 77,
+        updatedAt: at(9),
+      });
+      expect(ids((await list({ q: '#77' })).items)).toEqual(['C-5']);
+    });
+
     it('narrows to one plan, which has no cards', async () => {
       await w.plan({ project: w.a, author: w.authorId }, [
         { key: 't1', updatedAt: at(9) },

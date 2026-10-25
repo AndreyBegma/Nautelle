@@ -9,6 +9,7 @@ import {
   BudgetClock,
   budgetOptionsFromEnv,
 } from './budget-options';
+import { BudgetStops } from './budget-stops';
 import { BudgetSweep } from './budget-sweep';
 import {
   AdminBudgetsController,
@@ -22,7 +23,8 @@ import { BudgetsService } from './budgets.service';
  * service, #24's skill runs, #13's rollup service — inject `BudgetGate` and
  * `BudgetSweep` without importing this module; each takes it `@Optional()`,
  * so a build without it means "allowed" (D11). The local request router reads
- * `BudgetsService.remaining` (spec 201 D15).
+ * `BudgetsService.remaining` (spec 201 D15). The Board subscribes to
+ * `BudgetStops` to pause its running card rounds (C-399, ADR-0101).
  */
 @Global()
 @Module({
@@ -37,10 +39,11 @@ import { BudgetsService } from './budgets.service';
     BudgetClock,
     BudgetEvaluator,
     BudgetGate,
+    BudgetStops,
     BudgetSweep,
     BudgetsService,
   ],
   // `BudgetsService` for spec 201's `budget.remaining` (D15).
-  exports: [BudgetGate, BudgetSweep, BudgetClock, BudgetsService],
+  exports: [BudgetGate, BudgetStops, BudgetSweep, BudgetClock, BudgetsService],
 })
 export class BudgetsModule {}

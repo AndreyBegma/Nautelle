@@ -346,6 +346,35 @@ describe('draftFor (spec 22 D1)', () => {
       ).toBeNull();
     });
 
+    it('maps card.paused with the scope and how to resume, never the title (C-399)', () => {
+      const draft = draftFor(
+        card('card.paused', {
+          number: 12,
+          title: 'secret title',
+          round: 2,
+          reason: 'budget',
+          budget: {
+            id: 'b1',
+            scope: 'user',
+            limitUsd: '25.00',
+            resetsAt: '2026-10-26T00:00:00.000Z',
+          },
+        }),
+      );
+      expect(draft).toMatchObject({
+        kind: 'card.paused',
+        title: 'C-12 was paused: a hard budget was reached',
+        body: expect.stringContaining('Its user budget is used up') as string,
+        page: 'board',
+        card: 12,
+      });
+      expect(draft?.body).toContain('Resume continues the same session');
+      expect(JSON.stringify(draft)).not.toContain('secret');
+      expect(
+        draftFor(card('card.paused', { number: 12 }, 'runner')),
+      ).toBeNull();
+    });
+
     it('never copies more than the title, and only the first line of it', () => {
       const draft = draftFor(
         card('card.waiting', {

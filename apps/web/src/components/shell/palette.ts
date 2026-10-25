@@ -5,20 +5,33 @@ import type {
   Role,
   RunSummary,
   SessionSummary,
+  WorkCardItem,
 } from '@nautelle/shared';
-import { BOARD_ASK_QUESTION_MAX } from '@nautelle/shared';
+import { BOARD_ASK_QUESTION_MAX, parseWorkSearch } from '@nautelle/shared';
 import {
+  Check,
+  FilePlus2,
   FolderGit2,
+  Inbox,
   Lightbulb,
   LogOut,
   type LucideIcon,
+  MessagesSquare,
   Palette,
   Play,
   Sparkles,
+  Square,
   SquareTerminal,
   User,
   Zap,
 } from 'lucide-react';
+import { COLUMN_TITLE } from '../../lib/board/format';
+import {
+  boardCardAcceptHref,
+  boardCardStopHref,
+  boardNewWorkHref,
+  boardQuickCardHref,
+} from '../../lib/board/href';
 import { runHref } from '../../lib/history/format';
 import { planHref } from '../../lib/planner/href';
 import { planLabel, runLabel, sessionLabel } from './crumbs';
@@ -44,10 +57,34 @@ export interface PaletteInput {
   themeLabel: string;
   /** C-391: inside a project the person can create cards in (operator or up). */
   canQuickCard?: boolean;
+  /** C-393: the cards the lookup found for the query, across projects. */
+  cards?: readonly WorkCardItem[];
 }
 
 /** C-391: the palette row that opens Quick card for the current project. */
 export const QUICK_CARD_ACTION = 'action:quick-card';
+
+/** C-393: a palette row that runs a card from where the person is. */
+export const CARD_RUN_PREFIX = 'card:run:';
+
+/** C-393: the Inbox, until it has a page of its own. */
+export const INBOX_HREF = '/work?status=inbox';
+
+/** Cards listed for a lookup. */
+const CARDS_MAX = 6;
+
+/** New card rows listed when no project is open: one per project, this many. */
+const NEW_CARD_PROJECTS_MAX = 5;
+
+/** `C-12` or `#41`: a query that names one card, not a title to search. */
+export function isCardReference(query: string): boolean {
+  const search = parseWorkSearch(query);
+  return search.cardNumber !== null || search.issueNumber !== null;
+}
+
+/** C-393: whether the lookup should run for this query. */
+export const lookupWanted = (query: string): boolean =>
+  query.trim().length >= 2 || isCardReference(query);
 
 /** #660: the palette row that asks the Board the query, as a question. */
 export const ASK_PREFIX = 'ask:';
@@ -109,6 +146,53 @@ function projectPages(project: ProjectSummary, role: Role): Item[] {
 }
 
 /**
+ * C-393: what the palette offers for one found card. Run, Accept and Stop need
+ * an operator of the card's project and a card the Board owns; they apply to
+ * the column the card is in, and the API still refuses what does not fit.
+ * Open is always there.
+ */
+function cardActionItems(
+  card: WorkCardItem,
+  projects: readonly ProjectSummary[],
+): Item[] {
+  const role = projects.find((project) => project.id === card.projectId)?.role;
+  const operator = role !== undefined && role !== 'viewer';
+  const own = operator && card.source === 'card';
+  const items: Item[] = [];
+  if (own && (card.column === 'todo' || card.column === 'finished')) {
+    items.push({
+      id: `${CARD_RUN_PREFIX}${card.projectId}:${card.number}`,
+      label: `Run ${card.label}`,
+      hint: card.title,
+      icon: Play,
+    });
+  }
+  if (own && card.column === 'finished') {
+    items.push({
+      id: `go:${boardCardAcceptHref(card.projectId, card.number)}`,
+      label: `Accept ${card.label}`,
+      hint: card.title,
+      icon: Check,
+    });
+  }
+  if (own && card.column === 'in_progress') {
+    items.push({
+      id: `go:${boardCardStopHref(card.projectId, card.number)}`,
+      label: `Stop ${card.label}`,
+      hint: card.title,
+      icon: Square,
+    });
+  }
+  items.push({
+    id: `go:${card.href}`,
+    label: `Open ${card.label}`,
+    hint: card.title,
+    icon: SquareTerminal,
+  });
+  return items;
+}
+
+/**
  * The command palette's results (#159). Group titles are unique and no row
  * repeats its group's title as a hint. With no query, the project pages are
  * the current project's; with one, every project's that match.
@@ -132,6 +216,9 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
           })),
       );
   const pages = sectionPages('workspace');
+  if (matches('inbox')) {
+    pages.unshift({ id: `go:${INBOX_HREF}`, label: 'Inbox', icon: Inbox });
+  }
   const admin = sectionPages('admin');
   if (matches('account')) {
     pages.push({ id: 'go:/account', label: 'Account', icon: User });
@@ -208,6 +295,50 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
     .filter((item) => matches(`plan ${item.label}`))
     .slice(0, PLANS_MAX);
 
+  // C-393: New card and New work for the open project; with none open, one row
+  // per project the caller can operate.
+  const operable = (project: ProjectSummary) => project.role !== 'viewer';
+  const createIn = current
+    ? operable(current)
+      ? [current]
+      : []
+    : input.projects.filter(operable).slice(0, NEW_CARD_PROJECTS_MAX);
+  const several = !current && createIn.length > 1;
+  const create: Item[] = createIn
+    .flatMap((project) => {
+      const where = several ? ` · ${project.displayName}` : '';
+      return [
+        {
+          id: `go:${boardQuickCardHref(project.id)}`,
+          label: `New card${where}`,
+          hint: 'Quick',
+          icon: FilePlus2,
+        },
+        {
+          id: `go:${boardNewWorkHref(project.id)}`,
+          label: `New work${where}`,
+          hint: 'Interview',
+          icon: MessagesSquare,
+        },
+      ];
+    })
+    .filter((item) => matches(item.label));
+
+  const reference = isCardReference(input.query);
+  const found = (input.cards ?? []).slice(0, CARDS_MAX);
+  const cards: Item[] = found.map((card) => ({
+    id: `go:${card.href}`,
+    label: `${card.label} · ${card.title}`,
+    hint: [card.projectName, COLUMN_TITLE[card.column]].join(' · '),
+    icon: Square,
+  }));
+  // The card the query names — a reference, or the only one found — gets its
+  // actions, ahead of the lookup.
+  const target = found.length === 1 || reference ? found[0] : undefined;
+  const cardActions: Item[] = target
+    ? cardActionItems(target, input.projects)
+    : [];
+
   const actions: Item[] = [
     ...(input.canQuickCard
       ? [{ id: QUICK_CARD_ACTION, label: 'Quick card', icon: Zap }]
@@ -222,6 +353,9 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
   ].filter((item) => matches(item.label));
 
   return [
+    ...group('create', 'Create', create),
+    ...group('card-actions', target?.label ?? 'Card', cardActions),
+    ...group('cards', 'Cards', cards),
     ...group('pages', 'Go to', pages),
     ...group('project-pages', 'Project pages', subPages),
     ...group('projects', 'Projects', projects),

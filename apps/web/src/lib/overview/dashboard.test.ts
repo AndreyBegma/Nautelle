@@ -331,6 +331,47 @@ describe('needsYou', () => {
     expect(items[1]?.href).toBe('/projects/p1/activity?tab=runs&run=fresh');
     expect(items[2]?.title).toBe('Nightly audit');
   });
+
+  test('a blocked slot whose session is gone leaves the list (C-389)', () => {
+    const items = needsYou(
+      [project('p1')],
+      new Map([
+        [
+          'p1',
+          fleet('p1', [
+            slot({ id: 'idle', status: 'idle', lastCheckpoint: 'blocked' }),
+            slot({ id: 'stale', status: 'stale', lastCheckpoint: 'blocked' }),
+            slot({
+              id: 'dispatched',
+              status: 'dispatched',
+              lastCheckpoint: 'blocked',
+            }),
+            slot({ id: 'ended', status: 'ended', lastCheckpoint: 'blocked' }),
+          ]),
+        ],
+      ]),
+      new Map(),
+    );
+    expect(items.map((i) => i.key)).toEqual(['blocked:idle']);
+  });
+
+  test("a service's failed run is Activity's, not the list's (C-389)", () => {
+    const now = Date.parse('2026-10-14T12:00:00.000Z');
+    const items = needsYou([project('p1')], new Map(), new Map(), {
+      now,
+      failedRuns: new Map([
+        [
+          'p1',
+          [
+            run({ id: 'digest', kind: 'steward', slot: null }),
+            run({ id: 'assess', kind: 'card_assess', slot: null }),
+            run({ id: 'card', kind: 'card', slot: null, title: 'C-7' }),
+          ],
+        ],
+      ]),
+    });
+    expect(items.map((i) => i.key)).toEqual(['failed:card']);
+  });
 });
 
 describe('tile links (#213)', () => {

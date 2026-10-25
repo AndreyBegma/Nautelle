@@ -43,6 +43,7 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   'card.finished': 'Board card finished',
   'card.waiting': 'Card worker is waiting for you',
   'card.background_stalled': 'Card worker stuck on its own background task',
+  'card.paused': 'Card worker paused by a hard budget',
   'card.demo': 'Demo video of a card ready or failed',
   'cards.suggested': 'Cards suggested from your sessions',
   'steward.incident': 'Steward needs you on stuck work',
@@ -70,6 +71,8 @@ export const KIND_EXAMPLE: Record<NotificationKind, string> = {
   'card.waiting': 'The worker of card C-12 waits for your answer',
   'card.background_stalled':
     'C-39 has been waiting on its own background task for 30 min',
+  'card.paused':
+    'C-12 was paused: a hard budget was reached — Resume continues it',
   'card.demo': 'C-12 demo · PR #160 · CI green, with Merge and Feedback',
   'cards.suggested': '3 cards suggested in the luna-watch Inbox',
   'steward.incident':
@@ -112,6 +115,7 @@ const KIND_GROUP: Record<NotificationKind, RuleGroup> = {
   'card.finished': 'fleet',
   'card.waiting': 'fleet',
   'card.background_stalled': 'fleet',
+  'card.paused': 'budgets',
   'card.demo': 'fleet',
   'cards.suggested': 'fleet',
   'steward.incident': 'fleet',
@@ -138,6 +142,7 @@ export const KIND_TONE: Record<NotificationKind, KindTone> = {
   'card.finished': 'ok',
   'card.waiting': 'warn',
   'card.background_stalled': 'warn',
+  'card.paused': 'danger',
   'card.demo': 'ok',
   'cards.suggested': 'neutral',
   'steward.incident': 'warn',
