@@ -51,6 +51,7 @@ describe('seedDemo', () => {
     runner: { upsert: jest.fn() },
     project: { upsert: jest.fn() },
     boardSettings: { upsert: jest.fn() },
+    repositoryPushCheck: { upsert: jest.fn() },
     boardCard: { upsert: jest.fn().mockResolvedValue({ id: 'c1' }) },
     run: { upsert: jest.fn() },
     boardCardRound: { upsert: jest.fn() },

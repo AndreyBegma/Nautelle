@@ -138,6 +138,13 @@ export interface ProjectDetail extends ProjectSummary {
   } | null;
   hasClaudeMd: boolean;
   hasAgentsMd: boolean;
+  /** C-395: `demoflow.config.json` at the repository root; null until a runner reports it. */
+  hasDemoflowConfig: boolean | null;
+  /**
+   * C-395: the newest push check (C-396, `git push --dry-run`) of this
+   * project's checkout on its runner; null until one has run.
+   */
+  pushCheck: PushCheckView | null;
   lastInspectedAt: string;
   createdAt: string;
   updatedAt: string;

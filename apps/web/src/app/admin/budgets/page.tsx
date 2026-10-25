@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge } from '@andrewbehma/glass-ui/badge';
-import { Button } from '@andrewbehma/glass-ui/button';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Select } from '@andrewbehma/glass-ui/field';
@@ -36,6 +36,7 @@ import {
 } from '../../../lib/budgets/filters';
 import {
   ACTION_LABEL,
+  budgetSettingsHref,
   budgetTone,
   describeBudgetsError,
   formatBudgetUsd,
@@ -295,6 +296,7 @@ function AdminBudgets() {
               {list.map((budget) => {
                 const current = budget.current;
                 const busy = busyId === budget.id;
+                const settingsHref = budgetSettingsHref(budget);
                 const canOverride =
                   budget.action === 'stop' &&
                   budget.override === null &&
@@ -368,13 +370,24 @@ function AdminBudgets() {
                             Revoke
                           </Button>
                         ) : null}
-                        <Button
-                          variant="glass"
-                          disabled={busy}
-                          onClick={() => setEditing(budget)}
-                        >
-                          Edit
-                        </Button>
+                        {settingsHref ? (
+                          // C-395: a project budget is edited in one place,
+                          // its project's Settings.
+                          <Link
+                            href={settingsHref}
+                            className={buttonClassName({ variant: 'glass' })}
+                          >
+                            Edit
+                          </Link>
+                        ) : (
+                          <Button
+                            variant="glass"
+                            disabled={busy}
+                            onClick={() => setEditing(budget)}
+                          >
+                            Edit
+                          </Button>
+                        )}
                         <Button
                           variant="danger"
                           disabled={busy}

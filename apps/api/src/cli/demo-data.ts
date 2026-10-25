@@ -156,6 +156,7 @@ export const seedDemo = async (
     | 'runner'
     | 'project'
     | 'boardSettings'
+    | 'repositoryPushCheck'
     | 'boardCard'
     | 'run'
     | 'boardCardRound'
@@ -196,9 +197,29 @@ export const seedDemo = async (
       defaultBranch: 'main',
       hasClaudeMd: true,
       hasAgentsMd: false,
+      // C-395: what the Ready to run block reads; the runner stays offline.
+      hasDemoflowConfig: true,
       lastInspectedAt: now,
       createdById: admin.id,
       members: { create: { userId: admin.id, addedById: admin.id } },
+    },
+  });
+  // C-395: the push check Ready to run reads (C-396 keeps it per runner and path).
+  await prisma.repositoryPushCheck.upsert({
+    where: {
+      runnerId_rootPath: {
+        runnerId: DEMO_RUNNER_ID,
+        rootPath: '/srv/demo/acme-shop',
+      },
+    },
+    update: {},
+    create: {
+      runnerId: DEMO_RUNNER_ID,
+      rootPath: '/srv/demo/acme-shop',
+      ok: true,
+      remote: 'git@github.com:acme/shop.git',
+      message: 'origin accepts pushes from this checkout.',
+      checkedAt: now,
     },
   });
   await prisma.boardSettings.upsert({

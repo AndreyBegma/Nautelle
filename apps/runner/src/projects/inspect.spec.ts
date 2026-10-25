@@ -64,6 +64,7 @@ describe('project.inspect', () => {
       },
       hasClaudeMd: true,
       hasAgentsMd: false,
+      hasDemoflowConfig: false,
       docs: expect.objectContaining({
         kind: 'in_repo',
         localPath: join(root, 'docs'),
@@ -161,6 +162,14 @@ describe('project.inspect', () => {
       baseSource: 'config',
       defaultBranch: 'main',
     });
+  });
+
+  it('reports the DemoFlow config (C-395)', async () => {
+    ws = workspace();
+    const root = await ws.repo('x', 'git@github.com:acme/x.git');
+    ws.files({ 'x/demoflow.config.json': '{}' });
+
+    expect(await inspect(root)).toMatchObject({ hasDemoflowConfig: true });
   });
 
   it('refuses a linked worktree as not the main checkout and suggests the main path', async () => {
