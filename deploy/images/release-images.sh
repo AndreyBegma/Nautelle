@@ -239,7 +239,11 @@ mirror() {
   echo "Copying $src@$digest to $hub ($TAGS)"
   docker buildx imagetools create "$@" "$src@$digest" ||
     fail "Docker Hub refused $hub: does the repository exist, public, and may $DOCKERHUB_USERNAME push to it?"
-  copied=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$hub:$VERSION")
+  # The buildx in the CI image prints its whole default report whatever the
+  # --format says; its first top-level "Digest:" line is the index digest
+  # (the per-platform ones are indented under "Manifests:").
+  copied=$(docker buildx imagetools inspect "$hub:$VERSION" |
+    sed -n 's/^Digest:[[:space:]]*//p' | sed -n '1s/[[:space:]]*$//p')
   [ "$copied" = "$digest" ] ||
     fail "$hub:$VERSION is $copied, not $digest: the copy is not the same image"
   "$COSIGN" sign --yes --key env://COSIGN_PRIVATE_KEY "$hub@$digest"
