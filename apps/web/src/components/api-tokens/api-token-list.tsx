@@ -88,7 +88,12 @@ export function ApiTokenList<T extends ApiTokenView>({
             </div>
           </div>
           {token.status === 'active' ? (
-            <Button variant="danger" size="sm" onClick={() => onRevoke(token)}>
+            <Button
+              variant="danger"
+              size="sm"
+              aria-label={`Revoke ${token.name}`}
+              onClick={() => onRevoke(token)}
+            >
               Revoke
             </Button>
           ) : null}
