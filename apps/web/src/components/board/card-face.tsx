@@ -1,59 +1,25 @@
 import { Badge } from '@andrewbehma/glass-ui/badge';
-import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import type { BoardCardView, CardRoundBrief } from '@nautelle/shared';
-import {
-  Check,
-  Clock,
-  GitMerge,
-  Layers,
-  Paperclip,
-  Sparkles,
-  Zap,
-} from 'lucide-react';
+import type { BoardCardView } from '@nautelle/shared';
+import { GitMerge } from 'lucide-react';
 import NextLink from 'next/link';
 import type { ReactNode } from 'react';
-import { attachmentCountLabel } from '../../lib/attachments/format';
-import { dependencyChip, readinessChip } from '../../lib/board/dependencies';
-import {
-  ESCALATED_TAG,
-  ESCALATED_TAG_TITLE,
-  isEscalated,
-} from '../../lib/board/escalation';
+import { faceState } from '../../lib/board/face-state';
 import {
   approveRunOffer,
-  autoRunFailureText,
-  blockingDialogText,
-  collectFailedBadge,
   confidenceLabel,
-  DETACHED_HINT,
-  DETACHED_TEXT,
-  finishRefusedText,
   fleetHref,
   fleetSummary,
-  HOOKS_GUIDE_LABEL,
-  hooksGuideHref,
-  hooksNotice,
-  isSessionAlive,
   isSuggestion,
-  roundPill,
-  SLOT_GONE_TEXT,
   sessionHref,
-  TRACKED_TEXT,
   trackedSessionHref,
 } from '../../lib/board/format';
 import { prChipText } from '../../lib/board/pull-request';
-import { ciDot, readinessLine, shippingBadge } from '../../lib/board/shipping';
-import { SESSION_ENDED_TEXT, takenState } from '../../lib/board/taken';
-import { hintsLabel } from '../../lib/board-ai/triage';
-import { formatCost } from '../../lib/format';
+import { ciDot, readinessLine } from '../../lib/board/shipping';
 import { githubUrl } from '../../lib/url';
-import { DemoChip } from '../demos/demo-chip';
-import { StewardChip } from '../steward/steward-chip';
-import { ApproveRunLink, CardFaceDesign } from './card-design';
-import { RestartChip } from './handoff/restart-chip';
-import { QuotaWaitLine } from './quota-wait-line';
+import { ApproveRunLink } from './card-design';
+import { FaceIcons, KindIcon } from './card-face-icons';
 import {
   type FaceSelection,
   SelectedTint,
@@ -64,20 +30,16 @@ import {
 } from './selection-box';
 import { TAP, TAP_ROW } from './tap';
 
-/** A chip on the header's 16 px line (C-35). */
-const HEAD_CHIP = 'h-4 shrink-0';
-
 const TEXT_LINK = `${TAP} text-xs text-accent-ink underline-offset-2 hover:underline`;
 
 /**
- * What a card shows on the board (C-35, #423, #778): four rows in one column at
- * the card's full width — the **header** (selection box or unselectable mark,
- * label, Bug, and the menu trigger at its end; nothing else, so it never
- * truncates), the **title**, the **status** (one wrapping row: readiness, the
- * dependency, Auto-run, stack, triage hints, → Opus, then the process state;
- * below it the approve offer, detail lines and the face's links) and the
- * **footer** (PR and Issue, with the attachment count and the cost at its right
- * end, above a hairline). The token saving is in the card's Run section, not on the face.
+ * What a card shows on the board (C-392, after C-35, #423, #778): the **header**
+ * (selection box or unselectable mark, label, the kind icon, the design,
+ * dependency and demo icons, and the menu trigger at its end), the **title**,
+ * the **status** (one state signal, below it the approve offer, detail lines
+ * and the face's links) and the **footer** (the PR with its CI dot). That is
+ * four signals at most; cost, Saved, Steward, the handoff, hooks, the round
+ * pill and the sub-states are in the card sheet (`CardSignals`).
  */
 export function CardFace({
   projectId,
@@ -85,12 +47,11 @@ export function CardFace({
   canOperate,
   menu,
   selection,
-  hints,
   onOpen,
 }: {
   projectId: string;
   card: BoardCardView;
-  /** #660: triage hints waiting on the card; absent or 0 is none. */
+  /** #660: triage hints waiting on the card; they are in the card sheet now. */
   hints?: number;
   canOperate: boolean;
   /** The Board's card menu (`slots.menu`), placed at the end of the header. */
@@ -100,16 +61,8 @@ export function CardFace({
   onOpen: (card: BoardCardView) => void;
 }) {
   const offer = approveRunOffer(card);
-  const pill = roundPill(card.round);
-  const badge = shippingBadge(card);
+  const state = faceState(card);
   const readiness = readinessLine(card);
-  // #630: a collect that failed is on the face, not only in the sheet.
-  const notPushed = collectFailedBadge(card);
-  const cost = formatCost(card.costUsd);
-  // #337 D8: "after C-12", warning while it is not completed.
-  const after = dependencyChip(card.dependsOn);
-  // #443: Ready / Waiting of a To Do card with dependencies.
-  const ready = readinessChip(card.readiness);
   const suggestion = isSuggestion(card);
   const note = 'break-words text-xs text-ink-2';
   return (
@@ -137,14 +90,11 @@ export function CardFace({
             />
           ) : null}
           <span className="shrink-0 font-mono">{card.label}</span>
-          {card.kind === 'bug' ? (
-            <Chip size="sm" tone="danger" className={HEAD_CHIP}>
-              Bug
-            </Chip>
-          ) : null}
-          {menu ? (
-            <span className="ms-auto flex shrink-0 items-center">{menu}</span>
-          ) : null}
+          <KindIcon card={card} />
+          <span className="ms-auto flex shrink-0 items-center gap-1.5">
+            <FaceIcons card={card} />
+            {menu}
+          </span>
         </div>
         <button
           type="button"
@@ -157,137 +107,15 @@ export function CardFace({
           data-card-row="status"
           className="flex flex-wrap items-center gap-x-1.5 gap-y-1 empty:hidden"
         >
-          {ready ? (
-            <Chip
-              size="sm"
-              tone={ready.tone}
-              title={ready.title}
-              className="gap-1"
-            >
-              {ready.tone === 'ok' ? (
-                <Check aria-hidden="true" className="size-3" />
-              ) : (
-                <Clock aria-hidden="true" className="size-3" />
-              )}
-              {ready.text}
-            </Chip>
-          ) : null}
-          {after ? (
-            // #337 D8: next to the readiness it explains; truncates if long.
-            <Chip
-              size="sm"
-              tone={after.open ? 'warn' : 'neutral'}
-              title={after.title}
-              className="min-w-0 max-w-full"
-            >
-              <span className="truncate">{after.text}</span>
-            </Chip>
-          ) : null}
-          {ready?.waitsFor ? (
-            <span className="text-xs text-ink-3">{ready.waitsFor}</span>
-          ) : null}
-          {card.autoRunWhenReady ? (
-            <Chip size="sm" title="Auto-run when ready is on" className="gap-1">
-              <Zap aria-hidden="true" className="size-3" />
-              Auto-run
-            </Chip>
-          ) : null}
-          {card.stack ? (
-            // #480: the card's stack, wherever the card sits.
-            <Chip
-              size="sm"
-              title={`Part of ${card.stack.label} ${card.stack.title}`}
-              className="gap-1 font-mono"
-            >
-              <Layers aria-hidden="true" className="size-3" />
-              {card.stack.label}
-            </Chip>
-          ) : null}
-          {hints ? (
-            <Chip
-              size="sm"
-              title="Triage hints: open the card to apply or dismiss them"
-              className="gap-1"
-            >
-              <Sparkles aria-hidden="true" className="size-3" />
-              {hintsLabel(hints)}
-            </Chip>
-          ) : null}
-          {isEscalated(card) ? (
-            <Chip size="sm" title={ESCALATED_TAG_TITLE}>
-              {ESCALATED_TAG}
-            </Chip>
-          ) : null}
-          {card.tracking ? <TerminalBadges card={card} /> : null}
-          <TakenBadges card={card} />
-          {card.fleet ? <FleetBadges card={card} /> : null}
           {suggestion ? <SuggestionBadges card={card} /> : null}
-          <CardFaceDesign card={card} />
-          {pill ? (
-            <StatusPill size="sm" status={pill.status} label={pill.label} />
-          ) : null}
-          {card.round?.phase === 'background' &&
-          card.round.backgroundCommand ? (
-            <span
-              className="min-w-0 max-w-full truncate font-mono text-xs text-ink-2"
-              title={card.round.backgroundCommand}
-            >
-              {card.round.backgroundCommand}
-            </span>
-          ) : null}
-          {card.round?.blockingDialog ? (
-            <Tooltip content={blockingDialogText(card.round.blockingDialog)}>
-              <span>
-                <Badge tone="warn" size="md" label="Dialog open" />
-              </span>
-            </Tooltip>
-          ) : null}
-          {card.round?.quotaWait ? (
-            <QuotaWaitLine wait={card.round.quotaWait} />
-          ) : null}
-          {card.round?.finishRefused ? (
-            <Tooltip content={finishRefusedText(card.round.finishRefused)}>
-              <span>
-                <Badge tone="danger" size="md" label="Finish refused" />
-              </span>
-            </Tooltip>
-          ) : null}
-          {card.round?.hooksMissing ? (
-            <HooksChip projectId={projectId} card={card} round={card.round} />
-          ) : null}
-          {card.steward ? <StewardChip chip={card.steward} /> : null}
-          {card.demo ? <DemoChip demo={card.demo} /> : null}
-          <RestartChip card={card} />
-          {card.autoRunFailure ? (
-            <Tooltip content={autoRunFailureText(card.autoRunFailure)}>
-              <span>
-                <Badge tone="warn" size="md" label="Didn’t start" />
-              </span>
-            </Tooltip>
-          ) : null}
-          {notPushed ? (
-            <Tooltip content={notPushed.text}>
-              <span>
-                <Badge tone="warn" size="md" label={notPushed.label} />
-              </span>
-            </Tooltip>
-          ) : null}
-          {badge?.review ? (
-            // #891: one line; the step name truncates, the position stays.
-            <Tooltip content={badge.label}>
-              <Chip
-                size="sm"
-                tone={badge.tone}
-                data-review-chip=""
-                className="min-w-0 max-w-full"
-              >
-                <span className="truncate">{badge.label}</span>
-              </Chip>
-            </Tooltip>
-          ) : badge ? (
-            <Tooltip content={badge.label}>
-              <span>
-                <Badge tone={badge.tone} size="md" label={badge.label} />
+          {state ? (
+            <Tooltip content={state.title}>
+              <span data-face-state={state.status}>
+                <StatusPill
+                  size="sm"
+                  status={state.status}
+                  label={state.label}
+                />
               </span>
             </Tooltip>
           ) : null}
@@ -315,104 +143,14 @@ export function CardFace({
             {readiness.join(' · ')}
           </p>
         ) : null}
-        {card.stack ? <p className={note}>part of {card.stack.title}</p> : null}
         {card.fleet ? <p className={note}>{fleetSummary(card.fleet)}</p> : null}
         {suggestion && card.captureWhy ? (
           <p className={note}>{card.captureWhy}</p>
         ) : null}
         <FaceLinks projectId={projectId} card={card} suggestion={suggestion} />
-        {card.prNumber !== null ||
-        card.issueNumber !== null ||
-        cost ||
-        card.attachmentCount > 0 ? (
-          <CardFooter card={card} cost={cost} />
-        ) : null}
+        {card.prNumber !== null ? <CardFooter card={card} /> : null}
       </div>
     </SelectionFrame>
-  );
-}
-
-/** #367 D3: the chip names what the round's launch facts say, not a plugin to set up. */
-function HooksChip({
-  projectId,
-  card,
-  round,
-}: {
-  projectId: string;
-  card: BoardCardView;
-  round: CardRoundBrief;
-}) {
-  const notice = hooksNotice(card, round);
-  return (
-    <Tooltip content={notice.text}>
-      {notice.guide ? (
-        <NextLink
-          href={hooksGuideHref(projectId)}
-          className={TAP}
-          aria-label={`${notice.chip}. ${HOOKS_GUIDE_LABEL}`}
-        >
-          <Chip size="sm">{notice.chip}</Chip>
-        </NextLink>
-      ) : (
-        <span>
-          <Chip size="sm">{notice.chip}</Chip>
-        </span>
-      )}
-    </Tooltip>
-  );
-}
-
-/** #282 D1: a card tracked from a terminal session: the badge and the state. */
-function TerminalBadges({ card }: { card: BoardCardView }) {
-  return (
-    <>
-      <Tooltip content={TRACKED_TEXT}>
-        <span>
-          <Badge tone="neutral" size="sm" label="Terminal" />
-        </span>
-      </Tooltip>
-      {isSessionAlive(card) ? (
-        <StatusPill size="sm" status="running" label="Session running" />
-      ) : null}
-      {card.autoCollect ? <Chip size="sm">Automatic work</Chip> : null}
-    </>
-  );
-}
-
-/** #845 D2, D10: "taken by <session>" / "queued for <session>", and "session ended". */
-function TakenBadges({ card }: { card: BoardCardView }) {
-  const state = takenState(card);
-  if (!state) return null;
-  return (
-    <>
-      <Chip size="sm">{state.text}</Chip>
-      {state.kind === 'taken' && !state.alive ? (
-        <Chip size="sm">{SESSION_ENDED_TEXT}</Chip>
-      ) : null}
-    </>
-  );
-}
-
-/** #282 D4: a mirrored fleet slot: the badge, "Detached" and "Slot gone". */
-function FleetBadges({ card }: { card: BoardCardView }) {
-  return (
-    <>
-      <Badge tone="neutral" size="sm" label="Fleet" />
-      {card.fleet?.detached ? (
-        <Tooltip content={DETACHED_HINT}>
-          <span>
-            <Badge tone="neutral" size="sm" label={DETACHED_TEXT} />
-          </span>
-        </Tooltip>
-      ) : null}
-      {card.fleet?.slotGone ? (
-        <Tooltip content="The slot left the fleet; the card keeps its last column.">
-          <span>
-            <Badge tone="warn" size="sm" label={SLOT_GONE_TEXT} />
-          </span>
-        </Tooltip>
-      ) : null}
-    </>
   );
 }
 
@@ -466,28 +204,22 @@ function FaceLinks({
   );
 }
 
-/**
- * The PR (with its CI dot) and the Issue, above a hairline; the attachment
- * count and the cost sit at its right end and wrap as one group (#778).
- */
-function CardFooter({ card, cost }: { card: BoardCardView; cost: string }) {
+/** The PR with its CI dot, above a hairline; the issue is in the card sheet. */
+function CardFooter({ card }: { card: BoardCardView }) {
   const dot = ciDot(card);
   const prHref = card.prUrl ? githubUrl(card.prUrl) : null;
-  const issueHref = card.issueUrl ? githubUrl(card.issueUrl) : null;
   return (
     <div
       data-card-row="footer"
       className="mt-0.5 flex flex-wrap items-center gap-1.5 border-line border-t pt-1.5 text-xs pointer-coarse:gap-y-0 pointer-coarse:pt-0"
     >
-      {card.prNumber !== null ? (
-        <Link href={prHref}>
-          {card.prState === 'merged' ? (
-            <GitMerge aria-hidden="true" className="size-3 text-status-done" />
-          ) : null}
-          {prChipText(card)}
-        </Link>
-      ) : null}
-      {card.prNumber !== null && dot ? (
+      <PrLink href={prHref}>
+        {card.prState === 'merged' ? (
+          <GitMerge aria-hidden="true" className="size-3 text-status-done" />
+        ) : null}
+        {prChipText(card)}
+      </PrLink>
+      {dot ? (
         <span
           role="img"
           aria-label={dot.label}
@@ -497,37 +229,20 @@ function CardFooter({ card, cost }: { card: BoardCardView; cost: string }) {
           <Badge tone={dot.tone} dot />
         </span>
       ) : null}
-      {card.issueNumber !== null ? (
-        <Link href={issueHref}>Issue #{card.issueNumber}</Link>
-      ) : null}
-      {card.attachmentCount > 0 || cost ? (
-        <span className="ms-auto flex items-center gap-2 whitespace-nowrap text-ink-2 tabular-nums">
-          {card.attachmentCount > 0 ? (
-            <span
-              className="flex items-center gap-0.5"
-              role="img"
-              aria-label={attachmentCountLabel(card.attachmentCount)}
-              title={attachmentCountLabel(card.attachmentCount)}
-            >
-              <Paperclip aria-hidden="true" className="size-3" />
-              {card.attachmentCount}
-            </span>
-          ) : null}
-          {cost ? <span>{cost}</span> : null}
-        </span>
-      ) : null}
     </div>
   );
 }
 
-function Link({
+function PrLink({
   href,
   children,
 }: {
   href: string | null;
   children: ReactNode;
 }) {
-  if (!href) return <Chip size="sm">{children}</Chip>;
+  const pill =
+    'inline-flex h-5 items-center gap-1 rounded-full bg-hover px-2 text-ink-2 tabular-nums';
+  if (!href) return <span className={pill}>{children}</span>;
   return (
     <a
       href={href}
@@ -536,7 +251,9 @@ function Link({
       // #497: the anchor is the touch target; the pill inside is what is drawn.
       className={`group/link inline-flex items-center ${TAP}`}
     >
-      <span className="inline-flex h-5 items-center gap-1 rounded-full bg-hover px-2 text-ink-2 tabular-nums underline-offset-2 group-hover/link:text-ink group-hover/link:underline">
+      <span
+        className={`${pill} underline-offset-2 group-hover/link:text-ink group-hover/link:underline`}
+      >
         {children}
       </span>
     </a>
