@@ -7,6 +7,7 @@ import {
   BOARD_ERROR,
   type BoardCardDetail,
   type BoardCardKind,
+  type BoardCardView,
   type BoardColumnView,
   type BoardSettingsView,
   type BoardView,
@@ -55,8 +56,7 @@ import {
   type CardFacts,
   type CardWithRounds,
   cardDesignSelect,
-  cardFaceOmit,
-  cardFaceRoundSelect,
+  cardFaceArgs,
   prTargetOf,
   toCardDetail,
   toCardView,
@@ -210,16 +210,7 @@ export class BoardService implements OnModuleInit {
   ): Promise<BoardView> {
     const inbox = seesInbox(role);
     // C-364: only what a card face reads; the detail loads the rest.
-    const face = {
-      omit: cardFaceOmit,
-      include: {
-        rounds: {
-          orderBy: { round: 'desc' as const },
-          select: cardFaceRoundSelect,
-        },
-        design: cardDesignSelect,
-      },
-    };
+    const face = cardFaceArgs;
     const [open, completed, settings, running, project, stacks] =
       await Promise.all([
         this.prisma.boardCard.findMany({
@@ -364,6 +355,16 @@ export class BoardService implements OnModuleInit {
     return this.prisma.boardCardRound.count({
       where: { phase: { in: ACTIVE_PHASES }, card: { projectId } },
     });
+  }
+
+  /**
+   * C-390: cards read with `cardFaceArgs`, as the Board shows them — of any
+   * projects; the Inbox reads them across every project the caller sees.
+   */
+  async cardViews(cards: CardFace[]): Promise<BoardCardView[]> {
+    if (cards.length === 0) return [];
+    const facts = await this.facts(cards);
+    return cards.map((c) => toCardView(c, facts));
   }
 
   /** Round costs (#21 usage by run) and which card sessions hooks reached. */
