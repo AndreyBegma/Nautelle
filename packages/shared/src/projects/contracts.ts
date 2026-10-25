@@ -45,6 +45,12 @@ export const PROJECT_ERROR = {
   /** Only `active` users can be added as members. */
   userNotActive: 'user_not_active',
   alreadyMember: 'already_member',
+  /** C-400: a move to the runner the project is already on. */
+  sameRunner: 'same_runner',
+  /** C-400: the path on the target runner holds another repository. */
+  differentRepository: 'different_repository',
+  /** C-400: a card round or another run of the project is still running. */
+  workRunning: 'work_running',
 } as const;
 export type ProjectErrorCode =
   (typeof PROJECT_ERROR)[keyof typeof PROJECT_ERROR];
@@ -194,6 +200,45 @@ export interface ConnectProjectRequest {
   path: string;
   /** Defaults to the repository name. */
   displayName?: string;
+}
+
+/**
+ * `POST /projects/:id/move` (admin, C-400): the project's new runner and its
+ * main checkout there, validated by that runner. `defaultProfileId` is a
+ * profile of the new runner; absent or `null` leaves the project without one.
+ */
+export interface MoveProjectRequest {
+  runnerId: string;
+  path: string;
+  defaultProfileId?: string | null;
+}
+
+/** A worktree a move leaves on the old runner's machine, for cleanup. */
+export interface ProjectMoveWorktree {
+  /** The absolute path on the old machine. */
+  path: string;
+  /** A board card's worktree, or an orchestrator slot's. */
+  source: 'card' | 'slot';
+  /** `C-<number> <title>` for a card, the slot name for a slot. */
+  label: string;
+  branch: string | null;
+}
+
+/** `GET /projects/:id/move` (admin): what a move would meet right now. */
+export interface ProjectMoveCheck {
+  /** What still runs (`C-12 Fix login`, `skill: review`); a move is refused until it is empty. */
+  running: string[];
+  /** The worktrees a move would leave on the current runner's machine. */
+  worktrees: ProjectMoveWorktree[];
+}
+
+/** `POST /projects/:id/move`. */
+export interface ProjectMoveResult {
+  project: ProjectDetail;
+  /** Where the project was. */
+  from: { runnerId: string; runnerName: string; rootPath: string };
+  /** Left on the old machine; nothing there was touched. */
+  worktrees: ProjectMoveWorktree[];
 }
 
 /** `PATCH /projects/:id` (admin). `null` clears an optional field. */

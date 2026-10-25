@@ -44,6 +44,8 @@ export const AUDIT_ACTIONS = [
   'project.member_remove',
   'project.docs_source_override',
   'project.docs_source_reset',
+  /** C-400: the project moved to another runner and a root there. */
+  'project.move',
   /** A GitHub App delivery found the project's repository under a new name. */
   'project.repo_rename',
   /**

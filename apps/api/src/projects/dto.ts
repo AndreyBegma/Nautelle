@@ -3,6 +3,7 @@ import {
   type ConnectProjectRequest,
   type DocsSourceOverrideRequest,
   type InspectProjectRequest,
+  type MoveProjectRequest,
   PROJECT_BRANCH_MAX_LENGTH,
   PROJECT_DISPLAY_NAME_MAX_LENGTH,
   PROJECT_LABEL_MAX_LENGTH,
@@ -95,6 +96,18 @@ export class ConnectProjectDto
   @IsNotEmpty()
   @MaxLength(PROJECT_DISPLAY_NAME_MAX_LENGTH)
   displayName?: string;
+}
+
+/** C-400: the target runner and path, as connect takes them, plus its profile. */
+export class MoveProjectDto
+  extends InspectProjectDto
+  implements MoveProjectRequest
+{
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  defaultProfileId?: string | null;
 }
 
 /** `null` on an optional field clears it; `undefined` leaves it alone. */
