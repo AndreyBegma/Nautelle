@@ -89,6 +89,20 @@ describe('toolUseDanger', () => {
     'git -c core.sshCommand=evil fetch',
     'git config alias.wipe "!rm -rf ."',
     'git -C /repo reset --hard',
+    // Package runners of other ecosystems.
+    'uv run rm -rf ~',
+    'uv run --with requests rm -rf ~',
+    'uv run -- rm -rf ~',
+    'uv tool run rm -rf ~',
+    'uvx --from x rm -rf ~',
+    'poetry run rm -rf ~',
+    'pipenv run rm -rf /',
+    'pdm run rm -rf /',
+    'hatch run rm -rf /',
+    'rye run rm -rf /',
+    'conda run -n base rm -rf /',
+    'bundle exec rm -rf /',
+    'uv run bash -c "rm -rf ~"',
   ])('flags destructive shell: %s', (command) => {
     expect(toolUseDanger(bash(command))?.kind).toBe('destructive_shell');
   });
@@ -108,6 +122,9 @@ describe('toolUseDanger', () => {
     'git push --mirror',
     'git -C /repo push origin develop',
     'npm test && git push origin master',
+    'uv run git push origin main',
+    'poetry run git push -f',
+    'bundle exec git push origin master',
   ])('flags a push that may reach a protected branch: %s', (command) => {
     expect(toolUseDanger(bash(command))?.kind).toBe('protected_push');
   });
@@ -123,6 +140,24 @@ describe('toolUseDanger', () => {
     'printenv',
     'env',
     'cat ~/.config/nautelle/runner.json',
+    // The environment, which holds the runner token and API keys.
+    'cat /proc/self/environ',
+    'cat /proc/1/environ',
+    'cat /proc/thread-self/environ',
+    'strings /proc/self/environ',
+    'xargs -0 -n1 echo </proc/self/environ',
+    'tr "\\0" "\\n" < /proc/1/environ',
+    'set',
+    'export',
+    'export -p',
+    'declare -x',
+    'declare -p',
+    'declare -p ANTHROPIC_API_KEY',
+    'typeset -x',
+    'readonly -p',
+    'builtin set',
+    'command export -p',
+    'uv run printenv',
   ])('flags reading a secret in the shell: %s', (command) => {
     expect(toolUseDanger(bash(command))?.kind).toBe('secret_read');
   });
@@ -201,6 +236,14 @@ describe('toolUseDanger', () => {
     'npx prisma generate',
     'timeout 60 bun test',
     'git -c color.ui=never status',
+    'set -e',
+    'set -o pipefail',
+    'export NODE_ENV=test',
+    'declare -x FOO=bar',
+    'uv run pytest',
+    'uv run --with requests python3 -m pytest',
+    'poetry run pytest -q',
+    'bundle exec rspec',
   ])('lets a harmless command through: %s', (command) => {
     expect(toolUseDanger(bash(command))).toBeNull();
   });
@@ -210,6 +253,12 @@ describe('toolUseDanger', () => {
     expect(toolUseDanger(read('/repo/.env.example'))).toBeNull();
     expect(toolUseDanger(read('/home/me/.ssh_notes.md'))).toBeNull();
     expect(isSecretPath('/home/me/id_ed25519.pub')).toBe(false);
+  });
+
+  it('flags reading a process environment with a file tool', () => {
+    expect(toolUseDanger(read('/proc/self/environ'))?.kind).toBe('secret_read');
+    expect(isSecretPath('/proc/1234/environ')).toBe(true);
+    expect(isSecretPath('/proc/self/task/12/environ')).toBe(true);
   });
 
   it('does not read the text an Edit writes, only its path', () => {
@@ -392,6 +441,33 @@ describe('toolRuleAllowing', () => {
     }
   });
 
+  it('never lets a package-runner rule run destructive shell or a protected push', () => {
+    const rules = [
+      { id: 'u', toolName: 'Bash', ruleContent: 'uv run:*' },
+      { id: 'p', toolName: 'Bash', ruleContent: 'poetry run:*' },
+      { id: 'x', toolName: 'Bash', ruleContent: 'uvx:*' },
+    ];
+    for (const command of [
+      'uv run rm -rf ~',
+      'uv run bash -c "rm -rf ~"',
+      'uv run git push origin main',
+      'poetry run git push -f',
+      'uvx rm -rf ~',
+    ]) {
+      expect(toolRuleAllowing(rules, bash(command))).toBeNull();
+    }
+  });
+
+  it('never lets a cat rule read the process environment', () => {
+    const rules = [
+      { id: 'c', toolName: 'Bash', ruleContent: 'cat:*' },
+      { id: 's', toolName: 'Bash', ruleContent: 'strings:*' },
+    ];
+    expect(toolRuleAllowing(rules, bash('cat /proc/self/environ'))).toBeNull();
+    expect(toolRuleAllowing(rules, bash('strings /proc/1/environ'))).toBeNull();
+    expect(toolRuleAllowing(rules, bash('cat README.md'))?.id).toBe('c');
+  });
+
   it('never answers a write to agent config, even under a stored rule', () => {
     const settings = '/home/me/.claude/settings.json';
     const rules = [
@@ -510,6 +586,18 @@ describe('rememberableToolRules', () => {
     ['npm run lint', 'npm run:*'],
     ['bun run lint', 'bun:*'],
     ['ssh host uptime', 'ssh host:*'],
+    ['uv run pytest', 'uv run:*'],
+    ['uv run pytest', 'uv run --with requests:*'],
+    ['uv tool run ruff', 'uv tool run:*'],
+    ['uvx ruff check', 'uvx:*'],
+    ['poetry run pytest', 'poetry run:*'],
+    ['pipenv run pytest', 'pipenv run:*'],
+    ['pdm run test', 'pdm run:*'],
+    ['hatch run test', 'hatch run:*'],
+    ['rye run test', 'rye run:*'],
+    ['conda run -n base pytest', 'conda run -n base:*'],
+    ['bundle exec rspec', 'bundle exec:*'],
+    ['uv run bash -c "echo hi"', 'uv run bash:*'],
   ])('refuses an interpreter, wrapper or runner prefix: %s as %s', (command, ruleContent) => {
     expect(
       rememberableToolRules(bash(command), [{ toolName: 'Bash', ruleContent }])
@@ -523,6 +611,8 @@ describe('rememberableToolRules', () => {
       ['npm test', 'npm test:*'],
       ['git status', 'git status:*'],
       ['npx prisma generate', 'npx prisma:*'],
+      ['uv run pytest', 'uv run pytest:*'],
+      ['poetry run pytest -q', 'poetry run pytest:*'],
     ] as const) {
       expect(
         rememberableToolRules(bash(command), [

@@ -35,7 +35,8 @@ Nautelle never offered it.
    or interpreter is never stored: a tool-wide shell or file-writing rule, a
    prefix starting with a shell, interpreter, `ssh`, `sudo`, `docker` or
    `kubectl` whatever follows (`Bash(bash -c:*)`, `Bash(python3 -m:*)`), a
-   prefix that is only wrappers (`timeout:*`, `npm exec:*`, `npx:*`), and a
+   prefix that is only wrappers (`timeout:*`, `npm exec:*`, `npx:*`,
+   `uv run:*`, `uvx:*`, `poetry run:*`, `bundle exec:*`), and a
    prefix that stops at a package manager, its `run`, or a subcommand that
    runs code (`npm:*`, `bun run:*`, `bun -e:*`, `git:*`, `git -c:*`).
 3. **The API keeps and applies the rules; Claude Code never learns them.**
@@ -67,14 +68,18 @@ Nautelle never offered it.
    program named by a variable, and the like), read past quotes and escapes
    (`\rm`, `'rm'`), subshells and groups, and wrappers with their options
    (`env`, `timeout 60`, `nice -n 5`, `xargs -I {}`, `npm exec --`, `npx`,
-   `bun x` …); writing agent, hook, git or shell configuration that can
+   `bun x`, and the package runners `uv run`, `uvx`, `poetry run`,
+   `pipenv run`, `pdm run`, `hatch run`, `rye run`, `conda run`,
+   `bundle exec` …); writing agent, hook, git or shell configuration that can
    switch this check off (`.claude/`, `.codex/`, `.mcp.json`, plugin
    `hooks.json`, `.git/hooks`, `.git/config`, `.husky/`, shell rc files —
    reading them is fine; any shell word naming them asks); a `git push` that may reach a protected branch (`main`, `master`,
    `develop`, `release/*`, `production` …, `HEAD`, any force, delete or
    mirror push, or a push that names no branch), and reading secrets or
    credential files (`.env` but not `.env.example`, keys, `~/.ssh`, `~/.aws`,
-   `.netrc`, the runner's `runner.json`, printing the environment …). Such a
+   `.netrc`, the runner's `runner.json`, printing the environment with
+   `env`, `printenv`, a bare `set`, `export -p` or `declare -x`, or reading
+   `/proc/*/environ` …). Such a
    call is never answered by a rule, and remembering it is refused with
    `409 not_rememberable`, deciding nothing.
 6. **The timeout is a setting.** `Project.toolUseTimeoutMinutes`, else the

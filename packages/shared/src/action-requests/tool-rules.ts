@@ -197,6 +197,8 @@ const SECRET_PATHS: readonly RegExp[] = [
   /\.(?:pem|key|p12|pfx|jks|keystore|kdbx)$/i,
   /(?:^|\/)nautelle\/runner\.json$/i,
   /^\/etc\/(?:shadow|gshadow|sudoers)$/i,
+  // A process environment: `/proc/self/environ`, `/proc/1/environ` and the like.
+  /(?:^|\/)environ$/i,
 ];
 
 /** Whether a path (or a shell word holding one) names a secret. */
@@ -275,7 +277,39 @@ const PACKAGE_EXEC: Wrapper = {
   runsString: ['-c', '--call'],
 };
 
-/** Words that run the program after them, by name or by `name subcommand`. */
+const UV_RUN: Wrapper = {
+  valued: [
+    '-p',
+    '--python',
+    '--with',
+    '--with-editable',
+    '--with-requirements',
+    '--from',
+    '--package',
+    '--project',
+    '--directory',
+    '--extra',
+    '--group',
+    '--only-group',
+    '--no-group',
+    '--env-file',
+    '--index',
+    '--default-index',
+    '--index-url',
+    '--extra-index-url',
+    '-f',
+    '--find-links',
+    '--cache-dir',
+    '--config-file',
+    '-C',
+    '--config-setting',
+  ],
+};
+
+/**
+ * Words that run the program after them, by name or by `name subcommand`
+ * (up to two subcommand words).
+ */
 const WRAPPERS: ReadonlyMap<string, Wrapper> = new Map<string, Wrapper>([
   [
     'env',
@@ -328,6 +362,20 @@ const WRAPPERS: ReadonlyMap<string, Wrapper> = new Map<string, Wrapper>([
   ['yarn exec', {}],
   ['yarn dlx', PACKAGE_EXEC],
   ['bun x', PACKAGE_EXEC],
+  // Package runners of other ecosystems: they run any program in a project
+  // environment (`uv run rm -rf ~` is `rm -rf ~`).
+  ['uv run', UV_RUN],
+  ['uv tool run', UV_RUN],
+  ['uvx', UV_RUN],
+  ['poetry run', { valued: ['-C', '--directory', '-P', '--project'] }],
+  ['pipenv run', {}],
+  ['pdm run', { valued: ['-p', '--project', '--venv'] }],
+  ['hatch run', {}],
+  ['rye run', {}],
+  ['pixi run', { valued: ['-e', '--environment', '--manifest-path'] }],
+  ['conda run', { valued: ['-n', '--name', '-p', '--prefix', '--cwd'] }],
+  ['mamba run', { valued: ['-n', '--name', '-p', '--prefix', '--cwd'] }],
+  ['bundle exec', { valued: ['--gemfile'] }],
 ]);
 
 interface Program {
@@ -350,10 +398,12 @@ const programOf = (words: readonly string[]): Program => {
       i += 1;
       continue;
     }
-    const pair = WRAPPERS.get(`${baseName(word)} ${words[i + 1] ?? ''}`);
-    const wrapper = pair ?? WRAPPERS.get(baseName(word));
+    const pair = `${baseName(word)} ${words[i + 1] ?? ''}`;
+    const triple = WRAPPERS.get(`${pair} ${words[i + 2] ?? ''}`);
+    const double = triple ? undefined : WRAPPERS.get(pair);
+    const wrapper = triple ?? double ?? WRAPPERS.get(baseName(word));
     if (wrapper === undefined) break;
-    i += pair ? 2 : 1;
+    i += triple ? 3 : double ? 2 : 1;
     let positional = wrapper.positional ?? 0;
     while (i < words.length) {
       const arg = words[i] ?? '';
@@ -670,6 +720,28 @@ const strings = (value: unknown, depth = 0): string[] => {
   return Object.values(value).flatMap((v) => strings(v, depth + 1));
 };
 
+/** Shell builtins that print variables when no `NAME=value` is given. */
+const VARIABLE_BUILTINS = new Set([
+  'export',
+  'declare',
+  'typeset',
+  'readonly',
+  'local',
+]);
+
+/**
+ * Whether a program prints the environment or the shell's variables:
+ * `printenv`, a bare `set`, `export -p`, `declare -x`, `typeset -p` …
+ */
+const printsEnvironment = (words: readonly string[]): boolean => {
+  const [program, ...args] = words;
+  if (program === undefined) return false;
+  const name = baseName(program);
+  if (name === 'printenv') return true;
+  if (name === 'set') return args.every((arg) => /^[-+]o$/.test(arg));
+  return VARIABLE_BUILTINS.has(name) && !args.some((arg) => arg.includes('='));
+};
+
 /**
  * Why a call must always ask a person, or null. Checked before a rule is
  * remembered and before a rule answers a call, so no rule — however broad
@@ -695,7 +767,7 @@ export const toolUseDanger = (call: ToolUseCall): ToolUseDanger | null => {
       }
       if (
         (words.length === 0 && segment.includes('env')) ||
-        words[0] === 'printenv'
+        printsEnvironment(words)
       ) {
         return {
           kind: 'secret_read',
