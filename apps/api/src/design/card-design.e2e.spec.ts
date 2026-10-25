@@ -1,5 +1,6 @@
 import { BOARD_ERROR } from '@nautelle/shared';
 import { BoardFailure } from '../board/board-error';
+import { BoardRunQueue } from '../board/board-run-queue';
 import { BudgetGate } from '../budgets/budget-gate';
 import { capabilities } from '../runners/testing/runner-e2e';
 import { CardDesignHarness } from './testing/card-design-e2e';
@@ -573,7 +574,7 @@ describe('card design (e2e, #243)', () => {
       expect(await failure(card.number)).toBeNull();
     });
 
-    it('max_running: 200, approved, run_failed stored on the card; a later Run clears it', async () => {
+    it('max_running: 200, approved, run queued; the card starts when a slot frees (C-398)', async () => {
       const { card, revisionId } = await reviewing(true);
       await h.ctx.prisma.boardSettings.upsert({
         where: { projectId: h.projectId },
@@ -589,27 +590,26 @@ describe('card design (e2e, #243)', () => {
       const answered = await approve(card.number, revisionId);
       expect(answered.status).toBe(200);
       expect(answered.body.status).toBe('approved');
-      expect(answered.body.run).toMatchObject({
-        status: 'run_failed',
-        code: 'max_running',
+      expect(answered.body.run).toEqual({ status: 'queued' });
+      expect(await failure(card.number)).toBeNull();
+      expect(await h.auditOf('card.auto_run_failed')).toEqual([]);
+      expect((await h.author.get(h.cardPath(card.number))).body.queue).toEqual({
+        state: 'queued',
+        place: 1,
+        stack: null,
       });
-      expect(answered.body.run.message).toContain('1 of 1');
-      expect(await failure(card.number)).toMatchObject({
-        code: 'max_running',
-      });
-      const [audit] = await h.auditOf('card.auto_run_failed');
-      expect(audit.after).toMatchObject({ error: 'max_running' });
-      expect(audit.targetId).toBe(card.id);
+      expect(h.cardSentOf('card.run')).toHaveLength(1);
 
       await h.ctx.prisma.boardSettings.update({
         where: { projectId: h.projectId },
         data: { maxRunning: 3 },
       });
-      expect(
-        (await h.author.send('post', `${h.cardPath(card.number)}/run`, {}))
-          .status,
-      ).toBe(200);
-      expect(await failure(card.number)).toBeNull();
+      jest.spyOn(h.boardCommands, 'isConnected').mockReturnValue(true);
+      await h.ctx.app.get(BoardRunQueue).nudge(h.projectId);
+      expect(h.cardSentOf('card.run')).toHaveLength(2);
+      expect((await h.author.get(h.cardPath(card.number))).body.queue).toBe(
+        null,
+      );
     });
 
     it('a hard-stop budget: run_failed with budget_exceeded', async () => {

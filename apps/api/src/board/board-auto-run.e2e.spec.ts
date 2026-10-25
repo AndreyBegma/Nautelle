@@ -301,7 +301,7 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       expect((await w.card(c.number)).rounds).toHaveLength(1);
     });
 
-    it('with no free slot, refuses like a manual Run and says why on the card', async () => {
+    it('with no free slot, queues the card like a manual Run and starts it when a slot frees (C-398)', async () => {
       await w.admin.send('put', `${w.path()}/board-settings`, {
         issueOnRun: false,
         specOnRun: false,
@@ -316,26 +316,31 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       await accept(b.number);
       await w.work.settled();
 
-      // Only the busy card's Run was sent; the manual Run is refused the same way.
+      // Only the busy card's Run was sent; C waits for a slot, not refused.
       expect(w.sent('card.run')).toHaveLength(1);
-      const manual = await w.runCard(c.number);
-      expect(manual.status).toBe(409);
-      expect(manual.body.error).toBe(BOARD_ERROR.maxRunning);
-
       const shown = await face(c.number);
       expect(shown?.column).toBe('todo');
       expect(shown?.autoRunWhenReady).toBe(false);
-      expect(shown?.readiness?.state).toBe('ready');
-      expect(shown?.autoRunFailure).toMatchObject({
-        code: BOARD_ERROR.maxRunning,
-        message: manual.body.message,
-        after: b.number,
+      expect(shown?.autoRunFailure).toBeNull();
+      expect(shown?.queue).toEqual({ state: 'queued', place: 1, stack: null });
+      expect(await w.audit('card.auto_run_failed')).toEqual([]);
+      // A manual Run of a queued card leaves it queued once.
+      const manual = await w.runCard(c.number);
+      expect(manual.status).toBe(200);
+      expect((manual.body as BoardCardDetail).queue).toMatchObject({
+        place: 1,
       });
-      const [failed] = await w.audit('card.auto_run_failed');
-      expect(failed).toMatchObject({
-        result: 'error',
-        after: { number: c.number, error: 'max_running', after: b.number },
-      });
+
+      expect(
+        (await w.operator.send('post', `${cardPath(busy.number)}/finish`))
+          .status,
+      ).toBe(200);
+      await w.work.settled();
+      expect(w.sent('card.run')).toHaveLength(2);
+      const started = await detail(c.number);
+      expect(started.column).toBe('in_progress');
+      expect(started.queue).toBeNull();
+      expect((await w.card(c.number)).rounds[0].autoRunAfter).toBe(b.number);
     });
 
     it('with the budget reached, refuses like a manual Run', async () => {

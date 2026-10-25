@@ -4,7 +4,7 @@ import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
 
 /**
- * C-396 (ADR-0102): what the connect dialog needs from a runner before a
+ * C-396 (ADR-0103): what the connect dialog needs from a runner before a
  * project is stored. The control plane never reads a project's filesystem
  * (ADR-0001), so the runner lists the git repositories under its own
  * `allowedRoots` for a picker, and checks that it can push to a repository's

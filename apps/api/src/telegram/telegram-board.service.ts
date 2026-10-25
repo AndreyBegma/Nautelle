@@ -374,8 +374,9 @@ export class TelegramBoardService {
         );
         service = `Moved to ${COLUMN_TITLE[column]}.`;
       } else if (action === 'run') {
-        await this.rounds.run(projectId, number, {}, scope.actor);
-        service = 'Run started.';
+        const card = await this.rounds.run(projectId, number, {}, scope.actor);
+        // C-398: a full Board queues the card instead of refusing it.
+        service = card.queue ? 'Waiting for a slot.' : 'Run started.';
       } else {
         await this.board.stop(projectId, number, scope.actor);
         service = 'Worker stopped.';

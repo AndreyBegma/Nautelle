@@ -91,6 +91,7 @@ model User {
   boardCardsCreated           BoardCard[]                   @relation("BoardCardCreatedBy")
   boardStacksCreated          BoardStack[]                  @relation("BoardStackCreatedBy")
   boardStackRunsStarted       BoardStackRun[]               @relation("BoardStackRunStartedBy")
+  boardRunQueueCards          BoardRunQueueCard[]           @relation("BoardRunQueueCardQueuedBy")
   boardCardsMoved             BoardCard[]                   @relation("BoardCardMovedBy")
   boardCardsCompleted         BoardCard[]                   @relation("BoardCardCompletedBy")
   boardCardsAutoRunArmed      BoardCard[]                   @relation("BoardCardAutoRunArmedBy")
@@ -3449,8 +3450,8 @@ model BoardCard {
   candidate            PlanCandidate?
   /// #660: the triage hints written when the card was made.
   triage               BoardCardTriage?
-  /// #652: the card's place in its stack's run queue.
-  stackRunEntry        BoardStackRunCard?
+  /// #652, C-398: the card's place in the run queue.
+  queueEntry           BoardRunQueueCard?
   /// #652: the stack runs this card paused.
   stackRunsPaused      BoardStackRun[]        @relation("BoardStackRunPausedCard")
   /// #746: the card's A/B arm per technique, drawn at its first launch.
@@ -3596,36 +3597,51 @@ model BoardStackRun {
   stack      BoardStack          @relation(fields: [stackId], references: [id], onDelete: Cascade)
   startedBy  User?               @relation("BoardStackRunStartedBy", fields: [startedById], references: [id], onDelete: SetNull)
   pausedCard BoardCard?          @relation("BoardStackRunPausedCard", fields: [pausedCardId], references: [id], onDelete: SetNull)
-  cards      BoardStackRunCard[]
+  cards      BoardRunQueueCard[]
 
   @@index([pausedCardId])
   @@map("board_stack_runs")
 }
 
-/// #652: a card's place in a stack run — `queued` and ready to start,
-/// `waiting` for a dependency, or `started` by the run (`roundId`).
-enum BoardStackRunCardStatus {
+/// #652: a card's place in the run queue — `queued` and ready to start when
+/// a slot frees, `waiting` for a dependency, or `started` by a stack run
+/// (`roundId`). C-398: a card queued on its own is never `started`; its entry
+/// goes once its round starts.
+enum BoardRunQueueStatus {
   queued
   waiting
   started
 }
 
-/// #652: one card of a stack run's queue. A card is in one stack, so in one run.
-model BoardStackRunCard {
-  id        String                  @id @default(cuid())
-  runId     String
-  cardId    String                  @unique
-  status    BoardStackRunCardStatus @default(queued)
-  /// The round the run started; `null` until it starts one.
-  roundId   String?
-  createdAt DateTime                @default(now())
-  updatedAt DateTime                @updatedAt
+/// #652, C-398 (ADR-0102): one card of the Board's run queue — a card of a
+/// stack run (`runId`), or a To Do card a Run at `maxRunning` left waiting
+/// for a slot (`runId` null). Queued cards start in To Do order.
+model BoardRunQueueCard {
+  id           String              @id @default(cuid())
+  /// The stack run that queued it; `null` for a card queued on its own.
+  runId        String?
+  cardId       String              @unique
+  status       BoardRunQueueStatus @default(queued)
+  /// The round the stack run started; `null` until it starts one.
+  roundId      String?
+  /// C-398: who pressed Run — the card starts as them. `null` in a stack run (its `startedById`) or for AgentDock.
+  queuedById   String?
+  /// C-398: their project role then (`operator` or `admin`); `null` in a stack run.
+  queuedByRole String?
+  /// C-398: the Run's launch choices (`RunBoardCardRequest`); `null` in a stack run.
+  options      Json?
+  /// C-398: the dependency an Auto-run when ready Run started after.
+  autoRunAfter Int?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 
-  run  BoardStackRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  card BoardCard     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  run      BoardStackRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
+  card     BoardCard      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  queuedBy User?          @relation("BoardRunQueueCardQueuedBy", fields: [queuedById], references: [id], onDelete: SetNull)
 
   @@index([runId])
-  @@map("board_stack_run_cards")
+  @@index([queuedById])
+  @@map("board_run_queue")
 }
 
 /// #480: one stage of a stack. Its cards may run in parallel; they wait on

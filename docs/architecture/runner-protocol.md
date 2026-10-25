@@ -1026,13 +1026,13 @@ D2–D8 and D10.
   other file is read. Admin-only, like `project.inspect`, and checked against
   the policy's `allowedRoots` the same way. Nothing is stored: the API
   creates rules only from the candidates a person accepts.
-- `project.discover {}` (C-396, ADR-0102) walks the policy's `allowedRoots`
+- `project.discover {}` (C-396, ADR-0103) walks the policy's `allowedRoots`
   — at most 3 folders deep, 5000 folders and 200 repositories — and answers
   the git main checkouts it finds (`.git` is a directory) with their
   GitHub `owner/name`, read from `.git/config` as text. It runs no git and
   reads no other file; linked worktrees, hidden folders, symlinks and build
   folders are skipped. `truncated` says a limit was hit.
-- `project.push_check { path }` (C-396, ADR-0102) runs
+- `project.push_check { path }` (C-396, ADR-0103) runs
   `git push --dry-run --porcelain origin HEAD:refs/heads/nautelle/push-check`
   with the runner's usual git settings and answers
   `{ ok, remote, message }`: whether origin accepts pushes from this runner,

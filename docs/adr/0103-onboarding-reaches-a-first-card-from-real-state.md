@@ -1,4 +1,4 @@
-# ADR-0102: Onboarding reaches a first card from real state
+# ADR-0103: Onboarding reaches a first card from real state
 
 Status: accepted · Date: 2026-10-25 · Card: C-396 ·
 Spec: [`docs/specs/card-396-onboarding-to-the-first-card-a-full-chec.md`](../specs/card-396-onboarding-to-the-first-card-a-full-chec.md) ·
