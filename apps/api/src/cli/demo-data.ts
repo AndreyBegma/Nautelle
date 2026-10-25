@@ -106,6 +106,27 @@ export const DEMO_FAILED_RUNS: ReadonlyArray<{
   },
 ];
 
+/** C-401: the away session that asks for the tool calls below. */
+export const DEMO_AWAY_SESSION_ID = 'demo-session-away';
+
+/**
+ * C-401: tool calls the away session waits on. One comes with Claude Code's
+ * rule suggestion, so it can be allowed for similar calls; the push to the
+ * default branch always asks.
+ */
+export const DEMO_TOOL_CALLS: ReadonlyArray<{
+  id: string;
+  command: string;
+  suggestions?: ReadonlyArray<{ toolName: string; ruleContent: string }>;
+}> = [
+  {
+    id: 'demo-action-test',
+    command: 'bun run test --filter web',
+    suggestions: [{ toolName: 'Bash', ruleContent: 'bun run test:*' }],
+  },
+  { id: 'demo-action-push', command: 'git push origin main' },
+];
+
 /**
  * Seeds the demo project and its cards for the admin `adminEmail`, who must
  * exist (`bun run admin:create`). Every row has a fixed key, so running it
@@ -114,7 +135,15 @@ export const DEMO_FAILED_RUNS: ReadonlyArray<{
 export const seedDemo = async (
   prisma: Pick<
     PrismaClient,
-    'user' | 'runner' | 'project' | 'boardCard' | 'run' | 'boardCardRound'
+    | 'user'
+    | 'runner'
+    | 'project'
+    | 'boardCard'
+    | 'run'
+    | 'boardCardRound'
+    | 'agentSession'
+    | 'actionRequest'
+    | 'toolUseRule'
   >,
   adminEmail: string,
 ): Promise<{ projectId: string; cards: number }> => {
@@ -148,6 +177,8 @@ export const seedDemo = async (
       hasClaudeMd: true,
       hasAgentsMd: false,
       lastInspectedAt: now,
+      // C-401: away mode requests wait four hours for a person.
+      toolUseTimeoutMinutes: 240,
       createdById: admin.id,
       members: { create: { userId: admin.id, addedById: admin.id } },
     },
@@ -263,5 +294,65 @@ export const seedDemo = async (
       },
     });
   }
+
+  // C-401: an unattended session waiting on two tool calls, and a project
+  // rule an earlier "Always allow" stored.
+  await prisma.agentSession.upsert({
+    where: { id: DEMO_AWAY_SESSION_ID },
+    update: {},
+    create: {
+      id: DEMO_AWAY_SESSION_ID,
+      runnerId: DEMO_RUNNER_ID,
+      runtime: 'claude',
+      externalId: '0000c401-0000-4000-8000-000000000001',
+      projectId: DEMO_PROJECT_ID,
+      cwd: '/srv/demo/acme-shop',
+      gitBranch: 'card/c4-show-the-runner-version-in-the-header',
+      title: 'Show the runner version in the header',
+      origin: 'manual',
+      ownerId: admin.id,
+      startedAt: new Date(now.getTime() - 30 * 60_000),
+      lastEventAt: now,
+    },
+  });
+  for (const call of DEMO_TOOL_CALLS) {
+    const input = JSON.stringify({ command: call.command });
+    await prisma.actionRequest.upsert({
+      where: { id: call.id },
+      update: {},
+      create: {
+        id: call.id,
+        projectId: DEMO_PROJECT_ID,
+        runnerId: DEMO_RUNNER_ID,
+        sessionId: DEMO_AWAY_SESSION_ID,
+        requestedById: admin.id,
+        kind: 'tool_use',
+        summary: 'Allow Bash in an unattended Claude Code session',
+        args: {
+          toolName: 'Bash',
+          input,
+          truncated: false,
+          fullLength: input.length,
+          ...(call.suggestions ? { suggestions: [...call.suggestions] } : {}),
+        },
+        expiresAt: new Date(now.getTime() + 240 * 60_000),
+      },
+    });
+  }
+  await prisma.toolUseRule.upsert({
+    where: { id: 'demo-rule-lint' },
+    update: {},
+    create: {
+      id: 'demo-rule-lint',
+      projectId: DEMO_PROJECT_ID,
+      scope: 'project',
+      toolName: 'Bash',
+      ruleContent: 'bun run lint:*',
+      createdById: admin.id,
+      useCount: 3,
+      lastUsedAt: new Date(now.getTime() - 15 * 60_000),
+      createdAt: new Date(now.getTime() - 2 * 24 * 60 * 60_000),
+    },
+  });
   return { projectId: DEMO_PROJECT_ID, cards: DEMO_CARDS.length };
 };
