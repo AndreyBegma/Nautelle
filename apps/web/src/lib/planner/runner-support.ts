@@ -114,6 +114,8 @@ const FEATURE_VERB: Record<RunnerFeature, string> = {
   worktree: 'read worktrees',
   docsRepo: 'write specs to a docs repository',
   ruleScan: 'scan a project for coding rules',
+  repoPicker: 'list the repositories under its allowed folders',
+  pushCheck: 'check that it can push',
   prefixOptimise: 'compress rules and propose prefix overlays',
 };
 
