@@ -5,6 +5,7 @@
 | **Control plane** | `apps/api` + `apps/web` + PostgreSQL. Stores everything, serves the UI, never touches a project's filesystem |
 | **Runner** | `apps/runner`, a daemon on each machine that hosts projects and agents. Observes and executes on behalf of the control plane |
 | **Pairing** | exchanging a one-time code for a runner token |
+| **Personal API token** | a `ntl_…` bearer token a user makes under Account › API tokens to call the REST API from scripts; acts as its owner with the owner's current role or less, optionally read-only, limited to projects or expiring ([ADR-0102](../adr/0102-personal-api-tokens-act-as-their-owner-never-above-the-owners-current-role.md)) |
 | **Project** | a git repository on a runner, connected by path |
 | **Docs source** | where a project's specs / ADRs / roadmap live — in-repo folder or a separate repository |
 | **Runtime** | an agent CLI: `claude` or `codex` |
