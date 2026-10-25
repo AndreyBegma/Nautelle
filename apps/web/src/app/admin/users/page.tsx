@@ -39,6 +39,7 @@ import {
   ROLE_LABEL,
   roleChangeNeedsConfirm,
 } from '../../../lib/users/format';
+import { AdminApiTokensCard } from './api-tokens-card';
 import { type Confirmation, confirmationCopy } from './confirmation';
 import { RegistrationCard } from './registration-card';
 import { TwoFactorPolicyCard } from './two-factor-policy-card';
@@ -413,11 +414,12 @@ export default function AdminUsersPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Users"
-        description="Approve registrations, pick each person’s role, and disable or delete accounts. Operators and viewers see only the projects they are added to, under each project’s Settings › Members."
+        description="Approve registrations, pick each person’s role, disable or delete accounts, and revoke their API tokens. Operators and viewers see only the projects they are added to, under each project’s Settings › Members."
       />
       <Suspense fallback={<Skeleton className="h-48 w-full" />}>
         <UsersTable viewer={viewer} />
       </Suspense>
+      <AdminApiTokensCard />
     </div>
   );
 }

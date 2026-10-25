@@ -10,6 +10,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'auth.two_factor_enable': 'Turned on two-factor sign-in',
   'auth.two_factor_disable': 'Turned off two-factor sign-in',
   'auth.two_factor_recovery_codes': 'Made new recovery codes',
+  'auth.api_token_create': 'Created an API token',
+  'auth.api_token_revoke': 'Revoked an API token',
   'user.create': 'Created a user',
   'user.approve': 'Approved a registration',
   'user.reject': 'Rejected a registration',

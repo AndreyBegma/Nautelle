@@ -49,3 +49,8 @@ This is part of the core plan of 2026-10-25, settled with the person in a grilli
 
 ## Open questions
 - None.
+
+## Implementation note
+- The implementation is recorded in
+  [ADR-0104](../adr/0104-personal-api-tokens-act-as-their-owner-never-above-the-owners-current-role.md),
+  including the routes that refuse a token because they need a browser session.

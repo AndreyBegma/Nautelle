@@ -25,6 +25,10 @@ import { ArrowDown, ArrowLeft, Layers, Play, Square, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import {
+  DesignReview,
+  type DesignReviewActions,
+} from '../../../../../../../components/design/design-review';
 import { GenerateDesignLink } from '../../../../../../../components/design/generate-design-link';
 import { MockupFrame } from '../../../../../../../components/design/mockup-frame';
 import { ScaledPreview } from '../../../../../../../components/design/scaled-preview';
@@ -79,6 +83,8 @@ import {
 } from '../../../../../../../lib/design/href';
 import { mobilePreset } from '../../../../../../../lib/design/mobile-preview';
 import { isDesignBusy } from '../../../../../../../lib/design/progress';
+import { showsInPlaceReview } from '../../../../../../../lib/design/review';
+import type { DesignBusy } from '../../../../../../../lib/design/use-design';
 import { formatCost } from '../../../../../../../lib/format';
 import { useLive } from '../../../../../../../lib/live/use-live';
 import { useErrorToast } from '../../../../../../../lib/section/use-error-toast';
@@ -214,6 +220,51 @@ function StackDetail({
       setBusy(false);
     }
   };
+  const designApi = stackDesignApi(projectId, stack.number);
+  // C-394: while the design waits with a revision to look at, the aside's
+  // in-place review is the one place to decide it; the header and the dock
+  // drop their Approve.
+  const inPlace = design !== undefined && showsInPlaceReview(design);
+  const [decision, setDecision] = useState<DesignBusy | null>(null);
+  /** One in-place decision; a refusal is toasted and rethrown so the comment keeps its text. */
+  const decide = async (what: DesignBusy, job: () => Promise<unknown>) => {
+    setBusy(true);
+    setDecision(what);
+    try {
+      await job();
+      onChanged();
+    } catch (error) {
+      showError(describeDesignError(error, projectId));
+      throw error;
+    } finally {
+      setBusy(false);
+      setDecision(null);
+    }
+  };
+  const reviewActions: DesignReviewActions = {
+    approve: (body) =>
+      decide('approve', () =>
+        api(`${designApi}/approve`, { method: 'POST', body }),
+      ),
+    comment: (body) =>
+      decide('comment', () =>
+        api(`${designApi}/comments`, { method: 'POST', body }),
+      ),
+    revise: () =>
+      decide('revise', () => api(`${designApi}/revise`, { method: 'POST' })),
+  };
+  const review =
+    inPlace && design ? (
+      <DesignReview
+        design={design}
+        label={stack.label}
+        viewerHref={stackDesignHref(projectId, stack.number)}
+        canOperate={canOperate}
+        busy={decision}
+        actions={reviewActions}
+        consequence="Approving lifts the design gate: the stack's cards can run, each drawing its own design on this one."
+      />
+    ) : null;
   const gated = isGated(stack);
   const approvable = design ? approvableRevision(design) : null;
   const viewer = stackDesignHref(projectId, stack.number);
@@ -231,7 +282,7 @@ function StackDetail({
       onClick={() =>
         run(
           () =>
-            api(`${stackDesignApi(projectId, stack.number)}/approve`, {
+            api(`${designApi}/approve`, {
               method: 'POST',
               body: { revisionId: approvable.id },
             }),
@@ -256,7 +307,7 @@ function StackDetail({
         <Link href={viewer} className={buttonClassName({ variant: 'glass' })}>
           Revise design
         </Link>
-        {approve}
+        {inPlace ? null : approve}
       </>
     ) : null
   ) : null;
@@ -267,7 +318,7 @@ function StackDetail({
       generate
     ) : reviewing ? (
       <>
-        {approve}
+        {inPlace ? null : approve}
         <Link href={viewer} className={buttonClassName({ variant: 'glass' })}>
           Open viewer
         </Link>
@@ -362,6 +413,7 @@ function StackDetail({
           projectId={projectId}
           stack={stack}
           design={design}
+          review={review}
           canOperate={canOperate}
           busy={busy}
           onChanged={onChanged}
@@ -774,6 +826,7 @@ function StackDesignAside({
   projectId,
   stack,
   design,
+  review,
   canOperate,
   busy,
   onChanged,
@@ -781,6 +834,8 @@ function StackDesignAside({
   projectId: string;
   stack: BoardStackDetail;
   design: TaskDesignView | undefined;
+  /** C-394: the in-place review; while shown it carries the preview and the viewer link. */
+  review: React.ReactNode;
   canOperate: boolean;
   busy: boolean;
   onChanged: () => void;
@@ -813,7 +868,7 @@ function StackDesignAside({
           </p>
         ) : (
           <>
-            {frame && narrow ? (
+            {review ? null : frame && narrow ? (
               <ScaledPreview
                 src={frame.htmlUrl}
                 title={`${stack.label} design · variant ${preview?.variant}`}
@@ -871,18 +926,20 @@ function StackDesignAside({
                 },
               ]}
             />
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={viewer}
-                className={buttonClassName({
-                  variant: 'glass',
-                  size: 'sm',
-                  className: 'max-lg:h-11',
-                })}
-              >
-                Open full size
-              </Link>
-            </div>
+            {review ?? (
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={viewer}
+                  className={buttonClassName({
+                    variant: 'glass',
+                    size: 'sm',
+                    className: 'max-lg:h-11',
+                  })}
+                >
+                  Open full size
+                </Link>
+              </div>
+            )}
           </>
         )}
       </div>

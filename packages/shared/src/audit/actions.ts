@@ -12,6 +12,9 @@ export const AUDIT_ACTIONS = [
   'auth.two_factor_enable',
   'auth.two_factor_disable',
   'auth.two_factor_recovery_codes',
+  /** C-403: a personal API token was created or revoked (by its owner or an admin). */
+  'auth.api_token_create',
+  'auth.api_token_revoke',
   'user.create',
   'user.approve',
   'user.reject',
