@@ -4,6 +4,7 @@ import type {
   ProjectMemberView,
   ProjectRuntimeProfile,
   ProjectSummary,
+  PushCheckView,
   Role,
   RunnerStatus,
 } from '@nautelle/shared';
@@ -21,6 +22,7 @@ import type {
   Prisma,
   Project,
   ProjectMember,
+  RepositoryPushCheck,
   RuntimeProfile,
   User,
 } from '@prisma/client';
@@ -105,10 +107,18 @@ export const toProjectSummary = (
   watchRefusal: project.watchRefusal,
 });
 
+const toPushCheckView = (check: RepositoryPushCheck): PushCheckView => ({
+  ok: check.ok,
+  remote: check.remote,
+  message: check.message,
+  checkedAt: check.checkedAt.toISOString(),
+});
+
 export const toProjectDetail = (
   project: ProjectWithRelations,
   runnerStatus: RunnerStatus,
   role: Role,
+  pushCheck: RepositoryPushCheck | null,
 ): ProjectDetail => ({
   ...toProjectSummary(project, runnerStatus, role),
   baseBranch: project.baseBranch,
@@ -128,6 +138,8 @@ export const toProjectDetail = (
         ),
   hasClaudeMd: project.hasClaudeMd,
   hasAgentsMd: project.hasAgentsMd,
+  hasDemoflowConfig: project.hasDemoflowConfig,
+  pushCheck: pushCheck ? toPushCheckView(pushCheck) : null,
   lastInspectedAt: project.lastInspectedAt.toISOString(),
   createdAt: project.createdAt.toISOString(),
   updatedAt: project.updatedAt.toISOString(),

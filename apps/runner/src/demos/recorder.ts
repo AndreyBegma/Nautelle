@@ -34,6 +34,7 @@ import {
   type UploadOptions,
   uploadDemoVideo,
 } from './api';
+import { DEMOFLOW_CONFIG_FILE } from './config-file';
 import { demoflowCommand } from './pin';
 import {
   createDemoflowSpawn,
@@ -56,8 +57,6 @@ export const DEMO_RUN_TIMEOUT_MS = 10 * 60_000;
 export const DEMO_DEFAULT_MAX_CONCURRENT = 2;
 /** Demos waiting behind the ones recording; one more is `busy`. */
 export const DEMO_QUEUE_MAX = 16;
-/** DemoFlow's project config, at the root of the repository. */
-export const DEMOFLOW_CONFIG_FILE = 'demoflow.config.json';
 
 /** What the runner reads of `demoflow.config.json`; DemoFlow checks the rest. */
 const demoflowConfigSchema = z.object({

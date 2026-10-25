@@ -189,6 +189,40 @@ describe('paletteGroups', () => {
   });
 });
 
+describe('paletteGroups: Settings (C-395)', () => {
+  const settingsIn = (groups: ReturnType<typeof paletteGroups>) =>
+    groups.find((group) => group.id === 'settings')?.items ?? [];
+
+  test('"budget" opens the Budget block of the current project', () => {
+    const items = settingsIn(
+      paletteGroups(input({ query: 'budget', projectId: 'p1' })),
+    );
+    expect(items[0]).toMatchObject({
+      id: 'go:/projects/p1/settings?tab=budget',
+      label: 'Budgets',
+      hint: 'Cost › Budget',
+    });
+  });
+
+  test('"profile" finds each block with a profile once', () => {
+    const items = settingsIn(
+      paletteGroups(input({ query: 'profile', projectId: 'p1' })),
+    );
+    expect(items.map((item) => item.label)).toContain(
+      'Default runtime profile',
+    );
+    expect(items.map((item) => item.label)).toContain(
+      'Orchestrator runtime profile',
+    );
+    expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
+  });
+
+  test('nothing without a query or outside a project', () => {
+    expect(settingsIn(paletteGroups(input({ projectId: 'p1' })))).toEqual([]);
+    expect(settingsIn(paletteGroups(input({ query: 'budget' })))).toEqual([]);
+  });
+});
+
 describe('askItem (#660)', () => {
   test('offers any query as a question, last', () => {
     const groups = paletteGroups(

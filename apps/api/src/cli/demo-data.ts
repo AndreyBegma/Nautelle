@@ -1,4 +1,7 @@
-import { captureFingerprint } from '@nautelle/shared';
+import {
+  type CardNeedsPersonReason,
+  captureFingerprint,
+} from '@nautelle/shared';
 import type { BoardColumn, CardEffort, PrismaClient } from '@prisma/client';
 
 /**
@@ -62,6 +65,10 @@ export const DEMO_CARDS: ReadonlyArray<{
    * in Finished — the API's sweep moves it to Completed by itself.
    */
   mergedPr?: number;
+  /** C-390: an open PR on `branch`, so the card waits in the Inbox to merge. */
+  openPr?: { number: number; branch: string };
+  /** C-390: the card needs a person, so the Inbox lists it with Retry. */
+  needsPerson?: CardNeedsPersonReason;
   /** C-394: a design drawn and waiting for approval, with one frame. */
   design?: true;
 }> = [
@@ -99,6 +106,19 @@ export const DEMO_CARDS: ReadonlyArray<{
     column: 'finished',
     kind: 'feature',
     mergedPr: 42,
+  },
+  {
+    title: 'Gift cards in the cart',
+    column: 'finished',
+    kind: 'feature',
+    openPr: { number: 43, branch: 'card/c7-gift-cards' },
+  },
+  {
+    title: 'Order history pages past 100 orders',
+    column: 'finished',
+    kind: 'bug',
+    openPr: { number: 44, branch: 'card/c8-order-history' },
+    needsPerson: 'ci_still_failing',
   },
   {
     title: 'Import products from a CSV file',
@@ -186,6 +206,7 @@ export const seedDemo = async (
     | 'runner'
     | 'project'
     | 'boardSettings'
+    | 'repositoryPushCheck'
     | 'boardCard'
     | 'run'
     | 'boardCardRound'
@@ -229,11 +250,31 @@ export const seedDemo = async (
       defaultBranch: 'main',
       hasClaudeMd: true,
       hasAgentsMd: false,
+      // C-395: what the Ready to run block reads; the runner stays offline.
+      hasDemoflowConfig: true,
       lastInspectedAt: now,
       // C-401: away mode requests wait four hours for a person.
       toolUseTimeoutMinutes: 240,
       createdById: admin.id,
       members: { create: { userId: admin.id, addedById: admin.id } },
+    },
+  });
+  // C-395: the push check Ready to run reads (C-396 keeps it per runner and path).
+  await prisma.repositoryPushCheck.upsert({
+    where: {
+      runnerId_rootPath: {
+        runnerId: DEMO_RUNNER_ID,
+        rootPath: '/srv/demo/acme-shop',
+      },
+    },
+    update: {},
+    create: {
+      runnerId: DEMO_RUNNER_ID,
+      rootPath: '/srv/demo/acme-shop',
+      ok: true,
+      remote: 'git@github.com:acme/shop.git',
+      message: 'origin accepts pushes from this checkout.',
+      checkedAt: now,
     },
   });
   await prisma.boardSettings.upsert({
@@ -278,6 +319,17 @@ export const seedDemo = async (
               prState: 'merged' as const,
               mergedAt: new Date(now.getTime() - 10 * 60_000),
             }),
+        ...(card.openPr === undefined
+          ? {}
+          : {
+              branch: card.openPr.branch,
+              prNumber: card.openPr.number,
+              prUrl: `https://github.com/acme/shop/pull/${card.openPr.number}`,
+              prState: 'open' as const,
+            }),
+        ...(card.needsPerson === undefined
+          ? {}
+          : { needsPerson: true, needsPersonReason: card.needsPerson }),
       },
     });
     if (card.design) {

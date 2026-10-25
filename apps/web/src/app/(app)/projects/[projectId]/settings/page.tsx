@@ -5,8 +5,19 @@ import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import type { ProjectDetail } from '@nautelle/shared';
-import { useParams, useSearchParams } from 'next/navigation';
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from 'next/navigation';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { WatchRefusalBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
@@ -35,10 +46,12 @@ import { GitHubAppRow } from './github-app-row';
 import { MembersTab } from './members-tab';
 import { OrchestratorTab } from './orchestrator-tab';
 import { PlannerTab } from './planner-tab';
+import { ReadyToRun } from './ready-to-run';
 import { ReviewTab } from './review-tab';
 import { RulesTab } from './rules/rules-tab';
 import { SessionsTab } from './sessions-tab';
 import { SettingsIndex } from './settings-index';
+import { SettingsSearchBox } from './settings-search-box';
 import { StewardTab } from './steward-tab';
 import { TokenSaverTab } from './token-saver-tab';
 
@@ -145,7 +158,11 @@ export default function ProjectSettingsPage() {
     SETTINGS_ITEM_SECTION,
   );
   const anchor = settingsItemOf(useSearchParams().get('tab'));
+  const router = useRouter();
+  const pathname = usePathname();
   const showError = useErrorToast();
+  // C-395: the block a search result jumped to, outlined for a moment.
+  const [landed, setLanded] = useState<SettingsItemId | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -165,12 +182,35 @@ export default function ProjectSettingsPage() {
   // Scroll to a deep-linked block once the page has drawn it. The first block
   // of a section is already at the top, under the header.
   const loaded = project !== undefined;
+  // A search result scrolls even to the first block: the page may be far down.
+  const searched = useRef<SettingsItemId | null>(null);
   useEffect(() => {
     if (!loaded || !anchor) return;
     const first = SETTINGS_SECTIONS.find(({ id }) => id === section)?.items[0];
-    if (first?.id === anchor) return;
+    const wasSearched = searched.current === anchor;
+    searched.current = null;
+    if (first?.id === anchor && !wasSearched) return;
     document.getElementById(anchor)?.scrollIntoView({ block: 'start' });
   }, [loaded, anchor, section]);
+
+  useEffect(() => {
+    if (!landed) return;
+    const timer = setTimeout(() => setLanded(null), 2000);
+    return () => clearTimeout(timer);
+  }, [landed]);
+
+  // A search result: its block's id opens the section and scrolls there, as
+  // a deep link does. The same id again does not change the URL, so it
+  // scrolls by hand.
+  const jump = (item: SettingsItemId) => {
+    setLanded(item);
+    if (item === anchor) {
+      document.getElementById(item)?.scrollIntoView({ block: 'start' });
+      return;
+    }
+    searched.current = item;
+    router.replace(`${pathname}?tab=${item}`, { scroll: false });
+  };
 
   // The API publishes no project events yet; any that arrive reload the page.
   useLive(`project:${projectId}`, () => {
@@ -213,6 +253,13 @@ export default function ProjectSettingsPage() {
       />
       {/* #691: an online runner whose policy refuses the project. */}
       <WatchRefusalBanner project={project} />
+      <SettingsSearchBox onJump={jump} />
+      <ReadyToRun
+        project={project}
+        isAdmin={isAdmin}
+        canOperate={canOperate}
+        onRefreshed={() => void load()}
+      />
 
       <TabGroup
         value={section}
@@ -239,7 +286,13 @@ export default function ProjectSettingsPage() {
               <SettingsIndex items={items} />
               <div className="flex flex-col gap-4">
                 {items.map((item) => (
-                  <div key={item.id} id={item.id} className="scroll-mt-4">
+                  <div
+                    key={item.id}
+                    id={item.id}
+                    className={`scroll-mt-4 rounded-xl transition-shadow ${
+                      landed === item.id ? 'ring-2 ring-accent/50' : ''
+                    }`}
+                  >
                     {BLOCKS[item.id]({
                       project,
                       isAdmin,

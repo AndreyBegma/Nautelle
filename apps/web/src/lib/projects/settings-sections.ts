@@ -71,3 +71,14 @@ export function settingsItemOf(tab: string | null): SettingsItemId | undefined {
     ? (tab as SettingsItemId)
     : undefined;
 }
+
+/**
+ * C-395: the one place a project setting is edited — the block's anchor on
+ * the Settings page. Every other entry point to the setting links here.
+ */
+export function settingsItemHref(
+  projectId: string,
+  item: SettingsItemId,
+): string {
+  return `/projects/${encodeURIComponent(projectId)}/settings?tab=${item}`;
+}

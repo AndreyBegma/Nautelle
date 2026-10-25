@@ -145,6 +145,21 @@ export type CardFaceRound = Prisma.BoardCardRoundGetPayload<{
   select: typeof cardFaceRoundSelect;
 }>;
 
+/**
+ * C-364: the `findMany` arguments that read a card face — the Board's and
+ * the Inbox's (C-390) read.
+ */
+export const cardFaceArgs = {
+  omit: cardFaceOmit,
+  include: {
+    rounds: {
+      orderBy: { round: 'desc' as const },
+      select: cardFaceRoundSelect,
+    },
+    design: cardDesignSelect,
+  },
+} satisfies Prisma.BoardCardFindManyArgs;
+
 /** C-364: a card as its face reads it; every `CardWithRounds` is one. */
 export type CardFace = Omit<BoardCard, keyof typeof cardFaceOmit> & {
   rounds: CardFaceRound[];

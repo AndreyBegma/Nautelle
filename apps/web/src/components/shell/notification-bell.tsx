@@ -10,12 +10,14 @@ import {
 import { Bell } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { INBOX_HREF, inboxLinkText } from '../../lib/inbox/format';
 import {
   BELL_LIMIT,
   bellLabel,
   unreadCountText,
 } from '../../lib/notifications/format';
 import { useNotifications } from '../../lib/notifications/use-notifications';
+import { useInbox } from '../inbox/inbox-context';
 import { NotificationItem } from './notification-item';
 import { useCurrentUser } from './user-context';
 
@@ -27,6 +29,7 @@ export function NotificationBell() {
   const user = useCurrentUser();
   const [open, setOpen] = useState(false);
   const feed = useNotifications(user.id, { limit: BELL_LIMIT, capped: true });
+  const inbox = useInbox();
 
   return (
     <PopoverRoot open={open} onOpenChange={setOpen}>
@@ -76,13 +79,25 @@ export function NotificationBell() {
           </span>
         }
         footer={
-          <Link
-            href="/account/notifications"
-            onClick={() => setOpen(false)}
-            className="text-sm hover:underline"
-          >
-            See all
-          </Link>
+          <span className="flex items-center justify-between gap-3">
+            <Link
+              href="/account/notifications"
+              onClick={() => setOpen(false)}
+              className="text-sm hover:underline"
+            >
+              See all
+            </Link>
+            {/* C-390: the bell tells; the Inbox is where it gets handled. */}
+            {user.role === 'viewer' ? null : (
+              <Link
+                href={INBOX_HREF}
+                onClick={() => setOpen(false)}
+                className="text-sm hover:underline"
+              >
+                {inboxLinkText(inbox.data?.total ?? 0)}
+              </Link>
+            )}
+          </span>
         }
       >
         {feed.failed ? (
