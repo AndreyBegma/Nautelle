@@ -38,6 +38,7 @@ import {
   canStop,
   columnsOf,
   isSuggestion,
+  runActionLabel,
 } from '../../lib/board/format';
 import { boardStackPageHref } from '../../lib/board/href';
 import { boardItems, isPlanItem } from '../../lib/board/plan-tasks';
@@ -629,7 +630,7 @@ function RunMenuItem({
   const hold = card.stack?.gate ?? runWaitsFor(card.dependsOn);
   return (
     <MenuItem disabled={disabled || hold !== null} onSelect={onRun}>
-      {canRetry(card) ? 'Run again' : 'Run'}
+      {runActionLabel(card)}
       {hold ? ` — ${hold.charAt(0).toLowerCase()}${hold.slice(1)}` : ''}
     </MenuItem>
   );

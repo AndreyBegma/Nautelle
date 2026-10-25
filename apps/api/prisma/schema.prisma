@@ -3101,6 +3101,12 @@ enum CardRoundPhase {
   cancelled
 }
 
+/// Shared `CARD_PAUSE_REASONS` (C-399, ADR-0101): why Nautelle paused a round.
+enum CardPauseReason {
+  /// A hard (`stop`) budget in the round's scope was reached.
+  budget
+}
+
 /// Shared `CARD_FINISHED_BY` (D6).
 enum CardFinishedBy {
   worker
@@ -3739,6 +3745,10 @@ model BoardCardRound {
   /// C-359: the effort the round launched with; `null` for a round recorded
   /// before, or when the runner takes no effort (the CLI's default).
   effort              CardEffort?
+  /// C-399 (ADR-0101): set on a `cancelled` round Nautelle stopped because a
+  /// hard budget in its scope was reached; the card shows "Paused: budget"
+  /// until a later round supersedes it.
+  pausedFor           CardPauseReason?
 
   card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
