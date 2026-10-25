@@ -42,6 +42,8 @@ export function QuickCardProvider({ children }: { children: ReactNode }) {
       {children}
       {target ? (
         <QuickCardDialog
+          // A new project gets a fresh dialog: no state crosses projects.
+          key={target.projectId}
           projectId={target.projectId}
           open={open}
           initialText={target.text}

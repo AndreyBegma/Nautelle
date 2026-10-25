@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'bun:test';
+import type { UploadItem } from '@andrewbehma/glass-ui/use-file-upload';
 import { BOARD_CARD_TITLE_MAX, type BoardCardView } from '@nautelle/shared';
 import { ApiError } from '../api';
+import type { AttachmentUploads } from '../attachments/use-attachment-uploads';
 import {
+  discardUnclaimed,
   draftWithin,
   mergeQuickDraft,
   type QuickCardInput,
@@ -163,5 +166,29 @@ describe('draftWithin', () => {
     const started = Date.now();
     expect(await draftWithin(slow, 20)).toBeNull();
     expect(Date.now() - started).toBeLessThan(1_000);
+  });
+});
+
+describe('discardUnclaimed', () => {
+  it('drops every upload a cancelled Quick card left, so the next open starts empty', () => {
+    const items = [
+      { id: 'a', state: { status: 'done', response: { id: 'att-1' } } },
+      { id: 'b', state: { status: 'uploading', loaded: 1, total: 2 } },
+    ] as UploadItem[];
+    const dropped: string[] = [];
+    discardUnclaimed({
+      upload: { items } as AttachmentUploads['upload'],
+      discard: (item) => dropped.push(item.id),
+    });
+    expect(dropped).toEqual(['a', 'b']);
+  });
+
+  it('does nothing once a save forgot its claimed uploads', () => {
+    const dropped: string[] = [];
+    discardUnclaimed({
+      upload: { items: [] as UploadItem[] } as AttachmentUploads['upload'],
+      discard: (item) => dropped.push(item.id),
+    });
+    expect(dropped).toEqual([]);
   });
 });

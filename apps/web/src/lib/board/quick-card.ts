@@ -9,6 +9,7 @@ import {
   quickCardFallbackTitle,
 } from '@nautelle/shared';
 import { ApiError, api } from '../api';
+import type { AttachmentUploads } from '../attachments/use-attachment-uploads';
 import { createCard, runCard } from './actions';
 import { describeBoardError } from './format';
 
@@ -59,6 +60,17 @@ export const quickCardReady = (
   input: Pick<QuickCardInput, 'text'>,
   uploading: boolean,
 ): boolean => input.text.trim() !== '' && !uploading;
+
+/**
+ * Drops every upload a closed Quick card left unclaimed. The finished ones are
+ * deleted from the server too, so a later open (in this project or another)
+ * never sends a stale attachment id. A saved card forgot its uploads first.
+ */
+export function discardUnclaimed(
+  uploads: Pick<AttachmentUploads, 'upload' | 'discard'>,
+): void {
+  for (const item of uploads.upload.items) uploads.discard(item);
+}
 
 /**
  * The title and kind to save: a field the person wrote wins, otherwise the

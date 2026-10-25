@@ -19,6 +19,7 @@ import { describeUploadFailure } from '../../lib/attachments/format';
 import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploads';
 import { describeBoardError } from '../../lib/board/format';
 import {
+  discardUnclaimed,
   draftQuickCard,
   draftWithin,
   mergeQuickDraft,
@@ -91,6 +92,14 @@ export function QuickCardDialog({
     draft: Promise<QuickCardDraft | null>;
   } | null>(null);
   const asked = useRef(0);
+  const latestUploads = useRef(uploads);
+  latestUploads.current = uploads;
+
+  // Closed without saving: what was uploaded here is abandoned, not carried to
+  // the next open. Runs while `projectId` is still the one it was uploaded to.
+  useEffect(() => {
+    if (!open) discardUnclaimed(latestUploads.current);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
