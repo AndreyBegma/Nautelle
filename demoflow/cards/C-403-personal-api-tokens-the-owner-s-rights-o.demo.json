@@ -274,7 +274,7 @@
     {
       "action": "waitFor",
       "target": {
-        "text": "Revoked an API token"
+        "css": ":nth-match(tbody span[title=\"auth.api_token_revoke\"], 1)"
       },
       "caption": "Creating and revoking tokens are in the audit log.",
       "timeoutMs": 30000,
