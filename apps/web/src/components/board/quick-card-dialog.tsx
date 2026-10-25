@@ -187,7 +187,7 @@ export function QuickCardDialog({
             void save();
           }}
         >
-          <Field label="What to do" htmlFor="quick-card-text">
+          <Field label="Quick card text" htmlFor="quick-card-text">
             <Textarea
               id="quick-card-text"
               rows={5}

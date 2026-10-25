@@ -47,7 +47,7 @@
     { "action": "marker", "title": "Type what to do" },
     {
       "action": "fill",
-      "target": { "label": "What to do" },
+      "target": { "label": "Quick card text" },
       "value": "The footer link to the docs opens a 404 page. Point it at the current docs."
     },
     { "action": "wait", "ms": 4000 },
