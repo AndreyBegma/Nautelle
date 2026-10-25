@@ -14,9 +14,10 @@ import { BoardWork } from './board-work';
  * switch on and now has no open dependency — under the manual Run's rules
  * (slots, budget, profile). C-181 (D-09): it runs as the person who armed
  * the switch (`autoRunArmedById`), never as whoever moved the dependency —
- * their role now, their budget. A refusal is not queued: it is stored on the card
- * (`autoRunFailure` with `after`) and audited, like a refused design
- * auto-run (#273 D9).
+ * their role now, their budget. A full Board queues the card like a manual
+ * Run (C-398, ADR-0102): it waits in the run queue for a slot. Any other
+ * refusal is stored on the card (`autoRunFailure` with `after`) and audited,
+ * like a refused design auto-run (#273 D9).
  */
 @Injectable()
 export class BoardAutoRun implements OnModuleInit {

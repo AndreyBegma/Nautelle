@@ -21,8 +21,12 @@ import {
 
 type RuleCard = Pick<
   BoardCardView,
-  'source' | 'tracking' | 'column' | 'round' | 'design'
+  'source' | 'tracking' | 'column' | 'round' | 'design' | 'queue'
 >;
+
+/** C-398: the card waits in the run queue for a slot (or a dependency). */
+export const isQueued = (card: RuleCard): boolean =>
+  card.queue !== undefined && card.queue !== null;
 
 export const isRoundActive = (round: RuleCard['round']): boolean =>
   isActiveRoundPhase(round?.phase);
@@ -52,6 +56,7 @@ export const canRun = (card: RuleCard): boolean =>
   ownsWorker(card) &&
   (card.column === 'todo' || card.column === 'finished') &&
   !isRoundActive(card.round) &&
+  !isQueued(card) &&
   !designBlocksRun(card);
 
 /** A retry after a failed, ended or stopped round resumes the same session. */
@@ -62,8 +67,9 @@ export const canRetry = (card: RuleCard): boolean =>
   !isRoundActive(card.round) &&
   !designBlocksRun(card);
 
+/** C-398: Stop on a card in the run queue takes it out of the queue. */
 export const canStop = (card: RuleCard): boolean =>
-  ownsWorker(card) && isRoundActive(card.round);
+  ownsWorker(card) && (isRoundActive(card.round) || isQueued(card));
 
 /**
  * C-399 (ADR-0101): a hard budget paused the card's latest round. The retry

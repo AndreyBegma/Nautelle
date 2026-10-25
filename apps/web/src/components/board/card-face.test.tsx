@@ -53,6 +53,21 @@ const design = (status: 'reviewing' | 'approved'): BoardCardView['design'] => ({
   busySince: null,
 });
 
+describe('CardFace run queue (C-398)', () => {
+  test('a card in the run queue says it waits for a slot, with its place', () => {
+    const status = row(
+      render('todo', { queue: { state: 'queued', place: 2, stack: null } }),
+      'status',
+    );
+    expect(status).toContain('data-face-state="idle"');
+    expect(status).toContain('Waiting for a slot · #2');
+  });
+
+  test('a card out of the queue says nothing about it', () => {
+    expect(render('todo')).not.toContain('Waiting for a slot');
+  });
+});
+
 describe('CardFace pull request link (#329 D6)', () => {
   for (const column of COLUMNS) {
     test(`shows PR #7 with its state in ${column}`, () => {
