@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "name": "Quick card: a line of text becomes a To Do card",
+  "steps": [
+    { "action": "marker", "title": "Sign in" },
+    { "action": "navigate", "path": "/login?next=/projects/demo-project" },
+    { "action": "wait", "ms": 3000 },
+    {
+      "action": "fill",
+      "target": { "label": "Email" },
+      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+    },
+    {
+      "action": "fill",
+      "target": { "label": "Password" },
+      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
+    },
+    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
+    { "action": "marker", "title": "Open the Board" },
+    {
+      "action": "click",
+      "target": { "role": "link", "name": "Board", "exact": true },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertText",
+      "target": { "role": "heading", "name": "Board", "exact": true },
+      "text": "Board",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    { "action": "marker", "title": "New work has a Quick card beside Start" },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "New work" },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": { "role": "button", "name": "Quick card", "exact": true }
+    },
+    { "action": "wait", "ms": 1500 },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Quick card", "exact": true }
+    },
+    { "action": "marker", "title": "Type what to do" },
+    {
+      "action": "fill",
+      "target": { "label": "Quick card text" },
+      "value": "The footer link to the docs opens a 404 page. Point it at the current docs."
+    },
+    { "action": "wait", "ms": 4000 },
+    {
+      "action": "marker",
+      "title": "The title and kind are suggested and editable"
+    },
+    { "action": "wait", "ms": 2000 },
+    { "action": "marker", "title": "Save: the card lands in To Do" },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Create card", "exact": true }
+    },
+    { "action": "wait", "ms": 4000 }
+  ]
+}
