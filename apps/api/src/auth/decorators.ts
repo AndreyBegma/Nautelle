@@ -30,6 +30,29 @@ export const BearerBody = () => SetMetadata(BEARER_BODY_KEY, true);
 export const AllowedBeforeTwoFactorSetup = () =>
   SetMetadata(TWO_FACTOR_SETUP_KEY, true);
 
+export const SESSION_ONLY_KEY = 'auth:session-only';
+
+/**
+ * C-403: refuses personal API tokens — the route needs a browser session.
+ * Used on every route that creates, changes or removes a way to sign in or
+ * act as the owner, where a token could widen its own reach: tokens
+ * themselves, the password, two-factor sign-in, sessions, the Telegram link
+ * (it signs in the Mini App) and terminal tickets. The full list is in
+ * ADR-0104. `SessionOnly(false)` on a handler
+ * re-opens it under a session-only controller.
+ */
+export const SessionOnly = (only = true) => SetMetadata(SESSION_ONLY_KEY, only);
+
+export const PROJECT_SCOPED_TOKEN_KEY = 'auth:project-scoped-token';
+
+/**
+ * C-403: opens a route that is not under `ProjectAccessGuard` to a token
+ * limited to projects — only for a route that narrows what it returns through
+ * `ProjectAccessService` (the project list, the caller).
+ */
+export const ProjectScopedTokenAllowed = () =>
+  SetMetadata(PROJECT_SCOPED_TOKEN_KEY, true);
+
 /** Restricts a route (or controller) to callers holding one of these roles. */
 export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);
 

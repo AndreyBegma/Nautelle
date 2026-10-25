@@ -153,6 +153,7 @@ export class AuditService implements OnModuleInit {
             ...(origin?.userAgent
               ? { userAgent: origin.userAgent.slice(0, 512) }
               : {}),
+            ...(origin?.apiToken ? { apiToken: origin.apiToken } : {}),
           })
         : null;
 

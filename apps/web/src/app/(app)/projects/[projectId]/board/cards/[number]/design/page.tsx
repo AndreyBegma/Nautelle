@@ -15,14 +15,11 @@ import { AsyncSection } from '../../../../../../../../components/prerequisites/a
 import { api } from '../../../../../../../../lib/api';
 import { fetchCard, runCard } from '../../../../../../../../lib/board/actions';
 import {
-  approveAndRun,
+  approveAndRunCard,
   approveConsequence,
   offersApproveAndRun,
 } from '../../../../../../../../lib/board/design-actions';
-import {
-  describeBoardError,
-  isNotFound,
-} from '../../../../../../../../lib/board/format';
+import { isNotFound } from '../../../../../../../../lib/board/format';
 import { boardCardHref } from '../../../../../../../../lib/board/href';
 import {
   DESIGN_STATUS_LABEL,
@@ -107,26 +104,18 @@ export default function CardDesignViewerPage() {
     consequence: approveConsequence(continueAfterDesign),
     onApproveAndRun:
       card.data && offersApproveAndRun(card.data)
-        ? async (revisionId: string) => {
-            let approved = false;
-            try {
-              await approveAndRun(
-                {
-                  approve: async (id) => {
-                    await section.actions.approve({ revisionId: id });
-                    approved = true;
-                  },
-                  run: () => runCard(projectId, number),
-                },
-                revisionId,
-              );
-              toast.success(`Approved. Started a worker on C-${number}.`);
-            } catch (error) {
-              // An approval refusal was toasted by the design hook; the dialog stays.
-              if (!approved) throw error;
-              toast.error(describeBoardError(error));
-            }
-          }
+        ? // An approval refusal was toasted by the design hook and is
+          // rethrown, so the dialog stays.
+          (revisionId: string) =>
+            approveAndRunCard(
+              {
+                approve: (id) => section.actions.approve({ revisionId: id }),
+                run: () => runCard(projectId, number),
+              },
+              revisionId,
+              `C-${number}`,
+              toast,
+            )
         : undefined,
   };
 

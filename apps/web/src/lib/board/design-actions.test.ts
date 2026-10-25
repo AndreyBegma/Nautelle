@@ -1,28 +1,47 @@
 import { describe, expect, test } from 'bun:test';
+import type { BoardCardView } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   approveAndRun,
+  approveAndRunCard,
   approveConsequence,
+  backWithComment,
   offersApproveAndRun,
+  offersInPlaceApproveAndRun,
 } from './design-actions';
-import { card } from './fixtures';
+import { card, round } from './fixtures';
 import { describeBoardError } from './format';
 
 describe('approveAndRun (#243 D6)', () => {
   test('approves the picked revision, then runs', async () => {
     const calls: string[] = [];
-    await approveAndRun(
+    const queued = await approveAndRun(
       {
         approve: async (id) => {
           calls.push(`approve:${id}`);
         },
         run: async () => {
           calls.push('run');
+          return { queue: null };
         },
       },
       'rev-2-1',
     );
     expect(calls).toEqual(['approve:rev-2-1', 'run']);
+    expect(queued).toBe(false);
+  });
+
+  test('says when a full Board queued the card (C-398)', async () => {
+    const queued = await approveAndRun(
+      {
+        approve: async () => {},
+        run: async () => ({
+          queue: { state: 'queued', place: 1, stack: null },
+        }),
+      },
+      'rev-1-1',
+    );
+    expect(queued).toBe(true);
   });
 
   test('a refused approval never runs the card', async () => {
@@ -35,6 +54,7 @@ describe('approveAndRun (#243 D6)', () => {
           },
           run: async () => {
             calls.push('run');
+            return { queue: null };
           },
         },
         'rev-1-1',
@@ -59,6 +79,81 @@ describe('approveAndRun (#243 D6)', () => {
       ),
     ).rejects.toThrow('max_running');
     expect(calls).toEqual(['approve']);
+  });
+});
+
+describe('approveAndRunCard (C-394, C-398)', () => {
+  const notifier = () => {
+    const said: string[] = [];
+    return {
+      said,
+      notify: {
+        success: (m: string) => said.push(`ok:${m}`),
+        error: (m: string) => said.push(`error:${m}`),
+      },
+    };
+  };
+
+  test('a started worker is announced', async () => {
+    const { said, notify } = notifier();
+    await approveAndRunCard(
+      { approve: async () => {}, run: async () => ({ queue: null }) },
+      'rev-1-1',
+      'C-7',
+      notify,
+    );
+    expect(said).toEqual(['ok:Approved. Started a worker on C-7.']);
+  });
+
+  test('a queued card says it waits for a slot, not that a worker started', async () => {
+    const { said, notify } = notifier();
+    await approveAndRunCard(
+      {
+        approve: async () => {},
+        run: async () => ({
+          queue: { state: 'queued', place: 2, stack: null },
+        }),
+      },
+      'rev-1-1',
+      'C-7',
+      notify,
+    );
+    expect(said).toEqual(['ok:Approved. C-7 is waiting for a slot.']);
+  });
+
+  test('a refused approval is rethrown untoasted', async () => {
+    const { said, notify } = notifier();
+    await expect(
+      approveAndRunCard(
+        {
+          approve: async () => {
+            throw new Error('design_busy');
+          },
+          run: async () => ({ queue: null }),
+        },
+        'rev-1-1',
+        'C-7',
+        notify,
+      ),
+    ).rejects.toThrow('design_busy');
+    expect(said).toEqual([]);
+  });
+
+  test('a refused run is toasted and the approval stands', async () => {
+    const { said, notify } = notifier();
+    await approveAndRunCard(
+      {
+        approve: async () => {},
+        run: async () => {
+          throw new Error('boom');
+        },
+      },
+      'rev-1-1',
+      'C-7',
+      notify,
+    );
+    expect(said).toHaveLength(1);
+    expect(said[0]).toStartWith('error:');
   });
 });
 
@@ -91,8 +186,106 @@ describe('the switch', () => {
     ).toBe(false);
   });
 
+  test('the card sheet offers Approve & run only on a card that could start now', () => {
+    const design: BoardCardView['design'] = {
+      needed: true,
+      suggested: false,
+      suggestionWhy: null,
+      variantCount: 1,
+      status: 'reviewing',
+      approvedRevisionId: null,
+      busySince: null,
+    };
+    expect(offersInPlaceApproveAndRun(card(1, 'todo', { design }))).toBe(true);
+    expect(
+      offersInPlaceApproveAndRun(
+        card(1, 'todo', { design, continueAfterDesign: true }),
+      ),
+    ).toBe(false);
+    expect(
+      offersInPlaceApproveAndRun(
+        card(2, 'todo', {
+          design,
+          source: 'fleet',
+          fleet: {
+            issue: 1,
+            slot: 'i1',
+            stage: null,
+            slotGone: false,
+            detached: false,
+          },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      offersInPlaceApproveAndRun(
+        card(3, 'in_progress', { design, round: round('running') }),
+      ),
+    ).toBe(false);
+  });
+
   test('the dialog says whether the worker starts', () => {
     expect(approveConsequence(true)).toContain('worker starts after approval');
     expect(approveConsequence(false)).toContain('waits in To Do');
+  });
+});
+
+describe('backWithComment (C-394)', () => {
+  test('saves the comment on the revision, then starts the revise turn', async () => {
+    const calls: string[] = [];
+    await backWithComment(
+      {
+        comment: async (id, body) => {
+          calls.push(`comment:${id}:${body}`);
+        },
+        revise: async () => {
+          calls.push('revise');
+        },
+      },
+      'rev-1-2',
+      '  Make the header smaller  ',
+    );
+    expect(calls).toEqual([
+      'comment:rev-1-2:Make the header smaller',
+      'revise',
+    ]);
+  });
+
+  test('an empty comment sends nothing', async () => {
+    const calls: string[] = [];
+    await expect(
+      backWithComment(
+        {
+          comment: async () => {
+            calls.push('comment');
+          },
+          revise: async () => {
+            calls.push('revise');
+          },
+        },
+        'rev-1-1',
+        '   ',
+      ),
+    ).rejects.toThrow();
+    expect(calls).toEqual([]);
+  });
+
+  test('a refused comment never starts the turn', async () => {
+    const calls: string[] = [];
+    await expect(
+      backWithComment(
+        {
+          comment: async () => {
+            throw new Error('design_busy');
+          },
+          revise: async () => {
+            calls.push('revise');
+          },
+        },
+        'rev-1-1',
+        'x',
+      ),
+    ).rejects.toThrow('design_busy');
+    expect(calls).toEqual([]);
   });
 });

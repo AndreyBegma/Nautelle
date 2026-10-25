@@ -64,6 +64,10 @@ describe('seedDemo', () => {
     agentSession: { upsert: jest.fn() },
     actionRequest: { upsert: jest.fn() },
     toolUseRule: { upsert: jest.fn() },
+    taskDesign: { upsert: jest.fn().mockResolvedValue({ id: 'd1' }) },
+    planTurn: { upsert: jest.fn().mockResolvedValue({ id: 't1' }) },
+    designRevision: { upsert: jest.fn().mockResolvedValue({ id: 'r1' }) },
+    designFrame: { upsert: jest.fn() },
     boardRunQueueCard: { upsert: jest.fn() },
   });
 
@@ -89,7 +93,9 @@ describe('seedDemo', () => {
     await seedDemo(db as never, 'demo@example.com');
     const withRound = DEMO_CARDS.filter((card) => card.round);
     expect(db.run.upsert).toHaveBeenCalledTimes(
-      withRound.length + DEMO_FAILED_RUNS.length,
+      withRound.length +
+        DEMO_FAILED_RUNS.length +
+        DEMO_CARDS.filter((card) => card.design).length,
     );
     expect(db.boardCardRound.upsert).toHaveBeenCalledTimes(withRound.length);
     const rounds = db.boardCardRound.upsert.mock.calls.map(([arg]) => arg);
@@ -207,6 +213,19 @@ describe('seedDemo', () => {
     expect(secretCall && toolUseDanger(secretCall)?.kind).toBe('secret_read');
     const [rule] = db.toolUseRule.upsert.mock.calls[0];
     expect(rule.create).toMatchObject({ scope: 'project', toolName: 'Bash' });
+  });
+
+  it('seeds a card whose design waits for approval (C-394)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    const [design] = db.taskDesign.upsert.mock.calls[0];
+    expect(design.create).toMatchObject({
+      cardId: 'c1',
+      needed: true,
+      status: 'reviewing',
+    });
+    expect(db.designRevision.upsert).toHaveBeenCalledTimes(1);
+    expect(db.designFrame.upsert).toHaveBeenCalledTimes(1);
   });
 
   it('needs the admin to exist', async () => {
