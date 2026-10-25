@@ -61,8 +61,32 @@ export const pendingQuestionOptionSchema = z.object({
   index: z.number().int().min(1).max(99),
   label: z.string().min(1).max(PENDING_QUESTION_LABEL_MAX_CHARS),
   description: z.string().max(PENDING_QUESTION_LABEL_MAX_CHARS).optional(),
+  /** #967: a multi-select question's box is ticked; absent on one-choice questions. */
+  checked: z.boolean().optional(),
 });
 export type PendingQuestionOption = z.infer<typeof pendingQuestionOptionSchema>;
+
+/** #967: one question of a form of several, as its tab shows it. */
+export const pendingQuestionTabSchema = z.object({
+  label: z.string().min(1).max(PENDING_QUESTION_LABEL_MAX_CHARS),
+  answered: z.boolean(),
+});
+export type PendingQuestionTab = z.infer<typeof pendingQuestionTabSchema>;
+
+/**
+ * #967: the form a screen belongs to, when the selector asks several
+ * questions. The pane shows one tab at a time, so each question is reported
+ * as its tab comes up, with a key of its own; `step: 'submit'` is the
+ * closing "Submit answers" screen.
+ */
+export const pendingQuestionFormSchema = z.object({
+  tabs: z
+    .array(pendingQuestionTabSchema)
+    .min(1)
+    .max(PENDING_QUESTION_MAX_OPTIONS),
+  step: z.enum(['question', 'submit']),
+});
+export type PendingQuestionForm = z.infer<typeof pendingQuestionFormSchema>;
 
 /**
  * M4: the question selector a session shows (#473), read from its pane. It
@@ -84,6 +108,13 @@ export const pendingQuestionSchema = z.object({
     .max(PENDING_QUESTION_MAX_OPTIONS),
   /** The selector offers a typed answer ("Type something."). */
   other: z.boolean(),
+  /**
+   * #967: the question takes several boxes. An option answer ticks it and
+   * moves to the next tab; an "Other" answer ticks the typed one.
+   */
+  multiSelect: z.boolean().optional(),
+  /** #967: absent for a selector of one question. */
+  form: pendingQuestionFormSchema.optional(),
 });
 export type PendingQuestion = z.infer<typeof pendingQuestionSchema>;
 
@@ -109,12 +140,14 @@ export type SessionMessageInput = z.infer<typeof sessionMessageInputSchema>;
 
 /**
  * What became of a message. `sent`: typed and submitted — a busy session
- * queues it for its next step (M3). `answered`: the option was selected.
- * The rest sent nothing: `no_session` (the session is gone), `question`
- * (text while a selector is up — answer it instead), `question_changed`
- * (the selector is gone or shows another screen), `not_at_input` (a
- * dialog or permission prompt is up), `no_option` (no such option, or no
- * "Other" field).
+ * queues it for its next step (M3). `answered`: the option was selected and
+ * the selector moved on — to the form's next tab, or away (#967).
+ * `not_at_input`: a dialog or permission prompt is up and nothing was sent,
+ * or an answer's keys were sent but the selector stayed on the same
+ * question (#967). The rest sent nothing: `no_session` (the session is
+ * gone), `question` (text while a selector is up — answer it instead),
+ * `question_changed` (the selector is gone or shows another screen),
+ * `no_option` (no such option, or no "Other" field).
  */
 export const SESSION_MESSAGE_OUTCOMES = [
   'sent',

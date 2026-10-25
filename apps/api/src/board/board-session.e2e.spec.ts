@@ -726,6 +726,127 @@ describe('the Board from a session (#845, e2e)', () => {
       ]);
     });
 
+    it('#967: a form of two questions stays waiting through both tabs and its Submit step', async () => {
+      const tabs = (first: boolean, second: boolean) => [
+        { label: 'Time', answered: first },
+        { label: 'Channel', answered: second },
+      ];
+      const TAB1: PendingQuestion = {
+        key: '1111111111111111',
+        header: '←  ☐ Time  ☐ Channel  ✔ Submit  →',
+        text: 'When should the daily summary go out?',
+        options: [
+          { index: 1, label: 'Morning' },
+          { index: 2, label: 'Evening' },
+        ],
+        other: true,
+        form: { tabs: tabs(false, false), step: 'question' },
+      };
+      const TAB2: PendingQuestion = {
+        key: '2222222222222222',
+        header: '←  ☒ Time  ☐ Channel  ✔ Submit  →',
+        text: 'Where should it be posted?',
+        options: [
+          { index: 1, label: 'Email' },
+          { index: 2, label: 'Slack' },
+        ],
+        other: true,
+        form: { tabs: tabs(true, false), step: 'question' },
+      };
+      const REVIEW: PendingQuestion = {
+        key: '3333333333333333',
+        header: '←  ☒ Time  ☒ Channel  ✔ Submit  →',
+        text: 'Ready to submit your answers?',
+        options: [
+          { index: 1, label: 'Submit answers' },
+          { index: 2, label: 'Cancel' },
+        ],
+        other: false,
+        form: { tabs: tabs(true, true), step: 'submit' },
+      };
+      await manualSession();
+      await w.createCard({ title: 'Add login' });
+      await data(ask('card.run', { card: 1 }));
+      const card = await w.card(1);
+      const { runId } = card.rounds[0];
+      const shows = (question: PendingQuestion | null) =>
+        w.deliver('card_run.pending_question', {
+          cardId: card.id,
+          runId,
+          projectId: w.a,
+          at: new Date().toISOString(),
+          question,
+        });
+      const waiting = async () =>
+        (
+          await data<{
+            cards: { number: number; waitingOnQuestion: boolean }[];
+          }>(ask('board.list', {}))
+        ).cards.find((c) => c.number === 1)?.waitingOnQuestion;
+      const question = async () =>
+        (
+          await data<{ question: PendingQuestion | null }>(
+            ask('board.card', { card: 1 }),
+          )
+        ).question;
+
+      await w.deliver('card_run.question', {
+        cardId: card.id,
+        runId,
+        projectId: w.a,
+        at: new Date().toISOString(),
+      });
+      await shows(TAB1);
+      let cursor = (await data<Wait>(ask('board.wait', {}))).cursor;
+      expect(await waiting()).toBe(true);
+      expect(await question()).toEqual(TAB1);
+
+      // Each tab is relayed as it comes up, with its own key.
+      for (const [screen, message] of [
+        [TAB2, { kind: 'other', questionKey: TAB1.key, text: 'At noon' }],
+        [REVIEW, { kind: 'option', questionKey: TAB2.key, index: 2 }],
+      ] as const) {
+        expect(
+          await data(ask('card.message', { card: 1, ...message })),
+        ).toEqual({ outcome: 'answered' });
+        await shows(screen);
+        expect(await waiting()).toBe(true);
+        expect(await question()).toEqual(screen);
+        const woken = await data<Wait>(
+          ask('board.wait', { cursor, cards: [1], timeoutSec: 10 }),
+        );
+        expect(woken.events).toEqual([
+          {
+            type: 'question',
+            card: 1,
+            label: 'C-1',
+            title: 'Add login',
+            question: screen,
+          },
+        ]);
+        cursor = woken.cursor;
+      }
+
+      expect(
+        await data(
+          ask('card.message', {
+            card: 1,
+            kind: 'option',
+            questionKey: REVIEW.key,
+            index: 1,
+          }),
+        ),
+      ).toEqual({ outcome: 'answered' });
+      await shows(null);
+      expect(await waiting()).toBe(false);
+      expect(await question()).toBeNull();
+      expect(messagesSent().map((args) => args.message)).toEqual([
+        { kind: 'other', questionKey: TAB1.key, text: 'At noon' },
+        { kind: 'option', questionKey: TAB2.key, index: 2 },
+        { kind: 'option', questionKey: REVIEW.key, index: 1 },
+      ]);
+    });
+
     it('card.message says which runner policy refuses it, and the card says so before; nothing is sent', async () => {
       await w.ctx.prisma.runner.update({
         where: { id: w.runnerId },

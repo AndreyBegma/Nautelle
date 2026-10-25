@@ -1,0 +1,50 @@
+
+ ▐▛███▛█   Claude Code v2.1.310
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   /…/131c300a-3e00-4813-89fa-830fd2c16a7c/scratchpad/q
+
+
+❯ Call the AskUserQuestion tool exactly once with three questions: "Which colour?" (header
+  "Colour", options Red, Blue), "Which size?" (header "Size", options Small, Large) and "Which
+  events?" (header "Events", multiSelect true, options Started, Finished). Do nothing else.
+────────────────────────────────────────────────────────────────────────────────────────────────────
+←  ☒ Colour  ☒ Size  ☐ Events  ✔ Submit  →
+
+Which events?
+
+❯ 1. [ ] Started
+         Started
+  2. [ ] Finished
+         Finished
+  3. [ ] Type something
+     Submit
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  4. Chat about this
+
+Enter to select · Tab/Arrow keys to navigate · Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
