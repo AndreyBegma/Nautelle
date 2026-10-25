@@ -1,4 +1,7 @@
-import { captureFingerprint } from '@nautelle/shared';
+import {
+  type CardNeedsPersonReason,
+  captureFingerprint,
+} from '@nautelle/shared';
 import type { BoardColumn, CardEffort, PrismaClient } from '@prisma/client';
 
 /**
@@ -46,6 +49,10 @@ export const DEMO_CARDS: ReadonlyArray<{
    * in Finished — the API's sweep moves it to Completed by itself.
    */
   mergedPr?: number;
+  /** C-390: an open PR on `branch`, so the card waits in the Inbox to merge. */
+  openPr?: { number: number; branch: string };
+  /** C-390: the card needs a person, so the Inbox lists it with Retry. */
+  needsPerson?: CardNeedsPersonReason;
 }> = [
   { title: 'Export the activity feed as CSV', column: 'todo', kind: 'feature' },
   { title: 'Dark mode for the settings page', column: 'todo', kind: 'feature' },
@@ -70,6 +77,19 @@ export const DEMO_CARDS: ReadonlyArray<{
     column: 'finished',
     kind: 'feature',
     mergedPr: 42,
+  },
+  {
+    title: 'Gift cards in the cart',
+    column: 'finished',
+    kind: 'feature',
+    openPr: { number: 43, branch: 'card/c7-gift-cards' },
+  },
+  {
+    title: 'Order history pages past 100 orders',
+    column: 'finished',
+    kind: 'bug',
+    openPr: { number: 44, branch: 'card/c8-order-history' },
+    needsPerson: 'ci_still_failing',
   },
 ];
 
@@ -173,6 +193,17 @@ export const seedDemo = async (
               prState: 'merged' as const,
               mergedAt: new Date(now.getTime() - 10 * 60_000),
             }),
+        ...(card.openPr === undefined
+          ? {}
+          : {
+              branch: card.openPr.branch,
+              prNumber: card.openPr.number,
+              prUrl: `https://github.com/acme/shop/pull/${card.openPr.number}`,
+              prState: 'open' as const,
+            }),
+        ...(card.needsPerson === undefined
+          ? {}
+          : { needsPerson: true, needsPersonReason: card.needsPerson }),
       },
     });
     if (card.round) {
