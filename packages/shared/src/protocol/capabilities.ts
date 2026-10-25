@@ -473,6 +473,10 @@ export const RUNNER_FEATURE_COMMANDS = {
   docsRepo: ['docs.publish_specs'],
   /** #584: coding-rule candidates read from the project's own docs. */
   ruleScan: ['project.scan_rules'],
+  /** C-396: the connect dialog's repository picker. */
+  repoPicker: ['project.discover'],
+  /** C-396: whether the runner can push to a project's origin. */
+  pushCheck: ['project.push_check'],
   /** #751 B6, B8: compressed rules and overlay proposals. */
   prefixOptimise: ['rules.compress', 'prefix.propose'],
 } as const satisfies Record<string, readonly CommandName[]>;
