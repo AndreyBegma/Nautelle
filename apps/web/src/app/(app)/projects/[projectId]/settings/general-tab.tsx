@@ -26,6 +26,7 @@ import {
 } from '../../../../../lib/projects/format';
 import { formatLastSeen } from '../../../../../lib/runners/format';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
+import { MoveProjectDialog } from './move-project-dialog';
 
 const orNull = (value: string): string | null => value.trim() || null;
 
@@ -58,6 +59,7 @@ export function GeneralTab({
   const [profiles, setProfiles] = useState<AdminRuntimeProfile[]>([]);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [moving, setMoving] = useState(false);
 
   // Reset the form when the project reloads (a save, a live frame).
   useEffect(() => {
@@ -240,6 +242,42 @@ export function GeneralTab({
       </Card>
 
       <TextSettingsCard projectId={project.id} isAdmin={isAdmin} />
+
+      {isAdmin ? (
+        <Card
+          pad="lg"
+          className="flex flex-col gap-3"
+          aria-labelledby="project-runner"
+        >
+          <h2 id="project-runner" className="text-base font-semibold">
+            Runner
+          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="max-w-prose text-sm text-ink-2">
+              The project runs on {project.runnerName}. Moving it to another
+              runner keeps its cards and their history; the next rounds start
+              fresh sessions there.
+            </p>
+            <Button
+              variant="glass"
+              type="button"
+              onClick={() => setMoving(true)}
+            >
+              Move to another runner…
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      {isAdmin ? (
+        <MoveProjectDialog
+          project={project}
+          currentProfileKey={currentProfile?.key ?? null}
+          open={moving}
+          onClose={() => setMoving(false)}
+          onMoved={onChanged}
+        />
+      ) : null}
 
       {isAdmin ? (
         <Card
