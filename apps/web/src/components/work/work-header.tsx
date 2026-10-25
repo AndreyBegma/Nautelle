@@ -10,6 +10,8 @@ export interface WorkStatsValues {
   /** Workers in use, and the most the project allows. */
   workers: number;
   maxWorkers: number;
+  /** C-398: To Do cards in the run queue; shown when above 0. */
+  queued?: number;
   /** Cards on the board (the shown ones while filtering). */
   cards: number;
   filtering: boolean;
@@ -59,6 +61,14 @@ function WorkStats({ stats }: { stats: WorkStatsValues }) {
           running
         </span>
       </span>
+      {stats.queued ? (
+        <>
+          <Divider />
+          <span data-stat="queued">
+            <Num>{stats.queued}</Num> waiting for a slot
+          </span>
+        </>
+      ) : null}
       <Divider />
       <span>
         <Num>{stats.cards}</Num> {stats.cards === 1 ? 'card' : 'cards'}

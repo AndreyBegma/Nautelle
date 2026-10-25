@@ -793,6 +793,20 @@ export const localCardRunResultSchema = z.object({
 });
 
 /**
+ * `card.run`: C-398 (ADR-0102) — at the project's `maxRunning` a To Do card
+ * is put in the run queue instead of refused; `queued` says so, and `round`
+ * is `null` until a slot frees and the card starts.
+ */
+export const localCardRunQueuedResultSchema = z.union([
+  localCardRunResultSchema,
+  z.object({
+    number: cardNumberSchema,
+    round: z.null(),
+    queued: z.literal(true),
+  }),
+]);
+
+/**
  * `card.move` (#845): `index` is the place in the target column, 0 the top;
  * absent is the bottom. `completed` is always `completed_needs_person` (D5).
  */
@@ -1172,7 +1186,7 @@ export const localMethods = {
   },
   'card.run': {
     args: localCardRunArgsSchema,
-    result: localCardRunResultSchema,
+    result: localCardRunQueuedResultSchema,
     minRole: 'operator',
     needsProject: true,
   },
