@@ -14,7 +14,6 @@ import {
   describeBoardError,
   fleetHref,
   fleetSummary,
-  MOVE_REFUSAL_TEXT,
   trackedSessionHref,
 } from './format';
 
@@ -44,7 +43,13 @@ const fleet = (
 ) =>
   card(number, column, {
     source: 'fleet',
-    fleet: { issue: 12, slot: 'i12-web', stage: 'pr_open', slotGone: false },
+    fleet: {
+      issue: 12,
+      slot: 'i12-web',
+      stage: 'pr_open',
+      slotGone: false,
+      detached: false,
+    },
     ...extra,
   });
 
@@ -92,15 +97,12 @@ describe('a fleet card', () => {
     expect(canDelete(card(4, 'todo'))).toBe(true);
   });
 
-  test('a drag is refused fleet_slot, with its text', () => {
+  test('a drag moves it like any card (C-397, ADR-0098)', () => {
     const view = boardView([fleet(1, 'in_progress')]);
-    for (const to of ['todo', 'finished', 'completed']) {
-      const decision = decideDrop(view, drop('card-1', 'in_progress', to));
-      expect(decision.kind).toBe('refused');
-      if (decision.kind === 'refused') {
-        expect(decision.error).toBe('fleet_slot');
-        expect(decision.text).toBe(MOVE_REFUSAL_TEXT.fleet_slot);
-      }
+    for (const to of ['todo', 'finished']) {
+      expect(decideDrop(view, drop('card-1', 'in_progress', to)).kind).toBe(
+        'move',
+      );
     }
   });
 
@@ -124,7 +126,13 @@ describe('a fleet card', () => {
       '/projects/p1/fleet?open=i12-web&focus=i12-web',
     );
     const waiting = fleet(2, 'todo', {
-      fleet: { issue: 13, slot: null, stage: null, slotGone: false },
+      fleet: {
+        issue: 13,
+        slot: null,
+        stage: null,
+        slotGone: false,
+        detached: false,
+      },
     });
     expect(waiting.fleet && fleetSummary(waiting.fleet)).toBe(
       'Waiting for a slot',

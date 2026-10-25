@@ -1,20 +1,26 @@
 'use client';
 
-import type {
-  ActivityPage,
-  ApprovalsView,
-  FleetView,
-  OrchestratorSettingsView,
-  ProjectSummary,
-  RunPage,
-  RunSummary,
-  TerminalSetupView,
-  UsageBreakdownResponse,
-  UsageSummaryResponse,
-  UsageTimeseriesResponse,
+import {
+  type ActivityPage,
+  APPROVALS_LIVE_EVENT,
+  type ApprovalsView,
+  BOARD_CHANGED_EVENT,
+  FLEET_LIVE_EVENT,
+  type FleetsView,
+  type FleetView,
+  type OrchestratorSettingsView,
+  type ProjectSummary,
+  RUN_UPDATED_LIVE_EVENT,
+  type RunPage,
+  type RunSummary,
+  SESSIONS_CHANGED_LIVE_EVENT,
+  type TerminalSetupView,
+  type UsageBreakdownResponse,
+  type UsageSummaryResponse,
+  type UsageTimeseriesResponse,
 } from '@nautelle/shared';
-import { useEffect } from 'react';
 import { api } from '../../lib/api';
+import { useLiveRefresh } from '../../lib/live/use-live-refresh';
 import {
   lastSevenDays,
   nextHour,
@@ -23,8 +29,17 @@ import {
 import { type Section, useSection } from '../../lib/section/use-section';
 import { browserZone } from '../../lib/usage/format';
 
-/** The dashboard is a glance, not a live view: look again twice a minute. */
-const REFRESH_MS = 30_000;
+/** What moves the project facts: fleets, approvals and failed runs. */
+const FACTS_EVENTS = [
+  FLEET_LIVE_EVENT,
+  APPROVALS_LIVE_EVENT,
+  RUN_UPDATED_LIVE_EVENT,
+  BOARD_CHANGED_EVENT,
+];
+/** Today's cost moves when a session's usage lands. */
+const COST_EVENTS = [SESSIONS_CHANGED_LIVE_EVENT];
+/** Merges and recent activity follow the Board and the runs. */
+const ACTIVITY_EVENTS = [BOARD_CHANGED_EVENT, RUN_UPDATED_LIVE_EVENT];
 /** Merges in one day across every project; more than this is not a glance. */
 const MERGED_LIMIT = 200;
 /** Recent activity shows this many events before "All activity". */
@@ -52,19 +67,29 @@ export interface ProjectFacts {
 }
 
 /**
- * Every project's fleet, approvals, failed runs and orchestrator settings.
- * One project failing does not fail the rest: its id goes in `failed` and the
- * page says so beside the figures.
+ * Every project's fleet, approvals, failed runs and orchestrator settings. The
+ * fleets come from one `GET /fleet`; the rest is still per project. One project
+ * failing does not fail the rest: its id goes in `failed` and the page says so
+ * beside the figures.
  */
 async function loadProjectFacts(
   projects: ProjectSummary[],
 ): Promise<ProjectFacts> {
+  const fleetsCall = api<FleetsView>('/fleet').then(
+    ({ items }) => new Map(items.map((f) => [f.projectId, f])),
+  );
+  // A rejected call is handled per project below; keep it from going unhandled.
+  fleetsCall.catch(() => undefined);
   const results = await Promise.all(
     projects.map(async (project) => {
       const base = `/projects/${project.id}`;
       const [fleet, approvals, runs, settings, setup] =
         await Promise.allSettled([
-          api<FleetView>(`${base}/fleet`),
+          fleetsCall.then((byProject) => {
+            const view = byProject.get(project.id);
+            if (!view) throw new Error('no fleet');
+            return view;
+          }),
           api<ApprovalsView>(`${base}/approvals`),
           api<RunPage>(`${base}/runs?status=failed&limit=${FAILED_RUNS_LIMIT}`),
           api<OrchestratorSettingsView>(`${base}/orchestrator/settings`),
@@ -127,7 +152,8 @@ export interface Dashboard {
 /** The dashboard's sections, each loading and failing on its own. */
 export function useDashboard(projects: ProjectSummary[]): Dashboard {
   // The project list is refetched as a new array; load again only when it changes.
-  const ids = projects.map((p) => p.id).join(',');
+  const projectIds = projects.map((p) => p.id);
+  const ids = projectIds.join(',');
   const facts = useSection(() => loadProjectFacts(projects), [ids]);
   const costToday = useSection(() => {
     const query = new URLSearchParams({
@@ -167,21 +193,18 @@ export function useDashboard(projects: ProjectSummary[]): Dashboard {
     return api<UsageTimeseriesResponse>(`/usage/timeseries?${query}`);
   }, []);
 
-  const retries = [
-    facts.retry,
-    costToday.retry,
-    costByProject.retry,
-    merged.retry,
-    recent.retry,
-    spend.retry,
-  ];
-  // biome-ignore lint/correctness/useExhaustiveDependencies: retry callbacks are stable
-  useEffect(() => {
-    const timer = setInterval(() => {
-      for (const retry of retries) retry();
-    }, REFRESH_MS);
-    return () => clearInterval(timer);
-  }, []);
+  // Live events replace the old 30 s poll; the socket being down falls back to
+  // a slow one. The retry callbacks are stable.
+  useLiveRefresh(projectIds, FACTS_EVENTS, facts.retry);
+  useLiveRefresh(projectIds, COST_EVENTS, () => {
+    costToday.retry();
+    costByProject.retry();
+    spend.retry();
+  });
+  useLiveRefresh(projectIds, ACTIVITY_EVENTS, () => {
+    merged.retry();
+    recent.retry();
+  });
 
   return { facts, costToday, costByProject, merged, recent, spend };
 }

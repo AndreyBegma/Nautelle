@@ -1,4 +1,4 @@
-# ADR-0098: A card's demo is recorded when its head reads green, before review
+# ADR-0099: A card's demo is recorded when its head reads green, before review
 
 Status: accepted · Date: 2026-10-25 ·
 Card: C-408 (issue #946) ·

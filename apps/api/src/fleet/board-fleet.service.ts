@@ -41,7 +41,12 @@ type Tx = Prisma.TransactionClient;
 export const cardFleetView = (
   card: Pick<
     BoardCard,
-    'source' | 'fleetIssue' | 'fleetSlot' | 'fleetStage' | 'fleetSlotGone'
+    | 'source'
+    | 'fleetIssue'
+    | 'fleetSlot'
+    | 'fleetStage'
+    | 'fleetSlotGone'
+    | 'fleetDetached'
   >,
 ): CardFleetView | null =>
   card.source === 'fleet' && card.fleetIssue !== null
@@ -51,6 +56,7 @@ export const cardFleetView = (
         stage: isFleetStage(card.fleetStage) ? card.fleetStage : null,
         // #433: a slotless card has no slot to follow, so a person may move it.
         slotGone: card.fleetSlotGone || card.fleetSlot === null,
+        detached: card.fleetDetached,
       }
     : null;
 
@@ -156,8 +162,9 @@ export const fleetEditMessage = (edit: FleetCardEdit): string => {
  * The Board's fleet mirror (#282 D4, ADR-0030 §4): one `fleet` card per
  * dispatched slot, keyed `(projectId, issue, slot)`, and one To Do card per
  * ready issue no slot has picked up, keyed `(projectId, issue, null)`. The
- * card's column follows its slot; only a person moves it Finished →
- * Completed. Its text is a person's to edit: an edit reaches the running slot
+ * card's column follows its slot until a person moves it: that move detaches
+ * the card (`fleetDetached`, C-397, ADR-0098), and the mirror then copies only
+ * the slot's stage, pull request and "slot gone". Its text is a person's to edit: an edit reaches the running slot
  * as one `slot.message`, and the GitHub issue is never rewritten.
  *
  * A runner-event sink registered at bootstrap, so it runs after the fleet
@@ -255,7 +262,9 @@ export class BoardFleetService
     const project = await this.work.project(projectId);
     for (const { number, to } of moves) {
       const card = await this.work.card(projectId, number);
+      // C-397: a person may have moved it since the reconcile read it.
       if (card.column === to || card.column === 'completed') continue;
+      if (card.fleetDetached) continue;
       await this.work.move(
         project,
         card,
@@ -349,7 +358,9 @@ export class BoardFleetService
           byKey.set(`${issue}:${slot.name}`, card);
           touched.push(card.id);
           const to = columnOf(slot, settledIssue, card.column);
-          if (to) moves.push({ number: card.number, to });
+          // C-397 (ADR-0098): a card a person moved keeps its column.
+          if (to && !card.fleetDetached)
+            moves.push({ number: card.number, to });
           continue;
         }
         // An ended run never gets a card: the slot history is not work.
@@ -375,7 +386,12 @@ export class BoardFleetService
         touched.push(card.id);
       }
       const to = columnOf(slot, settledIssue, card.column);
-      if (to && to !== card.column && card.column !== 'completed') {
+      if (
+        to &&
+        to !== card.column &&
+        card.column !== 'completed' &&
+        !card.fleetDetached
+      ) {
         moves.push({ number: card.number, to });
       }
     }
@@ -405,12 +421,14 @@ export class BoardFleetService
 
     // #433: a slotless To Do card whose issue left the ready set is no longer
     // "Waiting for a slot". Closed issue → Finished; open (unlabelled) → the
-    // card leaves the Board. A card a person already moved on stays put.
+    // card leaves the Board. A card a person already moved on stays put —
+    // also one they moved back to To Do (C-397: it is detached).
     const readySet = new Set(ready.map((r) => r.issueNumber));
     const orphans = [...byKey.values()].filter(
       (c) =>
         c.fleetSlot === null &&
         c.column === 'todo' &&
+        !c.fleetDetached &&
         c.fleetIssue !== null &&
         !readySet.has(c.fleetIssue),
     );

@@ -4,6 +4,7 @@ import {
   FLEET_ROUNDS_MAX,
   FLEET_SLOTS_PAGE_DEFAULT,
   type FleetChannel,
+  type FleetsView,
   type FleetView,
   type RoundView,
   type SlotDetail,
@@ -11,7 +12,7 @@ import {
   type SlotStatus,
 } from '@nautelle/shared';
 import { HttpException, Injectable } from '@nestjs/common';
-import type { Round, Slot } from '@prisma/client';
+import type { FleetOrchestrator, Prisma, Round, Slot } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { projectNotFound } from '../projects';
 import {
@@ -71,6 +72,75 @@ export class FleetQueryService {
       }),
     ]);
     if (!project) throw projectNotFound();
+    return this.view(projectId, project, orchestrator, latestRound, slots);
+  }
+
+  /**
+   * The fleet of every project in `where` (the caller's visible ones), read
+   * with one query per table instead of one `fleet()` per project (C-388).
+   */
+  async fleets(where: Prisma.ProjectWhereInput): Promise<FleetsView> {
+    const projects = await this.prisma.project.findMany({
+      where,
+      orderBy: [{ displayName: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        baseBranch: true,
+        baseOverride: true,
+        rootPath: true,
+        runnerId: true,
+      },
+    });
+    if (projects.length === 0) return { items: [] };
+    const ids = projects.map((p) => p.id);
+    const [orchestrators, rounds, slots] = await Promise.all([
+      this.prisma.fleetOrchestrator.findMany({
+        where: { projectId: { in: ids } },
+      }),
+      this.prisma.round.findMany({
+        where: { projectId: { in: ids } },
+        orderBy: [{ projectId: 'asc' }, { date: 'desc' }, { label: 'desc' }],
+        distinct: ['projectId'],
+      }),
+      this.prisma.slot.findMany({
+        where: { projectId: { in: ids }, status: { not: 'ended' } },
+        orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]);
+    const orchestratorOf = new Map(orchestrators.map((o) => [o.projectId, o]));
+    const roundOf = new Map(rounds.map((r) => [r.projectId, r]));
+    const slotsOf = new Map<string, Slot[]>();
+    for (const slot of slots) {
+      const list = slotsOf.get(slot.projectId);
+      if (list) list.push(slot);
+      else slotsOf.set(slot.projectId, [slot]);
+    }
+    const items = await Promise.all(
+      projects.map((project) =>
+        this.view(
+          project.id,
+          project,
+          orchestratorOf.get(project.id) ?? null,
+          roundOf.get(project.id) ?? null,
+          slotsOf.get(project.id) ?? [],
+        ),
+      ),
+    );
+    return { items };
+  }
+
+  private async view(
+    projectId: string,
+    project: {
+      baseBranch: string;
+      baseOverride: string | null;
+      rootPath: string;
+      runnerId: string;
+    },
+    orchestrator: FleetOrchestrator | null,
+    latestRound: Round | null,
+    slots: Slot[],
+  ): Promise<FleetView> {
     return {
       projectId,
       fleetChannel: await this.channel(project, latestRound, slots),

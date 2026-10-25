@@ -47,10 +47,10 @@ describe('toLocalError', () => {
     expect(
       of(
         boardError(409, 'move_refused', 'This move is not allowed', {
-          reason: 'fleet_slot',
+          reason: 'card_completed',
         }),
       ),
-    ).toEqual({ code: 'move_refused', message: 'fleet_slot' });
+    ).toEqual({ code: 'move_refused', message: 'card_completed' });
   });
 
   it('maps the rest by status, as before', () => {

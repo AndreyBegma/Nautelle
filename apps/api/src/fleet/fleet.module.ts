@@ -14,6 +14,7 @@ import {
   defaultFleetWorkspaceOptions,
   FLEET_WORKSPACE_OPTIONS,
 } from './fleet-workspace-options';
+import { FleetsController } from './fleets.controller';
 
 /**
  * Fleet observation (docs/specs/11): projections of fleet events, read-only
@@ -28,7 +29,7 @@ import {
     LiveModule,
     RunnersModule,
   ],
-  controllers: [FleetController],
+  controllers: [FleetController, FleetsController],
   providers: [
     BoardFleetService,
     FleetProjector,

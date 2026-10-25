@@ -196,6 +196,7 @@ export class WorkQueryService {
                     ? card.fleetStage
                     : null,
                 slotGone: card.fleetSlotGone,
+                detached: card.fleetDetached,
               },
             }
           : {}),

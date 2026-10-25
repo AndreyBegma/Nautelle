@@ -71,7 +71,6 @@ export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
   card_completed: 'This card is already completed.',
   invalid_move: 'A suggestion leaves the Inbox only by Accept, into To Do.',
   plan_task_derived: PLAN_TASK_MOVE_REFUSAL_TEXT,
-  fleet_slot: 'A fleet card follows its slot. Accept it once it is finished.',
 };
 
 /** A round's phase as a person reads it. */

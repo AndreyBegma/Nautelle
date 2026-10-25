@@ -539,7 +539,7 @@ export class BoardShipping
         if (!(await this.shipsWithoutChecks(project, card, result, noneSince)))
           return;
       }
-      // #946 (ADR-0098): a green head is recorded before its review steps,
+      // #946 (ADR-0099): a green head is recorded before its review steps,
       // so a card the review holds or hands to a person still gets its demo.
       await this.recordDemo(project, card, result.headSha);
       // #884 (ADR-0084 §3): the review steps pass the head before Finished;

@@ -159,19 +159,17 @@ describe('board fleet mirror (e2e, #282 D4)', () => {
     });
   });
 
-  it('refuses a person’s drag back to To Do with fleet_slot, and lets Finished → Completed through', async () => {
+  it('accepts a slot’s card Finished → Completed without detaching it, merging or closing', async () => {
     await dispatch(dispatched(), appeared());
     const [running] = await fleetCards();
-
-    const refused = await move(running.number, 'todo');
-    expect(refused.status).toBe(409);
-    expect(refused.body).toMatchObject({ reason: 'fleet_slot' });
-    expect((await fleetCards())[0].column).toBe('in_progress');
 
     await dispatch(prOpened());
     const accepted = await move(running.number, 'completed');
     expect(accepted.status).toBe(200);
-    expect((await fleetCards())[0].column).toBe('completed');
+    expect((await fleetCards())[0]).toMatchObject({
+      column: 'completed',
+      fleetDetached: false,
+    });
     // Accept never merges or closes a fleet card: the orchestrator merges.
     expect(w.sent('card.merge')).toHaveLength(0);
     expect(w.sent('card.close')).toHaveLength(0);
@@ -255,18 +253,18 @@ describe('board fleet mirror (e2e, #282 D4)', () => {
       expect(await w.audit('card.fleet_removed')).toHaveLength(1);
     });
 
-    it('lets a person move a slotless card, while a live slot’s card is still refused', async () => {
+    it('keeps a slotless card a person moved back to To Do when its issue leaves the queue (C-397)', async () => {
       await ready(42);
       await fleet.mirror(w.a);
       const [card] = await fleetCards();
-      const moved = await move(card.number, 'finished');
-      expect(moved.status).toBe(200);
+      expect((await move(card.number, 'finished')).status).toBe(200);
+      expect((await move(card.number, 'todo')).status).toBe(200);
+      await leaveQueue('open');
+      await fleet.mirror(w.a);
 
-      await dispatch(dispatched('i43', 43), appeared('i43'));
-      const live = (await fleetCards()).find((c) => c.fleetSlot === 'i43');
-      const refused = await move(live?.number ?? 0, 'finished');
-      expect(refused.status).toBe(409);
-      expect(refused.body).toMatchObject({ reason: 'fleet_slot' });
+      expect(await fleetCards()).toMatchObject([
+        { id: card.id, column: 'todo', fleetDetached: true },
+      ]);
     });
   });
 
@@ -355,10 +353,51 @@ describe('board fleet mirror (e2e, #282 D4)', () => {
       const back = await move(card.number, 'todo');
       expect(back.status).toBe(200);
       expect((await fleetCards())[0].column).toBe('todo');
+    });
+  });
 
-      const running = await move(card.number, 'in_progress');
-      expect(running.status).toBe(409);
-      expect(running.body).toMatchObject({ reason: 'fleet_slot' });
+  describe('a person’s move of a live slot’s card (C-397, ADR-0098)', () => {
+    it('is allowed and detaches the card: the mirror no longer moves it, but still copies the stage and PR', async () => {
+      await dispatch(dispatched(), appeared());
+      const [running] = await fleetCards();
+
+      const moved = await move(running.number, 'todo');
+      expect(moved.status).toBe(200);
+      expect((await fleetCards())[0]).toMatchObject({
+        column: 'todo',
+        fleetDetached: true,
+      });
+      // The slot is not told: no command reaches the runner.
+      expect(runnerSend).not.toHaveBeenCalled();
+
+      await dispatch(prOpened());
+      expect((await fleetCards())[0]).toMatchObject({
+        column: 'todo',
+        fleetStage: 'pr_open',
+        prNumber: 7,
+        prUrl: PR_URL,
+      });
+
+      const view = await w.operator.get(
+        `${w.path()}/board/cards/${running.number}`,
+      );
+      expect(view.body).toMatchObject({
+        source: 'fleet',
+        fleet: { slot: 'i42', detached: true },
+      });
+    });
+
+    it('records the move in the audit like any card’s', async () => {
+      await dispatch(dispatched(), appeared());
+      const [running] = await fleetCards();
+      expect((await move(running.number, 'finished')).status).toBe(200);
+
+      const moved = await w.audit('card.moved');
+      expect(moved.at(-1)).toMatchObject({
+        targetId: running.id,
+        before: { column: 'in_progress' },
+        after: { column: 'finished', source: 'person' },
+      });
     });
   });
 

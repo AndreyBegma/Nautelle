@@ -3369,6 +3369,9 @@ model BoardCard {
   fleetStage              String?
   /// The slot left the projection; the card keeps its last column.
   fleetSlotGone           Boolean               @default(false)
+  /// C-397 (ADR-0098): a person moved the card; the mirror no longer moves or
+  /// deletes it, and still copies the slot's stage and pull request.
+  fleetDetached           Boolean               @default(false)
   /// #337 D6, D7: the plan the card came from — a New Card intake or a New
   /// Plan's Create cards; kept as its origin.
   planId                  String?

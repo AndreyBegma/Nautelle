@@ -1,6 +1,7 @@
 import {
   type AcceptBoardCardResponse,
   armForMode,
+  BOARD_CARD_BODY_MAX,
   BOARD_COLUMNS,
   BOARD_COMPLETED_PAGE_SIZE,
   BOARD_ERROR,
@@ -553,6 +554,11 @@ export class BoardService implements OnModuleInit {
       attachmentIds,
       actor,
     );
+    // C-397 (ADR-0098): Queue's "Make a card" — refused before the card exists.
+    const issue =
+      dto.issueNumber === undefined
+        ? null
+        : await this.linkedIssue(projectId, dto.issueNumber);
     const card = await this.prisma.$transaction(async (tx) => {
       const next = await this.work.nextCard(tx, projectId);
       const position = await this.work.place(
@@ -567,15 +573,17 @@ export class BoardService implements OnModuleInit {
           ...next,
           title,
           fingerprint: captureFingerprint(title),
-          body: dto.body ?? '',
+          body: dto.body ?? issue?.body ?? '',
           // #271 D9: without a kind the model classifies it.
           kind: dto.kind ?? 'feature',
           kindSource: dto.kind === undefined ? 'auto' : 'person',
           column: 'todo',
           position,
           // #359 D4: a bug gets an issue at Run, a feature none — unless the
-          // person says otherwise.
-          issueOnRun: dto.issueOnRun ?? dto.kind === 'bug',
+          // person says otherwise. A linked card already has its issue (#447 D8).
+          issueOnRun: issue ? false : (dto.issueOnRun ?? dto.kind === 'bug'),
+          issueNumber: issue?.number ?? null,
+          issueUrl: issue?.url ?? null,
           specOnRun: dto.specOnRun ?? settings.specOnRun,
           createdById: actor.userId,
           movedById: actor.userId,
@@ -601,6 +609,7 @@ export class BoardService implements OnModuleInit {
         kind: card.kind,
         issueOnRun: card.issueOnRun,
         specOnRun: card.specOnRun,
+        issueNumber: card.issueNumber,
       },
       result: 'ok',
     });
@@ -617,6 +626,22 @@ export class BoardService implements OnModuleInit {
       actor,
     );
     return this.detail(projectId, card.number);
+  }
+
+  /**
+   * C-397: the issue a new card is made from — open and of the project's
+   * repository (#447 D8) — with its body, which a card made without one takes.
+   */
+  private async linkedIssue(projectId: string, number: number) {
+    const link = await assertIssueLinkable(this.prisma, projectId, number);
+    const cached = await this.prisma.issueCache.findUnique({
+      where: { projectId_number: { projectId, number } },
+      select: { body: true },
+    });
+    return {
+      ...link,
+      body: (cached?.body ?? '').slice(0, BOARD_CARD_BODY_MAX),
+    };
   }
 
   /**

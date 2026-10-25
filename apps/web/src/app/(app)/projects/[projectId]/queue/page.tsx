@@ -24,7 +24,7 @@ import {
 } from '@nautelle/shared';
 import { CirclePlus, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
@@ -38,12 +38,12 @@ import { usePageActions } from '../../../../../components/shell/use-page-actions
 import { api } from '../../../../../lib/api';
 import { pendingApprovalCount } from '../../../../../lib/approvals/needs-you';
 import { useActionRequests } from '../../../../../lib/approvals/use-action-requests';
+import { boardNewWorkHref } from '../../../../../lib/board/href';
 import { useUrlFilters } from '../../../../../lib/filters/use-url-filters';
 import { Time } from '../../../../../lib/format/time';
 import { useLive } from '../../../../../lib/live/use-live';
 import { useTabParam } from '../../../../../lib/projects/use-tab-param';
 import {
-  allowedLabels,
   countByState,
   describeQueueError,
   filterItems,
@@ -61,8 +61,8 @@ import { useSection } from '../../../../../lib/section/use-section';
 import { useProjectDetail } from '../use-project-detail';
 import { ApprovalsTab } from './approvals-tab';
 import { HeldForLead } from './held-for-lead';
+import { IncomingList } from './incoming-list';
 import { IssueSheet } from './issue-sheet';
-import { NewIssueDialog } from './new-issue-dialog';
 import { QueueBoard } from './queue-board';
 import { QueueList } from './queue-list';
 
@@ -85,6 +85,7 @@ export default function QueuePage() {
 
 function QueueScreen() {
   const { projectId } = useParams<{ projectId: string }>();
+  const router = useRouter();
   /** Bumped by a live push; the queue and the issue sheet depend on it. */
   const [version, setVersion] = useState(0);
   /** The same for the approvals and the open approval's detail. */
@@ -99,7 +100,6 @@ function QueueScreen() {
   const setFilter = (next: StateFilter) => set({ state: next });
   const [selected, setSelected] = useState<QueueItemView>();
   const live = useLivePaused();
-  const [creating, setCreating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -140,13 +140,18 @@ function QueueScreen() {
   const canOperate = role !== 'viewer';
   const isAdmin = role === 'admin';
 
+  // C-397 (ADR-0098): new work is always a card, made on the Board.
+  const newWork = useCallback(
+    () => router.push(boardNewWorkHref(projectId)),
+    [router, projectId],
+  );
   // The capsule's `+` below `lg` (#521) opens what the header's button opens.
   usePageActions([
     {
-      id: 'new-issue',
-      label: 'New issue',
+      id: 'new-work',
+      label: 'New work',
       icon: CirclePlus,
-      onSelect: () => setCreating(true),
+      onSelect: newWork,
       operatorOnly: true,
     },
   ]);
@@ -203,14 +208,14 @@ function QueueScreen() {
         <PageHeader
           className="mb-0"
           title="Queue"
-          description="What the orchestrator runs next, and what is waiting on your decision."
+          description="Incoming work: open GitHub issues waiting to become cards, the orchestrator's ready queue, and what waits on your decision."
           actions={
             <>
               {/* The top bar's dot says "live"; the page speaks only when it is not. */}
               {live.status !== 'connected' ? <LiveStatusBadge /> : null}
               {canOperate ? (
-                <Button variant="solid" onClick={() => setCreating(true)}>
-                  New issue
+                <Button variant="solid" onClick={newWork}>
+                  New work
                 </Button>
               ) : null}
             </>
@@ -251,8 +256,16 @@ function QueueScreen() {
               const items = filterItems(data.items, filter);
               return (
                 <>
+                  <IncomingList
+                    projectId={projectId}
+                    data={data}
+                    canOperate={canOperate}
+                    runnerName={project?.runnerName}
+                  />
+
                   <p className="text-sm text-ink-2">
-                    Open issues labelled <code>{data.readyLabel}</code>
+                    The orchestrator’s ready queue: open issues labelled{' '}
+                    <code>{data.readyLabel}</code>
                     {data.snapshotAt ? (
                       <>
                         {' · snapshot '}
@@ -360,11 +373,8 @@ function QueueScreen() {
                       )}
                       action={
                         canOperate ? (
-                          <Button
-                            variant="glass"
-                            onClick={() => setCreating(true)}
-                          >
-                            New issue
+                          <Button variant="glass" onClick={newWork}>
+                            New work
                           </Button>
                         ) : undefined
                       }
@@ -394,17 +404,6 @@ function QueueScreen() {
                     <p className="text-xs text-ink-3">
                       {roundFooter(data.round)}
                     </p>
-                  ) : null}
-
-                  {canOperate ? (
-                    <NewIssueDialog
-                      projectId={projectId}
-                      open={creating}
-                      labelChoices={allowedLabels(data)}
-                      runnerName={project?.runnerName}
-                      onOpenChange={setCreating}
-                      onCreated={() => setVersion((v) => v + 1)}
-                    />
                   ) : null}
                 </>
               );

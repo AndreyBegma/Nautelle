@@ -43,6 +43,11 @@ export interface QueueItemView extends QueueVerdict {
   title: string;
   url: string;
   labels: string[];
+  /**
+   * C-397 (ADR-0098): the number of the Board card that works this issue —
+   * Queue offers "Open card" instead of "Make a card"; null when none does.
+   */
+  cardNumber?: number | null;
   assignees: string[];
   source: QueueSource;
   /**
@@ -70,6 +75,11 @@ export interface OpenIssueView {
   title: string;
   url: string;
   labels: string[];
+  /**
+   * C-397 (ADR-0098): the number of the Board card that works this issue —
+   * Queue offers "Open card" instead of "Make a card"; null when none does.
+   */
+  cardNumber?: number | null;
 }
 
 export interface QueueRoundRef {

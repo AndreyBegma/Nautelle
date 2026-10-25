@@ -34,9 +34,10 @@ const VIEW_LABEL: Record<WorkspaceView, string> = {
  * The Fleet's header (#160, #213, C-283): the shared `PageHeader` titled
  * Fleet with the project in the eyebrow, as the breadcrumb and the rail say
  * (C-301), the orchestrator's state beside the title in the one vocabulary the card and
- * the canvas use, the fleet's counters in `meta`, New issue as the one solid
+ * the canvas use, the fleet's counters in `meta`, New work as the one solid
  * action and everything else — fit, settings — behind the `…` menu. The view
- * switch is the one quiet control beside it.
+ * switch is the one quiet control beside it. C-397 (ADR-0098): Fleet is the
+ * live view of who works now; new work is always a card.
  */
 export function FleetHeader({
   projectId,
@@ -45,8 +46,8 @@ export function FleetHeader({
   counts,
   view,
   canOperate,
-  newIssuePrimary,
-  onNewIssue,
+  newWorkPrimary,
+  onNewWork,
   onFit,
   onViewChange,
 }: {
@@ -58,11 +59,11 @@ export function FleetHeader({
   view: WorkspaceView;
   canOperate: boolean;
   /**
-   * New issue is the screen's one solid button, except on an empty fleet,
+   * New work is the screen's one solid button, except on an empty fleet,
    * where the first-project checklist's Start is (#213).
    */
-  newIssuePrimary: boolean;
-  onNewIssue: () => void;
+  newWorkPrimary: boolean;
+  onNewWork: () => void;
   /** Absent while there is no canvas to fit. */
   onFit?: () => void;
   onViewChange: (view: WorkspaceView) => void;
@@ -99,7 +100,7 @@ export function FleetHeader({
         ) : undefined
       }
       title="Fleet"
-      description="The orchestrator and the agents it runs on this project."
+      description="Who works right now: card workers, orchestrator slots and sessions, each linked to its card."
       link={NextLink}
       {...(orchestrator
         ? {
@@ -137,17 +138,17 @@ export function FleetHeader({
           </SegmentedControl>
         </div>
       }
-      {...(canOperate && newIssuePrimary
+      {...(canOperate && newWorkPrimary
         ? {
-            // The capsule's `+` carries New issue below the tablet edge.
-            primaryAction: { label: 'New issue', onClick: onNewIssue },
+            // The capsule's `+` carries New work below the tablet edge.
+            primaryAction: { label: 'New work', onClick: onNewWork },
             primaryActionOnPhone: 'hidden' as const,
           }
         : {})}
       overflow={
-        canOperate && !newIssuePrimary
+        canOperate && !newWorkPrimary
           ? [
-              { id: 'new-issue', label: 'New issue', onSelect: onNewIssue },
+              { id: 'new-work', label: 'New work', onSelect: onNewWork },
               ...overflow,
             ]
           : overflow

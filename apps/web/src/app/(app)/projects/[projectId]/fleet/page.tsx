@@ -5,12 +5,12 @@ import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
+  BOARD_CHANGED_EVENT,
   FLEET_LIVE_EVENT,
   type FleetGraph,
   type FleetView,
   type OrchestratorSettingsView,
   projectRoleAtLeast,
-  type QueueView,
 } from '@nautelle/shared';
 import { CirclePlus } from 'lucide-react';
 import Link from 'next/link';
@@ -35,13 +35,18 @@ import { usePageActions } from '../../../../../components/shell/use-page-actions
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
 import type { TerminalTarget } from '../../../../../components/terminal/terminal-view';
 import { api } from '../../../../../lib/api';
-import { boardNewPlanHref } from '../../../../../lib/board/href';
+import { fetchBoard } from '../../../../../lib/board/actions';
+import {
+  boardNewPlanHref,
+  boardNewWorkHref,
+} from '../../../../../lib/board/href';
 import { useControl } from '../../../../../lib/control/use-control';
 import {
   EMPTY_FLEET_DESCRIPTION,
   isNotFound,
 } from '../../../../../lib/fleet/format';
 import { fleetCounts, liveSlots } from '../../../../../lib/fleet/graph';
+import { workingNow } from '../../../../../lib/fleet/working-now';
 import {
   blur,
   closeAll,
@@ -54,12 +59,10 @@ import {
   type WorkspaceState,
 } from '../../../../../lib/fleet/workspace-url';
 import { useLive } from '../../../../../lib/live/use-live';
-import { allowedLabels } from '../../../../../lib/queue/format';
 import { useSection } from '../../../../../lib/section/use-section';
 import { slotSessionMessenger } from '../../../../../lib/session-message/actions';
 import { useTabletUp } from '../../../../../lib/slot/use-wide';
 import { useTerminalAvailable } from '../../../../../lib/terminal/use-terminal-available';
-import { NewIssueDialog } from '../queue/new-issue-dialog';
 import { useProjectDetail } from '../use-project-detail';
 import { AgentCanvas, AgentList } from './agent-canvas';
 import { AgentDock } from './agent-dock';
@@ -75,6 +78,7 @@ import { SlotsView } from './slots-view';
 import { StartOrchestratorDialog } from './start-dialog';
 import { useControlReasons } from './use-control-reasons';
 import { useDesktop } from './use-desktop';
+import { WorkingNow } from './working-now';
 
 /** Pushes arrive in bursts (one per projected batch); one refetch covers them. */
 const REFETCH_DEBOUNCE_MS = 300;
@@ -108,9 +112,10 @@ function FleetWorkspace() {
 
   /** Bumped by a live push; the fleet and the graph depend on it. */
   const [version, setVersion] = useState(0);
+  /** Bumped by a Board push; Working now depends on it (C-397). */
+  const [boardVersion, setBoardVersion] = useState(0);
   const [, setNow] = useState(0);
   const [startOpen, setStartOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
   /** Remounting the canvas fits it to view again. */
   const [fitKey, setFitKey] = useState(0);
   const [attach, setAttach] = useState<{
@@ -127,13 +132,18 @@ function FleetWorkspace() {
   const isAdmin = role === 'admin';
   const canOperate = projectRoleAtLeast(role, 'operator');
 
+  // C-397 (ADR-0098): new work is always a card, made on the Board.
+  const newWork = useCallback(
+    () => router.push(boardNewWorkHref(projectId)),
+    [router, projectId],
+  );
   // The capsule's `+` below `lg` (#521) opens what the header's button opens.
   usePageActions([
     {
-      id: 'new-issue',
-      label: 'New issue',
+      id: 'new-work',
+      label: 'New work',
       icon: CirclePlus,
-      onSelect: () => setCreating(true),
+      onSelect: newWork,
       operatorOnly: true,
     },
   ]);
@@ -141,7 +151,18 @@ function FleetWorkspace() {
   const canAttach = useTerminalAvailable(project?.runnerId, isAdmin);
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const boardTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   useLive(`project:${projectId}`, (message) => {
+    if (message.event === BOARD_CHANGED_EVENT) {
+      clearTimeout(boardTimer.current);
+      boardTimer.current = setTimeout(
+        () => setBoardVersion((v) => v + 1),
+        REFETCH_DEBOUNCE_MS,
+      );
+      return;
+    }
     // Slots, checkpoints and the conversation all arrive on the fleet event.
     if (message.event !== FLEET_LIVE_EVENT) return;
     clearTimeout(timer.current);
@@ -150,7 +171,13 @@ function FleetWorkspace() {
       REFETCH_DEBOUNCE_MS,
     );
   });
-  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+      clearTimeout(boardTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     const id = setInterval(() => setNow((n) => n + 1), AGE_TICK_MS);
@@ -172,13 +199,14 @@ function FleetWorkspace() {
       ),
     [projectId],
   );
-  // The new-issue dialog's label choices; asked for only once it opens.
-  const queue = useSection<QueueView | undefined>(
-    () =>
-      creating
-        ? api<QueueView>(`/projects/${projectId}/queue?include=open`)
-        : Promise.resolve(undefined),
-    [projectId, creating],
+  // C-397: who works now is read off the Board's cards.
+  const board = useSection(
+    () => fetchBoard(projectId),
+    [projectId, version, boardVersion],
+  );
+  const working = useMemo(
+    () => (board.data ? workingNow(board.data) : undefined),
+    [board.data],
   );
   const orchestratorStatus = fleet.data?.orchestrator.status;
   const reasons = useControlReasons({
@@ -271,17 +299,17 @@ function FleetWorkspace() {
     </div>
   );
 
-  /** Running, but nothing to run: the queue is empty. */
+  /** Running, but no slot is busy. */
   const queueEmpty = (
     <EmptyState
-      title="The queue is empty"
-      description={`${EMPTY_FLEET_DESCRIPTION} Nautelle does not create agents itself: queue an issue and the orchestrator dispatches it.`}
+      title="No slot is working"
+      description={`${EMPTY_FLEET_DESCRIPTION} Nautelle does not create agents itself: new work is a card on the Board.`}
       action={
         <div className="flex flex-wrap items-center justify-center gap-3">
           {canOperate ? (
-            // Glass: New issue in the header is the screen's solid.
-            <Button variant="glass" onClick={() => setCreating(true)}>
-              New issue
+            // Glass: New work in the header is the screen's solid.
+            <Button variant="glass" onClick={newWork}>
+              New work
             </Button>
           ) : null}
           <Link
@@ -307,8 +335,8 @@ function FleetWorkspace() {
         counts={counts}
         view={workspace.view}
         canOperate={canOperate}
-        newIssuePrimary={!showChecklist}
-        onNewIssue={() => setCreating(true)}
+        newWorkPrimary={!showChecklist}
+        onNewWork={newWork}
         {...(desktop &&
         workspace.view === 'canvas' &&
         (graph.data?.nodes.length ?? 0) > 1
@@ -321,6 +349,8 @@ function FleetWorkspace() {
       {fleet.data?.boardError ? (
         <BoardErrorBanner error={fleet.data.boardError} />
       ) : null}
+
+      {working ? <WorkingNow rows={working} /> : null}
 
       {/* A row: the workspace, then the agent panel as its last child. */}
       <div className="flex min-w-0 items-start gap-4">
@@ -406,7 +436,7 @@ function FleetWorkspace() {
                 liveSlots={liveSlots(graph.data)}
                 focusedSlot={focusedSlot}
                 hasOpen={workspace.open.length > 0}
-                onNewIssue={() => setCreating(true)}
+                onNewWork={newWork}
                 {...(onAttach ? { onAttach } : {})}
                 onViewDependencies={() =>
                   document
@@ -464,17 +494,6 @@ function FleetWorkspace() {
           open={startOpen}
           onOpenChange={setStartOpen}
           onStarted={() => setVersion((v) => v + 1)}
-        />
-      ) : null}
-
-      {canOperate ? (
-        <NewIssueDialog
-          projectId={projectId}
-          open={creating}
-          labelChoices={allowedLabels(queue.data)}
-          {...(project ? { runnerName: project.runnerName } : {})}
-          onOpenChange={setCreating}
-          onCreated={() => setVersion((v) => v + 1)}
         />
       ) : null}
 

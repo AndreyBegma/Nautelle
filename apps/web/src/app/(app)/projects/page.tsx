@@ -8,7 +8,11 @@ import { SearchField } from '@andrewbehma/glass-ui/field';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
-import type { FleetView, ProjectSummary } from '@nautelle/shared';
+import {
+  FLEET_LIVE_EVENT,
+  type FleetView,
+  type ProjectSummary,
+} from '@nautelle/shared';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -20,6 +24,7 @@ import { api } from '../../../lib/api';
 import { ORCHESTRATOR_STATUS_LABEL } from '../../../lib/fleet/format';
 import { pluralize } from '../../../lib/format';
 import { projectHue } from '../../../lib/hue';
+import { useLiveRefresh } from '../../../lib/live/use-live-refresh';
 import { RUNNERS_PAGE } from '../../../lib/prerequisites/copy';
 import { usePrerequisites } from '../../../lib/prerequisites/use-prerequisites';
 import { RUNNER_STATUS_LABEL, STATUS_TONE } from '../../../lib/runners/format';
@@ -27,9 +32,6 @@ import { useSection } from '../../../lib/section/use-section';
 import { ORCHESTRATOR_PILL_STATUS } from '../../../lib/status/pill';
 import { ConnectDialog } from './connect-dialog';
 import { type Fact, useProjectFacts } from './use-project-facts';
-
-/** Like /admin/runners: the page polls; project events are not published yet. */
-const POLL_MS = 15_000;
 
 /** `/projects?connect=1` opens the Connect dialog (the pairing dialog links here). */
 const CONNECT_PARAM = 'connect';
@@ -153,11 +155,12 @@ export default function ProjectsPage() {
   const projects = useSection(() => api<ProjectSummary[]>('/projects'), []);
   const { runners } = usePrerequisites({ runners: isAdmin });
 
-  const { retry } = projects;
-  useEffect(() => {
-    const timer = setInterval(retry, POLL_MS);
-    return () => clearInterval(timer);
-  }, [retry]);
+  // The runner a card names changes with the fleet; fleet events reload the list.
+  useLiveRefresh(
+    (projects.data ?? []).map((p) => p.id),
+    [FLEET_LIVE_EVENT],
+    projects.retry,
+  );
 
   // Read once on mount, then dropped so a reload does not reopen the dialog.
   useEffect(() => {

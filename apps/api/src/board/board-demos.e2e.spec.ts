@@ -342,7 +342,7 @@ describe('demo videos of green cards (e2e, C-370)', () => {
   });
 
   /**
-   * #946 (ADR-0098): a green head is recorded as soon as it reads green —
+   * #946 (ADR-0099): a green head is recorded as soon as it reads green —
    * before its review steps decide, whatever the merge settings — and every
    * head that gets no demo says why in the API's log, once.
    */

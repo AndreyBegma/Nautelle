@@ -18,8 +18,6 @@ export interface BulkCardFacts {
   roundPhase: CardRoundPhase | null;
   source: BoardCardSource;
   autoCollect: boolean;
-  /** #424 / #433: nothing follows the card's slot any more. */
-  slotGone: boolean;
   trackingAlive?: boolean;
 }
 
@@ -63,7 +61,6 @@ export const bulkCardRule = (
     cardSource: card.source,
     autoCollect: card.autoCollect,
     trackingAlive: card.trackingAlive,
-    slotGone: card.slotGone,
   });
   return decision.allowed ? { applies: true } : skip(decision.error);
 };
