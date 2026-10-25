@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "name": "Each round shows the model and effort it ran with",
+  "description": "C-359: the API stores the model and effort a round launched with and returns them in card detail, so the round item in the Rounds tab shows them.",
+  "steps": [
+    { "action": "marker", "title": "Sign in" },
+    {
+      "action": "navigate",
+      "path": "/login?next=/projects/demo-project/board/cards/5"
+    },
+    { "action": "wait", "ms": 3000 },
+    {
+      "action": "fill",
+      "target": { "label": "Email" },
+      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+    },
+    {
+      "action": "fill",
+      "target": { "label": "Password" },
+      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
+    },
+    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
+    { "action": "marker", "title": "Open the finished card" },
+    {
+      "action": "waitFor",
+      "target": { "text": "Retry a failed collect from the card" },
+      "caption": "C-5 finished one round.",
+      "timeoutMs": 30000
+    },
+    { "action": "marker", "title": "Open its rounds" },
+    {
+      "action": "click",
+      "target": { "role": "tab", "name": "Rounds (1)" },
+      "timeoutMs": 15000
+    },
+    {
+      "action": "waitFor",
+      "target": { "text": "claude-opus-5-5 · high" },
+      "caption": "The round shows the model and effort it launched with.",
+      "timeoutMs": 15000
+    },
+    { "action": "screenshot", "name": "round-model-and-effort" },
+    { "action": "wait", "ms": 1500 }
+  ]
+}

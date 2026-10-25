@@ -1,5 +1,5 @@
 import { captureFingerprint } from '@nautelle/shared';
-import type { BoardColumn, PrismaClient } from '@prisma/client';
+import type { BoardColumn, CardEffort, PrismaClient } from '@prisma/client';
 
 /**
  * The database a demo recording runs on (C-383, ADR-0090): `agentdock_demo`,
@@ -39,6 +39,8 @@ export const DEMO_CARDS: ReadonlyArray<{
   title: string;
   column: BoardColumn;
   kind: 'feature' | 'bug';
+  /** C-359: a finished round 1 launched with this model and effort. */
+  round?: { model: string; effort: CardEffort };
 }> = [
   { title: 'Export the activity feed as CSV', column: 'todo', kind: 'feature' },
   { title: 'Dark mode for the settings page', column: 'todo', kind: 'feature' },
@@ -56,6 +58,7 @@ export const DEMO_CARDS: ReadonlyArray<{
     title: 'Retry a failed collect from the card',
     column: 'finished',
     kind: 'feature',
+    round: { model: 'claude-opus-5-5', effort: 'high' },
   },
 ];
 
@@ -65,7 +68,10 @@ export const DEMO_CARDS: ReadonlyArray<{
  * again changes nothing.
  */
 export const seedDemo = async (
-  prisma: Pick<PrismaClient, 'user' | 'runner' | 'project' | 'boardCard'>,
+  prisma: Pick<
+    PrismaClient,
+    'user' | 'runner' | 'project' | 'boardCard' | 'run' | 'boardCardRound'
+  >,
   adminEmail: string,
 ): Promise<{ projectId: string; cards: number }> => {
   const email = adminEmail.trim().toLowerCase();
@@ -105,7 +111,7 @@ export const seedDemo = async (
 
   for (const [index, card] of DEMO_CARDS.entries()) {
     const number = index + 1;
-    await prisma.boardCard.upsert({
+    const created = await prisma.boardCard.upsert({
       where: { projectId_number: { projectId: DEMO_PROJECT_ID, number } },
       update: {},
       create: {
@@ -125,6 +131,51 @@ export const seedDemo = async (
         movedAt: now,
       },
     });
+    if (card.round) {
+      const runId = `demo-run-${number}`;
+      const startedAt = new Date(now.getTime() - 20 * 60_000);
+      await prisma.run.upsert({
+        where: { id: runId },
+        update: {},
+        create: {
+          id: runId,
+          kind: 'card',
+          projectId: DEMO_PROJECT_ID,
+          title: `C-${number} ${card.title}`,
+          runtime: 'claude',
+          model: card.round.model,
+          args: { card: number, round: 1, trigger: 'run' },
+          status: 'succeeded',
+          triggeredByType: 'user',
+          triggeredById: admin.id,
+          startedAt,
+          endedAt: now,
+          updatedAt: now,
+        },
+      });
+      await prisma.boardCardRound.upsert({
+        where: { runId },
+        update: {},
+        create: {
+          cardId: created.id,
+          round: 1,
+          runId,
+          trigger: 'run',
+          cardTitle: card.title,
+          cardBody: '',
+          cardKind: card.kind,
+          authorId: admin.id,
+          phase: 'finished',
+          finishedBy: 'worker',
+          summary: 'Added a Retry collect button to the card.',
+          model: card.round.model,
+          effort: card.round.effort,
+          startedAt,
+          finishedAt: now,
+          endedAt: now,
+        },
+      });
+    }
   }
   return { projectId: DEMO_PROJECT_ID, cards: DEMO_CARDS.length };
 };
