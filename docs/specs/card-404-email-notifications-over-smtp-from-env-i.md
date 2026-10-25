@@ -1,16 +1,51 @@
 # C-404: Email notifications over SMTP from env, immediate or as a digest
 
-Part of the 2026-10-25 core and UX plan, settled with the person in a grilling session. Order of the plan: speed → daily flow → fleet scale → team. Nothing is removed in this iteration: pages and routes stay; roles and entry points may change.
+Stack **S-16 "Core 4 — Team"**, stage *Channels and tokens*, with C-403 and C-405. C-402 (account recovery) builds on it.
+This is part of the core plan of 2026-10-25, settled with the person in a grilling session.
 
 ## Why
-Notifications are in-app and Telegram only (`notification-writer.ts:118`).
+Notifications go only to the web app and Telegram (`apps/api/src/notifications/notification-writer.ts`).
+Self-service password reset (C-402) needs email.
+
+## Decisions (grilling session)
+- "SMTP from env, for notifications and for password reset."
+- The audience of this iteration is the person plus the first external users. Cheap team features only.
 
 ## What
-- `SMTP_URL` (and `SMTP_FROM`) in env, documented in `.env.example` and the docs site; a test-send button in Admin.
-- Account › Notifications: email per event kind, immediately or as a daily digest of what waits on you and what was done.
-- Used by the password-reset card for self-service reset.
+1. **Configuration.**
+   - `SMTP_URL` and `SMTP_FROM` in env, documented in `apps/api/.env.example`, the Compose file, the Helm
+     values and the docs site's configuration page. Compose takes them from `api.env` beside
+     `docker-compose.yml`, as it does every other optional API variable: `deploy/compose/.env.example`
+     holds only the install settings.
+   - Admin gets a **Send test email** button.
+2. **Per-user choice.** In Account › Notifications (`apps/web/src/app/account/notifications/`), email per event kind,
+   either immediately or as a daily digest.
+3. **The digest** lists what waits on you and what was done that day.
+4. **Without SMTP**, email options are hidden, and the reason is shown.
 
-## Done when
-With SMTP set, a waiting question emails its owner, and the digest arrives once a day. Tests with a fake SMTP server.
+## Out of scope
+- Inbound email, or replying to act.
+- HTML templates beyond a simple, accessible layout.
 
-Spec: docs/specs/card-404-email-notifications-over-smtp-from-env-i.md (PR #937)
+## Touched areas
+- `apps/api/src/notifications/notification-writer.ts`, `packages/shared/src/notifications/kinds.ts`
+- A new mail sender module in `apps/api/src/`
+- `apps/web/src/app/account/notifications/`
+- `apps/api/.env.example`, `deploy/compose/docker-compose.yml`, `deploy/helm/nautelle/values.yaml`, the docs site
+
+## ADRs to read
+- ADR-0046 (Telegram command router), ADR-0096 (demo to Telegram as a notification).
+- **A new ADR is needed**: email is a notification channel configured by env.
+  Take the next free number from origin/develop at implementation time.
+
+## Acceptance criteria
+- [ ] With SMTP set, a waiting question emails its owner.
+- [ ] The digest arrives once a day.
+- [ ] Without SMTP, nothing breaks and the UI says why email is off.
+- [ ] The test button reports success or the SMTP error.
+
+## Tests
+- API: e2e with a fake SMTP server, for immediate mail, the digest, and SMTP missing.
+
+## Open questions
+- None.
