@@ -161,6 +161,14 @@ export interface FleetView {
   slots: SlotSummary[];
 }
 
+/**
+ * `GET /fleet`: the `FleetView` of every project the caller can see, in one
+ * call (C-388). A project whose fleet cannot be read is absent, never partial.
+ */
+export interface FleetsView {
+  items: FleetView[];
+}
+
 export const FLEET_SLOTS_PAGE_DEFAULT = 50;
 export const FLEET_SLOTS_PAGE_MAX = 200;
 export const FLEET_ROUNDS_MAX = 100;

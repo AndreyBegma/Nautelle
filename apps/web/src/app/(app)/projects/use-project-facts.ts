@@ -1,8 +1,13 @@
 'use client';
 
-import type { FleetView } from '@nautelle/shared';
-import { useEffect, useState } from 'react';
+import {
+  FLEET_LIVE_EVENT,
+  type FleetsView,
+  type FleetView,
+} from '@nautelle/shared';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
+import { useLiveRefresh } from '../../../lib/live/use-live-refresh';
 
 /** `undefined` while loading, `null` when the request failed. */
 export type Fact<T> = T | null | undefined;
@@ -13,32 +18,47 @@ export interface ProjectFacts {
 
 /**
  * What the Projects list shows beside each project: its fleet (orchestrator
- * and slots). A failed request leaves that card on a dash; it never blanks
- * the list.
- *
- * TODO(follow-up): a single aggregate endpoint would replace the per-project
- * fleet calls (issue #159).
+ * and slots), from one `GET /fleet` for every project the user can see. A
+ * failed request leaves the cards on a dash; it never blanks the list, and a
+ * failed refresh keeps the figures already shown. The fleets reload when a
+ * project's fleet changes.
  */
 export function useProjectFacts(projectIds: readonly string[]): ProjectFacts {
   const [fleets, setFleets] = useState<Record<string, Fact<FleetView>>>({});
+  const [version, setVersion] = useState(0);
   const key = projectIds.join(',');
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for `projectIds`.
   useEffect(() => {
+    if (projectIds.length === 0) return;
     let cancelled = false;
-    for (const id of projectIds) {
-      api<FleetView>(`/projects/${id}/fleet`)
-        .then((fleet) => {
-          if (!cancelled) setFleets((prev) => ({ ...prev, [id]: fleet }));
-        })
-        .catch(() => {
-          if (!cancelled) setFleets((prev) => ({ ...prev, [id]: null }));
-        });
-    }
+    api<FleetsView>('/fleet')
+      .then(({ items }) => {
+        if (cancelled) return;
+        const byProject = new Map(items.map((f) => [f.projectId, f]));
+        setFleets(
+          Object.fromEntries(
+            projectIds.map((id) => [id, byProject.get(id) ?? null]),
+          ),
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Keep what a refresh already showed; a first load leaves the dashes.
+        setFleets((prev) =>
+          Object.fromEntries(projectIds.map((id) => [id, prev[id] ?? null])),
+        );
+      });
     return () => {
       cancelled = true;
     };
-  }, [key]);
+  }, [key, version]);
+
+  useLiveRefresh(
+    projectIds,
+    [FLEET_LIVE_EVENT],
+    useCallback(() => setVersion((n) => n + 1), []),
+  );
 
   return { fleets };
 }
