@@ -5,6 +5,28 @@ what to do on every machine that runs the runner.
 
 ## Unreleased
 
+## 0.18.0
+
+No upgrade steps: `npx` fetches DemoFlow 0.7.0 on the first demo after the
+upgrade.
+
+- **Demos sign in off camera.** The runner pins DemoFlow 0.7.0, which adds a
+  scenario's `setup` steps — run before the recording starts, so the video
+  opens on the page they end on — and reusable fragments under
+  `demoflow/fragments/`, run with an `include` step. A card's demo can sign in
+  through a shared fragment instead of showing the login form.
+- **Connecting a project lists the repositories it can use.** Two typed
+  commands for the connect dialog: `project.discover` lists the git
+  repositories under the policy's `allowedRoots` with their GitHub
+  owner/name, and `project.push_check` reports whether `origin` accepts
+  pushes (`git push --dry-run` to an unused branch).
+- **`develop` becomes the base when it is in use.** `project.inspect` prefers
+  an `origin/develop` with a commit in the last 90 days over `origin/HEAD`.
+- **A demo no longer leaves files behind.** Tracked files the recorded app
+  rewrote (such as Next.js's `next-env.d.ts`) are checked out from `HEAD`
+  after the recording, so they no longer reach the card's pull request
+  (#949).
+
 ## 0.17.0
 
 **Upgrade note — demo configs should use `${PORT}`.** The runner now pins
