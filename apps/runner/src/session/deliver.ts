@@ -1,5 +1,10 @@
 import type { SessionMessageOutcome } from '@nautelle/shared';
-import { answerSteps, readQuestion } from '../cards/question';
+import {
+  answerRow,
+  answerSteps,
+  type QuestionScreen,
+  readQuestion,
+} from '../cards/question';
 import type { TmuxControl } from '../control/tmux';
 import { readPane } from '../steward/pane-rules';
 
@@ -36,17 +41,64 @@ export const deliverText = async (
   return 'sent';
 };
 
+/** #967: how an answer waits for the selector to move on. */
+export interface AnswerPacing {
+  readonly sleep: (ms: number) => Promise<void>;
+  /** The pause after typed text, so the Enter behind it is not read as part of it. */
+  readonly settleMs: number;
+  /** The pane is read this many times, `settleMs` apart, before Enter is pressed again. */
+  readonly reads: number;
+}
+
+const ANSWER_PACING: AnswerPacing = {
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  settleMs: 150,
+  reads: 10,
+};
+
+type Answer = { index: number } | { text: string };
+
+/**
+ * #967: whether the selector left the question `place` names — to the next
+ * tab, the form's Submit screen, or away. `stuck` carries the screen when it
+ * did not; null when the session is gone.
+ */
+const leftQuestion = async (
+  tmux: DeliveryTmux,
+  session: string,
+  place: string,
+  pacing: AnswerPacing,
+): Promise<
+  { moved: true } | { moved: false; screen: QuestionScreen } | null
+> => {
+  let screen: QuestionScreen | null = null;
+  for (let read = 0; read < pacing.reads; read += 1) {
+    await pacing.sleep(pacing.settleMs);
+    const pane = await tmux.capture(session);
+    if (pane === null) return null;
+    screen = readQuestion(pane);
+    if (!screen || screen.place !== place) return { moved: true };
+  }
+  return screen ? { moved: false, screen } : { moved: true };
+};
+
 /**
  * #489 M4: answers the question selector the pane shows — the option with
  * that number, or typed text in its "Other" field — with the keys
  * `answerSteps` fixes, only while the pane still shows the screen
  * `questionKey` names.
+ *
+ * #967: `answered` only once the selector has moved on. Typed text gets a
+ * pause before its Enter; when the pane still shows the question with the
+ * cursor where that Enter went, the Enter was not taken and is pressed
+ * once more. A selector that stays is `not_at_input`.
  */
 export const answerQuestion = async (
   tmux: DeliveryTmux,
   session: string,
   questionKey: string,
-  answer: { index: number } | { text: string },
+  answer: Answer,
+  pacing: AnswerPacing = ANSWER_PACING,
 ): Promise<SessionMessageOutcome> => {
   const pane = await tmux.capture(session);
   if (pane === null) return 'no_session';
@@ -56,10 +108,19 @@ export const answerQuestion = async (
     return 'question_changed';
   }
   const steps = answerSteps(screen, answer);
-  if (!steps) return 'no_option';
+  const enterAt = answerRow(screen, answer);
+  if (!steps || enterAt === null) return 'no_option';
   for (const step of steps) {
-    if ('literal' in step) await tmux.sendLiteral(session, step.literal);
-    else await tmux.sendKey(session, step.key);
+    if ('literal' in step) {
+      await tmux.sendLiteral(session, step.literal);
+      await pacing.sleep(pacing.settleMs);
+    } else await tmux.sendKey(session, step.key);
   }
-  return 'answered';
+  for (let enter = 0; ; enter += 1) {
+    const left = await leftQuestion(tmux, session, screen.place, pacing);
+    if (left === null) return 'no_session';
+    if (left.moved) return 'answered';
+    if (enter > 0 || left.screen.cursor !== enterAt) return 'not_at_input';
+    await tmux.sendKey(session, 'Enter');
+  }
 };
