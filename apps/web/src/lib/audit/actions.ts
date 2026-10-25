@@ -54,6 +54,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'approval.request_changes': 'Requested changes',
   'approval.void': 'Voided an approval',
   'notification.rules': 'Changed notification rules',
+  'notification.email': 'Changed email digest time',
   'notification.mute': 'Muted notifications',
   'telegram.configure': 'Set the Telegram bot',
   'telegram.clear': 'Removed the Telegram bot',

@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import type {
+  EmailIntegrationStatus,
   GitHubAppView,
   InboundTriggerView,
   TelegramIntegrationStatus,
   WebhookView,
 } from '@nautelle/shared';
 import {
+  emailStatus,
   gitHubAppStatus,
   telegramStatus,
   triggersStatus,
@@ -100,6 +102,32 @@ describe('telegramStatus', () => {
     );
     expect(telegramStatus(status({ lastError: 'x' })).tone).toBe('warn');
     expect(telegramStatus(status({ configured: false })).label).toBe(
+      'Not set up',
+    );
+  });
+});
+
+describe('emailStatus', () => {
+  const status = (
+    over: Partial<EmailIntegrationStatus>,
+  ): EmailIntegrationStatus => ({
+    configured: true,
+    server: 'smtp.example.com:587',
+    secure: false,
+    from: 'Nautelle <bot@example.com>',
+    links: true,
+    pending: 1,
+    lastError: null,
+    lastSentAt: null,
+    ...over,
+  });
+
+  test('sending, refused, and not set up', () => {
+    expect(emailStatus(status({})).detail).toBe(
+      'smtp.example.com:587 · 1 email waiting.',
+    );
+    expect(emailStatus(status({ lastError: '550 no' })).tone).toBe('warn');
+    expect(emailStatus(status({ configured: false, server: null })).label).toBe(
       'Not set up',
     );
   });
