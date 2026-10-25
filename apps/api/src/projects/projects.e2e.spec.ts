@@ -592,6 +592,30 @@ describe('projects (e2e)', () => {
       ]);
     });
 
+    it('stores push access and the DemoFlow config the runner reports, unknown from an older runner (C-395)', async () => {
+      const runner = await connectRunner();
+      const project = await connectProject();
+      expect(project).toMatchObject({ hasDemoflowConfig: null, canPush: null });
+
+      runner.answer = () => ({
+        ok: true,
+        output: inspection({ hasDemoflowConfig: true, canPush: false }),
+      });
+      const refreshed = await admin.send(
+        'post',
+        `/projects/${project.id}/refresh`,
+      );
+      expect(refreshed.status).toBe(200);
+      expect(refreshed.body).toMatchObject({
+        hasDemoflowConfig: true,
+        canPush: false,
+      });
+      expect((await admin.get(`/projects/${project.id}`)).body).toMatchObject({
+        hasDemoflowConfig: true,
+        canPush: false,
+      });
+    });
+
     it('keeps the GitHub repository id on the same repo and drops it on another (spec 27 D7)', async () => {
       const runner = await connectRunner();
       const project = await connectProject();

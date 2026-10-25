@@ -138,6 +138,10 @@ export interface ProjectDetail extends ProjectSummary {
   } | null;
   hasClaudeMd: boolean;
   hasAgentsMd: boolean;
+  /** C-395: `demoflow.config.json` at the repository root; null until a runner reports it. */
+  hasDemoflowConfig: boolean | null;
+  /** C-395: the runner's GitHub login can push to the repository; null when unknown. */
+  canPush: boolean | null;
   lastInspectedAt: string;
   createdAt: string;
   updatedAt: string;

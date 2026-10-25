@@ -456,6 +456,12 @@ model Project {
   codeSentinelConfig          Json?
   hasClaudeMd                 Boolean
   hasAgentsMd                 Boolean
+  /// C-395: the repository has a `demoflow.config.json` at its root; null
+  /// until a runner that reports it inspects the project.
+  hasDemoflowConfig           Boolean?
+  /// C-395: the runner's GitHub login can push to the repository (`gh`'s
+  /// `viewerPermission`); null when `gh` could not tell or the runner is older.
+  canPush                     Boolean?
   lastInspectedAt             DateTime
   /// #691: why the runner's local policy refuses to watch this project, as the
   /// runner worded it in its latest `runner.watch_refused` (ADR-0047). Null

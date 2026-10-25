@@ -138,6 +138,9 @@ export const seedDemo = async (
       defaultBranch: 'main',
       hasClaudeMd: true,
       hasAgentsMd: false,
+      // C-395: what the Ready to run block reads; the runner stays offline.
+      hasDemoflowConfig: true,
+      canPush: true,
       lastInspectedAt: now,
       createdById: admin.id,
       members: { create: { userId: admin.id, addedById: admin.id } },

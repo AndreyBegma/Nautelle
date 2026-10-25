@@ -5,6 +5,7 @@ import type {
   WatchedProject,
 } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
+import { DEMOFLOW_CONFIG_FILE } from '../demos/config-file';
 import type { Exec } from '../detect/exec';
 import { stripUrlCredentials } from '../redact-url';
 import { emptyClassified } from './classify';
@@ -118,6 +119,36 @@ const resolveBase = async (
   };
 };
 
+/** C-395: the permissions `gh` reports that let its login push. */
+const PUSH_PERMISSIONS: ReadonlySet<string> = new Set([
+  'ADMIN',
+  'MAINTAIN',
+  'WRITE',
+]);
+
+/**
+ * C-395: whether the runner's `gh` login can push to `repo`; null when there
+ * is no GitHub repository or `gh` could not answer (not installed, not
+ * signed in, offline).
+ */
+const resolveCanPush = async (
+  exec: Exec,
+  repo: string | null,
+): Promise<boolean | null> => {
+  if (!repo) return null;
+  const view = await exec('gh', [
+    'repo',
+    'view',
+    repo,
+    '--json',
+    'viewerPermission',
+    '--jq',
+    '.viewerPermission',
+  ]);
+  const permission = view?.code === 0 ? view.stdout.trim() : '';
+  return permission ? PUSH_PERMISSIONS.has(permission) : null;
+};
+
 /**
  * `project.inspect` (D2–D7, D10): any existing absolute directory inside a git
  * repository. A linked worktree or a subdirectory is reported with
@@ -200,6 +231,8 @@ export const inspectProject = async (
     codeSentinelConfig,
     hasClaudeMd: isFile(fs, join(toplevel, 'CLAUDE.md')),
     hasAgentsMd: isFile(fs, join(toplevel, 'AGENTS.md')),
+    hasDemoflowConfig: isFile(fs, join(toplevel, DEMOFLOW_CONFIG_FILE)),
+    canPush: await resolveCanPush(exec, remote.repo),
     docs: detected?.docs ?? {
       kind: 'none',
       localPath: null,

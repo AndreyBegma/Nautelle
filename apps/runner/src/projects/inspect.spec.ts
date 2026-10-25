@@ -64,6 +64,8 @@ describe('project.inspect', () => {
       },
       hasClaudeMd: true,
       hasAgentsMd: false,
+      hasDemoflowConfig: false,
+      canPush: null,
       docs: expect.objectContaining({
         kind: 'in_repo',
         localPath: join(root, 'docs'),
@@ -127,6 +129,30 @@ describe('project.inspect', () => {
       baseSource: 'config',
       defaultBranch: 'main',
     });
+  });
+
+  it('reports the DemoFlow config and whether gh can push (C-395)', async () => {
+    ws = workspace();
+    const root = await ws.repo('x', 'git@github.com:acme/x.git');
+    ws.files({ 'x/demoflow.config.json': '{}' });
+    const permission = (answer: string) =>
+      gitWithFakeGh(ws.git, {
+        'repo view acme/x --json viewerPermission --jq .viewerPermission':
+          answer,
+      });
+
+    expect(await inspect(root, permission('WRITE'))).toMatchObject({
+      hasDemoflowConfig: true,
+      canPush: true,
+    });
+    expect(await inspect(root, permission('ADMIN'))).toMatchObject({
+      canPush: true,
+    });
+    expect(await inspect(root, permission('READ'))).toMatchObject({
+      canPush: false,
+    });
+    // gh unanswered: not installed, signed out or offline.
+    expect(await inspect(root)).toMatchObject({ canPush: null });
   });
 
   it('refuses a linked worktree as not the main checkout and suggests the main path', async () => {

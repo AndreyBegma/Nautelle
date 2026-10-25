@@ -127,6 +127,8 @@ export const toProjectDetail = (
         ),
   hasClaudeMd: project.hasClaudeMd,
   hasAgentsMd: project.hasAgentsMd,
+  hasDemoflowConfig: project.hasDemoflowConfig,
+  canPush: project.canPush,
   lastInspectedAt: project.lastInspectedAt.toISOString(),
   createdAt: project.createdAt.toISOString(),
   updatedAt: project.updatedAt.toISOString(),

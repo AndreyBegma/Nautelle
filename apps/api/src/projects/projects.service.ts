@@ -85,6 +85,9 @@ const inspectionData = (inspection: ProjectInspection) => ({
   codeSentinelConfig: inspection.codeSentinelConfig as Prisma.InputJsonValue,
   hasClaudeMd: inspection.hasClaudeMd,
   hasAgentsMd: inspection.hasAgentsMd,
+  // C-395: a runner older than the fields leaves them unknown.
+  hasDemoflowConfig: inspection.hasDemoflowConfig ?? null,
+  canPush: inspection.canPush ?? null,
   lastInspectedAt: new Date(),
 });
 
