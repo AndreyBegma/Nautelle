@@ -1,5 +1,6 @@
 import type {
   ChannelSwitches,
+  EmailMode,
   NotificationChannel,
   NotificationKind,
 } from './kinds';
@@ -56,6 +57,15 @@ export interface NotificationRuleView extends ChannelSwitches {
   channels: NotificationChannel[];
   /** No stored row: these are the D1 defaults. */
   isDefault: boolean;
+  /**
+   * C-404: the email mode the user chose; null: never chosen — their own
+   * cards get `ownerEmail`, everything else no email.
+   */
+  email: EmailMode | null;
+  /** C-404: false for a kind that is never emailed. */
+  emailable: boolean;
+  /** C-404: what a card's creator gets for their own card by default; null: nothing. */
+  ownerEmail: EmailMode | null;
 }
 
 export interface NotificationRulesView {
@@ -64,7 +74,50 @@ export interface NotificationRulesView {
 
 /** `PUT /notifications/rules` — the rules to store; kinds left out keep theirs. */
 export interface NotificationRulesUpdate {
-  rules: (ChannelSwitches & { kind: NotificationKind })[];
+  rules: (ChannelSwitches & {
+    kind: NotificationKind;
+    /** C-404: left out keeps the stored mode; null goes back to the default. */
+    email?: EmailMode | null;
+  })[];
+}
+
+/** `GET|PUT /notifications/email` — the caller's email delivery (C-404). */
+export interface NotificationEmailSettings {
+  /** `HH:MM` in `timezone` — when the daily digest goes out. */
+  digestTime: string;
+  /** IANA timezone. */
+  timezone: string;
+}
+
+export interface NotificationEmailView extends NotificationEmailSettings {
+  /** The server has `SMTP_URL`: email can be sent at all. */
+  configured: boolean;
+  /** Where the caller's email goes — their sign-in address. */
+  address: string;
+}
+
+export const EMAIL_DIGEST_DEFAULTS: NotificationEmailSettings = {
+  digestTime: '09:00',
+  timezone: 'UTC',
+};
+
+/** `GET /admin/integrations/email` (C-404). Credentials are never returned. */
+export interface EmailIntegrationStatus {
+  /** `SMTP_URL` is set and parses. */
+  configured: boolean;
+  /** The server's host and port, e.g. `smtp.example.com:587`; null when unset. */
+  server: string | null;
+  /** TLS from the first byte (`smtps://`). */
+  secure: boolean;
+  /** The sender, `SMTP_FROM` or the default. */
+  from: string;
+  /** `APP_URL` is set: emails carry links back to the app. */
+  links: boolean;
+  /** Emails waiting to go out right now. */
+  pending: number;
+  /** The newest failed delivery's error, redacted; null when none failed. */
+  lastError: string | null;
+  lastSentAt: string | null;
 }
 
 /** A project mute (D3). `until` null: until removed. */
@@ -103,7 +156,10 @@ export interface NotificationReadLive {
   unreadCount: number;
 }
 
-/** Telegram delivery states (spec 22 "Data / Schema"). */
+/**
+ * Delivery states (spec 22 "Data / Schema"). An email in the daily digest
+ * (C-404) is `digested` from the start, until its digest goes out.
+ */
 export const NOTIFICATION_DELIVERY_STATUSES = [
   'pending',
   'sent',
@@ -133,6 +189,8 @@ export const NOTIFICATION_ERROR_CODES = [
   'telegram_unavailable',
   'telegram_link_request_not_found',
   'telegram_chat_taken',
+  'email_not_configured',
+  'email_unavailable',
 ] as const;
 export type NotificationErrorCode = (typeof NOTIFICATION_ERROR_CODES)[number];
 

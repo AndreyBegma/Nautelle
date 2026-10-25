@@ -68,6 +68,7 @@ model User {
   notifications               Notification[]
   notificationRules           NotificationRule[]
   notificationMutes           NotificationMute[]
+  notificationEmailSettings   NotificationEmailSettings?
   telegramLink                TelegramLink?
   telegramLinkCodes           TelegramLinkCode[]
   telegramPendingLink         TelegramPendingLink?
@@ -1571,6 +1572,9 @@ model NotificationRule {
   kind      String
   inApp     Boolean
   telegram  Boolean
+  /// C-404: shared `EmailMode`; null: never chosen — the card's creator gets
+  /// the kind's `ownerEmail`, everyone else no email.
+  email     String?
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1595,6 +1599,22 @@ model NotificationMute {
 
 enum NotificationDeliveryChannel {
   telegram
+  email
+}
+
+/// C-404: when a user's daily email digest goes out. No row: 09:00 UTC.
+/// `lastDigestAt`: the digest time whose digest went out (or had nothing in
+/// it) — a digest is sent once per occurrence, however often the job runs.
+model NotificationEmailSettings {
+  userId       String    @id
+  digestTime   String    @default("09:00")
+  timezone     String    @default("UTC")
+  lastDigestAt DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_email_settings")
 }
 
 enum NotificationDeliveryStatus {
@@ -1607,8 +1627,10 @@ enum NotificationDeliveryStatus {
 
 /// One notification's delivery on an outside channel (D6). `digested`: over
 /// the rate limit, sent inside the digest `digestId` once its window ends
-/// (`nextAttemptAt`); `sentAt` is set when that digest went out. `skipped`:
-/// never sent — `lastError` says why (shared `DeliverySkipReason`).
+/// (`nextAttemptAt`); `sentAt` is set when that digest went out. An email in
+/// the daily digest (C-404) is `digested` from the start, `digestId` null
+/// until a digest claims it. `skipped`: never sent — `lastError` says why
+/// (shared `DeliverySkipReason`).
 model NotificationDelivery {
   id             String                      @id @default(cuid())
   notificationId BigInt

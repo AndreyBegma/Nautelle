@@ -9,7 +9,7 @@ keys the API generates for itself.
 | File | Holds | Written by |
 |---|---|---|
 | `nautelle/.env` | The address, the exposure mode, the image version and the database and Redis passwords | `install.sh`; edit it by hand to change a setting |
-| `nautelle/api.env` | Anything else the API reads: the Telegram bot, DeepL, speech to text, retention, limits | You; optional, one `KEY=value` per line |
+| `nautelle/api.env` | Anything else the API reads: the Telegram bot, email (SMTP), DeepL, speech to text, retention, limits | You; optional, one `KEY=value` per line |
 | `secrets.json` in the `data` volume | `APP_ENCRYPTION_KEY`, `AUDIT_HMAC_KEY`, `LLM_SECRETS_KEY` | The API, on its first start |
 
 After a change, apply it:
@@ -35,7 +35,7 @@ without a trailing slash. The others derive from it, and each can be set in
 |---|---|---|
 | `API_URL` | `NAUTELLE_URL/api` | the address runners pair with |
 | `WEB_URL` | `NAUTELLE_URL` | CORS and the WebSocket origin check |
-| `APP_URL` | `NAUTELLE_URL` | links in Telegram messages and the Telegram Mini App |
+| `APP_URL` | `NAUTELLE_URL` | links in Telegram messages and emails, and the Telegram Mini App |
 | `PUBLIC_URL` | `NAUTELLE_URL/api` | the GitHub App webhook; empty turns it off |
 
 To move an install to another address, run `install.sh --url <new address>`
@@ -55,6 +55,13 @@ the database cannot be read without it.
 
 - **The Telegram bot**: set up under **Admin › Integrations › Telegram**; it
   needs the encryption key, which every install has.
+- **Email notifications**: `SMTP_URL` (and optionally `SMTP_FROM`) in
+  `api.env`, for example `SMTP_URL=smtps://user:password@smtp.example.com:465`
+  — percent-encode an `@` or `:` in the user or password. Restart the API, then
+  send a test email from **Admin › Integrations › Email**. Each person picks
+  the kinds they get by email — at once or in one daily digest at their own
+  time — under **Account › Notifications**; the creator of a card is emailed
+  when its worker waits for them. The credentials are never shown or logged.
 - **Translation with DeepL**: `DEEPL_API_KEY` in `api.env`.
 - **Voice input in Telegram**: `SPEECH_TO_TEXT_URL`, `SPEECH_TO_TEXT_API_KEY`.
 - **AI providers** for the assistant features: **Admin › AI providers**.

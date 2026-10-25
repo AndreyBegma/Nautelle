@@ -1,6 +1,7 @@
 'use client';
 
 import { Card } from '@andrewbehma/glass-ui/card';
+import { Select } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
@@ -11,6 +12,10 @@ import type {
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api, describeErrorHint } from '../../../lib/api';
 import {
+  type EmailChoice,
+  emailChoice,
+  emailOptions,
+  emailRuleUpdate,
   type RuleRow,
   ruleRows,
   ruleSections,
@@ -28,8 +33,22 @@ const LINK_TELEGRAM = (
 /** The label and the two channel columns, shared by the headers and the rows. */
 const RULE_GRID =
   'grid grid-cols-[minmax(0,1fr)_3rem_3.75rem] gap-x-3 sm:grid-cols-[1fr_6rem_6rem]';
+/** With email (C-404): a third column from `sm`, its own line on phones. */
+const RULE_GRID_EMAIL =
+  'grid grid-cols-[minmax(0,1fr)_3rem_3.75rem] gap-x-3 sm:grid-cols-[1fr_6rem_6rem_11rem]';
 
-export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
+type RuleChange =
+  | { channel: NotificationChannel; value: boolean }
+  | { channel: 'email'; value: EmailChoice };
+
+export function RulesSection({
+  telegramLinked,
+  emailConfigured,
+}: {
+  telegramLinked: boolean;
+  /** The server can send email: show the Email column. */
+  emailConfigured: boolean;
+}) {
   const rules = useSection(
     () => api<NotificationRulesView>('/notifications/rules'),
     [],
@@ -37,16 +56,15 @@ export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
   const showError = useErrorToast();
   const view = rules.data;
 
-  const change = async (
-    row: RuleRow,
-    channel: NotificationChannel,
-    value: boolean,
-  ) => {
+  const change = async (row: RuleRow, update: RuleChange) => {
     try {
       rules.setData(
         await api<NotificationRulesView>('/notifications/rules', {
           method: 'PUT',
-          body: ruleUpdate(row, channel, value),
+          body:
+            update.channel === 'email'
+              ? emailRuleUpdate(row, update.value)
+              : ruleUpdate(row, update.channel, update.value),
         }),
       );
     } catch (error) {
@@ -64,6 +82,9 @@ export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
         description={
           <>
             Choose which kinds reach you, and where.
+            {emailConfigured
+              ? ' Email goes out at once or in your daily digest.'
+              : null}
             {telegramLinked ? null : (
               <> {LINK_TELEGRAM} above to turn on the Telegram column.</>
             )}
@@ -84,7 +105,8 @@ export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
         {() => (
           <RuleSections
             rows={rows}
-            onChange={(r, channel, value) => void change(r, channel, value)}
+            email={emailConfigured}
+            onChange={(r, update) => void change(r, update)}
           />
         )}
       </AsyncSection>
@@ -94,20 +116,19 @@ export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
 
 function RuleSections({
   rows,
+  email,
   onChange,
 }: {
   rows: RuleRow[];
-  onChange: (
-    row: RuleRow,
-    channel: NotificationChannel,
-    value: boolean,
-  ) => void;
+  email: boolean;
+  onChange: (row: RuleRow, update: RuleChange) => void;
 }) {
+  const grid = email ? RULE_GRID_EMAIL : RULE_GRID;
   return (
     <div className="flex flex-col gap-6">
       {ruleSections(rows).map((section) => (
         <section key={section.group} aria-labelledby={`rules-${section.group}`}>
-          <div className={`${RULE_GRID} items-end border-b border-line pb-2`}>
+          <div className={`${grid} items-end border-b border-line pb-2`}>
             <h3
               id={`rules-${section.group}`}
               className="text-sm font-semibold text-ink"
@@ -116,10 +137,19 @@ function RuleSections({
             </h3>
             <span className="text-xs text-ink-3">In-app</span>
             <span className="text-xs text-ink-3">Telegram</span>
+            {email ? (
+              <span className="hidden text-xs text-ink-3 sm:block">Email</span>
+            ) : null}
           </div>
           <ul className="divide-y divide-line">
             {section.rows.map((row) => (
-              <RuleLine key={row.kind} row={row} onChange={onChange} />
+              <RuleLine
+                key={row.kind}
+                row={row}
+                grid={grid}
+                email={email}
+                onChange={onChange}
+              />
             ))}
           </ul>
         </section>
@@ -130,17 +160,17 @@ function RuleSections({
 
 function RuleLine({
   row,
+  grid,
+  email,
   onChange,
 }: {
   row: RuleRow;
-  onChange: (
-    row: RuleRow,
-    channel: NotificationChannel,
-    value: boolean,
-  ) => void;
+  grid: string;
+  email: boolean;
+  onChange: (row: RuleRow, update: RuleChange) => void;
 }) {
   return (
-    <li className={`${RULE_GRID} items-center gap-y-0.5 py-3`}>
+    <li className={`${grid} items-center gap-y-0.5 py-3`}>
       {/* Phones: the example spans the row under the toggles (R4). */}
       <span
         id={`rule-${row.kind}`}
@@ -161,7 +191,7 @@ function RuleLine({
         ) : (
           <Toggle
             checked={row.inApp}
-            onChange={(value) => onChange(row, 'inApp', value)}
+            onChange={(value) => onChange(row, { channel: 'inApp', value })}
             labelledBy={`rule-${row.kind}-inapp`}
           />
         )}
@@ -189,11 +219,53 @@ function RuleLine({
         ) : (
           <Toggle
             checked={row.telegram}
-            onChange={(value) => onChange(row, 'telegram', value)}
+            onChange={(value) => onChange(row, { channel: 'telegram', value })}
             labelledBy={`rule-${row.kind}-telegram`}
           />
         )}
       </div>
+      {email ? <EmailCell row={row} onChange={onChange} /> : null}
     </li>
+  );
+}
+
+/** Phones: the Email select gets its own line under the example (R4). */
+function EmailCell({
+  row,
+  onChange,
+}: {
+  row: RuleRow;
+  onChange: (row: RuleRow, update: RuleChange) => void;
+}) {
+  const id = `rule-${row.kind}-email`;
+  return (
+    <div className="col-span-3 row-start-3 mt-2 flex items-center gap-2 sm:col-span-1 sm:col-start-4 sm:row-span-2 sm:row-start-1 sm:mt-0">
+      <span id={id} className="text-xs text-ink-3 sm:sr-only">
+        <span className="sr-only">{row.label}, </span>Email
+      </span>
+      {row.emailable ? (
+        <Select
+          aria-labelledby={id}
+          className="h-8 w-full text-sm"
+          value={emailChoice(row)}
+          onChange={(event) =>
+            onChange(row, {
+              channel: 'email',
+              value: event.target.value as EmailChoice,
+            })
+          }
+        >
+          {emailOptions(row).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      ) : (
+        <span className="text-ink-3 text-xs" title="Not sent by email">
+          —
+        </span>
+      )}
+    </div>
   );
 }

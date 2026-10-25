@@ -1,8 +1,11 @@
 import {
   type ChannelSwitches,
   defaultChannels,
+  type EmailMode,
+  isEmailMode,
   isNotificationKind,
   kindAllowsChannel,
+  kindAllowsEmail,
   kindsFor,
   NOTIFICATION_KIND_SPECS,
   type NotificationKind,
@@ -37,6 +40,10 @@ export const channelsFor = (
   };
 };
 
+/** A stored email mode; anything else reads as never chosen (C-404). */
+const storedEmail = (value: string | null | undefined): EmailMode | null =>
+  value && isEmailMode(value) ? value : null;
+
 /** Whether a mute with `until` silences at `at` (D3). */
 export const muteActive = (until: Date | null, at: Date): boolean =>
   until === null || until.getTime() > at.getTime();
@@ -54,15 +61,24 @@ export class NotificationRulesService {
   ) {}
 
   async rules(user: Caller): Promise<NotificationRulesView> {
-    const stored = await this.stored(user.id);
+    const rows = await this.prisma.notificationRule.findMany({
+      where: { userId: user.id },
+    });
+    const stored = new Map(rows.map((r) => [r.kind, r]));
     return {
       rules: kindsFor(user.role).map((kind) => {
         const row = stored.get(kind);
+        const emailable = kindAllowsEmail(kind);
         return {
           kind,
           ...channelsFor(kind, user.role, row),
           channels: [...NOTIFICATION_KIND_SPECS[kind].channels],
           isDefault: row === undefined,
+          email: emailable ? storedEmail(row?.email) : null,
+          emailable,
+          ownerEmail: emailable
+            ? (NOTIFICATION_KIND_SPECS[kind].ownerEmail ?? null)
+            : null,
         };
       }),
     };
@@ -89,18 +105,35 @@ export class NotificationRulesService {
           `"${rule.kind}" is never sent to Telegram`,
         );
       }
+      if (
+        rule.email !== undefined &&
+        rule.email !== null &&
+        rule.email !== 'off' &&
+        !kindAllowsEmail(rule.kind)
+      ) {
+        throw notificationError(
+          400,
+          'invalid_rule',
+          `"${rule.kind}" is never emailed`,
+        );
+      }
     }
     const before = await this.rules(user);
     await this.prisma.$transaction(
       update.rules.map((rule) =>
         this.prisma.notificationRule.upsert({
           where: { userId_kind: { userId: user.id, kind: rule.kind } },
-          update: { inApp: rule.inApp, telegram: rule.telegram },
+          update: {
+            inApp: rule.inApp,
+            telegram: rule.telegram,
+            ...(rule.email !== undefined ? { email: rule.email } : {}),
+          },
           create: {
             userId: user.id,
             kind: rule.kind,
             inApp: rule.inApp,
             telegram: rule.telegram,
+            email: rule.email ?? null,
           },
         }),
       ),
@@ -110,7 +143,10 @@ export class NotificationRulesService {
       Object.fromEntries(
         view.rules
           .filter((r) => update.rules.some((u) => u.kind === r.kind))
-          .map((r) => [r.kind, { inApp: r.inApp, telegram: r.telegram }]),
+          .map((r) => [
+            r.kind,
+            { inApp: r.inApp, telegram: r.telegram, email: r.email },
+          ]),
       );
     await this.audit.record({
       ...ctx,

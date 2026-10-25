@@ -1,4 +1,5 @@
 import {
+  type EmailMode,
   NOTIFICATION_KIND_SPECS,
   NOTIFICATION_NEW_EVENT,
   NOTIFICATION_READ_EVENT,
@@ -292,6 +293,11 @@ export interface RuleRow {
   inAppDisabled: boolean;
   telegramDisabled: boolean;
   telegramNote: 'unlinked' | 'in-app only' | null;
+  /** C-404: the stored email mode; null is the kind's default. */
+  email: EmailMode | null;
+  emailable: boolean;
+  /** What a card's creator gets for their own card while `email` is null. */
+  ownerEmail: EmailMode | null;
 }
 
 /**
@@ -321,6 +327,9 @@ export function ruleRows(
         : telegramLinked
           ? null
           : 'unlinked',
+      email: rule.email,
+      emailable: rule.emailable,
+      ownerEmail: rule.ownerEmail,
     };
   });
 }
@@ -355,6 +364,63 @@ export function ruleUpdate(
         inApp: row.inApp,
         telegram: row.telegram,
         [channel]: value,
+      },
+    ],
+  };
+}
+
+/** The Email select: the three modes, plus the default for kinds that have one. */
+export type EmailChoice = EmailMode | 'default';
+
+const EMAIL_MODE_LABEL: Record<EmailMode, string> = {
+  off: 'Off',
+  immediate: 'Immediately',
+  digest: 'Daily digest',
+};
+
+/**
+ * The options of a row's Email select (C-404). A kind with an owner default
+ * (a waiting question goes to the card's creator) offers it first, so "only
+ * my own cards" stays a choice once another mode was picked.
+ */
+export function emailOptions(
+  row: Pick<RuleRow, 'ownerEmail'>,
+): { value: EmailChoice; label: string }[] {
+  const owned = row.ownerEmail !== null;
+  const modes = (Object.keys(EMAIL_MODE_LABEL) as EmailMode[]).map((mode) => ({
+    value: mode as EmailChoice,
+    label:
+      owned && mode !== 'off'
+        ? `All cards: ${EMAIL_MODE_LABEL[mode]}`
+        : EMAIL_MODE_LABEL[mode],
+  }));
+  if (!row.ownerEmail) return modes;
+  return [
+    {
+      value: 'default',
+      label: `My cards: ${EMAIL_MODE_LABEL[row.ownerEmail]}`,
+    },
+    ...modes,
+  ];
+}
+
+/** The select's value: the stored mode, or the default (off without one). */
+export const emailChoice = (
+  row: Pick<RuleRow, 'email' | 'ownerEmail'>,
+): EmailChoice => row.email ?? (row.ownerEmail ? 'default' : 'off');
+
+/** Set one kind's email mode; the body of the `PUT /notifications/rules`. */
+export function emailRuleUpdate(
+  row: Pick<RuleRow, 'kind' | 'inApp' | 'telegram'>,
+  choice: EmailChoice,
+) {
+  return {
+    rules: [
+      {
+        kind: row.kind,
+        inApp: row.inApp,
+        telegram: row.telegram,
+        email: choice === 'default' ? null : choice,
       },
     ],
   };
