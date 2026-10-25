@@ -502,9 +502,12 @@ describe('projects (e2e)', () => {
       return { runnerId: paired.runnerId, runner };
     };
 
+    /** The runner's `key` profile — reused when its capabilities already reported it. */
     const profileOn = (id: string, key = 'claude-main') =>
-      ctx.prisma.runtimeProfile.create({
-        data: {
+      ctx.prisma.runtimeProfile.upsert({
+        where: { runnerId_key: { runnerId: id, key } },
+        update: {},
+        create: {
           runnerId: id,
           key,
           runtime: 'claude',
