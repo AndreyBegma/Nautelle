@@ -346,7 +346,13 @@ describe('CardFace rows (C-35, #423, #778)', () => {
   test('a fleet card shows its badges, its slot line and the Fleet link', () => {
     const html = render('in_progress', {
       source: 'fleet',
-      fleet: { issue: 12, slot: 'i12-web', stage: 'pr_open', slotGone: true },
+      fleet: {
+        issue: 12,
+        slot: 'i12-web',
+        stage: 'pr_open',
+        slotGone: true,
+        detached: false,
+      },
     });
     const status = row(html, 'status') ?? '';
     expect(status).toContain('Fleet');

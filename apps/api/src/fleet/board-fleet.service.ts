@@ -162,8 +162,9 @@ export const fleetEditMessage = (edit: FleetCardEdit): string => {
  * The Board's fleet mirror (#282 D4, ADR-0030 §4): one `fleet` card per
  * dispatched slot, keyed `(projectId, issue, slot)`, and one To Do card per
  * ready issue no slot has picked up, keyed `(projectId, issue, null)`. The
- * card's column follows its slot; only a person moves it Finished →
- * Completed. Its text is a person's to edit: an edit reaches the running slot
+ * card's column follows its slot until a person moves it: that move detaches
+ * the card (`fleetDetached`, C-397, ADR-0098), and the mirror then copies only
+ * the slot's stage, pull request and "slot gone". Its text is a person's to edit: an edit reaches the running slot
  * as one `slot.message`, and the GitHub issue is never rewritten.
  *
  * A runner-event sink registered at bootstrap, so it runs after the fleet
