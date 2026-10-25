@@ -1878,8 +1878,16 @@ question selector it shows. It is sent only to a runner whose capabilities say
 - **Answers.** An answer is sent only while the pane shows the screen
   `questionKey` names (`question_changed` otherwise). The keys are `Up` or
   `Down` from the cursor to the option, then `Enter`. "Other" moves to
-  "Type something.", types the text and presses `Enter`. An option the
-  screen does not list is `no_option`.
+  "Type something.", types the text, pauses, and presses `Enter`. On a
+  multi-select tab the answer ticks its box, then moves to `Next` (or
+  `Submit`) and presses `Enter`. An option the screen does not list is
+  `no_option`.
+- **An answer is confirmed (ADR-0111).** After the keys, the runner reads the
+  pane until the selector shows another tab of the form, its Submit screen,
+  or nothing: that is `answered`. If the same question stays with the cursor
+  where the `Enter` went, `Enter` is pressed once more; a selector that still
+  stays is `not_at_input`. A form of several questions is reported tab by
+  tab, each with its own `questionKey` and a `form` field (tabs, step).
 - **Fleet slots.** A delivered message is also appended to
   `<git-common-dir>/cs-orchestrator/events.jsonl` as `slot.message_sent`
   with `data.by: "person"`, so the orchestrator learns what its worker was
