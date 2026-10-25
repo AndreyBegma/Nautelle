@@ -5,6 +5,7 @@ import { AiDigestPanel } from '../../../components/ai/digest-panel';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { useProjects } from '../../../components/shell/use-shell-data';
 import { useCurrentUser } from '../../../components/shell/user-context';
+import { DigestPanel } from '../../../components/steward/digest-panel';
 import { ActivityFeed } from './feed';
 
 export default function ActivityPage() {
@@ -17,6 +18,7 @@ export default function ActivityPage() {
         description="What happened across your projects: pull requests, blockers, runner changes and schedule runs."
       />
       <AiDigestPanel projects={projects} />
+      <DigestPanel projects={projects} />
       <Section title="Feed" surface="none">
         <ActivityFeed isAdmin={user.role === 'admin'} />
       </Section>

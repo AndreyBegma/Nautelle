@@ -90,7 +90,9 @@ than on whatever the shared dev database holds. Nautelle's own
 `scripts/demo-dev.sh` creates `agentdock_demo_<card>`, applies the card's
 migrations, creates the admin from `DEMO_LOGIN_EMAIL` and `DEMO_LOGIN_PASSWORD`
 and a demo project with a few cards, and drops the database when DemoFlow stops
-it.
+it. A card's worktree has no `apps/api/.env`, so the script then takes
+`DATABASE_URL` — the dev PostgreSQL server the demo database is created on —
+from the environment: add it to the Demo env next to the demo account.
 
 A Next.js app in dev mode serves its scripts only to `localhost` unless told
 otherwise, so a page opened on `127.0.0.1` never hydrates and a form submits as
@@ -117,6 +119,13 @@ steps; `valueFrom.env` reads a Demo env secret:
 }
 ```
 
+A feature card records as soon as its pull request's head turns green, before
+its review steps run, so a card the review holds or hands to you has its video
+too; each new head records its own. A fix round the review asks for waits for
+the recording, at most 15 minutes, because it changes the worktree the video is
+recorded from. A card that changes no UI path, a bug card, and a head that
+conflicts with its base record none, and the API's log says why.
+
 Run one by hand with `npx demoflow@0.6.0 run <scenario>`. A demo that fails or
 is skipped shows its reason on the card; it never holds up Finished or a merge.
 The runner records two demos at a time and queues the rest; set
@@ -130,4 +139,5 @@ The runner records two demos at a time and queues the rest; set
 - [ADR-0080](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0080-auto-merge-needs-every-check-passed.md): auto-merge needs every check passed.
 - [ADR-0084](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0084-a-card-passes-its-review-steps-before-finished.md): a card passes its review steps before Finished.
 - [ADR-0090](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0090-a-finished-card-may-carry-a-demo-video-recorded-by-demoflow-on-the-runner.md): a finished card may carry a demo video recorded by DemoFlow on the runner.
+- [ADR-0099](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0099-a-cards-demo-is-recorded-when-its-head-reads-green-before-review.md): a card's demo is recorded when its head reads green, before review.
 - [All decisions](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/README.md).

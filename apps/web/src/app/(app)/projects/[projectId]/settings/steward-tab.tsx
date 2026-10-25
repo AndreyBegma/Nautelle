@@ -144,6 +144,13 @@ export function StewardTab({
               className="text-accent-ink underline underline-offset-2"
             >
               See incidents in Activity
+            </Link>{' '}
+            or{' '}
+            <Link
+              href="/activity#activity-digest"
+              className="text-accent-ink underline underline-offset-2"
+            >
+              the latest digest
             </Link>
             .
           </p>
@@ -169,7 +176,7 @@ export function StewardTab({
           <Field
             label="Digest time"
             htmlFor="steward-digest-time"
-            hint="Once a day, in your time zone, to Telegram and Overview. Also sent when away mode is switched off."
+            hint="Once a day, in your time zone, to Telegram and Activity. Also sent when away mode is switched off."
           >
             <Input
               id="steward-digest-time"
