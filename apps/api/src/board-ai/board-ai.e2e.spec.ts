@@ -1,8 +1,9 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import type {
-  BoardAskResponse,
-  BoardTriageCounts,
-  CardTriageView,
+import {
+  type BoardAskResponse,
+  type BoardTriageCounts,
+  type CardTriageView,
+  QUICK_CARD_TEXT_MAX,
 } from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import { answer, english, OPUS } from '../assistant/testing/scripted-answers';
@@ -15,6 +16,7 @@ import {
   resetDatabase,
   type Session,
 } from '../test/e2e-app';
+import { BOARD_ASK_LIMIT } from './board-ai.controller';
 import { BoardTriage } from './board-triage.service';
 
 const MASTER_KEY = randomBytes(32).toString('base64');
@@ -589,6 +591,89 @@ describe('Ask the Board and triage hints (e2e)', () => {
     it('is 404 for a project the person cannot see', async () => {
       const res = await alice.get(`/projects/${secret}/board/triage`);
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('Quick card draft (C-391)', () => {
+    const draft = (who: Session, body: object, projectId = dock) =>
+      who.send('post', `/projects/${projectId}/board/cards/draft`, body);
+
+    it('returns the cheap model title and kind, tagged quick_card', async () => {
+      script.push(json({ title: 'Fix the login redirect', kind: 'bug' }));
+      const res = await draft(alice, {
+        text: 'login sends me back to / instead of the page I was on',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        title: 'Fix the login redirect',
+        kind: 'bug',
+        source: 'model',
+      });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].system).toContain('You name a new card');
+      const row = await ctx.prisma.llmCall.findFirstOrThrow();
+      expect([row.feature, row.userId]).toEqual(['quick_card', aliceId]);
+    });
+
+    it('falls back to the first line when the model answer is out of contract', async () => {
+      script.push(answer([{ text: ['Sure! Here is a title.'] }]));
+      const res = await draft(alice, { text: 'Add dark mode\nfor the board' });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        title: 'Add dark mode',
+        kind: 'feature',
+        source: 'fallback',
+      });
+    });
+
+    it('falls back without a model call when the cap is reached', async () => {
+      await reachCap();
+      const res = await draft(alice, { text: 'Export usage as CSV' });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        title: 'Export usage as CSV',
+        source: 'fallback',
+      });
+      expect(calls).toHaveLength(0);
+    });
+
+    it('falls back when no provider is set up', async () => {
+      await ctx.prisma.$executeRawUnsafe(
+        'TRUNCATE TABLE llm_provider_settings CASCADE',
+      );
+      const res = await draft(alice, { text: 'Export usage as CSV' });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ source: 'fallback' });
+      expect(calls).toHaveLength(0);
+    });
+
+    it('validates the text', async () => {
+      expect((await draft(alice, { text: '   ' })).status).toBe(400);
+      expect((await draft(alice, {})).status).toBe(400);
+      expect(
+        (await draft(alice, { text: 'x'.repeat(QUICK_CARD_TEXT_MAX + 1) }))
+          .status,
+      ).toBe(400);
+      expect(
+        (await draft(alice, { text: 'Add dark mode', title: 'Mine' })).status,
+      ).toBe(400);
+      expect(calls).toHaveLength(0);
+    });
+
+    it('is for operators of the project only', async () => {
+      expect((await draft(viewer, { text: 'Add dark mode' })).status).toBe(403);
+      expect(
+        (await draft(alice, { text: 'Add dark mode' }, secret)).status,
+      ).toBe(404);
+      expect(calls).toHaveLength(0);
+    });
+
+    it('throttles one person per window', async () => {
+      await reachCap();
+      for (let i = 0; i < BOARD_ASK_LIMIT; i++) {
+        expect((await draft(alice, { text: `Card ${i}` })).status).toBe(200);
+      }
+      expect((await draft(alice, { text: 'One more' })).status).toBe(429);
     });
   });
 });

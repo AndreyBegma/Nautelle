@@ -24,6 +24,7 @@ import {
   Square,
   SquareTerminal,
   User,
+  Zap,
 } from 'lucide-react';
 import { COLUMN_TITLE } from '../../lib/board/format';
 import {
@@ -57,9 +58,14 @@ export interface PaletteInput {
   plans: readonly PlanSummary[];
   /** The theme the "Switch theme" action reads as its hint. */
   themeLabel: string;
+  /** C-391: inside a project the person can create cards in (operator or up). */
+  canQuickCard?: boolean;
   /** C-393: the cards the lookup found for the query, across projects. */
   cards?: readonly WorkCardItem[];
 }
+
+/** C-391: the palette row that opens Quick card for the current project. */
+export const QUICK_CARD_ACTION = 'action:quick-card';
 
 /** C-393: a palette row that runs a card from where the person is. */
 export const CARD_RUN_PREFIX = 'card:run:';
@@ -361,6 +367,9 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
     : [];
 
   const actions: Item[] = [
+    ...(input.canQuickCard
+      ? [{ id: QUICK_CARD_ACTION, label: 'Quick card', icon: Zap }]
+      : []),
     {
       id: 'action:theme',
       label: 'Switch theme',

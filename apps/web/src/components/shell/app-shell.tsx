@@ -11,7 +11,12 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { useBreakpoint } from '@andrewbehma/glass-ui/use-breakpoint';
 import { useCommandPaletteShortcut } from '@andrewbehma/glass-ui/use-command-palette-shortcut';
-import { cardLabel, LIVE_CLOSE_CODES, type PublicUser } from '@nautelle/shared';
+import {
+  cardLabel,
+  LIVE_CLOSE_CODES,
+  type PublicUser,
+  projectRoleAtLeast,
+} from '@nautelle/shared';
 import { ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -27,6 +32,7 @@ import { runCard } from '../../lib/board/actions';
 import { describeBoardError } from '../../lib/board/format';
 import { useLiveStatus } from '../../lib/live/use-live';
 import { Assistant } from '../assistant/assistant';
+import { QuickCardProvider, useQuickCard } from '../board/quick-card-context';
 import { AskBoardDialog } from '../board-ai/ask-board-dialog';
 import { InboxProvider, useInboxSection } from '../inbox/inbox-context';
 import { GettingStartedProvider } from '../onboarding/getting-started-context';
@@ -54,7 +60,12 @@ import {
   visibleNav,
 } from './nav';
 import { NotificationBell } from './notification-bell';
-import { ASK_PREFIX, CARD_RUN_PREFIX, paletteGroups } from './palette';
+import {
+  ASK_PREFIX,
+  CARD_RUN_PREFIX,
+  paletteGroups,
+  QUICK_CARD_ACTION,
+} from './palette';
 import { Rail } from './rail';
 import { useRailCollapsed, useRailToggleShortcut } from './rail-collapse';
 import {
@@ -122,7 +133,17 @@ export function AppShell({
   user: PublicUser;
   children: ReactNode;
 }) {
+  // C-391: one Quick card dialog for the shell's three ways in.
+  return (
+    <QuickCardProvider>
+      <Shell user={user}>{children}</Shell>
+    </QuickCardProvider>
+  );
+}
+
+function Shell({ user, children }: { user: PublicUser; children: ReactNode }) {
   const router = useRouter();
+  const quickCard = useQuickCard();
   const pathname = usePathname();
   const narrow = useNarrow();
   // #526: the soft keyboard replaces the capsule, so a docked action stays above it.
@@ -224,6 +245,7 @@ export function AppShell({
       recent,
       plans,
       themeLabel: THEME_LABEL[theme],
+      canQuickCard: projectId !== null && projectRoleAtLeast(role, 'operator'),
       cards: lookup.query === query.trim() ? lookup.cards : [],
     });
   };
@@ -236,7 +258,8 @@ export function AppShell({
 
   const onSelect = (item: { id: string }) => {
     setPaletteOpen(false);
-    if (item.id.startsWith('go:')) router.push(item.id.slice(3));
+    if (item.id === QUICK_CARD_ACTION && projectId) quickCard(projectId);
+    else if (item.id.startsWith('go:')) router.push(item.id.slice(3));
     else if (item.id.startsWith(CARD_RUN_PREFIX)) {
       const [project, number] = item.id
         .slice(CARD_RUN_PREFIX.length)

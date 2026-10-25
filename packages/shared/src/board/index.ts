@@ -11,6 +11,7 @@ export * from './dependencies';
 export * from './moves';
 export * from './naming';
 export * from './positions';
+export * from './quick-card';
 export * from './recommendation';
 export * from './session-board';
 export * from './shipping';
