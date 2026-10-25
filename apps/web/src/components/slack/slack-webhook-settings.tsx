@@ -237,6 +237,8 @@ export function SlackWebhookSettings({
                         (url.trim() !== '' && !state.encryptionAvailable)
                       }
                       aria-describedby={`slack-save-reason-${state.scope}`}
+                      // Settings › Project also holds General's Save.
+                      aria-label="Save Slack webhook"
                     >
                       Save
                     </Button>
