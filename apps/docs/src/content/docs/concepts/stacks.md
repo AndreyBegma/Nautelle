@@ -14,7 +14,8 @@ pieces that can be reviewed and merged one at a time.
 - **Run** on a card waits until each card it depends on has a ready pull
   request.
 - **Run stack** queues the stack's cards stage by stage, within the project's
-  limit of agents running at once.
+  limit of agents running at once. They share the Board's run queue with
+  single cards and start in To Do order.
 
 A card belongs to at most one stack. The planner may propose a stack when new
 work is large, two to eight cards in two or more stages; a person can also
@@ -27,3 +28,4 @@ group existing cards into a stack by hand on the Board.
 - [ADR-0064](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0064-a-dependent-card-branches-from-its-dependency-with-a-stacked-pr.md): a dependent card branches from its dependency with a stacked pull request.
 - [ADR-0065](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0065-run-waits-for-every-dependency-to-have-a-ready-pull-request.md): Run waits for every dependency to have a ready pull request.
 - [ADR-0067](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0067-run-stack-queues-a-stacks-cards-within-the-agent-limit.md): Run stack queues a stack's cards within the agent limit.
+- [ADR-0100](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0100-run-at-the-agent-limit-queues-the-card-in-to-do-order.md): Run at the agent limit queues the card, in To Do order.

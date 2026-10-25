@@ -40,6 +40,14 @@ Failed or Stopped. While a round runs you can watch the session, answer its
 questions, approve what it asks to do from the web app or Telegram, and send
 it a message.
 
+A project runs at most a set number of workers at once (Board settings, three
+by default). **Run** on a To Do card while every slot is taken does not refuse
+it: the card shows **Waiting for a slot** with its place in the run queue, and
+the Board header counts the waiting cards. When a worker finishes, the topmost
+waiting card in To Do starts, so dragging a card up in To Do moves it ahead.
+A waiting card whose dependency is not ready yet lets the next one start.
+**Stop** takes a waiting card out of the queue.
+
 **Feedback** on a finished card starts a new round on a new branch and pull
 request. **Completed** closes the worker and removes its worktree; it never
 merges anything by itself.
@@ -140,4 +148,5 @@ The runner records two demos at a time and queues the rest; set
 - [ADR-0084](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0084-a-card-passes-its-review-steps-before-finished.md): a card passes its review steps before Finished.
 - [ADR-0090](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0090-a-finished-card-may-carry-a-demo-video-recorded-by-demoflow-on-the-runner.md): a finished card may carry a demo video recorded by DemoFlow on the runner.
 - [ADR-0099](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0099-a-cards-demo-is-recorded-when-its-head-reads-green-before-review.md): a card's demo is recorded when its head reads green, before review.
+- [ADR-0100](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0100-run-at-the-agent-limit-queues-the-card-in-to-do-order.md): Run at the agent limit queues the card, in To Do order.
 - [All decisions](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/README.md).
