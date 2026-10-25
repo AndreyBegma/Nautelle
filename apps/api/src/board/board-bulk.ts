@@ -55,8 +55,6 @@ export class BoardBulk {
         roundPhase: card.rounds[0]?.phase ?? null,
         source: card.source,
         autoCollect: card.autoCollect,
-        // The same reading as `BoardWork.decide`.
-        slotGone: card.fleetSlotGone || card.fleetSlot === null,
       });
       if (!decision.applies) {
         return { number, status: 'skipped', reason: decision.reason };

@@ -60,6 +60,7 @@ import {
   canRetry,
   canRun,
   canStop,
+  DETACHED_HINT,
   describeBoardError,
   FLEET_EDIT_HINT,
   finishRefusedText,
@@ -1027,6 +1028,7 @@ export function CardDetailBody({
               </>
             ) : null}
           </p>
+          {card.fleet.detached ? <p>{DETACHED_HINT}</p> : null}
           {card.fleet.slotGone ? (
             <Badge tone="warn" label={SLOT_GONE_TEXT} />
           ) : null}

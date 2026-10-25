@@ -4,14 +4,15 @@ import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Section } from '@andrewbehma/glass-ui/section';
 import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import type {
-  ProjectSummary,
-  UsageBreakdownResponse,
-  UsageSummaryResponse,
-  UsageTimeseriesResponse,
+import {
+  type ProjectSummary,
+  SESSIONS_CHANGED_LIVE_EVENT,
+  type UsageBreakdownResponse,
+  type UsageSummaryResponse,
+  type UsageTimeseriesResponse,
 } from '@nautelle/shared';
 import Link from 'next/link';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { BudgetStrip } from '../../../components/budgets/budget-chip';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
@@ -19,6 +20,7 @@ import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { ApiError, api } from '../../../lib/api';
 import { useUrlFilters } from '../../../lib/filters/use-url-filters';
+import { useLiveRefresh } from '../../../lib/live/use-live-refresh';
 import { useSection } from '../../../lib/section/use-section';
 import {
   breakdownDrill,
@@ -48,6 +50,10 @@ interface Data {
   breakdown: UsageBreakdownResponse;
 }
 
+const USAGE_EVENTS = [SESSIONS_CHANGED_LIVE_EVENT];
+const ADMIN_TOPICS = ['admin'];
+const NO_TOPICS: string[] = [];
+
 const isNotFound = (error: unknown): boolean =>
   error instanceof ApiError && error.status === 404;
 
@@ -75,11 +81,10 @@ function UsageView() {
       });
   }, []);
 
-  const range = useMemo(
-    () => usageRange(filters),
-    // A preset moves with the clock only on a new choice, as before.
-    [filters],
-  );
+  // Bumped when usage lands, so a "today" range moves its end to the current hour.
+  const [version, setVersion] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` re-reads the clock.
+  const range = useMemo(() => usageRange(filters), [filters, version]);
   const interval = range ? intervalFor(range) : 'day';
   const key = range
     ? rangeQuery(range, filters.projectId, { tz, by: filters.by })
@@ -110,7 +115,16 @@ function UsageView() {
       byRuntime,
       breakdown,
     }));
-  }, [key]);
+  }, [key, version]);
+
+  // A round writing usage moves the figures. Sessions without a project are
+  // announced on the admin topic only.
+  useLiveRefresh(
+    projects.map((p) => p.id),
+    USAGE_EVENTS,
+    useCallback(() => setVersion((n) => n + 1), []),
+    { extraTopics: isAdmin ? ADMIN_TOPICS : NO_TOPICS },
+  );
 
   // Token saver is per project: the narrowed one, else every project listed.
   const tokenSaverIds = useMemo(

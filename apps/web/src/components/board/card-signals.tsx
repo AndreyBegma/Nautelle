@@ -6,6 +6,8 @@ import type { BoardCardView } from '@nautelle/shared';
 import { Zap } from 'lucide-react';
 import {
   collectFailedBadge,
+  DETACHED_HINT,
+  DETACHED_TEXT,
   isSessionAlive,
   SLOT_GONE_TEXT,
   TRACKED_TEXT,
@@ -52,6 +54,13 @@ function FleetBadges({ card }: { card: BoardCardView }) {
   return (
     <>
       <Badge tone="neutral" size="sm" label="Fleet" />
+      {card.fleet?.detached ? (
+        <Tooltip content={DETACHED_HINT}>
+          <span>
+            <Badge tone="neutral" size="sm" label={DETACHED_TEXT} />
+          </span>
+        </Tooltip>
+      ) : null}
       {card.fleet?.slotGone ? (
         <Tooltip content="The slot left the fleet; the card keeps its last column.">
           <span>

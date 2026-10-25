@@ -202,7 +202,7 @@ describe('CardFace thin face (C-392)', () => {
   test('a fleet card keeps its slot line and the Fleet link', () => {
     const html = render('in_progress', {
       source: 'fleet',
-      fleet: { issue: 12, slot: 'i12-web', stage: 'pr_open', slotGone: false },
+      fleet: { issue: 12, slot: 'i12-web', stage: 'pr_open', slotGone: false, detached: false },
     });
     expect(html).toContain('i12-web · PR open');
     expect(html).toContain('Open in Fleet');

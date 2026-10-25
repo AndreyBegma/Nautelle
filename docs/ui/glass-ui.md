@@ -67,7 +67,7 @@ process state.
   circle is removed while it is open), none inside a project falls back to
   New work on the Board, none outside a project draws no `+`. Operator-only
   actions are dropped for a viewer first; with nothing left there is no `+`.
-  Today the Board registers New work, Fleet and Queue New issue, and Schedules
+  Today the Board, Fleet and Queue register New work (ADR-0098), and Schedules
   New schedule.
 - The capsule's built-in spacer (6 rem plus the safe area) keeps a page's end
   clear of it; a sticky bottom bar (the planner composer's controls) sits at

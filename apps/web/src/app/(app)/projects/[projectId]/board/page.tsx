@@ -168,18 +168,27 @@ function BoardScreen() {
     },
   ]);
 
-  const board = useSection(() => fetchBoard(projectId), [projectId, version]);
-  const planTasks = useSection(
-    () => fetchPlanTasks(projectId),
-    [projectId, version],
-  );
+  const board = useSection(() => fetchBoard(projectId), [projectId]);
+  const planTasks = useSection(() => fetchPlanTasks(projectId), [projectId]);
   const planTaskItems: readonly BoardPlanTaskView[] =
     planTasks.data?.items ?? [];
   // #660: hints are advice — a failed read shows none.
   const triage = useSection(
     () => fetchTriageCounts(projectId).catch(() => ({ cards: [] })),
-    [projectId, version],
+    [projectId],
   );
+  // C-364: a version bump refreshes without cancelling a load in flight — a
+  // busy project's live events kept restarting the first load, so the
+  // columns never left the skeleton.
+  const { refresh: refreshBoard } = board;
+  const { refresh: refreshPlanTasks } = planTasks;
+  const { refresh: refreshTriage } = triage;
+  useEffect(() => {
+    if (version === 0) return;
+    refreshBoard();
+    refreshPlanTasks();
+    refreshTriage();
+  }, [version, refreshBoard, refreshPlanTasks, refreshTriage]);
   const hints = useMemo(
     () => new Map((triage.data?.cards ?? []).map((c) => [c.number, c.hints])),
     [triage.data],

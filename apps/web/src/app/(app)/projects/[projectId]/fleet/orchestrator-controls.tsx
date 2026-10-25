@@ -144,7 +144,7 @@ export function OrchestratorControls({
         {canOperate ? (
           <>
             {showStart ? (
-              // Glass: the page's one solid is New issue in its header (#213).
+              // Glass: the page's one solid is New work in its header (#213).
               <Button
                 variant="glass"
                 disabled={startBusy || !settings || reasons.start !== null}

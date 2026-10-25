@@ -17,6 +17,7 @@ A released note is never edited. A correction goes into the next release.
 
 | Version | Date | Summary |
 |---|---|---|
+| [v0.17.1](v0.17.1.md) | 2026-10-25 | Patch: all release images on Docker Hub, Helm chart and GitHub Release; no product changes |
 | [v0.17.0](v0.17.0.md) | 2026-10-24 | One-container try-out and Docker Hub images, demo videos in parallel; runner 0.17.0 |
 | [v0.16.0](v0.16.0.md) | 2026-10-24 | One-command install, demo videos of finished cards, review steps, stacks from a Claude Code session; runner 0.16.0 |
 | [v0.15.0](v0.15.0.md) | 2026-10-23 | Board from a Claude Code session, design frame templates, two-factor sign-in, token savings per card; runner 0.15.0 |

@@ -26,8 +26,9 @@ type Confirm = 'pause' | 'stop-all' | 'message';
 
 /**
  * Quick actions (#160). Nautelle does not create agents (ADR-0005): "New
- * issue" queues work for the orchestrator to dispatch. Pause all and Stop all
- * are the existing stop commands, each behind a confirmation.
+ * work" opens a card on the Board, the one create action (C-397, ADR-0098).
+ * Pause all and Stop all are the existing stop commands, each behind a
+ * confirmation.
  */
 export function QuickActions({
   control,
@@ -38,7 +39,7 @@ export function QuickActions({
   liveSlots,
   focusedSlot,
   hasOpen,
-  onNewIssue,
+  onNewWork,
   onAttach,
   onViewDependencies,
   onCollapseAll,
@@ -54,7 +55,7 @@ export function QuickActions({
   /** The slot in front, the one "Open worktree in terminal" attaches to. */
   focusedSlot: string | null;
   hasOpen: boolean;
-  onNewIssue: () => void;
+  onNewWork: () => void;
   /** Admins on a runner that can attach; absent leaves the rows disabled. */
   onAttach?: (key: string) => void;
   onViewDependencies: () => void;
@@ -93,11 +94,11 @@ export function QuickActions({
   const items: ActionListItem[] = [];
   if (canOperate) {
     items.push({
-      id: 'new-issue',
-      label: 'New issue',
-      description: 'Queue work; the orchestrator dispatches it.',
+      id: 'new-work',
+      label: 'New work',
+      description: 'A card on the Board, quick or planned.',
       icon: FilePlus2,
-      onSelect: onNewIssue,
+      onSelect: onNewWork,
     });
   }
   items.push({

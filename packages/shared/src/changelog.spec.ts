@@ -33,11 +33,11 @@ describe('CHANGELOG (C-294)', () => {
     }
   });
 
-  it('holds 3 to 8 one-sentence items per entry, new then improved then fixed', () => {
+  it('holds 1 to 8 one-sentence items per entry, new then improved then fixed', () => {
     for (const entry of CHANGELOG) {
       expect(entry.version).toMatch(SEMVER);
       expect(entry.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      expect(entry.items.length).toBeGreaterThanOrEqual(3);
+      expect(entry.items.length).toBeGreaterThanOrEqual(1);
       expect(entry.items.length).toBeLessThanOrEqual(8);
       const order = entry.items.map((item) => CHANGE_KINDS.indexOf(item.kind));
       expect(order).toEqual([...order].sort((a, b) => a - b));

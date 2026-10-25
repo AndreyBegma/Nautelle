@@ -49,6 +49,52 @@ describe('board (e2e)', () => {
       expect(column(await board(), 'todo')).toEqual([2, 1]);
     });
 
+    it('makes a card from an open issue, linked to it and described from it (C-397)', async () => {
+      const issue = (number: number, state: 'open' | 'closed') =>
+        w.ctx.prisma.issueCache.create({
+          data: {
+            projectId: w.a,
+            number,
+            title: `Issue ${number}`,
+            state,
+            labels: [],
+            assignees: [],
+            body: 'Export widgets as CSV.',
+            url: `https://github.com/acme/widget/issues/${number}`,
+            ghUpdatedAt: new Date('2026-10-08T09:00:00Z'),
+            snapshotAt: new Date('2026-10-08T09:00:00Z'),
+            lastSeq: 0n,
+          },
+        });
+      await issue(12, 'open');
+      await issue(13, 'closed');
+
+      const made = await w.operator.send('post', `${w.path()}/board/cards`, {
+        title: 'Issue 12',
+        kind: 'bug',
+        issueNumber: 12,
+      });
+      expect(made.status).toBe(201);
+      expect(made.body).toMatchObject({
+        column: 'todo',
+        body: 'Export widgets as CSV.',
+        issueNumber: 12,
+        issueUrl: 'https://github.com/acme/widget/issues/12',
+        // The card already has its issue: Run creates none.
+        issueOnRun: false,
+      });
+
+      for (const issueNumber of [13, 99]) {
+        const refused = await w.operator.send(
+          'post',
+          `${w.path()}/board/cards`,
+          { title: 'Nope', issueNumber },
+        );
+        expect(refused.status).toBe(422);
+      }
+      expect(column(await board(), 'todo')).toEqual([made.body.number]);
+    });
+
     it('numbers cards uniquely per project under concurrency', async () => {
       const created = await Promise.all(
         Array.from({ length: 8 }, (_, i) => w.createCard({ title: `C${i}` })),

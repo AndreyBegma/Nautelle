@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "name": "One work model: New work everywhere, Fleet shows who works, Queue shows incoming issues",
+  "description": "C-397: Fleet and Queue say what they are for, and their create button is New work, which opens the Board's intake.",
+  "steps": [
+    { "action": "marker", "title": "Sign in" },
+    { "action": "navigate", "path": "/login?next=/projects/demo-project" },
+    { "action": "wait", "ms": 3000 },
+    {
+      "action": "fill",
+      "target": { "label": "Email" },
+      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+    },
+    {
+      "action": "fill",
+      "target": { "label": "Password" },
+      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
+    },
+    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
+    {
+      "action": "waitFor",
+      "target": { "role": "link", "name": "Board", "exact": true },
+      "timeoutMs": 30000
+    },
+    { "action": "marker", "title": "Fleet is the live view of who works" },
+    { "action": "navigate", "path": "/projects/demo-project/fleet" },
+    {
+      "action": "assertVisible",
+      "target": { "text": "Who works right now" },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "Fleet's header says what it is for"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "role": "heading", "name": "Working now" },
+      "timeoutMs": 30000,
+      "caption": "Every card worker, slot and session, each linked to its card"
+    },
+    { "action": "wait", "ms": 1500 },
+    { "action": "marker", "title": "Queue is incoming work" },
+    { "action": "navigate", "path": "/projects/demo-project/queue" },
+    {
+      "action": "assertVisible",
+      "target": { "text": "Incoming work: open GitHub issues" },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "Queue's header says what it is for"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "role": "heading", "name": "Incoming" },
+      "timeoutMs": 30000,
+      "caption": "Open issues, labelled or all, each with Make a card"
+    },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "All open" },
+      "caption": "All open adds every other open issue"
+    },
+    { "action": "wait", "ms": 1500 },
+    { "action": "marker", "title": "One create action: New work" },
+    {
+      "action": "click",
+      "target": { "css": "header button:has-text(\"New work\")" },
+      "zoom": true,
+      "caption": "New work makes a card, wherever you start"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "role": "dialog", "name": "New work" },
+      "timeoutMs": 30000,
+      "caption": "The Board's New work intake opens"
+    },
+    { "action": "wait", "ms": 2000 }
+  ]
+}

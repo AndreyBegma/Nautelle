@@ -11,7 +11,6 @@ import {
   FLEET_LIVE_EVENT,
   type FleetView,
   projectRoleAtLeast,
-  type QueueView,
   RUN_UPDATED_LIVE_EVENT,
   type RunPage,
 } from '@nautelle/shared';
@@ -23,7 +22,11 @@ import { BudgetExceededBanner } from '../../../../components/budgets/exceeded-ba
 import { PageHeader } from '../../../../components/page-header/page-header';
 import { RunnerOfflineBanner } from '../../../../components/prerequisites/prerequisite-banner';
 import { api } from '../../../../lib/api';
-import { boardHref, boardNewPlanHref } from '../../../../lib/board/href';
+import {
+  boardHref,
+  boardNewPlanHref,
+  boardNewWorkHref,
+} from '../../../../lib/board/href';
 import {
   isNotFound,
   ORCHESTRATOR_STATUS_LABEL,
@@ -35,7 +38,6 @@ import {
   needsYou,
   summarySentence,
 } from '../../../../lib/project-home/summary';
-import { allowedLabels } from '../../../../lib/queue/format';
 import { useSection } from '../../../../lib/section/use-section';
 import { ORCHESTRATOR_PILL_STATUS } from '../../../../lib/status/pill';
 import {
@@ -44,7 +46,6 @@ import {
   RecentActivitySection,
   RecentResultSection,
 } from './home/home-sections';
-import { NewIssueDialog } from './queue/new-issue-dialog';
 import { useProjectDetail } from './use-project-detail';
 
 /** Pushes arrive in bursts; one refetch covers them. */
@@ -66,7 +67,6 @@ export default function ProjectHomePage() {
 
   /** Bumped by a live push; the live sections reload. */
   const [version, setVersion] = useState(0);
-  const [creating, setCreating] = useState(false);
   const detail = useProjectDetail(projectId);
   const project = detail.data;
   const canOperate = projectRoleAtLeast(project?.role ?? 'viewer', 'operator');
@@ -106,14 +106,6 @@ export default function ProjectHomePage() {
         `/activity?${new URLSearchParams({ projectId, limit: String(ACTIVITY_LIMIT) })}`,
       ),
     [projectId, version],
-  );
-  // The new-issue dialog's label choices; asked for only once it opens.
-  const openIssues = useSection<QueueView | undefined>(
-    () =>
-      creating
-        ? api<QueueView>(`${base}/queue?include=open`)
-        : Promise.resolve(undefined),
-    [base, creating],
   );
 
   if (project === undefined && isNotFound(detail.error)) {
@@ -188,9 +180,13 @@ export default function ProjectHomePage() {
           : {})}
         actions={
           canOperate ? (
-            <Button variant="glass" onClick={() => setCreating(true)}>
+            // C-397 (ADR-0098): new work is always a card, made on the Board.
+            <Button
+              variant="glass"
+              onClick={() => router.push(boardNewWorkHref(projectId))}
+            >
               <Plus aria-hidden="true" className="size-4" />
-              New task
+              New work
             </Button>
           ) : undefined
         }
@@ -215,17 +211,6 @@ export default function ProjectHomePage() {
         <FleetGlanceSection projectId={projectId} fleet={fleet} />
         <RecentActivitySection projectId={projectId} activity={activity} />
       </div>
-
-      {canOperate ? (
-        <NewIssueDialog
-          projectId={projectId}
-          open={creating}
-          labelChoices={allowedLabels(openIssues.data)}
-          {...(project ? { runnerName: project.runnerName } : {})}
-          onOpenChange={setCreating}
-          onCreated={() => setVersion((v) => v + 1)}
-        />
-      ) : null}
     </div>
   );
 }
