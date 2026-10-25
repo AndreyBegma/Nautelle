@@ -1042,9 +1042,13 @@ describe('action requests (e2e)', () => {
         { suggestions: [NPM_TEST] },
       );
       const notification = await notificationFor(first.id);
+      // The buttons of an offer; a reply prompt has none.
+      const buttonsOf = (
+        markup: Awaited<ReturnType<typeof telegram.offer>>,
+      ) => (markup && 'inline_keyboard' in markup ? markup.inline_keyboard : []);
       const offer = await telegram.offer(notification.id);
       const target = `${notification.id}:${first.id}`;
-      expect(offer?.inline_keyboard).toEqual([
+      expect(buttonsOf(offer)).toEqual([
         [
           { text: 'Approve', callback_data: `x:${target}` },
           { text: 'Deny', callback_data: `y:${target}` },
@@ -1085,7 +1089,7 @@ describe('action requests (e2e)', () => {
         (await notificationFor(sessionless.id)).id,
       );
       expect(
-        sessionlessOffer?.inline_keyboard.map((row) =>
+        buttonsOf(sessionlessOffer).map((row) =>
           row.map((button) => button.text),
         ),
       ).toEqual([['Approve', 'Deny'], ['Always allow in this project']]);
@@ -1094,7 +1098,7 @@ describe('action requests (e2e)', () => {
       const push = await call(sessionA, { command: 'git push origin main' });
       const pushNotification = await notificationFor(push.id);
       expect(
-        (await telegram.offer(pushNotification.id))?.inline_keyboard,
+        buttonsOf(await telegram.offer(pushNotification.id)),
       ).toHaveLength(1);
       const refused = await press(`xp:${pushNotification.id}:${push.id}`);
       expect(refused.text).toContain('cannot be remembered');
