@@ -15,6 +15,11 @@ export type AuditActor =
 export interface RequestOrigin {
   ip?: string;
   userAgent?: string;
+  /**
+   * C-403: the personal API token the request came with — written to
+   * `meta.apiToken`, so the record reads "<owner> via token <name>".
+   */
+  apiToken?: { id: string; name: string };
 }
 
 /** The caller of a request, as `@AuditCtx()` resolves it. */

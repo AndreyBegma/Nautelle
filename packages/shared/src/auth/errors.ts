@@ -42,6 +42,12 @@ export const AUTH_ERROR = {
   setupDone: 'setup_done',
   /** C-367: the first admin's email or password breaks the account rules. */
   setupInvalid: 'setup_invalid',
+  /** C-403: a read-only API token on a route that changes something. */
+  apiTokenReadOnly: 'api_token_read_only',
+  /** C-403: a route only a signed-in browser session may use (tokens, password, 2FA). */
+  apiTokenNotAllowed: 'api_token_not_allowed',
+  /** C-403: a token limited to projects on an instance-wide admin route. */
+  apiTokenProjectScoped: 'api_token_project_scoped',
 } as const;
 export type AuthErrorCode = (typeof AUTH_ERROR)[keyof typeof AUTH_ERROR];
 

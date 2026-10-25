@@ -69,6 +69,8 @@ export const DEMO_CARDS: ReadonlyArray<{
   openPr?: { number: number; branch: string };
   /** C-390: the card needs a person, so the Inbox lists it with Retry. */
   needsPerson?: CardNeedsPersonReason;
+  /** C-394: a design drawn and waiting for approval, with one frame. */
+  design?: true;
 }> = [
   {
     title: 'Export the activity feed as CSV',
@@ -124,7 +126,19 @@ export const DEMO_CARDS: ReadonlyArray<{
     kind: 'feature',
     round: { model: 'claude-sonnet-5-5', effort: 'medium', paused: true },
   },
+  {
+    title: 'Redesign the order summary',
+    column: 'todo',
+    kind: 'feature',
+    design: true,
+  },
 ];
+
+const DEMO_DESIGN_FRAME_HTML =
+  '<!doctype html><html><body style="margin:0;font-family:sans-serif;background:#f4f4f5">' +
+  '<header style="padding:16px 24px;background:#18181b;color:#fff"><b>Order summary</b></header>' +
+  '<main style="padding:24px"><div style="background:#fff;border-radius:12px;padding:16px">' +
+  '<p>2 items</p><p><b>Total: $48.00</b></p></div></main></body></html>';
 
 /**
  * C-389: runs that failed an hour ago. Needs you lists the card's; the
@@ -166,6 +180,10 @@ export const seedDemo = async (
     | 'run'
     | 'boardCardRound'
     | 'boardRunQueueCard'
+    | 'taskDesign'
+    | 'planTurn'
+    | 'designRevision'
+    | 'designFrame'
   >,
   adminEmail: string,
 ): Promise<{ projectId: string; cards: number }> => {
@@ -258,6 +276,81 @@ export const seedDemo = async (
           : { needsPerson: true, needsPersonReason: card.needsPerson }),
       },
     });
+    if (card.design) {
+      const runId = `demo-run-design-${number}`;
+      const drawnAt = new Date(now.getTime() - 10 * 60_000);
+      await prisma.run.upsert({
+        where: { id: runId },
+        update: {},
+        create: {
+          id: runId,
+          kind: 'plan',
+          projectId: DEMO_PROJECT_ID,
+          title: `C-${number} design`,
+          runtime: 'claude',
+          status: 'succeeded',
+          triggeredByType: 'user',
+          triggeredById: admin.id,
+          startedAt: new Date(drawnAt.getTime() - 3 * 60_000),
+          endedAt: drawnAt,
+          updatedAt: drawnAt,
+        },
+      });
+      const design = await prisma.taskDesign.upsert({
+        where: { cardId: created.id },
+        update: {},
+        create: {
+          cardId: created.id,
+          needed: true,
+          status: 'reviewing',
+        },
+      });
+      const turn = await prisma.planTurn.upsert({
+        where: { runId },
+        update: {},
+        create: {
+          cardId: created.id,
+          runId,
+          action: 'design',
+          authorId: admin.id,
+          input: {},
+          phase: 'succeeded',
+          finishedAt: drawnAt,
+        },
+      });
+      const revision = await prisma.designRevision.upsert({
+        where: {
+          designId_variant_revision: {
+            designId: design.id,
+            variant: 1,
+            revision: 1,
+          },
+        },
+        update: {},
+        create: {
+          designId: design.id,
+          variant: 1,
+          revision: 1,
+          title: 'Order summary',
+          rationale: 'A compact card with the total on its own line.',
+          turnId: turn.id,
+        },
+      });
+      await prisma.designFrame.upsert({
+        where: {
+          revisionId_position: { revisionId: revision.id, position: 0 },
+        },
+        update: {},
+        create: {
+          revisionId: revision.id,
+          position: 0,
+          name: 'Screen',
+          slug: 'screen',
+          html: DEMO_DESIGN_FRAME_HTML,
+          kind: 'screen',
+        },
+      });
+    }
     if (card.queued) {
       await prisma.boardRunQueueCard.upsert({
         where: { cardId: created.id },
