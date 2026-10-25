@@ -156,6 +156,59 @@ describe('boardMoveRule', () => {
     });
   });
 
+  describe('a merge completes a card (C-389, ADR-0100)', () => {
+    for (const from of ['in_progress', 'finished'] as const) {
+      it(`completes a ${from} card whose round is over`, () => {
+        expect(
+          boardMoveRule(
+            move({
+              from,
+              to: 'completed',
+              roundPhase: 'finished',
+              source: 'merged',
+            }),
+          ),
+        ).toEqual({ allowed: true, effects: ['accept'], offerRun: false });
+      });
+    }
+
+    it('waits for a round that is still running', () => {
+      expect(
+        boardMoveRule(
+          move({
+            from: 'in_progress',
+            to: 'completed',
+            roundPhase: 'running',
+            source: 'merged',
+          }),
+        ),
+      ).toEqual({ allowed: false, error: 'card_running' });
+    });
+
+    for (const from of ['inbox', 'todo'] as const) {
+      it(`never completes a ${from} card`, () => {
+        expect(
+          boardMoveRule(
+            move({ from, to: 'completed', roundPhase: null, source: 'merged' }),
+          ),
+        ).toEqual({ allowed: false, error: 'invalid_move' });
+      });
+    }
+
+    it('moves a card nowhere but to Completed', () => {
+      expect(
+        boardMoveRule(
+          move({
+            from: 'in_progress',
+            to: 'finished',
+            roundPhase: 'finished',
+            source: 'merged',
+          }),
+        ),
+      ).toEqual({ allowed: false, error: 'invalid_move' });
+    });
+  });
+
   describe('Finished', () => {
     it('collects when a card with a round enters Finished', () => {
       expect(

@@ -21,6 +21,7 @@ import {
   type Session,
 } from '../test/e2e-app';
 import { ApprovalCommands } from './approval-commands';
+import { ApprovalsService } from './approvals.service';
 
 const OTHER_ROOT = '/srv/dev/gadget';
 const PR = 51;
@@ -415,6 +416,43 @@ describe('merge approval queue (e2e)', () => {
       expect(view.recent).toEqual([
         expect.objectContaining({ pr: PR, status: 'merged' }),
       ]);
+    });
+
+    describe('a PR that left GitHub with no event (C-389)', () => {
+      it.each([
+        'merged',
+        'closed',
+      ] as const)('the sweep closes the row of a PR %s while no event came', async (state) => {
+        await ingest(awaiting());
+        prState = state;
+        const live = await liveOn(viewerOfA);
+
+        await ctx.app.get(ApprovalsService).sweep();
+
+        expect((await nextNamed(live, APPROVALS_LIVE_EVENT)).data).toEqual({
+          kind: 'approvals',
+          projectId: a,
+        });
+        const view = await list();
+        expect(view.waiting).toEqual([]);
+        expect(view.recent).toEqual([
+          expect.objectContaining({ pr: PR, status: state }),
+        ]);
+      });
+
+      it('keeps the row of a PR the runner cannot read, and of one still open', async () => {
+        await ingest(awaiting());
+        const service = ctx.app.get(ApprovalsService);
+
+        head = null;
+        await service.sweep();
+        expect((await list()).waiting).toHaveLength(1);
+
+        head = H1;
+        await service.sweep();
+        expect((await list()).waiting).toHaveLength(1);
+        expect(commands.inspect).toHaveBeenCalledTimes(2);
+      });
     });
   });
 

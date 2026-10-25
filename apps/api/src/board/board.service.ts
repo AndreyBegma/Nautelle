@@ -1360,7 +1360,10 @@ export class BoardService implements OnModuleInit {
     deleteBranch: boolean,
     actor: BoardActor,
   ): Promise<CardMergeOutcome> {
-    return this.work.mergePr(project, card, headSha, deleteBranch, actor);
+    // C-389: Accept moves the card to Completed itself, as the person's Accept.
+    return this.work.mergePr(project, card, headSha, deleteBranch, actor, {
+      complete: false,
+    });
   }
 
   /**

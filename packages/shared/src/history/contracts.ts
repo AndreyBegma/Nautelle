@@ -45,6 +45,25 @@ export const RUN_KINDS = [
 export type RunKind = (typeof RUN_KINDS)[number];
 
 /**
+ * Runs the control plane starts for itself — Steward's classification and
+ * digest prose, extractions, assessments, rule upkeep. Their failure is a
+ * fact for Activity, never something waiting on a person (C-389, ADR-0100).
+ */
+export const SERVICE_RUN_KINDS: ReadonlySet<RunKind> = new Set<RunKind>([
+  'steward',
+  'card_capture',
+  'text_normalize',
+  'card_assess',
+  'code_ask',
+  'ui_profile_learn',
+  'rules_compress',
+  'prefix_propose',
+]);
+
+export const isServiceRun = (run: { kind: RunKind }): boolean =>
+  SERVICE_RUN_KINDS.has(run.kind);
+
+/**
  * - `running` — work in progress;
  * - `blocked` — the worker reported `blocked` or `misclassified`;
  * - `waiting_person` — a launch prompt or the quota banner, or its PR waits
