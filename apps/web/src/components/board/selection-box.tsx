@@ -98,3 +98,14 @@ export function SelectedTint() {
     />
   );
 }
+
+/** C-393: the keyboard cursor — an outline around the card the j/k keys are on. */
+export function CursorMark() {
+  return (
+    <span
+      aria-hidden="true"
+      data-keyboard-cursor=""
+      className="pointer-events-none absolute -inset-[13px] rounded-surface border-2 border-accent"
+    />
+  );
+}

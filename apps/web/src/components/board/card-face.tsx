@@ -21,6 +21,7 @@ import { githubUrl } from '../../lib/url';
 import { ApproveRunLink } from './card-design';
 import { FaceIcons, KindIcon } from './card-face-icons';
 import {
+  CursorMark,
   type FaceSelection,
   SelectedTint,
   SelectionBox,
@@ -47,6 +48,7 @@ export function CardFace({
   canOperate,
   menu,
   selection,
+  focused,
   onOpen,
 }: {
   projectId: string;
@@ -58,6 +60,8 @@ export function CardFace({
   menu?: ReactNode;
   /** #452: set for an operator; a suggestion shows why it has no box instead. */
   selection?: FaceSelection;
+  /** C-393: the keyboard cursor (j/k) is on this card. */
+  focused?: boolean;
   onOpen: (card: BoardCardView) => void;
 }) {
   const offer = approveRunOffer(card);
@@ -68,9 +72,11 @@ export function CardFace({
   return (
     <SelectionFrame>
       {selection?.selected ? <SelectedTint /> : null}
+      {focused ? <CursorMark /> : null}
       <div
         data-card-number={card.number}
         data-select-column={card.column}
+        aria-current={focused ? 'true' : undefined}
         data-selected={selection ? selection.selected : undefined}
         onClickCapture={(event) => toggleOnClick(event, selection)}
         className="@container relative flex min-w-0 flex-col gap-1.5 text-sm"

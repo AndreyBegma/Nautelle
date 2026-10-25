@@ -110,7 +110,10 @@ function BoardScreen() {
   // the discussion. C-165: a value that is not an id is ignored.
   const { intakeId, planPanelId, discussionId } = parseLinkedPlans(params);
   const planPanelOpen = planPanelId !== undefined;
-  const newWorkLinked = params.has('newWork') || params.has('newPlan');
+  // C-393: ⌘K's New card (quick) lands here with `?quickCard=1`; it opens the
+  // same dialog until the quick card (C-391) gets its own mode.
+  const newWorkLinked =
+    params.has('newWork') || params.has('newPlan') || params.has('quickCard');
   // L-45: a `?brief=` someone else wrote is flagged; Discuss's own hand-over
   // is remembered here so it is not.
   const [ownBrief, setOwnBrief] = useState<string>();
@@ -267,6 +270,7 @@ function BoardScreen() {
   const NEW_WORK_LINK = {
     newWork: undefined,
     newPlan: undefined,
+    quickCard: undefined,
     brief: undefined,
   } as const;
 
@@ -304,6 +308,23 @@ function BoardScreen() {
 
   const selectedCard =
     view && selected !== undefined ? cardByNumber(view, selected) : undefined;
+
+  // C-393: ⌘K's Accept and Stop open the card with `?accept=1` / `?stop=1`;
+  // the card's own dialog asks, and the param is gone once it has.
+  const intent = params.has('accept')
+    ? 'accept'
+    : params.has('stop')
+      ? 'stop'
+      : undefined;
+  const { accept: askAccept, askStop } = actions;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per link; `setParams` is re-made every render
+  useEffect(() => {
+    if (!intent || !selectedCard) return;
+    setParams({ accept: undefined, stop: undefined });
+    if (!canOperate) return;
+    if (intent === 'accept') askAccept(selectedCard);
+    else askStop(selectedCard);
+  }, [intent, selectedCard, canOperate, askAccept, askStop]);
 
   const terminal: TerminalAccess = canAttach
     ? {
@@ -437,6 +458,7 @@ function BoardScreen() {
               onOpen={(card) => select(card.number)}
               onOpenPlanTask={selectPlanTask}
               onOpenTerminal={setAttaching}
+              onNewCard={() => setCreating(true)}
               onReload={reload}
             />
           ) : null
