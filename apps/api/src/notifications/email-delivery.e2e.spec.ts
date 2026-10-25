@@ -93,6 +93,15 @@ describe('email notifications over SMTP (C-404, e2e)', () => {
       },
     });
 
+  /** The SMTP error Admin › Integrations › Email shows. */
+  const lastSmtpError = async (): Promise<string | null> => {
+    const admin = await signIn('root@example.com', 'admin');
+    const status = (
+      await admin.session.get('/admin/integrations/email').expect(200)
+    ).body as EmailIntegrationStatus;
+    return status.lastError;
+  };
+
   beforeAll(async () => {
     await smtp.start();
     ctx = await createNotificationsApp(undefined, undefined, {
@@ -199,6 +208,24 @@ describe('email notifications over SMTP (C-404, e2e)', () => {
       ]);
       await delivery.deliverOnce();
       expect(smtp.messages).toHaveLength(0);
+      // A muted email never reached the server: it is no SMTP error.
+      expect(await lastSmtpError()).toBeNull();
+    });
+
+    it('is not emailed to an account that is no longer active', async () => {
+      const ada = await signIn('ada@example.com', 'operator');
+      await event(CARD_WAITING_EVENT, await card(ada.id));
+      await ctx.prisma.user.update({
+        where: { id: ada.id },
+        data: { status: 'disabled' },
+      });
+
+      await delivery.deliverOnce();
+      expect(smtp.messages).toHaveLength(0);
+      expect(await emailRows()).toEqual([
+        expect.objectContaining({ status: 'failed', attempts: 0 }),
+      ]);
+      expect(await lastSmtpError()).toBeNull();
     });
 
     it('retries a refused send, then gives up on a permanent refusal', async () => {
@@ -224,6 +251,7 @@ describe('email notifications over SMTP (C-404, e2e)', () => {
         expect.objectContaining({ status: 'failed', attempts: 2 }),
       ]);
       expect(smtp.messages).toHaveLength(0);
+      expect(await lastSmtpError()).toContain('550');
     });
   });
 

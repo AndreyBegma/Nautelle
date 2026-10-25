@@ -41,7 +41,8 @@ const BACKOFF_BASE_MS = 30_000;
 /** Emails a pass sends at most; the rest wait for the next one. */
 const BATCH = 50;
 const LAST_ERROR_MAX = 500;
-const INACTIVE = 'The account is not active';
+/** Why a row of an account that is no longer active was never sent. */
+export const EMAIL_ACCOUNT_INACTIVE = 'The account is not active';
 
 /** What one pass did; the e2e suites assert on it. */
 export interface EmailPass {
@@ -269,7 +270,11 @@ export class EmailDeliveryService
     if (inactive.length > 0) {
       await tx.notificationDelivery.updateMany({
         where: { id: { in: inactive.map((d) => d.id) } },
-        data: { status: 'failed', lastError: INACTIVE, nextAttemptAt: null },
+        data: {
+          status: 'failed',
+          lastError: EMAIL_ACCOUNT_INACTIVE,
+          nextAttemptAt: null,
+        },
       });
     }
     const claimed = due.filter((d) => d.notification.user.status === 'active');
@@ -341,7 +346,11 @@ export class EmailDeliveryService
       if (user.status !== 'active') {
         await tx.notificationDelivery.updateMany({
           where: { id: { in: ids } },
-          data: { status: 'failed', lastError: INACTIVE, nextAttemptAt: null },
+          data: {
+            status: 'failed',
+            lastError: EMAIL_ACCOUNT_INACTIVE,
+            nextAttemptAt: null,
+          },
         });
         continue;
       }

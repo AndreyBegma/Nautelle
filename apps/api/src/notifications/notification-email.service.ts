@@ -10,6 +10,7 @@ import type { AuditContext } from '../audit/audit.types';
 import type { AuthUser } from '../auth';
 import { PrismaService } from '../database/prisma.service';
 import { MailSendError, MailService } from '../mail/mail.service';
+import { EMAIL_ACCOUNT_INACTIVE } from './email-delivery.service';
 import { notificationError } from './notification-error';
 
 const TEST_SUBJECT = '[Nautelle] Test email';
@@ -86,8 +87,19 @@ export class NotificationEmailService {
           OR: [{ status: 'pending' }, { status: 'digested', sentAt: null }],
         },
       }),
+      // Only a send the SMTP server refused: a muted (`skipped`) row or one
+      // of an inactive account carries a reason too, but never reached it.
       this.prisma.notificationDelivery.findFirst({
-        where: { channel: 'email', lastError: { not: null }, sentAt: null },
+        where: {
+          channel: 'email',
+          status: { in: ['pending', 'digested', 'failed'] },
+          attempts: { gt: 0 },
+          sentAt: null,
+          AND: [
+            { lastError: { not: null } },
+            { lastError: { not: EMAIL_ACCOUNT_INACTIVE } },
+          ],
+        },
         orderBy: { createdAt: 'desc' },
         select: { lastError: true },
       }),
