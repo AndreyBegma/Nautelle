@@ -85,8 +85,7 @@ export const permissionModeRefusal = (
  * on validated args, before any handler, whatever the server sent:
  * a gated command, a permission mode above the cap, a terminal write, a
  * profile skill install, a root (or `project.inspect` / `project.scan_rules`
- * path) outside
- * `allowedRoots`.
+ * / `project.push_check` path) outside `allowedRoots`.
  */
 export const commandRefusal = (
   name: CommandName,
@@ -121,7 +120,9 @@ export const commandRefusal = (
   }
   const roots = rootsIn(args);
   if (
-    (name === 'project.inspect' || name === 'project.scan_rules') &&
+    (name === 'project.inspect' ||
+      name === 'project.scan_rules' ||
+      name === 'project.push_check') &&
     typeof args.path === 'string'
   ) {
     roots.push(args.path);

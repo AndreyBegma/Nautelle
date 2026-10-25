@@ -1,11 +1,14 @@
+import type { OnboardingFacts, ProjectSummary } from '@nautelle/shared';
 import type { RunnersFact } from '../../lib/prerequisites/facts';
 
 export type StepId =
-  | 'admin'
   | 'install'
   | 'pair'
-  | 'online'
   | 'project'
+  | 'profile'
+  | 'plugin'
+  | 'push'
+  | 'card'
   | 'github'
   | 'invite';
 
@@ -13,7 +16,7 @@ export interface Step {
   id: StepId;
   title: string;
   done: boolean;
-  /** Not counted in "N of 5", and never hides or shows the checklist. */
+  /** Not counted in "N of 7", and never hides or shows the checklist. */
   optional: boolean;
   /** The page that does this step. */
   href?: string;
@@ -22,38 +25,49 @@ export interface Step {
 
 export interface GettingStarted {
   steps: Step[];
-  /** Required steps done, for "N of 5". */
+  /** Required steps done, for "N of 7". */
   done: number;
   total: number;
   /** Every required step is done: the checklist is not shown. */
   complete: boolean;
+  /** The project the project-scoped steps act on: the first connected one. */
+  project: Pick<
+    ProjectSummary,
+    'id' | 'displayName' | 'runnerId' | 'rootPath'
+  > | null;
+  /** The push check the push step shows; null when none ran or unknown. */
+  pushCheck: OnboardingFacts['pushCheck'];
 }
 
 export const RUNNERS_PATH = '/admin/runners';
 export const CONNECT_PATH = '/projects?connect=1';
+/** The Overview's checklist, where the rail's setup link goes. */
+export const GETTING_STARTED_PATH = '/#getting-started';
+export const GETTING_STARTED_ID = 'getting-started';
 
 /**
- * The first-run checklist (issue #132) from what is already known. A paired
- * runner implies it was installed; revoked runners do not count (`runnersFact`).
- * Only admins see it, so `runners` is never `unknown` in practice — if it is,
- * the runner steps read as not done rather than guessed.
+ * The first-run checklist (issue #132, C-396) through to a first card with a
+ * pull request, every step from real state. A paired runner implies it was
+ * installed; revoked runners do not count (`runnersFact`). Only admins see
+ * it, so `runners` is never `unknown` in practice — if it is, or `facts` has
+ * not loaded, those steps read as not done rather than guessed.
  */
 export function gettingStarted({
   runners,
   projects,
+  facts,
 }: {
   runners: RunnersFact;
-  projects: number;
+  projects: readonly Pick<
+    ProjectSummary,
+    'id' | 'displayName' | 'runnerId' | 'rootPath'
+  >[];
+  facts: OnboardingFacts | null;
 }): GettingStarted {
   const paired = runners.kind === 'offline' || runners.kind === 'online';
   const online = runners.kind === 'online';
+  const project = projects[0] ?? null;
   const steps: Step[] = [
-    {
-      id: 'admin',
-      title: 'Create the admin account',
-      done: true,
-      optional: false,
-    },
     {
       id: 'install',
       title: 'Install the runner on the machine that holds your repositories',
@@ -62,15 +76,7 @@ export function gettingStarted({
     },
     {
       id: 'pair',
-      title: 'Pair a runner',
-      done: paired,
-      optional: false,
-      href: RUNNERS_PATH,
-      cta: 'Open Runners',
-    },
-    {
-      id: 'online',
-      title: 'Keep it online',
+      title: 'Pair the runner and keep it online',
       done: online,
       optional: false,
       href: RUNNERS_PATH,
@@ -79,15 +85,45 @@ export function gettingStarted({
     {
       id: 'project',
       title: 'Connect a project',
-      done: projects > 0,
+      done: project !== null,
       optional: false,
       href: CONNECT_PATH,
       cta: 'Connect project',
     },
     {
+      id: 'profile',
+      title: 'Pick the runtime profile agents run with',
+      done: facts?.profile === true,
+      optional: false,
+      href: project
+        ? `/projects/${project.id}/settings?tab=general`
+        : undefined,
+      cta: 'Open settings',
+    },
+    {
+      id: 'plugin',
+      title: 'Install the Claude Code plugin',
+      done: facts?.plugin === true,
+      optional: false,
+    },
+    {
+      id: 'push',
+      title: 'Check that the runner can push',
+      done: facts?.pushCheck?.ok === true,
+      optional: false,
+    },
+    {
+      id: 'card',
+      title: 'Run a first card to a pull request',
+      done: facts !== null && facts.firstCard !== 'none',
+      optional: false,
+      href: project ? `/projects/${project.id}/board` : undefined,
+      cta: 'Open Board',
+    },
+    {
       id: 'github',
       title: 'Install the GitHub App',
-      done: false,
+      done: facts?.githubApp === true,
       optional: true,
       href: '/admin/integrations/github',
       cta: 'Open GitHub App',
@@ -95,7 +131,7 @@ export function gettingStarted({
     {
       id: 'invite',
       title: 'Invite teammates',
-      done: false,
+      done: facts?.teammates === true,
       optional: true,
       href: '/admin/users',
       cta: 'Open Users',
@@ -108,6 +144,8 @@ export function gettingStarted({
     done,
     total: required.length,
     complete: done === required.length,
+    project,
+    pushCheck: facts?.pushCheck ?? null,
   };
 }
 

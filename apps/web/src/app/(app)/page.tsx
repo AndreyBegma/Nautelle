@@ -8,16 +8,13 @@ import type { ProjectSummary } from '@nautelle/shared';
 import Link from 'next/link';
 import { type ComponentProps, useEffect } from 'react';
 import { GettingStarted } from '../../components/onboarding/getting-started';
-import {
-  CONNECT_PATH,
-  gettingStarted,
-} from '../../components/onboarding/steps';
+import { useGettingStarted } from '../../components/onboarding/getting-started-context';
+import { CONNECT_PATH } from '../../components/onboarding/steps';
 import { Dashboard } from '../../components/overview/dashboard';
 import { PageHeader } from '../../components/page-header/page-header';
 import { AsyncSection } from '../../components/prerequisites/async-section';
 import { useCurrentUser } from '../../components/shell/user-context';
 import { api } from '../../lib/api';
-import { usePrerequisites } from '../../lib/prerequisites/use-prerequisites';
 import { useSection } from '../../lib/section/use-section';
 
 /** The header's primary action keeps client-side navigation. */
@@ -32,33 +29,18 @@ const NextLink: NonNullable<ComponentProps<typeof PageHeader>['link']> = ({
   </Link>
 );
 
-/** While the checklist is open, the admin is usually pairing on another screen. */
-const SETUP_POLL_MS = 15_000;
-
 export default function OverviewPage() {
   const isAdmin = useCurrentUser().role === 'admin';
   const projects = useSection(() => api<ProjectSummary[]>('/projects'), []);
-  const { runners, reload } = usePrerequisites({ runners: isAdmin });
+  const { setup, runners, reload } = useGettingStarted();
 
-  const setup =
-    isAdmin && runners.state === 'ready' && projects.data !== undefined
-      ? gettingStarted({
-          runners: runners.value,
-          projects: projects.data.length,
-        })
-      : undefined;
-  const settingUp = isAdmin && setup?.complete !== true;
-
-  // Steps finish elsewhere (Runners, a terminal): look again until they are done.
-  const { retry } = projects;
+  // The checklist polls on its own; a project connected meanwhile shows here.
+  const { refresh } = projects;
+  const projectCount = setup?.project ? 1 : 0;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the first project is the trigger
   useEffect(() => {
-    if (!settingUp) return;
-    const timer = setInterval(() => {
-      reload();
-      retry();
-    }, SETUP_POLL_MS);
-    return () => clearInterval(timer);
-  }, [settingUp, reload, retry]);
+    if (projectCount > 0) refresh();
+  }, [projectCount]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -89,7 +71,11 @@ export default function OverviewPage() {
         />
       ) : null}
       {setup && !setup.complete && runners.state === 'ready' ? (
-        <GettingStarted state={setup} runners={runners.value} />
+        <GettingStarted
+          state={setup}
+          runners={runners.value}
+          onChange={reload}
+        />
       ) : null}
 
       <AsyncSection
