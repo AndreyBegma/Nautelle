@@ -137,6 +137,7 @@ export const cardFaceRoundSelect = {
   quotaLimit: true,
   quotaResetsAt: true,
   restartMode: true,
+  pausedFor: true,
 } as const satisfies Prisma.BoardCardRoundSelect;
 
 export type CardFaceRound = Prisma.BoardCardRoundGetPayload<{
@@ -464,6 +465,7 @@ const brief = (
         finishRefused: finishRefusedOf(round),
         blockingDialog: blockingDialogOf(round),
         quotaWait: quotaWaitOf(round),
+        pausedFor: round.pausedFor,
       }
     : null;
 
@@ -810,6 +812,7 @@ const toRoundView = (
   finishedAt: iso(round.finishedAt),
   endedAt: iso(round.endedAt),
   restartMode: round.restartMode,
+  pausedFor: round.pausedFor,
   restartEstimate: restartEstimateOf(round.restartEstimate),
   warmupTokens: round.warmupTokens,
   warmupMs: round.warmupMs,

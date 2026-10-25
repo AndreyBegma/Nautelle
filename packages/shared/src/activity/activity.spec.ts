@@ -52,6 +52,7 @@ const audit = (
 const SAMPLE: Record<string, unknown> = {
   'pr.checks_changed': { number: 7, branch: 'b', checks: 'red' },
   'session.vanished': { name: 'cs-i21-api' },
+  'card.paused': { number: 12, round: 1, reason: 'budget' },
 };
 
 /** Types the API records itself (ADR-0014): only `source` `api` shows them. */
@@ -60,6 +61,7 @@ const API_ONLY = new Set<string>([
   'manual.note',
   'manual.handoff',
   'card.background_stalled',
+  'card.paused',
   ...STEWARD_ACTIVITY_TYPES,
   ...AI_DIGEST_ACTIVITY_TYPES,
   ...Object.values(CARD_DEMO_EVENTS),
@@ -109,6 +111,7 @@ describe('the curated event map (spec 21 D3)', () => {
         'manual.note',
         'manual.handoff',
         'card.background_stalled',
+        'card.paused',
         'steward_incident.opened',
         'steward_incident.acted',
         'steward_incident.escalated',
