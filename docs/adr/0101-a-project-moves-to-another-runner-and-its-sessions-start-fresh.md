@@ -1,4 +1,4 @@
-# ADR-0100: A project moves to another runner, and its sessions start fresh
+# ADR-0101: A project moves to another runner, and its sessions start fresh
 
 Status: accepted · Date: 2026-10-25 ·
 Card: C-400 ·

@@ -183,6 +183,13 @@ export const CARD_CI_FIX_ATTEMPTS_MAX = 3;
 export const CARD_CI_POLL_MS = 60_000;
 
 /**
+ * C-389 (ADR-0100): how often the API reads the PR of a Finished card that
+ * nothing else reads — auto-merge off, a protected path, a card that needs a
+ * person — so a merge on GitHub completes the card.
+ */
+export const CARD_FINISHED_PR_POLL_MS = 5 * 60_000;
+
+/**
  * #484 (ADR-0043): how long a card PR's head may go without checks, in a
  * project whose CI has reported on a card before, until the API asks the
  * forge to send its event again (`card.ciRetrigger`) — and, after that one

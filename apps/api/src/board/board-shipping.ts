@@ -3,6 +3,7 @@ import {
   CARD_CI_FIX_ATTEMPTS_MAX,
   CARD_CI_MISSING_MS,
   CARD_CI_POLL_MS,
+  CARD_FINISHED_PR_POLL_MS,
   CARD_PR_HEAD_LAG_MS,
   CARD_ROUND_AT_ONCE_MS,
   type CardCiFixInput,
@@ -41,7 +42,12 @@ import { BoardFailure } from './board-error';
 import type { CardWithRounds } from './board-mapper';
 import { BoardReview } from './board-review';
 import { BoardRoundsService } from './board-rounds.service';
-import { BOARD_SYSTEM_ACTOR, type BoardProject, BoardWork } from './board-work';
+import {
+  BOARD_SYSTEM_ACTOR,
+  type BoardProject,
+  BoardWork,
+  MERGED_TO_COMPLETE,
+} from './board-work';
 
 /** The poller runs outside tests; a test drives `poll` and `check` itself. */
 export const shippingAutoStart = (env: NodeJS.ProcessEnv = process.env) =>
@@ -161,6 +167,14 @@ const roundSinceMove = (card: CardWithRounds): boolean => {
   return latest !== undefined && latest.startedAt >= card.movedAt;
 };
 
+/** The PR of a card that ships itself: open on GitHub as far as Nautelle knows. */
+const OPEN_PR = {
+  source: { notIn: ['fleet', 'terminal'] },
+  prNumber: { not: null },
+  prState: { in: ['open', 'draft'] },
+  mergedAt: null,
+} satisfies Prisma.BoardCardWhereInput;
+
 /**
  * Cards whose PR the poller reads (#359 D5): an open PR, not merged, of a
  * card that ships itself, either In progress with its round over — CI
@@ -168,10 +182,7 @@ const roundSinceMove = (card: CardWithRounds): boolean => {
  */
 const watched = (now: number) =>
   ({
-    source: { notIn: ['fleet', 'terminal'] },
-    prNumber: { not: null },
-    prState: { in: ['open', 'draft'] },
-    mergedAt: null,
+    ...OPEN_PR,
     needsPerson: false,
     OR: [
       {
@@ -214,6 +225,18 @@ const watched = (now: number) =>
   }) satisfies Prisma.BoardCardWhereInput;
 
 /**
+ * C-389 (ADR-0100): the Finished cards whose PR the CI pass does not read —
+ * auto-merge off, a protected path, a person needed, checks never read. Only
+ * a merge or a close on GitHub is watched for, so the merge completes them.
+ */
+const mergeWatched = (now: number) =>
+  ({
+    ...OPEN_PR,
+    column: 'finished',
+    NOT: watched(now),
+  }) satisfies Prisma.BoardCardWhereInput;
+
+/**
  * A card ships itself (issue #359, ADR-0035), the API's half: Nautelle
  * watches the checks of a card's PR through the runner (`card.checks`, D5),
  * turns red CI or a conflict into a `ci_fix` round — at most
@@ -230,6 +253,8 @@ export class BoardShipping
   private readonly inFlight = new Set<string>();
   /** #722: merged cards whose stored base the backfill has read on GitHub. */
   private readonly basesRead = new Set<string>();
+  /** C-389: when the merge watch last read a card's PR (epoch ms). */
+  private readonly mergeReads = new Map<string, number>();
   private timer: NodeJS.Timeout | undefined;
   private polling = false;
 
@@ -308,7 +333,9 @@ export class BoardShipping
         if (!this.commands.servesChecks(card.project.runnerId)) continue;
         await this.check(card.id);
       }
+      await this.watchMerges();
       await this.backfillMergedBases();
+      await this.completeMergedCards();
     } finally {
       this.polling = false;
     }
@@ -348,6 +375,105 @@ export class BoardShipping
       if ((await this.work.refreshMergedBase(project, card)) !== null) {
         this.basesRead.add(card.id);
       }
+    }
+  }
+
+  /**
+   * C-389 (ADR-0100): the merge watch. A Finished card the CI pass does not
+   * read has its PR read every `CARD_FINISHED_PR_POLL_MS` — at most, kept in
+   * memory, so a restart only reads it sooner. A merge there completes the
+   * card (`mergedOutside`); a close is recorded. Its checks are not stored:
+   * they would move the card into the CI pass, which may merge it.
+   */
+  async watchMerges(): Promise<void> {
+    const now = Date.now();
+    const cards = await this.prisma.boardCard.findMany({
+      where: mergeWatched(now),
+      select: { id: true, project: { select: { runnerId: true } } },
+      orderBy: { updatedAt: 'asc' },
+    });
+    const due = new Set(cards.map((card) => card.id));
+    for (const id of this.mergeReads.keys()) {
+      if (!due.has(id)) this.mergeReads.delete(id);
+    }
+    for (const card of cards) {
+      const last = this.mergeReads.get(card.id);
+      if (last !== undefined && now - last < CARD_FINISHED_PR_POLL_MS) continue;
+      if (!this.commands.servesChecks(card.project.runnerId)) continue;
+      if (this.inFlight.has(card.id)) continue;
+      this.inFlight.add(card.id);
+      try {
+        await this.watchMerge(card.id);
+        this.mergeReads.set(card.id, now);
+      } catch (error) {
+        if (!(error instanceof BoardFailure)) throw error;
+        this.logger.warn(`PR of ${card.id} not read: ${error.message}`);
+      } finally {
+        this.inFlight.delete(card.id);
+      }
+    }
+  }
+
+  private async watchMerge(cardId: string): Promise<void> {
+    const card = await this.prisma.boardCard.findUnique({
+      where: { id: cardId },
+      include: { rounds: { orderBy: { round: 'desc' } } },
+    });
+    if (!card || card.prNumber === null || card.mergedAt !== null) return;
+    if (card.column !== 'finished') return;
+    const project = await this.work.project(card.projectId);
+    if (!this.work.ships(project, card)) return;
+    const result = boardOutput(
+      'card.checks',
+      await this.commands.checks(
+        project.runnerId,
+        {
+          cardId: card.id,
+          projectId: project.id,
+          root: project.rootPath,
+          pr: card.prNumber,
+        },
+        { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },
+      ),
+    );
+    if (result.state === 'merged') {
+      await this.mergedOutside(project, card, result);
+      return;
+    }
+    if (result.state !== 'closed') return;
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { prState: 'closed' },
+    });
+    await this.prisma.boardCardPullRequest.updateMany({
+      where: { cardId: card.id, number: card.prNumber },
+      data: { state: 'closed' },
+    });
+    this.work.publish(card.projectId, card.id);
+  }
+
+  /**
+   * C-389 (ADR-0100): the sweep. Every card whose PR merged into the project
+   * base and that is still In progress or Finished is completed: one whose
+   * round ran when its PR merged, a stacked card that landed with its
+   * dependency — and, on the first pass after the upgrade, the merged cards
+   * Finished held until then (the one-time migration). A card a round still
+   * runs on waits for the next pass. Needs nothing of the runner.
+   */
+  async completeMergedCards(): Promise<void> {
+    const cards = await this.prisma.boardCard.findMany({
+      where: MERGED_TO_COMPLETE,
+      select: { id: true, projectId: true },
+      orderBy: { number: 'asc' },
+    });
+    const projects = new Map<string, BoardProject>();
+    for (const card of cards) {
+      let project = projects.get(card.projectId);
+      if (!project) {
+        project = await this.work.project(card.projectId);
+        projects.set(card.projectId, project);
+      }
+      await this.work.completeMerged(project, card.id);
     }
   }
 
@@ -885,9 +1011,11 @@ export class BoardShipping
   }
 
   /**
-   * D8: the PR was merged on GitHub — the card is Merged, in Finished. #709:
-   * with the branch it went into and when, so a stacked PR merged into a
-   * dependency branch that had already merged is carried forward.
+   * D8: the PR was merged on GitHub — the card is Merged. #709: with the
+   * branch it went into and when, so a stacked PR merged into a dependency
+   * branch that had already merged is carried forward. C-389 (ADR-0100): a
+   * card whose work is in the base is Completed; one In progress that is not
+   * goes to Finished, as before.
    */
   private async mergedOutside(
     project: BoardProject,
@@ -901,7 +1029,8 @@ export class BoardShipping
       mergedAt: result.mergedAt ? new Date(result.mergedAt) : null,
     });
     this.work.publish(project.id, card.id);
-    if (card.column === 'in_progress') await this.toFinished(project, card);
+    const fresh = await this.work.card(project.id, card.number);
+    if (fresh.column === 'in_progress') await this.toFinished(project, fresh);
   }
 
   /** D7: the project's switch, `null` following the base. */

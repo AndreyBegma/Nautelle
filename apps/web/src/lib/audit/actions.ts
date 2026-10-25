@@ -142,6 +142,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'card.finished': 'Finished a card round',
   'card.escalated': 'A card worker asked for Opus',
   'card.accepted': 'Accepted a board card',
+  'card.completed_by_merge': 'Completed a board card when its PR merged',
   'card.stopped': 'Stopped a card worker',
   'card.design_continue_toggled': 'Switched Continue after design on a card',
   'card.captured': 'Suggested a card from a session',

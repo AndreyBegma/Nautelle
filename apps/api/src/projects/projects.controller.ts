@@ -150,7 +150,7 @@ export class ProjectsController {
     return this.mover.check(access.projectId);
   }
 
-  /** C-400 (ADR-0100): the project's new runner and its root there. */
+  /** C-400 (ADR-0101): the project's new runner and its root there. */
   @Post(':projectId/move')
   @HttpCode(200)
   @Roles('admin')

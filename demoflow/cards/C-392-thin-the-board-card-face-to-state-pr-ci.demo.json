@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "name": "A thin Board card face: state, PR with CI, and icons",
+  "steps": [
+    { "action": "marker", "title": "Sign in" },
+    { "action": "navigate", "path": "/login?next=/projects/demo-project" },
+    { "action": "wait", "ms": 3000 },
+    {
+      "action": "fill",
+      "target": { "label": "Email" },
+      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+    },
+    {
+      "action": "fill",
+      "target": { "label": "Password" },
+      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
+    },
+    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
+    { "action": "marker", "title": "Open the Board" },
+    {
+      "action": "click",
+      "target": { "role": "link", "name": "Board", "exact": true },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertText",
+      "target": { "role": "heading", "name": "Board", "exact": true },
+      "text": "Board",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "marker",
+      "title": "Each card shows a state, its PR and small icons"
+    },
+    { "action": "wait", "ms": 4000 }
+  ]
+}
