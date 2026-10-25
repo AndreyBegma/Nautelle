@@ -4,7 +4,10 @@ import {
   canRetry,
   canRun,
   canStop,
+  isPausedForBudget,
   MOVE_REFUSAL_TEXT,
+  roundStateLabel,
+  runActionLabel,
 } from './card-rules';
 import { BOARD_ERROR } from './contracts';
 import { boardMoveRule } from './moves';
@@ -61,6 +64,29 @@ describe('card action rules', () => {
       canRetry(card({ column: 'in_progress', round: round('running') })),
     ).toBe(false);
     expect(canRetry(card({ column: 'in_progress' }))).toBe(false);
+  });
+
+  it('a round a hard budget paused reads Paused: budget, and its Run reads Resume (C-399)', () => {
+    const paused = card({
+      column: 'in_progress',
+      round: {
+        round: 1,
+        phase: 'cancelled',
+        pausedFor: 'budget',
+      } as RuleCard['round'],
+    });
+    expect(isPausedForBudget(paused)).toBe(true);
+    expect(canRetry(paused)).toBe(true);
+    expect(runActionLabel(paused)).toBe('Resume');
+    expect(roundStateLabel({ phase: 'cancelled', pausedFor: 'budget' })).toBe(
+      'Paused: budget',
+    );
+
+    const stopped = card({ column: 'in_progress', round: round('cancelled') });
+    expect(isPausedForBudget(stopped)).toBe(false);
+    expect(runActionLabel(stopped)).toBe('Run again');
+    expect(roundStateLabel({ phase: 'cancelled' })).toBe('Stopped');
+    expect(runActionLabel(card())).toBe('Run');
   });
 
   it('Stop: only while a round is active', () => {
