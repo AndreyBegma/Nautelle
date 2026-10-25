@@ -1,47 +1,75 @@
 {
   "schemaVersion": 1,
   "name": "Accept dialog: pick the action, then see only its options",
-  "description": "C-380: the Accept dialog shows an action selector when the pull request can be merged, only the selected path's options, and one primary button.",
-  "viewport": { "width": 1440, "height": 900 },
+  "description": "C-380: the Accept dialog has one short explanation and a single primary button. The demo stack has no runner, so the pull request is unreadable and the dialog shows its single accept-only path; the selector needs a readable open pull request.",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
   "steps": [
-    { "action": "marker", "title": "Sign in" },
+    {
+      "action": "marker",
+      "title": "Sign in"
+    },
     {
       "action": "navigate",
-      "path": "/login?next=/projects/demo-project/board"
-    },
-    { "action": "wait", "ms": 3000 },
-    {
-      "action": "fill",
-      "target": { "label": "Email" },
-      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+      "path": "/login?next=%2Fprojects%2Fdemo-project%2Fboard%3Fcard%3D7%26accept%3D1"
     },
     {
-      "action": "fill",
-      "target": { "label": "Password" },
-      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
+      "action": "wait",
+      "ms": 3000
     },
-    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
-    { "action": "marker", "title": "Open Accept on a finished card" },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Email"
+      },
+      "valueFrom": {
+        "env": "DEMO_LOGIN_EMAIL"
+      }
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Password"
+      },
+      "valueFrom": {
+        "env": "DEMO_LOGIN_PASSWORD"
+      }
+    },
     {
       "action": "click",
-      "target": { "role": "button", "name": "Accept" },
-      "caption": "Accept on a finished card with a pull request.",
-      "timeoutMs": 30000
+      "target": {
+        "role": "button",
+        "name": "Sign in"
+      }
+    },
+    {
+      "action": "marker",
+      "title": "Open Accept on a finished card"
     },
     {
       "action": "waitFor",
-      "target": { "role": "dialog" },
-      "caption": "The dialog shows the pull request, then the action selector.",
-      "timeoutMs": 15000
+      "target": {
+        "role": "dialog"
+      },
+      "caption": "Accept on 'Gift cards in the cart' opens the redesigned dialog.",
+      "timeoutMs": 30000
     },
-    { "action": "screenshot", "name": "accept-merge-path" },
-    { "action": "marker", "title": "Switch to no merge" },
     {
-      "action": "click",
-      "target": { "role": "button", "name": "Accept without merging" },
-      "caption": "Only the leave-open or close choice remains."
+      "action": "wait",
+      "ms": 2000
     },
-    { "action": "wait", "ms": 1000 },
-    { "action": "screenshot", "name": "accept-no-merge-path" }
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "button",
+        "name": "Cancel"
+      }
+    },
+    {
+      "action": "screenshot",
+      "name": "accept-dialog"
+    }
   ]
 }
