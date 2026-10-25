@@ -179,6 +179,8 @@ export const AUDIT_ACTIONS = [
   /** C-389 (ADR-0100): the card's pull request merged, so it is Completed. */
   'card.completed_by_merge',
   'card.stopped',
+  /** C-399 (ADR-0101): a hard budget paused the card's running round. */
+  'card.paused',
   /** #243 D10: the card's Continue after design switch. */
   'card.design_continue_toggled',
   /** #244 D12: a suggestion landed in the Inbox (system actor, `meta.captureId`). */

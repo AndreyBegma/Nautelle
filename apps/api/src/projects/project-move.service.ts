@@ -41,7 +41,7 @@ const LIVE_SLOT_STATUSES = [
 ] as const;
 
 /**
- * C-400 (ADR-0101): moves a project to another runner and its main checkout
+ * C-400 (ADR-0102): moves a project to another runner and its main checkout
  * there. The old machine is never touched: its worktrees are listed for the
  * admin to clean up.
  */

@@ -3,10 +3,12 @@ import {
   CARD_BACKGROUND_STALLED_EVENT,
   CARD_DEMO_EVENT,
   CARD_FINISHED_EVENT,
+  CARD_PAUSED_EVENT,
   CARD_WAITING_EVENT,
   CARDS_SUGGESTED_EVENT,
   cardBackgroundStalledTitle,
   cardLabel,
+  cardPausedForBudgetTitle,
   type NotificationKind,
   SCHEDULE_DISABLED_LIVE_EVENT,
   STEWARD_INCIDENT_EVENTS,
@@ -318,6 +320,23 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
         issue: null,
         title: cardBackgroundStalledTitle(number, minutes),
         body: 'Its worker ended its turn waiting on a background task that has not finished. Check the task in its session.',
+        page: 'board',
+        card: number,
+      };
+    }
+    // C-399: only the API records it; it names the card and the budget's
+    // scope, never the session's text.
+    case CARD_PAUSED_EVENT: {
+      if (event.source !== API_EVENT_SOURCE) return null;
+      const number = positiveInt(data.number);
+      if (!number) return null;
+      const scope = asRecord(data.budget).scope === 'user' ? 'user' : 'project';
+      return {
+        kind: 'card.paused',
+        slot: null,
+        issue: null,
+        title: cardPausedForBudgetTitle(number),
+        body: `Its ${scope} budget is used up, so its worker was stopped; the worktree and the session are kept. Resume continues the same session once the budget is raised or its period resets.`,
         page: 'board',
         card: number,
       };

@@ -15,6 +15,7 @@ import {
   canRetry,
   canRun,
   roundPill,
+  runActionLabel,
 } from '../../lib/board/format';
 import { boardStackPageHref } from '../../lib/board/href';
 import { pauseText, stackFaceRunPill } from '../../lib/board/stack-page';
@@ -264,7 +265,7 @@ function StackCard({
               disabled={actions.busy}
               onClick={() => void actions.run(card)}
             >
-              {canRetry(card) ? 'Run again' : 'Run'}
+              {runActionLabel(card)}
             </Button>
           )
         ) : null}

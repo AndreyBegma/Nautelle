@@ -104,6 +104,14 @@ export const isActiveRoundPhase = (
   phase != null &&
   (ACTIVE_CARD_ROUND_PHASES as readonly CardRoundPhase[]).includes(phase);
 
+/**
+ * C-399 (ADR-0101): why Nautelle paused a round — it stopped the session and
+ * kept the worktree and the Claude session, so Resume continues it.
+ * `budget`: a hard (`stop`) budget in the round's scope was reached.
+ */
+export const CARD_PAUSE_REASONS = ['budget'] as const;
+export type CardPauseReason = (typeof CARD_PAUSE_REASONS)[number];
+
 /** D6: who finished a round, in the order the API trusts them. */
 export const CARD_FINISHED_BY = ['worker', 'session_end', 'person'] as const;
 export type CardFinishedBy = (typeof CARD_FINISHED_BY)[number];

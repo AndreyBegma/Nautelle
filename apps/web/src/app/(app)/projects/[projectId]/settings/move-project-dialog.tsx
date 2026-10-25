@@ -70,7 +70,7 @@ function OldWorktrees({ result }: { result: ProjectMoveResult }) {
 }
 
 /**
- * C-400 (ADR-0101): moves the project to another paired runner and its main
+ * C-400 (ADR-0102): moves the project to another paired runner and its main
  * checkout there, re-choosing the runtime profile from that runner's.
  */
 export function MoveProjectDialog({

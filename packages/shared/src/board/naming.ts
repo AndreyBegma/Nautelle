@@ -19,6 +19,10 @@ export const cardBackgroundStalledTitle = (
     minutes % 60 === 0 && minutes >= 60 ? `${minutes / 60} h` : `${minutes} min`
   }`;
 
+/** C-399: "C-39 was paused: a hard budget was reached". */
+export const cardPausedForBudgetTitle = (number: number): string =>
+  `${cardLabel(number)} was paused: a hard budget was reached`;
+
 /** D8: the line every card PR body carries, so a PR is traced back to its card. */
 export const CARD_PR_MARKER = 'Nautelle-Card';
 /** The marker of PRs opened before the rename, still recognised (ADR-0073). */
