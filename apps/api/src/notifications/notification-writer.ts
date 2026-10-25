@@ -1,6 +1,9 @@
 import {
   type DeliverySkipReason,
+  type EmailMode,
   effectiveProjectRole,
+  emailModeFor,
+  isEmailMode,
   kindAllowsChannel,
   NOTIFICATION_FOLD_WINDOW_MS,
   type NotificationKind,
@@ -8,6 +11,7 @@ import {
 } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { MailService } from '../mail/mail.service';
 import { channelsFor, muteActive } from './notification-rules.service';
 
 type Tx = Prisma.TransactionClient;
@@ -33,6 +37,11 @@ export interface NotificationInput {
   at: Date;
   /** D6 folding; off for the runner watcher, whose items are one per incident. */
   fold: boolean;
+  /**
+   * C-404: the creator of the card it is about — they get the kind's
+   * `ownerEmail` when they never chose an email mode. Absent: no card.
+   */
+  ownerId?: string | null;
 }
 
 /** A row created or folded into — published once the transaction commits. */
@@ -44,12 +53,16 @@ export interface WrittenNotification {
 const ACTIVE = 'active' as const;
 
 /**
- * Recipients (D2), rules and mutes (D3), folding (D6) and the Telegram
- * delivery bookkeeping, inside the caller's transaction. Sending is not here:
- * a `pending` delivery is what the Telegram module picks up.
+ * Recipients (D2), rules and mutes (D3), folding (D6) and the Telegram and
+ * email delivery bookkeeping, inside the caller's transaction. Sending is not
+ * here: a `pending` delivery is what the Telegram module or
+ * `EmailDeliveryService` picks up, and a `digested` email waits for its
+ * person's daily digest (C-404).
  */
 @Injectable()
 export class NotificationWriter {
+  constructor(private readonly mail: MailService) {}
+
   /** D2: every active member of the project and every active admin. */
   async projectRecipients(tx: Tx, projectId: string): Promise<Recipient[]> {
     const [admins, members] = await Promise.all([
@@ -110,12 +123,10 @@ export class NotificationWriter {
 
     const written: WrittenNotification[] = [];
     for (const recipient of recipients) {
-      const channels = channelsFor(
-        input.kind,
-        recipient.role,
-        ruleOf.get(recipient.userId),
-      );
-      if (!channels.inApp && !channels.telegram) continue;
+      const rule = ruleOf.get(recipient.userId);
+      const channels = channelsFor(input.kind, recipient.role, rule);
+      const email = this.emailMode(input, recipient.userId, rule?.email);
+      if (!channels.inApp && !channels.telegram && email === 'off') continue;
       // A Telegram-only kind (C-372) is nothing to a user with no linked chat.
       if (
         !kindAllowsChannel(input.kind, 'inApp') &&
@@ -152,7 +163,8 @@ export class NotificationWriter {
             firstAt: input.at,
             lastAt: input.at,
             muted,
-            // In-app off, Telegram on: the row exists for its delivery, read.
+            // In-app off, Telegram or email on: the row exists for its
+            // delivery, read.
             readAt: channels.inApp ? null : input.at,
           },
         ],
@@ -183,8 +195,39 @@ export class NotificationWriter {
           },
         });
       }
+      if (email !== 'off') {
+        await tx.notificationDelivery.create({
+          data: {
+            notificationId: created.id,
+            userId: recipient.userId,
+            channel: 'email',
+            ...(muted
+              ? {
+                  status: 'skipped',
+                  lastError: 'muted' satisfies DeliverySkipReason,
+                }
+              : email === 'immediate'
+                ? { status: 'pending', nextAttemptAt: input.at }
+                : { status: 'digested' }),
+          },
+        });
+      }
     }
     return written;
+  }
+
+  /** C-404: what `userId` gets by email; always `off` without `SMTP_URL`. */
+  private emailMode(
+    input: NotificationInput,
+    userId: string,
+    stored: string | null | undefined,
+  ): EmailMode {
+    if (!this.mail.configured) return 'off';
+    return emailModeFor(
+      input.kind,
+      stored && isEmailMode(stored) ? stored : null,
+      input.ownerId === userId,
+    );
   }
 
   /**

@@ -68,6 +68,8 @@ export const AUDIT_ACTIONS = [
   'approval.void',
   'notification.rules',
   'notification.mute',
+  /** C-404: the caller's digest time or zone changed (`before`/`after: { digestTime, timezone }`). */
+  'notification.email',
   'telegram.configure',
   'telegram.clear',
   'telegram.link',
