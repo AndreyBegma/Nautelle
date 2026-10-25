@@ -3,7 +3,10 @@
   "name": "Search every project setting and see what keeps cards from running",
   "steps": [
     { "action": "marker", "title": "Sign in" },
-    { "action": "navigate", "path": "/login?next=/projects/demo-project/settings" },
+    {
+      "action": "navigate",
+      "path": "/login?next=/projects/demo-project/settings"
+    },
     {
       "action": "waitFor",
       "target": { "role": "button", "name": "Sign in" },
@@ -66,7 +69,9 @@
     },
     {
       "action": "fill",
-      "target": { "placeholder": "Go to a page, a project or a run — or ask the Board" },
+      "target": {
+        "placeholder": "Go to a page, a project or a run — or ask the Board"
+      },
       "value": "orchestrator profile",
       "caption": "Settings of the current project are listed in the palette"
     },
