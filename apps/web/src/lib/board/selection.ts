@@ -109,8 +109,6 @@ export const bulkFacts = (card: BoardCardView): BulkCardFacts => ({
   roundPhase: card.round?.phase ?? null,
   source: card.source,
   autoCollect: card.autoCollect,
-  // The same reading as the API's: no slot to follow, or the slot is gone.
-  slotGone: card.fleet === null || card.fleet.slotGone,
   trackingAlive: card.tracking?.alive === true,
 });
 
@@ -155,7 +153,6 @@ export const BULK_SKIP_TEXT: Record<BulkCardSkipReason, string> = {
   card_completed: 'completed',
   invalid_move: 'a suggestion',
   plan_task_derived: 'a plan task',
-  fleet_slot: 'its fleet slot owns the move',
   already_in_column: 'already there',
   wrong_column: 'not finished',
   not_running: 'not running',

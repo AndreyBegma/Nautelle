@@ -349,6 +349,7 @@ const fleetOf = (card: CardFace): CardFleetView | null =>
             ? card.fleetStage
             : null,
         slotGone: card.fleetSlotGone,
+        detached: card.fleetDetached,
       }
     : null;
 

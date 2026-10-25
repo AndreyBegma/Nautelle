@@ -27,7 +27,7 @@ const slot = (
   prUrl: null,
   updatedAt,
   href: `/projects/${projectId}/board?card=${number}`,
-  fleet: { issue, slot: name, stage: null, slotGone: false },
+  fleet: { issue, slot: name, stage: null, slotGone: false, detached: false },
 });
 
 const card = (number: number): WorkItem => ({

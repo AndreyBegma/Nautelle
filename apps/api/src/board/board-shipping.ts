@@ -225,7 +225,7 @@ const watched = (now: number) =>
   }) satisfies Prisma.BoardCardWhereInput;
 
 /**
- * C-389 (ADR-0098): the Finished cards whose PR the CI pass does not read —
+ * C-389 (ADR-0099): the Finished cards whose PR the CI pass does not read —
  * auto-merge off, a protected path, a person needed, checks never read. Only
  * a merge or a close on GitHub is watched for, so the merge completes them.
  */
@@ -379,7 +379,7 @@ export class BoardShipping
   }
 
   /**
-   * C-389 (ADR-0098): the merge watch. A Finished card the CI pass does not
+   * C-389 (ADR-0099): the merge watch. A Finished card the CI pass does not
    * read has its PR read every `CARD_FINISHED_PR_POLL_MS` — at most, kept in
    * memory, so a restart only reads it sooner. A merge there completes the
    * card (`mergedOutside`); a close is recorded. Its checks are not stored:
@@ -453,7 +453,7 @@ export class BoardShipping
   }
 
   /**
-   * C-389 (ADR-0098): the sweep. Every card whose PR merged into the project
+   * C-389 (ADR-0099): the sweep. Every card whose PR merged into the project
    * base and that is still In progress or Finished is completed: one whose
    * round ran when its PR merged, a stacked card that landed with its
    * dependency — and, on the first pass after the upgrade, the merged cards
@@ -999,7 +999,7 @@ export class BoardShipping
   /**
    * D8: the PR was merged on GitHub — the card is Merged. #709: with the
    * branch it went into and when, so a stacked PR merged into a dependency
-   * branch that had already merged is carried forward. C-389 (ADR-0098): a
+   * branch that had already merged is carried forward. C-389 (ADR-0099): a
    * card whose work is in the base is Completed; one In progress that is not
    * goes to Finished, as before.
    */

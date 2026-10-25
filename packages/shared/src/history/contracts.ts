@@ -47,7 +47,7 @@ export type RunKind = (typeof RUN_KINDS)[number];
 /**
  * Runs the control plane starts for itself — Steward's classification and
  * digest prose, extractions, assessments, rule upkeep. Their failure is a
- * fact for Activity, never something waiting on a person (C-389, ADR-0098).
+ * fact for Activity, never something waiting on a person (C-389, ADR-0099).
  */
 export const SERVICE_RUN_KINDS: ReadonlySet<RunKind> = new Set<RunKind>([
   'steward',

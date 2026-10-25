@@ -8,7 +8,7 @@ import {
 import { ApprovalsService } from './approvals.service';
 
 /**
- * C-389 (ADR-0098): runs `ApprovalsService.sweep` every `APPROVAL_SWEEP_MS`,
+ * C-389 (ADR-0099): runs `ApprovalsService.sweep` every `APPROVAL_SWEEP_MS`,
  * so an approval whose PR merged or closed without an event leaves Needs
  * you by itself. Not started under tests, which call `sweep` themselves.
  */

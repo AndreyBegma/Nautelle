@@ -167,7 +167,7 @@ export class ApprovalsService {
   }
 
   /**
-   * C-389 (ADR-0098): re-reads every PR with a current approval, as the
+   * C-389 (ADR-0099): re-reads every PR with a current approval, as the
    * system, so one that merged or closed without an event reaching Nautelle
    * — the runner was down, the event was lost — closes its row. Never
    * throws: a runner that cannot answer leaves the row for the next sweep.

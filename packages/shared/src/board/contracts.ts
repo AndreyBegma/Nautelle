@@ -170,6 +170,11 @@ export interface CardFleetView {
   stage: FleetStage | null;
   /** The slot left the projection: the card keeps its last column ("Slot gone"). */
   slotGone: boolean;
+  /**
+   * C-397 (ADR-0098): a person moved the card, so the mirror no longer moves
+   * or deletes it; it still copies the slot's stage and pull request.
+   */
+  detached: boolean;
 }
 
 /**
@@ -740,6 +745,12 @@ export interface CreateBoardCardRequest {
   kind?: BoardCardKind;
   issueOnRun?: boolean;
   specOnRun?: boolean;
+  /**
+   * C-397 (ADR-0098): the open GitHub issue the card works — Queue's "Make a
+   * card". Its pull request closes the issue; an issue that is not open in the
+   * project's repository is refused `issue_not_linkable`.
+   */
+  issueNumber?: number;
   /**
    * #309 D3: pending uploads to claim, at most `ATTACHMENTS_PER_CARD_MAX`.
    * Each must be pending, in this project and uploaded by the caller, else

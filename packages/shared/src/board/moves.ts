@@ -15,7 +15,7 @@ import {
  * - `person` — a drag, or a button that moves the card (Accept, Mark finished);
  * - `automatic` — the work moving it: Run → In progress, done → Finished;
  * - `merged` — the card's pull request merged into the project base (C-389,
- *   ADR-0098): In progress or Finished → Completed. The merge was a person's
+ *   ADR-0099): In progress or Finished → Completed. The merge was a person's
  *   decision — on GitHub, through Accept, or by turning auto-merge on.
  */
 export type BoardMoveSource = 'person' | 'automatic' | 'merged';
@@ -52,20 +52,17 @@ export type BoardMoveEffect =
  *   Finished to Completed;
  * - `plan_task_derived` — the item is a plan task projected onto the board
  *   (#270 D5, ADR-0028): its column follows its plan and its issue, so no
- *   move, reorder or column change of it is ever allowed;
- * - `fleet_slot` — a person moved a `fleet` card (#282 D4, ADR-0030 §4):
- *   its column follows the slot, so the one move a person makes is Finished
- *   → Completed (Accept). A reorder inside a column is not a move. Once the
- *   slot is gone (#424) a person may also move the card to To Do or
- *   Finished, never into In progress.
+ *   move, reorder or column change of it is ever allowed.
+ *
+ * A person moves a `fleet` card like any card (C-397, ADR-0098): the move
+ * detaches it from its slot, so nothing refuses it here.
  */
 export type BoardMoveRefusal =
   | 'card_running'
   | 'automatic_to_completed'
   | 'card_completed'
   | 'invalid_move'
-  | 'plan_task_derived'
-  | 'fleet_slot';
+  | 'plan_task_derived';
 
 /** #270 D5: what is being moved. A plan task is on the board read-only. */
 export type BoardMoveItem = 'card' | 'plan_task';
@@ -91,11 +88,6 @@ export interface BoardMoveInput {
    * gone, Run is offered again. Default `false`.
    */
   trackingAlive?: boolean;
-  /**
-   * #424: a `fleet` card's slot ended without a PR of its own — nothing
-   * moves the card any more, so a person may. Default `false`.
-   */
-  slotGone?: boolean;
 }
 
 export type BoardMoveDecision =
@@ -114,26 +106,6 @@ const refuse = (error: BoardMoveRefusal): BoardMoveDecision => ({
   allowed: false,
   error,
 });
-
-const WORK_COLUMNS: readonly BoardColumn[] = [
-  'todo',
-  'in_progress',
-  'finished',
-];
-
-/** #282 D4 / #424: the moves a person makes of a `fleet` card. */
-const personMovesFleetCard = (
-  from: BoardColumn,
-  to: BoardColumn,
-  slotGone: boolean,
-): boolean => {
-  if (from === 'finished' && to === 'completed') return true;
-  return (
-    slotGone &&
-    WORK_COLUMNS.includes(from) &&
-    (to === 'todo' || to === 'finished')
-  );
-};
 
 /**
  * D8 / #282 D3: a card worker's work is always collected; a terminal
@@ -169,13 +141,6 @@ export const boardMoveRule = (move: BoardMoveInput): BoardMoveDecision => {
   }
   if (from === to) return { allowed: true, effects: [], offerRun: false };
   const cardSource = move.cardSource ?? 'manual';
-  if (
-    cardSource === 'fleet' &&
-    source === 'person' &&
-    !personMovesFleetCard(from, to, move.slotGone === true)
-  ) {
-    return refuse('fleet_slot');
-  }
   if (from === 'inbox' || to === 'inbox') {
     return from === 'inbox' && to === 'todo' && source === 'person'
       ? { allowed: true, effects: ['accept_suggestion'], offerRun: false }

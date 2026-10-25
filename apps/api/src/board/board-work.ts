@@ -182,7 +182,7 @@ export interface LivePr {
 }
 
 /**
- * C-389 (ADR-0098): the cards a merge completes — a card worker's card in
+ * C-389 (ADR-0099): the cards a merge completes — a card worker's card in
  * In progress or Finished whose PR merged into the project base. The sweep's
  * query; `completesOnMerge` also wants no round running.
  */
@@ -265,9 +265,6 @@ const MOVE_REFUSED: Record<
   automatic_to_completed: 'Only a person completes a card',
   card_completed: 'A completed card is moved only by a person',
   plan_task_derived: 'A completed card is moved only by a person',
-  // #282 D4: the column follows the slot; #424: until the slot is gone.
-  fleet_slot:
-    'A fleet card follows its live slot: the one move it takes is Finished → Completed',
 };
 
 const refusalOf = (
@@ -460,6 +457,13 @@ export class BoardWork implements OnModuleInit {
       const reopen = decision.effects.includes('reopen');
       // #244 D8: the evidence is content; an accepted card keeps none.
       const suggestion = decision.effects.includes('accept_suggestion');
+      // C-397 (ADR-0098): a person's move takes a fleet card off its slot's
+      // columns; accepting it into Completed is the one move that does not.
+      const detach =
+        fresh.source === 'fleet' &&
+        request.source === 'person' &&
+        !sameColumn &&
+        request.to !== 'completed';
       await tx.boardCard.update({
         where: { id: fresh.id },
         data: {
@@ -468,6 +472,7 @@ export class BoardWork implements OnModuleInit {
           ...(sameColumn
             ? {}
             : { movedAt: now, movedById: actor.userId ?? null }),
+          ...(detach ? { fleetDetached: true } : {}),
           ...(accept ? { completedAt: now, completedById: actor.userId } : {}),
           ...(reopen ? { completedAt: null, completedById: null } : {}),
           ...(suggestion ? { evidence: Prisma.DbNull } : {}),
@@ -522,7 +527,7 @@ export class BoardWork implements OnModuleInit {
       });
     }
     if (effects.includes('accept')) {
-      // C-389 (ADR-0098): a merge completes the card; no one accepted it.
+      // C-389 (ADR-0099): a merge completes the card; no one accepted it.
       const merged = request.source === 'merged';
       await this.audit.record({
         ...actor.ctx,
@@ -597,13 +602,10 @@ export class BoardWork implements OnModuleInit {
       roundPhase: card.rounds[0]?.phase ?? null,
       source: request.source,
       stopWorker: request.stopWorker,
-      // #282: a fleet card follows its slot; a terminal card collects only
-      // with Automatic work on.
+      // #282: a fleet card never collects; a terminal card collects only
+      // with Automatic work on. C-397: a person moves a fleet card freely.
       cardSource: card.source,
       autoCollect: card.autoCollect,
-      // #424: a gone slot no longer moves its card, so a person may.
-      // #433: a card with no slot at all has nothing to follow either.
-      slotGone: card.fleetSlotGone || card.fleetSlot === null,
     });
   }
 
@@ -928,7 +930,7 @@ export class BoardWork implements OnModuleInit {
    * branch it went into and when. A stacked PR that went into the project
    * base itself (GitHub moved it there) is no longer stacked; one that went
    * into its dependency's branch after that branch's own PR merged is
-   * carried forward (`retarget`). C-389 (ADR-0098): a card whose work is in
+   * carried forward (`retarget`). C-389 (ADR-0099): a card whose work is in
    * the base now is Completed (`completeMerged`), unless `complete` is false.
    */
   async markMerged(
@@ -967,7 +969,7 @@ export class BoardWork implements OnModuleInit {
   }
 
   /**
-   * C-389 (ADR-0098): a card whose PR merged into the project base moves to
+   * C-389 (ADR-0099): a card whose PR merged into the project base moves to
    * Completed — the merge was the person's decision, on GitHub, through
    * Accept or by the auto-merge they turned on. Completed cleans up as
    * Accept does. A card stays where it is while a round runs on it (the PR

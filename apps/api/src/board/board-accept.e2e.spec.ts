@@ -160,7 +160,7 @@ describe('board accept with merge (e2e, #273)', () => {
         mergeCommit: 'b'.repeat(40),
         issueClosed: true,
       });
-      // C-389 (ADR-0098): the person accepted it — one move, one audit.
+      // C-389 (ADR-0099): the person accepted it — one move, one audit.
       expect(await w.audit('card.accepted')).toHaveLength(1);
       expect(await w.audit('card.completed_by_merge')).toHaveLength(0);
     });

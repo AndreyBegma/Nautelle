@@ -1,4 +1,4 @@
-# ADR-0098: A merged card completes itself, and Needs you clears itself
+# ADR-0099: A merged card completes itself, and Needs you clears itself
 
 Status: accepted · Date: 2026-10-25 · Card: C-389 ·
 Spec: [`docs/specs/card-389-a-card-whose-pull-request-merged-moves-t.md`](../specs/card-389-a-card-whose-pull-request-merged-moves-t.md) ·

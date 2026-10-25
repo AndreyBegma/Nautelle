@@ -233,7 +233,7 @@ describe('a card ships itself (e2e, #359)', () => {
       ]);
       const [record] = await w.audit('card.merged');
       expect(record).toMatchObject({ actorType: 'system', result: 'ok' });
-      // C-389 (ADR-0098): the auto-merge completes the card, and cleans up.
+      // C-389 (ADR-0099): the auto-merge completes the card, and cleans up.
       const [completed] = await w.audit('card.completed_by_merge');
       expect(completed).toMatchObject({ actorType: 'system', result: 'ok' });
       expect(completed.after).toEqual({ number: 1, pr: 77 });
@@ -844,7 +844,7 @@ describe('a card ships itself (e2e, #359)', () => {
     it('Send back on a merged card moved back from Completed resumes the session on <branch>-2 from the base, and lists both PRs', async () => {
       await started();
       await ended();
-      // C-389 (ADR-0098): the merge completed the card; a person moves it
+      // C-389 (ADR-0099): the merge completed the card; a person moves it
       // back for the follow-up.
       expect(await w.card(1)).toMatchObject({ column: 'completed' });
       expect((await w.card(1)).mergedAt).not.toBeNull();

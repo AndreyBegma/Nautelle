@@ -106,8 +106,8 @@ describe('board actions', () => {
   });
 
   it('words the board’s refusals as the web does', () => {
-    expect(boardFailureText('move_refused', 'fleet_slot', 'x')).toMatch(
-      /follows its slot/,
+    expect(boardFailureText('move_refused', 'card_completed', 'x')).toBe(
+      'This card is already completed.',
     );
     expect(boardFailureText('move_refused', 'unknown', 'x')).toBe(
       'That move is not allowed.',

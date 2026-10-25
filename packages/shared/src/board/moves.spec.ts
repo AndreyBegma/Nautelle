@@ -156,7 +156,7 @@ describe('boardMoveRule', () => {
     });
   });
 
-  describe('a merge completes a card (C-389, ADR-0098)', () => {
+  describe('a merge completes a card (C-389, ADR-0099)', () => {
     for (const from of ['in_progress', 'finished'] as const) {
       it(`completes a ${from} card whose round is over`, () => {
         expect(
@@ -406,29 +406,14 @@ describe('boardMoveRule', () => {
       }
     });
 
-    it('refuses every other move a person makes of a fleet card', () => {
-      for (const from of BOARD_COLUMNS) {
-        for (const to of BOARD_COLUMNS) {
+    it('lets a person move a fleet card between work columns like any card (C-397)', () => {
+      for (const from of WORK_COLUMNS) {
+        for (const to of WORK_COLUMNS) {
           if (from === to) continue;
-          if (from === 'finished' && to === 'completed') continue;
           expect([
             from,
             to,
             boardMoveRule(move({ from, to, cardSource: 'fleet' })),
-          ]).toEqual([from, to, { allowed: false, error: 'fleet_slot' }]);
-        }
-      }
-    });
-
-    it('lets a person move a gone slot’s card to Finished or To Do (#424)', () => {
-      const gone = { cardSource: 'fleet', slotGone: true } as const;
-      for (const from of WORK_COLUMNS) {
-        for (const to of ['todo', 'finished'] as const) {
-          if (from === to) continue;
-          expect([
-            from,
-            to,
-            boardMoveRule(move({ ...gone, from, to })),
           ]).toEqual([
             from,
             to,
@@ -436,26 +421,32 @@ describe('boardMoveRule', () => {
           ]);
         }
       }
-      expect(
-        boardMoveRule(move({ ...gone, from: 'finished', to: 'completed' })),
-      ).toEqual({ allowed: true, effects: ['accept'], offerRun: false });
     });
 
-    it('still refuses a gone slot’s card into In progress, or out of Completed (#424)', () => {
-      const gone = { cardSource: 'fleet', slotGone: true } as const;
-      for (const [from, to] of [
-        ['todo', 'in_progress'],
-        ['finished', 'in_progress'],
-        ['completed', 'todo'],
-        ['completed', 'finished'],
-        ['todo', 'completed'],
-      ] as const) {
-        expect([from, to, boardMoveRule(move({ ...gone, from, to }))]).toEqual([
-          from,
-          to,
-          { allowed: false, error: 'fleet_slot' },
-        ]);
-      }
+    it('never offers Run nor collects for a person’s fleet card move (C-397)', () => {
+      expect(
+        boardMoveRule(
+          move({ from: 'todo', to: 'in_progress', cardSource: 'fleet' }),
+        ),
+      ).toEqual({ allowed: true, effects: [], offerRun: false });
+      expect(
+        boardMoveRule(
+          move({
+            from: 'in_progress',
+            to: 'finished',
+            cardSource: 'fleet',
+            roundPhase: null,
+          }),
+        ),
+      ).toEqual({ allowed: true, effects: [], offerRun: false });
+    });
+
+    it('reopens a completed fleet card like any card (C-397)', () => {
+      expect(
+        boardMoveRule(
+          move({ from: 'completed', to: 'todo', cardSource: 'fleet' }),
+        ),
+      ).toEqual({ allowed: true, effects: ['reopen'], offerRun: false });
     });
 
     it('lets a person reorder a fleet card inside its column', () => {
