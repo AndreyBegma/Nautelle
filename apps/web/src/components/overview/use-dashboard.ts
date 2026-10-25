@@ -8,13 +8,9 @@ import {
   FLEET_LIVE_EVENT,
   type FleetsView,
   type FleetView,
-  type OrchestratorSettingsView,
   type ProjectSummary,
   RUN_UPDATED_LIVE_EVENT,
-  type RunPage,
-  type RunSummary,
   SESSIONS_CHANGED_LIVE_EVENT,
-  type TerminalSetupView,
   type UsageBreakdownResponse,
   type UsageSummaryResponse,
   type UsageTimeseriesResponse,
@@ -29,13 +25,8 @@ import {
 import { type Section, useSection } from '../../lib/section/use-section';
 import { browserZone } from '../../lib/usage/format';
 
-/** What moves the project facts: fleets, approvals and failed runs. */
-const FACTS_EVENTS = [
-  FLEET_LIVE_EVENT,
-  APPROVALS_LIVE_EVENT,
-  RUN_UPDATED_LIVE_EVENT,
-  BOARD_CHANGED_EVENT,
-];
+/** What moves the project facts: fleets and approvals. */
+const FACTS_EVENTS = [FLEET_LIVE_EVENT, APPROVALS_LIVE_EVENT];
 /** Today's cost moves when a session's usage lands. */
 const COST_EVENTS = [SESSIONS_CHANGED_LIVE_EVENT];
 /** Merges and recent activity follow the Board and the runs. */
@@ -46,29 +37,18 @@ const MERGED_LIMIT = 200;
 const RECENT_LIMIT = 8;
 /** Projects in the cost breakdown; the API caps a breakdown at 200 rows. */
 const COST_PROJECTS_LIMIT = 200;
-/** The newest failed runs per project; "Needs you" shows the last 24 h of them. */
-const FAILED_RUNS_LIMIT = 20;
 
 export interface ProjectFacts {
   fleets: Map<string, FleetView>;
   approvals: Map<string, ApprovalsView>;
-  /** Each project's latest failed runs; "Needs you" keeps the last 24 h. */
-  failedRuns: Map<string, RunSummary[]>;
-  /** Projects whose orchestrator has no profile, its own or the default. */
-  missingProfile: Set<string>;
-  /**
-   * Each operator-or-up project's "Terminal → Board" checklist (#281). A
-   * project whose checklist did not answer is absent — an API that predates the
-   * endpoint must not read as a problem, so it is not in `failed`.
-   */
-  terminalSetup: Map<string, TerminalSetupView>;
   /** Projects where any of these did not answer — never shown as zero. */
   failed: ProjectSummary[];
 }
 
 /**
- * Every project's fleet, approvals, failed runs and orchestrator settings. The
- * fleets come from one `GET /fleet`; the rest is still per project. One project
+ * Every project's fleet and approvals. What waits on the person is the
+ * Inbox's (C-390), not these. The fleets come from one `GET /fleet`; the
+ * approvals are still per project. One project
  * failing does not fail the rest: its id goes in `failed` and the page says so
  * beside the figures.
  */
@@ -83,54 +63,28 @@ async function loadProjectFacts(
   const results = await Promise.all(
     projects.map(async (project) => {
       const base = `/projects/${project.id}`;
-      const [fleet, approvals, runs, settings, setup] =
-        await Promise.allSettled([
-          fleetsCall.then((byProject) => {
-            const view = byProject.get(project.id);
-            if (!view) throw new Error('no fleet');
-            return view;
-          }),
-          api<ApprovalsView>(`${base}/approvals`),
-          api<RunPage>(`${base}/runs?status=failed&limit=${FAILED_RUNS_LIMIT}`),
-          api<OrchestratorSettingsView>(`${base}/orchestrator/settings`),
-          project.role === 'viewer'
-            ? Promise.reject(new Error('viewer'))
-            : api<TerminalSetupView>(`${base}/terminal-setup`),
-        ]);
-      return { project, fleet, approvals, runs, settings, setup };
+      const [fleet, approvals] = await Promise.allSettled([
+        fleetsCall.then((byProject) => {
+          const view = byProject.get(project.id);
+          if (!view) throw new Error('no fleet');
+          return view;
+        }),
+        api<ApprovalsView>(`${base}/approvals`),
+      ]);
+      return { project, fleet, approvals };
     }),
   );
   const facts: ProjectFacts = {
     fleets: new Map(),
     approvals: new Map(),
-    failedRuns: new Map(),
-    missingProfile: new Set(),
-    terminalSetup: new Map(),
     failed: [],
   };
-  for (const { project, fleet, approvals, runs, settings, setup } of results) {
-    if (setup.status === 'fulfilled') {
-      facts.terminalSetup.set(project.id, setup.value);
-    }
+  for (const { project, fleet, approvals } of results) {
     if (fleet.status === 'fulfilled') facts.fleets.set(project.id, fleet.value);
     if (approvals.status === 'fulfilled') {
       facts.approvals.set(project.id, approvals.value);
     }
-    if (runs.status === 'fulfilled') {
-      facts.failedRuns.set(project.id, runs.value.items);
-    }
-    if (
-      settings.status === 'fulfilled' &&
-      settings.value.effectiveProfile === null
-    ) {
-      facts.missingProfile.add(project.id);
-    }
-    if (
-      fleet.status === 'rejected' ||
-      approvals.status === 'rejected' ||
-      runs.status === 'rejected' ||
-      settings.status === 'rejected'
-    ) {
+    if (fleet.status === 'rejected' || approvals.status === 'rejected') {
       facts.failed.push(project);
     }
   }
