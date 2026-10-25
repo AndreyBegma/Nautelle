@@ -51,7 +51,10 @@
       "value": "The footer link to the docs opens a 404 page. Point it at the current docs."
     },
     { "action": "wait", "ms": 4000 },
-    { "action": "marker", "title": "The title and kind are suggested and editable" },
+    {
+      "action": "marker",
+      "title": "The title and kind are suggested and editable"
+    },
     { "action": "wait", "ms": 2000 },
     { "action": "marker", "title": "Save: the card lands in To Do" },
     {
