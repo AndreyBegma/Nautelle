@@ -168,7 +168,7 @@ function AdminBudgets() {
         description={
           noBudgets
             ? 'Spending caps for projects and people.'
-            : 'A stop budget refuses new orchestrator starts and skill runs once used up; running workers are never stopped.'
+            : 'A stop budget refuses new orchestrator starts and skill runs once used up, and pauses running card rounds; other running workers are never stopped.'
         }
         actions={
           <>

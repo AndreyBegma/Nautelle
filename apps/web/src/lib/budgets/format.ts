@@ -47,7 +47,7 @@ export const ACTION_LABEL: Record<BudgetAction, string> = {
 
 export const ACTION_HINT: Record<BudgetAction, string> = {
   alert: 'Notifies at each threshold. Nothing is refused.',
-  stop: 'After 100 % new orchestrator starts and skill runs are refused until the period resets. Running workers are never stopped.',
+  stop: 'After 100 % new orchestrator starts and skill runs are refused until the period resets. Running card rounds are paused; other running workers are never stopped.',
 };
 
 export const SCOPE_LABEL: Record<BudgetScope, string> = {

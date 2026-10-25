@@ -95,6 +95,13 @@ describe('roundPill', () => {
       label: 'Running in background',
     });
   });
+
+  test('a round a hard budget paused reads Paused: budget (C-399)', () => {
+    expect(roundPill({ ...round('cancelled'), pausedFor: 'budget' })).toEqual({
+      status: 'blocked',
+      label: 'Paused: budget',
+    });
+  });
 });
 
 describe('what a card offers', () => {
