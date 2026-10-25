@@ -35,7 +35,7 @@
     },
     {
       "action": "click",
-      "target": { "text": "Design in review" },
+      "target": { "text": "Redesign the order summary" },
       "timeoutMs": 15000
     },
     {
