@@ -33,7 +33,9 @@ digested so a bad hour does not become two hundred messages.
 
 - Telegram inline approve / request-changes buttons. They are optional and conditional on #20 (D12); otherwise a follow-up.
 - Budget alerts (M3.5): the kind is reserved, never emitted here.
-- Email, Slack and browser push. Outbound webhooks are M3.3.
+- Email, Slack and browser push. Outbound webhooks are M3.3. (Slack was added
+  later through an incoming webhook per project or workspace, with the kinds
+  `card.failed` and `card.merged`: [ADR-0109](../adr/0109-slack-notifications-go-through-an-incoming-webhook-per-project-or-workspace.md).)
 - Digest scheduling beyond the rate-limit window (daily summaries).
 
 ## Decisions

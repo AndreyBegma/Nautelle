@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "name": "Slack notifications through an incoming webhook",
+  "description": "C-405: a project's Settings and Admin › Integrations take a Slack incoming webhook URL, stored encrypted and shown only by its last characters, with a toggle for each event and a test send.",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Sign in"
+    },
+    {
+      "action": "navigate",
+      "path": "/login?next=/projects/demo-project"
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Email"
+      },
+      "valueFrom": {
+        "env": "DEMO_LOGIN_EMAIL"
+      }
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Password"
+      },
+      "valueFrom": {
+        "env": "DEMO_LOGIN_PASSWORD"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Sign in"
+      }
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "marker",
+      "title": "A project's own Slack webhook"
+    },
+    {
+      "action": "navigate",
+      "path": "/projects/demo-project/settings?tab=slack"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Post to the channel when"
+      },
+      "caption": "Settings › Slack: the project's incoming webhook and the events it posts.",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Webhook URL"
+      },
+      "value": "https://hooks.slack.com/services/T0DEMO000/B0DEMO000/demoWebhookPath0000"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "checkbox",
+        "name": "Card waits for you"
+      },
+      "caption": "Each event has its own toggle; this channel skips questions."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Save"
+      },
+      "caption": "The URL is stored encrypted and never shown again."
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "…0000",
+        "exact": true
+      },
+      "caption": "Only its last characters are shown.",
+      "timeoutMs": 15000,
+      "zoom": true
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "button",
+        "name": "Send test message"
+      },
+      "caption": "Send test message posts one message to the channel.",
+      "timeoutMs": 15000,
+      "zoom": true
+    },
+    {
+      "action": "screenshot",
+      "name": "project-slack-saved"
+    },
+    {
+      "action": "marker",
+      "title": "The workspace-wide webhook"
+    },
+    {
+      "action": "navigate",
+      "path": "/admin/integrations"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "posted to a channel through an incoming webhook"
+      },
+      "caption": "Admin › Integrations lists Slack beside Telegram.",
+      "timeoutMs": 30000,
+      "zoom": true
+    },
+    {
+      "action": "navigate",
+      "path": "/admin/integrations/slack"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Post to the channel when"
+      },
+      "caption": "One webhook for every project without its own.",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "screenshot",
+      "name": "workspace-slack"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    }
+  ]
+}

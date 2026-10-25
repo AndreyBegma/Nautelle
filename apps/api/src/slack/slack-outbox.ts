@@ -70,10 +70,7 @@ export const enqueueSlack = async (
 ): Promise<void> => {
   if (!input.projectId) return;
   // Most kinds never post: skip the queries for them.
-  if (
-    input.kind !== 'card.demo' &&
-    slackEventFor(input.kind) === null
-  ) {
+  if (input.kind !== 'card.demo' && slackEventFor(input.kind) === null) {
     return;
   }
   const webhook = await slackWebhookFor(tx, input.projectId);

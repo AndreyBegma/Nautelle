@@ -78,6 +78,7 @@ export const slackTestText = (
     scope === 'project' && project
       ? `for ${slackEscape(project)}`
       : 'for every project without its own webhook';
-  const open = appUrl && linkable(appUrl) ? ` ${link(appUrl, 'Open Nautelle')}` : '';
+  const open =
+    appUrl && linkable(appUrl) ? ` ${link(appUrl, 'Open Nautelle')}` : '';
   return `*Nautelle test message*\nThis channel receives Nautelle notifications ${where}.${open}`;
 };

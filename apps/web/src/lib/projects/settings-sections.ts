@@ -12,6 +12,7 @@ export const SETTINGS_SECTIONS = [
       { id: 'members', label: 'Members' },
       { id: 'docs', label: 'Docs source' },
       { id: 'rules', label: 'Coding rules' },
+      { id: 'slack', label: 'Slack' },
     ],
   },
   {

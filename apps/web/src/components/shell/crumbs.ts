@@ -17,6 +17,7 @@ const STATIC: Record<string, string> = {
   '/admin/integrations/github': 'GitHub App',
   '/admin/integrations/github/callback': 'Connecting',
   '/admin/integrations/telegram': 'Telegram',
+  '/admin/integrations/slack': 'Slack',
   '/admin/integrations/triggers': 'Triggers',
   '/admin/integrations/webhooks': 'Webhooks',
   '/whats-new': 'What’s new',

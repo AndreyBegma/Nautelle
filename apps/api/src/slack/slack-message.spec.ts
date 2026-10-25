@@ -1,4 +1,8 @@
-import { type SlackMessageParts, slackText, slackTestText } from './slack-message';
+import {
+  type SlackMessageParts,
+  slackTestText,
+  slackText,
+} from './slack-message';
 
 const parts = (overrides: Partial<SlackMessageParts>): SlackMessageParts => ({
   event: 'finished',

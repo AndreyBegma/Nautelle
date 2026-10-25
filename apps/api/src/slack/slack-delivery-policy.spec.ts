@@ -9,7 +9,7 @@ const answer = (overrides: Partial<SlackPostResult>): SlackPostResult => ({
   retryAfterMs: null,
   ...overrides,
 });
-const after = (ms: number) => new Date(now.getTime() + ms);
+const inMs = (ms: number) => new Date(now.getTime() + ms);
 
 describe('slackAfterAttempt (C-405)', () => {
   it('is sent on a good answer', () => {
@@ -36,11 +36,11 @@ describe('slackAfterAttempt (C-405)', () => {
   it('backs off on a server error or no answer, then gives up', () => {
     expect(slackAfterAttempt(answer({}), 1, now)).toEqual({
       status: 'pending',
-      nextAttemptAt: after(30_000),
+      nextAttemptAt: inMs(30_000),
     });
     expect(
       slackAfterAttempt(answer({ status: null, error: 'timeout' }), 3, now),
-    ).toEqual({ status: 'pending', nextAttemptAt: after(120_000) });
+    ).toEqual({ status: 'pending', nextAttemptAt: inMs(120_000) });
     expect(slackAfterAttempt(answer({}), SLACK_MAX_ATTEMPTS, now).status).toBe(
       'failed',
     );
@@ -49,13 +49,13 @@ describe('slackAfterAttempt (C-405)', () => {
   it('waits what a 429 asks, at most an hour', () => {
     expect(
       slackAfterAttempt(answer({ status: 429, retryAfterMs: 5_000 }), 1, now),
-    ).toEqual({ status: 'pending', nextAttemptAt: after(5_000) });
+    ).toEqual({ status: 'pending', nextAttemptAt: inMs(5_000) });
     expect(
       slackAfterAttempt(
         answer({ status: 429, retryAfterMs: 86_400_000 }),
         1,
         now,
       ).nextAttemptAt,
-    ).toEqual(after(3_600_000));
+    ).toEqual(inMs(3_600_000));
   });
 });

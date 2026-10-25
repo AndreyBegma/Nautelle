@@ -55,6 +55,9 @@ the database cannot be read without it.
 
 - **The Telegram bot**: set up under **Admin › Integrations › Telegram**; it
   needs the encryption key, which every install has.
+- **Slack**: an incoming webhook URL under **Admin › Integrations › Slack** for
+  every project, or in a project's **Settings › Slack** for that project only.
+  It is sealed with the same key.
 - **Translation with DeepL**: `DEEPL_API_KEY` in `api.env`.
 - **Voice input in Telegram**: `SPEECH_TO_TEXT_URL`, `SPEECH_TO_TEXT_API_KEY`.
 - **AI providers** for the assistant features: **Admin › AI providers**.

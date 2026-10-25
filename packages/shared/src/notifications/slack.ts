@@ -30,7 +30,8 @@ export const SLACK_EVENT_HINTS: Record<SlackEvent, string> = {
   demo: 'A card’s demo video is ready; with its pull request and the demo.',
   question: 'A card round stopped, asks a question or shows a dialog.',
   failed: 'A card round failed to run, or its demo video failed.',
-  budget: 'A project budget reached a threshold or its limit, or paused a card.',
+  budget:
+    'A project budget reached a threshold or its limit, or paused a card.',
   merged: 'A card’s pull request merged.',
 };
 
@@ -121,7 +122,7 @@ export interface SlackLastDelivery {
 export interface SlackWebhookStatus {
   scope: SlackWebhookScope;
   configured: boolean;
-  /** `…/abcd`: the URL's last four characters; null when not configured. */
+  /** `…abcd`: the URL's last four characters; null when not configured. */
   urlHint: string | null;
   /** The events posted; every event when not configured yet. */
   events: SlackEvent[];

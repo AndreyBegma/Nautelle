@@ -7,16 +7,25 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import type {
   GitHubAppView,
   InboundTriggerView,
+  SlackWebhookStatus,
   TelegramIntegrationStatus,
   WebhookView,
 } from '@nautelle/shared';
-import { GitBranch, type LucideIcon, Send, Webhook, Zap } from 'lucide-react';
+import {
+  GitBranch,
+  Hash,
+  type LucideIcon,
+  Send,
+  Webhook,
+  Zap,
+} from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { api } from '../../../lib/api';
 import {
   gitHubAppStatus,
   type IntegrationStatus,
+  slackStatus,
   telegramStatus,
   triggersStatus,
   UNAVAILABLE,
@@ -88,6 +97,10 @@ export default function IntegrationsPage() {
     () => api<TelegramIntegrationStatus>('/admin/integrations/telegram'),
     [],
   );
+  const slack = useSection(
+    () => api<SlackWebhookStatus>('/admin/integrations/slack'),
+    [],
+  );
   const webhooks = useSection(() => api<WebhookView[]>('/admin/webhooks'), []);
   const triggers = useSection(
     () => api<InboundTriggerView[]>('/admin/triggers'),
@@ -114,6 +127,13 @@ export default function IntegrationsPage() {
           purpose="Notifications and approvals in each person’s own Telegram chat."
           href="/admin/integrations/telegram"
           status={statusOf(telegram, telegramStatus)}
+        />
+        <IntegrationCard
+          icon={Hash}
+          title="Slack"
+          purpose="Finished cards, demos and failures posted to a channel through an incoming webhook."
+          href="/admin/integrations/slack"
+          status={statusOf(slack, slackStatus)}
         />
         <IntegrationCard
           icon={Webhook}

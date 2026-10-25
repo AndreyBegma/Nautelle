@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth';
 import { CryptoModule } from '../common/crypto';
 import { ProjectsModule } from '../projects';
-import { AdminSlackController, ProjectSlackController } from './slack.controller';
+import {
+  AdminSlackController,
+  ProjectSlackController,
+} from './slack.controller';
 import { SlackClient } from './slack-client';
 import { SlackDeliveryService } from './slack-delivery.service';
 import { SLACK_OPTIONS, slackOptionsFromEnv } from './slack-options';

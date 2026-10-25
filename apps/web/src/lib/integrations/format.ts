@@ -1,6 +1,7 @@
 import type {
   GitHubAppView,
   InboundTriggerView,
+  SlackWebhookStatus,
   TelegramIntegrationStatus,
   WebhookView,
 } from '@nautelle/shared';
@@ -93,6 +94,34 @@ export function telegramStatus(
     tone: 'ok',
     label: 'Connected',
     detail: `${bot} · ${plural(status.linkedUsers, 'linked user')}.`,
+  };
+}
+
+/** C-405: the workspace-wide Slack webhook. */
+export function slackStatus(status: SlackWebhookStatus): IntegrationStatus {
+  if (!status.configured) {
+    return {
+      tone: 'neutral',
+      label: 'Not set up',
+      detail: status.encryptionAvailable
+        ? 'Post finished cards, demos and failures to a Slack channel.'
+        : 'Needs APP_ENCRYPTION_KEY on the server before a webhook can be set.',
+    };
+  }
+  if (
+    status.lastDelivery?.status === 'failed' ||
+    (status.lastDelivery?.status === 'pending' && status.lastDelivery.error)
+  ) {
+    return {
+      tone: 'warn',
+      label: 'Messages failing',
+      detail: 'Slack did not accept the last message. Open it to see why.',
+    };
+  }
+  return {
+    tone: 'ok',
+    label: 'Connected',
+    detail: `${plural(status.events.length, 'event')} posted for every project without its own webhook.`,
   };
 }
 

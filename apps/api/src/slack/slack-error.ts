@@ -30,7 +30,11 @@ export const slackNotConfigured = (): HttpException =>
 
 /** Slack answered the test message with an error. */
 export const slackRejected = (reason: string): HttpException =>
-  notificationError(502, 'slack_rejected', `Slack refused the message: ${reason}`);
+  notificationError(
+    502,
+    'slack_rejected',
+    `Slack refused the message: ${reason}`,
+  );
 
 /** The stored URL cannot be opened: the encryption key changed or is gone. */
 export const slackUnavailable = (): HttpException =>

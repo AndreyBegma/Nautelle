@@ -69,7 +69,9 @@ export class SlackWebhooksService {
       scope,
       configured: webhook !== null,
       urlHint: webhook ? `…${webhook.urlHint}` : null,
-      events: webhook ? ordered(webhook.events.filter(isSlackEvent)) : [...SLACK_EVENTS],
+      events: webhook
+        ? ordered(webhook.events.filter(isSlackEvent))
+        : [...SLACK_EVENTS],
       encryptionAvailable: this.cipher.available,
       updatedAt: webhook?.updatedAt.toISOString() ?? null,
       lastDelivery: last

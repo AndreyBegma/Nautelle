@@ -34,9 +34,9 @@ describe('project settings sections (#704)', () => {
     const items: string[] = SETTINGS_SECTIONS.flatMap(({ items }) =>
       items.map(({ id }) => id),
     );
-    // Review (#890) and Demo videos (C-371) were never tabs.
+    // Review (#890), Demo videos (C-371) and Slack (C-405) were never tabs.
     expect([...items].sort()).toEqual(
-      [...FORMER_TABS, 'review', 'demo-videos'].sort(),
+      [...FORMER_TABS, 'review', 'demo-videos', 'slack'].sort(),
     );
   });
 
