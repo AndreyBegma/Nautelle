@@ -3,6 +3,7 @@ import { ApiError } from '../api';
 import {
   approveAndRun,
   approveConsequence,
+  backWithComment,
   offersApproveAndRun,
 } from './design-actions';
 import { card } from './fixtures';
@@ -94,5 +95,65 @@ describe('the switch', () => {
   test('the dialog says whether the worker starts', () => {
     expect(approveConsequence(true)).toContain('worker starts after approval');
     expect(approveConsequence(false)).toContain('waits in To Do');
+  });
+});
+
+describe('backWithComment (C-394)', () => {
+  test('saves the comment on the revision, then starts the revise turn', async () => {
+    const calls: string[] = [];
+    await backWithComment(
+      {
+        comment: async (id, body) => {
+          calls.push(`comment:${id}:${body}`);
+        },
+        revise: async () => {
+          calls.push('revise');
+        },
+      },
+      'rev-1-2',
+      '  Make the header smaller  ',
+    );
+    expect(calls).toEqual([
+      'comment:rev-1-2:Make the header smaller',
+      'revise',
+    ]);
+  });
+
+  test('an empty comment sends nothing', async () => {
+    const calls: string[] = [];
+    await expect(
+      backWithComment(
+        {
+          comment: async () => {
+            calls.push('comment');
+          },
+          revise: async () => {
+            calls.push('revise');
+          },
+        },
+        'rev-1-1',
+        '   ',
+      ),
+    ).rejects.toThrow();
+    expect(calls).toEqual([]);
+  });
+
+  test('a refused comment never starts the turn', async () => {
+    const calls: string[] = [];
+    await expect(
+      backWithComment(
+        {
+          comment: async () => {
+            throw new Error('design_busy');
+          },
+          revise: async () => {
+            calls.push('revise');
+          },
+        },
+        'rev-1-1',
+        'x',
+      ),
+    ).rejects.toThrow('design_busy');
+    expect(calls).toEqual([]);
   });
 });

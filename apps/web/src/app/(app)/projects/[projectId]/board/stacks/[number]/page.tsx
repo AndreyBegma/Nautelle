@@ -25,6 +25,7 @@ import { ArrowDown, ArrowLeft, Layers, Play, Square, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { DesignReview } from '../../../../../../../components/design/design-review';
 import { GenerateDesignLink } from '../../../../../../../components/design/generate-design-link';
 import { MockupFrame } from '../../../../../../../components/design/mockup-frame';
 import { ScaledPreview } from '../../../../../../../components/design/scaled-preview';
@@ -79,6 +80,8 @@ import {
 } from '../../../../../../../lib/design/href';
 import { mobilePreset } from '../../../../../../../lib/design/mobile-preview';
 import { isDesignBusy } from '../../../../../../../lib/design/progress';
+import { isAwaitingReview } from '../../../../../../../lib/design/review';
+import { useStackDesign } from '../../../../../../../lib/design/use-design';
 import { formatCost } from '../../../../../../../lib/format';
 import { useLive } from '../../../../../../../lib/live/use-live';
 import { useErrorToast } from '../../../../../../../lib/section/use-error-toast';
@@ -770,6 +773,49 @@ function AddCard({
   );
 }
 
+/**
+ * C-394: the stack's waiting design decided in place, as the card sheet does
+ * for a card's. Approving a stack design starts no worker, so there is no
+ * Approve & run.
+ */
+function StackDesignReview({
+  projectId,
+  stack,
+  canOperate,
+  onChanged,
+}: {
+  projectId: string;
+  stack: BoardStackDetail;
+  canOperate: boolean;
+  onChanged: () => void;
+}) {
+  const section = useStackDesign(projectId, stack.number);
+  const design = section.data;
+  if (!design || !isAwaitingReview(design)) return null;
+  const { actions } = section;
+  return (
+    <DesignReview
+      design={design}
+      label={stack.label}
+      viewerHref={stackDesignHref(projectId, stack.number)}
+      canOperate={canOperate}
+      busy={section.busy}
+      actions={{
+        approve: async (body) => {
+          await actions.approve(body);
+          onChanged();
+        },
+        comment: actions.comment,
+        revise: async () => {
+          await actions.revise();
+          onChanged();
+        },
+      }}
+      consequence="Approving lifts the design gate: the stack's cards can run, each drawing its own design on this one."
+    />
+  );
+}
+
 function StackDesignAside({
   projectId,
   stack,
@@ -871,6 +917,14 @@ function StackDesignAside({
                 },
               ]}
             />
+            {stack.design.status === 'reviewing' ? (
+              <StackDesignReview
+                projectId={projectId}
+                stack={stack}
+                canOperate={canOperate}
+                onChanged={onChanged}
+              />
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <Link
                 href={viewer}

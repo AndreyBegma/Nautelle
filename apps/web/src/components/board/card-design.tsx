@@ -10,6 +10,7 @@ import {
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import type {
   BoardCardView,
@@ -20,11 +21,17 @@ import { Ellipsis } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 import { api, type Described } from '../../lib/api';
-import { updateCard } from '../../lib/board/actions';
+import { runCard, updateCard } from '../../lib/board/actions';
+import {
+  approveAndRun,
+  approveConsequence,
+  offersApproveAndRun,
+} from '../../lib/board/design-actions';
 import {
   type ApproveRunOffer,
   describeBoardError,
 } from '../../lib/board/format';
+import { stackDrawBlock } from '../../lib/design/comments';
 import {
   CARD_DESIGN_CHIP_LABEL,
   type CardDesignChipState,
@@ -40,8 +47,11 @@ import {
   cardDesignHref,
   uiProfileApi,
 } from '../../lib/design/href';
+import { isAwaitingReview } from '../../lib/design/review';
+import { useCardDesign } from '../../lib/design/use-design';
 import { useErrorToast } from '../../lib/section/use-error-toast';
 import { useSection } from '../../lib/section/use-section';
+import { DesignReview } from '../design/design-review';
 import { TemplateSelect } from '../design/template-select';
 
 /** A badge is a fact, not a status (style system): only approval is toned. */
@@ -128,6 +138,75 @@ export function ApproveRunLink({
     >
       Approve & run
     </Button>
+  );
+}
+
+/**
+ * C-394: the card's waiting design decided in place — preview, Approve,
+ * Approve & run, Back with comment — without the full-screen viewer. Loads
+ * the design only while it is in review.
+ */
+function CardDesignReview({
+  projectId,
+  card,
+  canOperate,
+  onChanged,
+}: {
+  projectId: string;
+  card: BoardCardView;
+  canOperate: boolean;
+  onChanged: () => void;
+}) {
+  const section = useCardDesign(projectId, card.number);
+  const design = section.data;
+  if (!design || !isAwaitingReview(design)) return null;
+
+  const { actions } = section;
+  const approve = async (body: { revisionId: string }) => {
+    await actions.approve(body);
+    onChanged();
+  };
+  const onApproveAndRun = offersApproveAndRun(card)
+    ? async (revisionId: string) => {
+        let approved = false;
+        try {
+          await approveAndRun(
+            {
+              approve: async (id) => {
+                await approve({ revisionId: id });
+                approved = true;
+              },
+              run: () => runCard(projectId, card.number),
+            },
+            revisionId,
+          );
+          toast.success(`Approved. Started a worker on C-${card.number}.`);
+        } catch (error) {
+          // An approval refusal was toasted by the design hook.
+          if (approved) toast.error(describeBoardError(error));
+        }
+      }
+    : undefined;
+
+  return (
+    <DesignReview
+      design={design}
+      label={`C-${card.number}`}
+      viewerHref={cardDesignHref(projectId, card.number)}
+      canOperate={canOperate}
+      busy={section.busy}
+      actions={{
+        approve,
+        comment: actions.comment,
+        revise: async () => {
+          await actions.revise();
+          onChanged();
+        },
+      }}
+      consequence={approveConsequence(card.continueAfterDesign)}
+      onApproveAndRun={onApproveAndRun}
+      stackBlock={stackDrawBlock(card.stack)}
+    />
   );
 }
 
@@ -317,6 +396,14 @@ export function CardDesignSection({
             ? 'Approving the design starts the worker.'
             : 'Approving the design leaves the card in To Do; you press Run.'}
         </p>
+      ) : null}
+      {state === 'reviewing' ? (
+        <CardDesignReview
+          projectId={projectId}
+          card={card}
+          canOperate={canOperate}
+          onChanged={onChanged}
+        />
       ) : null}
     </section>
   );

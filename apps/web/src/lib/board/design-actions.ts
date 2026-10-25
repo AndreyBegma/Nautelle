@@ -25,6 +25,28 @@ export async function approveAndRun(
   await steps.run();
 }
 
+/** The two requests **Back with comment** is made of (C-394). */
+export interface BackWithCommentSteps {
+  comment: (revisionId: string, body: string) => Promise<unknown>;
+  revise: () => Promise<unknown>;
+}
+
+/**
+ * Leave the comment on the revision, then start the revise turn, which
+ * passes every open comment. Revise is only sent once the comment is saved;
+ * a refused Revise leaves the comment open for the next try.
+ */
+export async function backWithComment(
+  steps: BackWithCommentSteps,
+  revisionId: string,
+  body: string,
+): Promise<void> {
+  const text = body.trim();
+  if (text === '') throw new Error('A comment is required.');
+  await steps.comment(revisionId, text);
+  await steps.revise();
+}
+
 /** Whether the viewer offers Approve & run: the switch is off, so nothing starts by itself. */
 export const offersApproveAndRun = (
   card: Pick<BoardCardView, 'continueAfterDesign'>,
