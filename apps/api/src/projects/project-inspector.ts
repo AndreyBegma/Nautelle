@@ -5,7 +5,9 @@ import type {
 } from '@nautelle/shared';
 import type {
   CommandResult,
+  ProjectDiscoverResult,
   ProjectInspection,
+  ProjectPushCheckResult,
   ProjectScanRulesResult,
 } from '@nautelle/shared/protocol';
 import { HttpException, Injectable } from '@nestjs/common';
@@ -18,11 +20,13 @@ import { projectError } from './project-error';
 type ProjectCommand =
   | 'project.inspect'
   | 'project.refresh'
-  | 'project.scan_rules';
+  | 'project.scan_rules'
+  | 'project.discover'
+  | 'project.push_check';
 
 /**
- * Runs `project.inspect` / `project.refresh` / `project.scan_rules` on a
- * runner and turns every way they can fail into the HTTP error
+ * Runs the `project.*` commands (`inspect`, `refresh`, `scan_rules`,
+ * `discover`, `push_check`) on a runner and turns every way they can fail into the HTTP error
  * runner-protocol.md maps it to.
  */
 @Injectable()
@@ -77,6 +81,29 @@ export class ProjectInspector {
     ctx: AuditContext,
   ): Promise<ProjectScanRulesResult> {
     return this.run(runnerId, 'project.scan_rules', { path }, 'admin', ctx);
+  }
+
+  /**
+   * C-396: the git repositories under the runner's allowed roots, for the
+   * connect dialog's picker. Admin only, as `project.inspect`.
+   */
+  discover(
+    runnerId: string,
+    ctx: AuditContext,
+  ): Promise<ProjectDiscoverResult> {
+    return this.run(runnerId, 'project.discover', {}, 'admin', ctx);
+  }
+
+  /**
+   * C-396: whether origin of the repository at `path` accepts pushes from the
+   * runner (`git push --dry-run`). A refused push is a result, not an error.
+   */
+  pushCheck(
+    runnerId: string,
+    path: string,
+    ctx: AuditContext,
+  ): Promise<ProjectPushCheckResult> {
+    return this.run(runnerId, 'project.push_check', { path }, 'admin', ctx);
   }
 
   private async run<N extends ProjectCommand>(

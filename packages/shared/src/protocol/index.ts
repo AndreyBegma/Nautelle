@@ -13,6 +13,7 @@ export * from './commands/github';
 export * from './commands/handoff';
 export * from './commands/planner';
 export * from './commands/prefix';
+export * from './commands/project-connect';
 export * from './commands/project-rules';
 export * from './commands/queue';
 export * from './commands/repo';

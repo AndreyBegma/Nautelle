@@ -8,7 +8,7 @@ import {
   REAL_PROCESS_TIMEOUT_MS,
   workspace,
 } from '../testing/projects';
-import { inspectProject, refreshProject } from './inspect';
+import { DEVELOP_ACTIVE_DAYS, inspectProject, refreshProject } from './inspect';
 
 setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS);
 
@@ -109,6 +109,40 @@ describe('project.inspect', () => {
     expect(await inspect(root)).toMatchObject({
       baseBranch: 'release',
       defaultBranch: 'release',
+    });
+  });
+
+  it('takes develop when origin/develop had a commit lately, else the default branch (C-396)', async () => {
+    ws = workspace();
+    const root = await ws.repo('x', 'git@github.com:acme/x.git');
+    await ws.commit('x');
+    await ws.run(root, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+    await ws.run(
+      root,
+      'symbolic-ref',
+      'refs/remotes/origin/HEAD',
+      'refs/remotes/origin/main',
+    );
+    expect(await inspect(root)).toMatchObject({
+      baseBranch: 'main',
+      baseSource: 'origin_head',
+    });
+
+    await ws.run(root, 'update-ref', 'refs/remotes/origin/develop', 'HEAD');
+    expect(await inspect(root)).toMatchObject({
+      baseBranch: 'develop',
+      baseSource: 'develop',
+      defaultBranch: 'main',
+    });
+
+    const later = Date.now() + (DEVELOP_ACTIVE_DAYS + 1) * 24 * 60 * 60 * 1000;
+    const stale = await inspectProject(root, {
+      exec: gitWithFakeGh(ws.git),
+      now: () => later,
+    });
+    expect(stale).toMatchObject({
+      baseBranch: 'main',
+      baseSource: 'origin_head',
     });
   });
 
