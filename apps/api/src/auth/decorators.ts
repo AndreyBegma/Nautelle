@@ -34,8 +34,11 @@ export const SESSION_ONLY_KEY = 'auth:session-only';
 
 /**
  * C-403: refuses personal API tokens — the route needs a browser session.
- * Used where a token could widen its own reach: tokens themselves, the
- * password, two-factor sign-in, sessions. `SessionOnly(false)` on a handler
+ * Used on every route that creates, changes or removes a way to sign in or
+ * act as the owner, where a token could widen its own reach: tokens
+ * themselves, the password, two-factor sign-in, sessions, the Telegram link
+ * (it signs in the Mini App) and terminal tickets. The full list is in
+ * ADR-0103. `SessionOnly(false)` on a handler
  * re-opens it under a session-only controller.
  */
 export const SessionOnly = (only = true) => SetMetadata(SESSION_ONLY_KEY, only);

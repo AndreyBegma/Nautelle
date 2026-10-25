@@ -34,11 +34,31 @@ and every use attributed to the owner in the audit log.
 4. **No CSRF for tokens.** A request authenticated by a token skips the CSRF
    check: CSRF defends ambient cookies, and a cross-site page cannot set
    `Authorization`. A request with a cookie and no token keeps spec 3 D7.
-5. **Session-only routes.** `@SessionOnly()` routes refuse a token (403
-   `api_token_not_allowed`): every `auth/*` route except `GET /auth/me`, and
-   token management for the owner and for an admin. A token therefore cannot
-   mint a wider token, change the password or two-factor sign-in, or list
-   sessions.
+5. **Session-only routes.** The rule: a route that creates, changes or removes
+   a way to sign in or to act as the token's owner needs a browser session.
+   `@SessionOnly()` routes refuse a token (403 `api_token_not_allowed`). They
+   are:
+   - every `auth/*` route except `GET /auth/me` — password, two-factor
+     sign-in, sessions, sign-out;
+   - `auth/api-tokens` and `admin/api-tokens` — token management for the
+     owner and for an admin;
+   - `notifications/telegram/link` (every method) — a linked Telegram chat
+     signs in the Mini App (`POST /auth/telegram`) with a browser session, so
+     a token that could link a chat could turn itself into a session that
+     outlives its revoke;
+   - `POST /terminal/tickets` — a ticket is bound to the browser session that
+     asked for it, and the terminal socket checks that cookie.
+
+   A token therefore cannot mint a wider token, change the password or
+   two-factor sign-in, list sessions, or open a sign-in path of its own. A new
+   route that issues a credential for the owner must carry `@SessionOnly()`.
+
+   Not session-only, because they are the owner's rights rather than a way to
+   sign in as the owner: an admin's instance credentials (runner pairing codes,
+   inbound trigger secrets, outbound webhooks, the GitHub App) and an admin's
+   management of other accounts (approve, role, status, resetting another
+   user's two-factor sign-in; an admin cannot reset their own). An admin token
+   limited to projects reaches none of them (point 6).
 6. **Project list.** A token limited to projects narrows
    `ProjectAccessService`: `resolve` answers null (404) for a project outside
    the list, and `visibleWhere` adds the list as an `AND` term. Because many

@@ -180,7 +180,7 @@ describe('Personal API tokens (e2e)', () => {
       );
     });
 
-    it('is refused on the session-only routes: tokens, password, sessions', async () => {
+    it('is refused on the session-only routes: tokens, sessions, the Telegram link', async () => {
       const { token } = await mint(w.operator);
       const minted = await bearer(token).send('post', '/auth/api-tokens', {
         name: 'wider',
@@ -191,9 +191,48 @@ describe('Personal API tokens (e2e)', () => {
       expect((await bearer(token).get('/auth/api-tokens')).status).toBe(403);
       expect((await bearer(token).get('/auth/sessions')).status).toBe(403);
 
+      // A linked Telegram chat signs in the Mini App with a browser session.
+      for (const [method, path] of [
+        ['post', '/notifications/telegram/link'],
+        ['post', '/notifications/telegram/link/confirm'],
+        ['delete', '/notifications/telegram/link'],
+        ['delete', '/notifications/telegram/link/pending'],
+      ] as const) {
+        const response = await bearer(token).send(method, path, {});
+        expect(response.status).toBe(403);
+        expect(response.body.error).toBe('api_token_not_allowed');
+      }
+      expect(
+        (await bearer(token).get('/notifications/telegram/link')).status,
+      ).toBe(403);
+
       const me = await bearer(token).get('/auth/me');
       expect(me.status).toBe(200);
       expect(me.body.email).toBe('op@x.test');
+    });
+
+    it('refuses an admin token a terminal ticket, which needs the browser session', async () => {
+      const { token } = await mint(w.admin);
+      const ticket = await bearer(token).send('post', '/terminal/tickets', {});
+      expect(ticket.status).toBe(403);
+      expect(ticket.body.error).toBe('api_token_not_allowed');
+    });
+
+    it('skips CSRF only for a personal API token', async () => {
+      const { number } = await w.createCard();
+      const path = `${w.path()}/board/cards/${number}/run`;
+
+      // A session cookie without the CSRF header is refused, with or
+      // without a bearer header that is not a personal API token.
+      const bare = await w.operator.sendWithoutCsrf('post', path);
+      expect(bare.status).toBe(403);
+      expect(bare.body.error).toBe('csrf_failed');
+      const foreign = await w.operator
+        .sendWithoutCsrf('post', path)
+        .set('Authorization', 'Bearer not-a-personal-token');
+      expect(foreign.status).toBe(403);
+      expect(foreign.body.error).toBe('csrf_failed');
+      expect(w.sent('card.run')).toHaveLength(0);
     });
   });
 
