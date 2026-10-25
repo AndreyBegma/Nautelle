@@ -795,6 +795,8 @@ const toRoundView = (
   ...wiringOf(round),
   autoRunAfter: round.autoRunAfter,
   escalation: round.escalation,
+  model: round.model,
+  effort: round.effort,
   finishRefused: finishRefusedOf(round),
   blockingDialog: blockingDialogOf(round),
   costUsd: facts.costs.get(round.runId) ?? null,

@@ -100,6 +100,81 @@ describe('board rounds (e2e)', () => {
       expect((await w.card(1)).model).toBe('sonnet');
     });
 
+    describe("each round's model and effort (C-359)", () => {
+      const detail = async (number: number) => {
+        const response = await w.operator.get(
+          `${w.path()}/board/cards/${number}`,
+        );
+        expect(response.status).toBe(200);
+        return response.body as BoardCardDetail;
+      };
+
+      it('stores an explicit model and effort on the round and returns them', async () => {
+        await w.advertiseCardEffort();
+        await w.createCard();
+        await w.runCard(1, { model: 'sonnet', effort: 'high' });
+        const [stored] = (await w.card(1)).rounds;
+        expect(stored).toMatchObject({ model: 'sonnet', effort: 'high' });
+        expect((await detail(1)).rounds[0]).toMatchObject({
+          model: 'sonnet',
+          effort: 'high',
+        });
+      });
+
+      it('stores the resolved defaults the runner launched with', async () => {
+        await w.advertiseCardEffort();
+        await w.createCard();
+        await w.runCard(1);
+        const [sent] = w.sent('card.run');
+        expect(sent.model).toBe('opus');
+        expect((await detail(1)).rounds[0]).toMatchObject({
+          model: 'opus',
+          effort: sent.effort ?? null,
+        });
+      });
+
+      it('stores no effort for a runner that takes none', async () => {
+        await w.createCard();
+        await w.runCard(1, { model: 'sonnet', effort: 'high' });
+        expect(w.sent('card.run')[0]).not.toHaveProperty('effort');
+        expect((await detail(1)).rounds[0]).toMatchObject({
+          model: 'sonnet',
+          effort: null,
+        });
+      });
+
+      it('keeps each round its own pair', async () => {
+        await w.advertiseCardEffort();
+        await w.createCard();
+        await w.runCard(1, { model: 'sonnet', effort: 'low' });
+        await post(1, 'stop');
+        await w.runCard(1, { model: 'opus', effort: 'medium' });
+        const rounds = (await detail(1)).rounds;
+        expect(
+          rounds
+            .map((r) => [r.round, r.model, r.effort])
+            .sort((a, b) => Number(a[0]) - Number(b[0])),
+        ).toEqual([
+          [1, 'sonnet', 'low'],
+          [2, 'opus', 'medium'],
+        ]);
+      });
+
+      it('returns null for a round recorded before the migration', async () => {
+        await w.createCard();
+        await w.runCard(1, { model: 'sonnet' });
+        const [round] = (await w.card(1)).rounds;
+        await w.ctx.prisma.boardCardRound.update({
+          where: { id: round.id },
+          data: { model: null, effort: null },
+        });
+        expect((await detail(1)).rounds[0]).toMatchObject({
+          model: null,
+          effort: null,
+        });
+      });
+    });
+
     it('refuses bypassPermissions without admin', async () => {
       await w.createCard();
       const response = await w.runCard(1, {
