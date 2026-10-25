@@ -1,8 +1,7 @@
 'use client';
 
 import type { ProjectSummary } from '@nautelle/shared';
-import { needsYou } from '../../lib/overview/dashboard';
-import { terminalSetupNeeds } from '../../lib/setup/format';
+import { useInbox } from '../inbox/inbox-context';
 import { LiveSessions } from './live-sessions';
 import { NeedsYou } from './needs-you';
 import { ProjectsPanel } from './projects-panel';
@@ -15,19 +14,10 @@ import { useDashboard } from './use-dashboard';
 export function Dashboard({ projects }: { projects: ProjectSummary[] }) {
   const dashboard = useDashboard(projects);
   const { facts } = dashboard;
-  const waiting = facts.data
-    ? needsYou(projects, facts.data.fleets, facts.data.approvals, {
-        failedRuns: facts.data.failedRuns,
-        missingProfile: facts.data.missingProfile,
-      })
-    : undefined;
-  const setup = terminalSetupNeeds(
-    projects,
-    facts.data?.terminalSetup ?? new Map(),
-  );
-  // Every row of Needs you counts, the setup rows included.
+  const inbox = useInbox();
+  // A project's count is what waits on the person there in the Inbox.
   const needsByProject = new Map<string, number>();
-  for (const { projectId } of [...setup, ...(waiting ?? [])]) {
+  for (const { projectId } of inbox.data?.items ?? []) {
     needsByProject.set(projectId, (needsByProject.get(projectId) ?? 0) + 1);
   }
 
@@ -36,7 +26,7 @@ export function Dashboard({ projects }: { projects: ProjectSummary[] }) {
       <StatsStrip {...dashboard} />
       <div className="grid grid-cols-1 items-start gap-6 desktop:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-6">
-          <NeedsYou facts={facts} waiting={waiting} setup={setup} />
+          <NeedsYou />
           <LiveSessions projects={projects} facts={facts} />
           <RecentActivity projects={projects} recent={dashboard.recent} />
         </div>

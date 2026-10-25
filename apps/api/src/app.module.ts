@@ -25,6 +25,7 @@ import { GitHubAppModule } from './github-app';
 import { HandoffModule } from './handoff';
 import { HealthController } from './health.controller';
 import { HistoryModule } from './history';
+import { InboxModule } from './inbox';
 import { LiveModule } from './live/live.module';
 import { LlmModule } from './llm/llm.module';
 import { LocalModule } from './local';
@@ -110,6 +111,8 @@ import { WorkflowsModule } from './workflows';
     CaptureModule,
     // Issue #270: one Work surface — the List and the Board's plan tasks.
     WorkModule,
+    // C-390: the Inbox — what waits on the caller across their projects.
+    InboxModule,
     // Issue #271: saved text normalized to English on the runner.
     TextModule,
     // Issue #445: Token saver. Global: every launch sender asks it what to send.

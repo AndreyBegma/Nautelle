@@ -162,6 +162,23 @@ describe('seedDemo', () => {
     expect(merged[0].mergedAt).toBeInstanceOf(Date);
   });
 
+  it('seeds a card to merge and a card that needs a person, for the Inbox (C-390)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    const open = db.boardCard.upsert.mock.calls
+      .map(([args]) => args.create)
+      .filter((card) => card.prState === 'open');
+    expect(open).toHaveLength(2);
+    expect(open[0]).toMatchObject({ column: 'finished', prNumber: 43 });
+    expect(open[0].needsPerson).toBeUndefined();
+    expect(open[1]).toMatchObject({
+      column: 'finished',
+      prNumber: 44,
+      needsPerson: true,
+      needsPersonReason: 'ci_still_failing',
+    });
+  });
+
   it('seeds a failed card run and a failed Steward run (C-389)', async () => {
     const db = prisma();
     await seedDemo(db as never, 'demo@example.com');
