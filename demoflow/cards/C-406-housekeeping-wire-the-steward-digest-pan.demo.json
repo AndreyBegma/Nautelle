@@ -4,7 +4,12 @@
   "steps": [
     { "action": "marker", "title": "Sign in" },
     { "action": "navigate", "path": "/login?next=/activity" },
-    { "action": "wait", "ms": 3000 },
+    {
+      "action": "waitFor",
+      "target": { "role": "button", "name": "Sign in" },
+      "timeoutMs": 60000
+    },
+    { "action": "wait", "ms": 5000 },
     {
       "action": "fill",
       "target": { "label": "Email" },
@@ -16,6 +21,11 @@
       "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
     },
     { "action": "click", "target": { "role": "button", "name": "Sign in" } },
+    {
+      "action": "waitFor",
+      "target": { "role": "heading", "name": "Activity", "exact": true },
+      "timeoutMs": 60000
+    },
     { "action": "marker", "title": "The latest Steward digest" },
     {
       "action": "assertText",
