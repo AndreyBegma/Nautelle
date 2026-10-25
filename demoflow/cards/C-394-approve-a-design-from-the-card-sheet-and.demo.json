@@ -49,7 +49,10 @@
       "target": { "label": "Comment" },
       "value": "Make the header smaller."
     },
-    { "action": "click", "target": { "role": "button", "name": "Approve & run" } },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Approve & run" }
+    },
     { "action": "wait", "ms": 3000 }
   ]
 }
