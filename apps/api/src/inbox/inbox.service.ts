@@ -37,7 +37,7 @@ interface InboxProject {
 }
 
 /**
- * `GET /inbox` (C-390, ADR-0100): everything that waits for a decision of
+ * `GET /inbox` (C-390, ADR-0101): everything that waits for a decision of
  * the caller, across every project where they are operator or higher. One
  * read model, so the page, the rail badge and Overview's preview count the
  * same items; the rules of which card raises what are the shared
