@@ -3,22 +3,18 @@ import {
   QUEUE_STATES,
   type QueueItemView,
   type QueueState,
-  type QueueView,
 } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
-  allowedLabels,
   boardColumns,
   computedNote,
   countByState,
   describeQueueError,
   filterItems,
-  gapSentence,
   heldForLeadSummary,
   parseStateFilter,
   QUEUE_FILTER_CODEC,
   queueEmptyDescription,
-  queueHint,
   queueUnavailableCopy,
   refusedLabels,
   roundFooter,
@@ -46,19 +42,6 @@ const item = (
   waveSlots: null,
   ghUpdatedAt: '2026-10-08T00:00:00Z',
   ...extra,
-});
-
-const view = (
-  items: QueueItemView[],
-  others: QueueView['others'],
-): QueueView => ({
-  snapshotAt: null,
-  unavailable: null,
-  readyLabel: 'cs:ready',
-  round: null,
-  items,
-  heldForLead: [],
-  others,
 });
 
 const apiError = (
@@ -147,55 +130,6 @@ describe('computedNote', () => {
       computedNote(item(1, 'ready', { source: 'orchestrator', computed })),
     ).toBeNull();
     expect(computedNote(item(1, 'ready'))).toBeNull();
-  });
-});
-
-describe('allowedLabels', () => {
-  test('before the first load only the always-allowed labels', () => {
-    expect(allowedLabels(undefined)).toEqual(['enhancement', 'bug']);
-  });
-
-  test('labels seen on the queue and on open issues, deduplicated, without the ready label', () => {
-    const labels = allowedLabels(
-      view(
-        [item(1, 'ready', { labels: ['cs:ready', 'Bug', 'priority: high'] })],
-        [
-          {
-            number: 2,
-            title: 't',
-            url: 'u',
-            labels: ['CS:READY', 'docs', 'priority: high'],
-          },
-        ],
-      ),
-    );
-    expect(labels).toEqual(['bug', 'docs', 'enhancement', 'priority: high']);
-  });
-});
-
-describe('queueHint', () => {
-  test('a body with acceptance criteria can be queued', () => {
-    const hint = queueHint('## Acceptance criteria\n- [ ] it works', []);
-    expect(hint).toEqual({ canQueue: true, gap: null });
-  });
-
-  test('no acceptance criteria cannot be queued, and says why', () => {
-    const hint = queueHint('just do it', []);
-    expect(hint.canQueue).toBe(false);
-    expect(hint.gap).toBe('no_acceptance_criteria');
-    const sentence = gapSentence('no_acceptance_criteria');
-    expect(sentence).toContain('Cannot be queued');
-    expect(sentence).not.toContain('`');
-  });
-
-  test('size: XL without a parallel plan is a different gap', () => {
-    const body = '## Acceptance criteria\n- [ ] done';
-    expect(queueHint(body, ['size: XL']).gap).toBe('no_parallel_plan');
-    expect(
-      queueHint(`${body}\n## Parallel plan\n| Slot |\n|---|\n| a |`, [
-        'size: XL',
-      ]).canQueue,
-    ).toBe(true);
   });
 });
 

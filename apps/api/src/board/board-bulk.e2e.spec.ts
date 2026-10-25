@@ -145,21 +145,31 @@ describe('board bulk actions (e2e, #452)', () => {
       });
     });
 
-    it('skips a running card, a fleet card with a live slot and a card already there', async () => {
+    it('skips a running card and a card already there', async () => {
       const busy = await running();
+      const { number: todo } = await w.createCard();
+      const response = await bulk([busy, todo], 'todo');
+      expect(response.body.results).toEqual([
+        { number: busy, status: 'skipped', reason: 'card_running' },
+        { number: todo, status: 'skipped', reason: 'already_in_column' },
+      ]);
+      expect(w.sent('card.stop')).toEqual([]);
+    });
+
+    it('moves a fleet card with a live slot like any card, detaching it (C-397)', async () => {
       const fleet = await finished();
       await w.ctx.prisma.boardCard.updateMany({
         where: { projectId: w.a, number: fleet },
         data: { source: 'fleet', fleetSlot: 'i42', fleetSlotGone: false },
       });
-      const { number: todo } = await w.createCard();
-      const response = await bulk([busy, fleet, todo], 'todo');
+      const response = await bulk([fleet], 'todo');
       expect(response.body.results).toEqual([
-        { number: busy, status: 'skipped', reason: 'card_running' },
-        { number: fleet, status: 'skipped', reason: 'fleet_slot' },
-        { number: todo, status: 'skipped', reason: 'already_in_column' },
+        { number: fleet, status: 'done' },
       ]);
-      expect(w.sent('card.stop')).toEqual([]);
+      expect(await w.card(fleet)).toMatchObject({
+        column: 'todo',
+        fleetDetached: true,
+      });
     });
   });
 

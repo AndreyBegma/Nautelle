@@ -228,6 +228,24 @@ describe('task queue (e2e)', () => {
       ).toBe(400);
     });
 
+    it('names the card that works an open issue, after Make a card (C-397)', async () => {
+      expect((await queue('?include=open')).others).toEqual([
+        expect.objectContaining({ number: 2, cardNumber: null }),
+      ]);
+      const made = await operatorOfA.send(
+        'post',
+        `/projects/${a}/board/cards`,
+        {
+          title: 'Issue 2',
+          issueNumber: 2,
+        },
+      );
+      expect(made.status).toBe(201);
+      expect((await queue('?include=open')).others).toEqual([
+        expect.objectContaining({ number: 2, cardNumber: made.body.number }),
+      ]);
+    });
+
     it('serves one issue with its body and blockers; 404 outside the queue', async () => {
       const response = await viewerOfA.get(`/projects/${a}/queue/1`);
       expect(response.status).toBe(200);

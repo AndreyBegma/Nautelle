@@ -211,7 +211,7 @@ export const columnsOf = (view: BoardView) =>
       },
   );
 
-/** #282 D4: a `fleet` card follows its slot, so a person cannot delete it. */
+/** #282 D4: a `fleet` card mirrors a slot, so a person cannot delete it. */
 export const canDelete = (card: BoardCardView): boolean => !isFleetCard(card);
 
 /** #282 D1: the card's session page; `null` when it is not a terminal card. */
@@ -256,6 +256,12 @@ export function fleetSummary(
 }
 
 export const SLOT_GONE_TEXT = 'Slot gone';
+
+/** C-397 (ADR-0098): a person moved the card, so its slot no longer moves it. */
+export const DETACHED_TEXT = 'Detached';
+
+export const DETACHED_HINT =
+  'A person moved this card, so its slot no longer moves it. The slot’s stage and pull request still show here.';
 
 export const FLEET_EDIT_HINT =
   'Title and text only. An edit reaches the running slot; the GitHub issue is not changed.';

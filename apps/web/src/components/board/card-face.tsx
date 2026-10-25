@@ -27,6 +27,8 @@ import {
   blockingDialogText,
   collectFailedBadge,
   confidenceLabel,
+  DETACHED_HINT,
+  DETACHED_TEXT,
   finishRefusedText,
   fleetHref,
   fleetSummary,
@@ -391,11 +393,18 @@ function TakenBadges({ card }: { card: BoardCardView }) {
   );
 }
 
-/** #282 D4: a mirrored fleet slot: the badge and "Slot gone". */
+/** #282 D4: a mirrored fleet slot: the badge, "Detached" and "Slot gone". */
 function FleetBadges({ card }: { card: BoardCardView }) {
   return (
     <>
       <Badge tone="neutral" size="sm" label="Fleet" />
+      {card.fleet?.detached ? (
+        <Tooltip content={DETACHED_HINT}>
+          <span>
+            <Badge tone="neutral" size="sm" label={DETACHED_TEXT} />
+          </span>
+        </Tooltip>
+      ) : null}
       {card.fleet?.slotGone ? (
         <Tooltip content="The slot left the fleet; the card keeps its last column.">
           <span>

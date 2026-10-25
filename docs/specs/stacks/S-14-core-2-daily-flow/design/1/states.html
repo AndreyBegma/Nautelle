@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>States · Inbox</title>
+<style>
+:root{--font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--radius-control:6px;--radius-surface:8px;--size-control:28px;--size-control-sm:32px;--focus-width:3px;--focus-offset:4px;--glass-blur:26px}
+:root[data-theme='dark']{color-scheme:dark;--color-ground:#0a1022;--color-raised:#18223f;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--canvas-glow:18%;--glass-shadow-clear:rgb(0 0 0 / 0.15);--control-spec:rgb(255 255 255 / 0.05);--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--glass-brightness:0.85}
+:root[data-theme='light']{color-scheme:light;--color-ground:#ffffff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--canvas-glow:10%;--glass-shadow-clear:rgb(0 0 0 / 0.08);--control-spec:rgb(255 255 255 / 0.05);--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--glass-brightness:1.15}
+:root{--glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness))}
+*,*::before,*::after{box-sizing:border-box}html{background:var(--color-ground);color:var(--color-ink)}body{margin:0;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}h1,h2,p{margin:0}:focus-visible{outline:var(--focus-width) solid var(--color-focus);outline-offset:var(--focus-offset)}.mono{font-family:var(--font-mono)}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:inherit;font-weight:600;height:var(--size-control);padding:0 16px;font-size:14px;border-radius:var(--radius-control);border:1px solid transparent;background:transparent;color:var(--color-ink);cursor:pointer;white-space:nowrap}.btn--solid{background:var(--color-accent);color:var(--color-on-accent)}.btn--glass{background:var(--color-raised);border-color:var(--color-line-strong);box-shadow:inset 0 1px 0 var(--control-spec)}.btn--sm{height:var(--size-control-sm);padding:0 12px;font-size:12px}
+.segmented{display:inline-flex;gap:4px;padding:2px;border-radius:999px;height:28px}.segmented button{padding:0 12px;border:0;border-radius:999px;background:transparent;color:var(--color-ink-2);font:inherit;font-size:13px;font-weight:500;white-space:nowrap}.segmented button[aria-checked='true']{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:40px 24px;text-align:center}.empty__icon{color:var(--color-ink-3);margin-bottom:4px}.empty__title{font-size:15px;line-height:22px;font-weight:600}.empty__desc{max-width:44ch;color:var(--color-ink-2)}
+.skeleton{border-radius:var(--radius-control);background:var(--color-hover);animation:gu-pulse 1.6s ease-in-out infinite}@keyframes gu-pulse{50%{opacity:.5}}@media (prefers-reduced-motion:reduce){.skeleton{animation:none}}
+.wrap{max-width:64rem;margin:0 auto;padding:24px 16px 48px;display:flex;flex-direction:column;gap:32px}
+.state{display:flex;flex-direction:column;gap:12px}.state__label{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}.h1{font-size:28px;line-height:32px;letter-spacing:-0.02em;font-weight:600}
+.skrow{display:grid;grid-template-columns:16px 1fr 96px;gap:12px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--color-line)}.skrow:last-child{border-bottom:0}
+@media (max-width:639px){.skrow{grid-template-columns:16px 1fr}.skrow .sk-act{display:none}}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="wrap">
+  <section class="state" aria-label="Empty">
+    <span class="state__label">Empty: nothing waits on you</span>
+    <div class="head"><div><span class="state__label">All projects</span><h1 class="h1">Inbox</h1></div><button class="btn btn--glass">Quick card</button></div>
+    <div class="card surface-content empty" style="border-radius:var(--radius-surface)">
+      <svg class="empty__icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      <p class="empty__title">Nothing waits on you</p>
+      <p class="empty__desc">3 cards are running across 2 projects. Designs, questions, merges and failures show up here as they happen.</p>
+      <button class="btn btn--solid" style="margin-top:8px">Open the Board</button>
+    </div>
+  </section>
+
+  <section class="state" aria-label="Empty filter">
+    <span class="state__label">Empty: the kind filter matches nothing</span>
+    <div class="segmented glass" role="radiogroup" aria-label="Kind" style="align-self:flex-start;max-width:100%;overflow:auto"><button role="radio" aria-checked="false">All 5</button><button role="radio" aria-checked="true">Designs 0</button><button role="radio" aria-checked="false">Questions 3</button><button role="radio" aria-checked="false">Merges 2</button></div>
+    <div class="surface-content empty" style="border-radius:var(--radius-surface);padding:28px 24px">
+      <p class="empty__title">No designs to approve</p>
+      <p class="empty__desc">5 other things wait on you.</p>
+      <button class="btn btn--glass btn--sm" style="margin-top:4px">Show all</button>
+    </div>
+  </section>
+
+  <section class="state" aria-label="Loading">
+    <span class="state__label">Loading</span>
+    <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden" aria-busy="true">
+      <div style="padding:10px 16px;border-bottom:1px solid var(--color-line)"><div class="skeleton" style="height:12px;width:120px"></div></div>
+      <div class="skrow"><div class="skeleton" style="height:16px"></div><div style="display:flex;flex-direction:column;gap:6px"><div class="skeleton" style="height:14px;width:55%"></div><div class="skeleton" style="height:12px;width:80%"></div></div><div class="skeleton sk-act" style="height:28px"></div></div>
+      <div class="skrow"><div class="skeleton" style="height:16px"></div><div style="display:flex;flex-direction:column;gap:6px"><div class="skeleton" style="height:14px;width:40%"></div><div class="skeleton" style="height:12px;width:65%"></div></div><div class="skeleton sk-act" style="height:28px"></div></div>
+      <div class="skrow"><div class="skeleton" style="height:16px"></div><div style="display:flex;flex-direction:column;gap:6px"><div class="skeleton" style="height:14px;width:60%"></div><div class="skeleton" style="height:12px;width:50%"></div></div><div class="skeleton sk-act" style="height:28px"></div></div>
+    </div>
+  </section>
+
+  <section class="state" aria-label="Error">
+    <span class="state__label">Error: the Inbox could not load</span>
+    <div class="surface-content empty" style="border-radius:var(--radius-surface)">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true" style="color:var(--color-danger)"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+      <p class="empty__title">The Inbox is unavailable</p>
+      <p class="empty__desc">The API did not answer in 10 seconds. Your cards keep running; reload to try again.</p>
+      <button class="btn btn--glass" style="margin-top:8px">Reload</button>
+    </div>
+  </section>
+
+  <section class="state" aria-label="Partial">
+    <span class="state__label">Error: one project could not be read</span>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--radius-surface);border:1px solid color-mix(in oklab,var(--color-danger) 30%,transparent);background:color-mix(in oklab,var(--color-danger) 10%,transparent)" role="status">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="color:var(--color-danger);flex-shrink:0"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg>
+      <span style="flex:1"><b>runner is missing from this list.</b> <span style="color:var(--color-ink-2)">Its GitHub App installation was revoked.</span></span>
+      <button class="btn btn--glass btn--sm">Reconnect</button>
+    </div>
+  </section>
+</div>
+</body>
+</html>

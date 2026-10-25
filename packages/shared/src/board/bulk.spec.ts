@@ -6,7 +6,6 @@ const card = (facts: Partial<BulkCardFacts>): BulkCardFacts => ({
   roundPhase: 'finished',
   source: 'manual',
   autoCollect: false,
-  slotGone: false,
   ...facts,
 });
 
@@ -33,10 +32,9 @@ describe('bulkCardRule', () => {
     );
   });
 
-  it('moves a Finished card back to To Do, never a fleet card with a live slot', () => {
+  it('moves a Finished card back to To Do, also a fleet card (C-397)', () => {
     expect(reason('todo', {})).toBeNull();
-    expect(reason('todo', { source: 'fleet' })).toBe('fleet_slot');
-    expect(reason('todo', { source: 'fleet', slotGone: true })).toBeNull();
+    expect(reason('todo', { source: 'fleet' })).toBeNull();
     expect(reason('todo', { column: 'todo', roundPhase: null })).toBe(
       'already_in_column',
     );
