@@ -1,7 +1,8 @@
 {
   "schemaVersion": 1,
   "name": "Each round shows the model and effort it ran with",
-  "description": "C-359: the API stores the model and effort a round launched with and returns them in card detail, so the round item in the Rounds tab shows them.",
+  "description": "C-359: the API stores the model and effort a round launched with and returns them in card detail, so the round item on the card page shows them.",
+  "viewport": { "width": 1440, "height": 900 },
   "steps": [
     { "action": "marker", "title": "Sign in" },
     {
@@ -27,17 +28,19 @@
       "caption": "C-5 finished one round.",
       "timeoutMs": 30000
     },
-    { "action": "marker", "title": "Open its rounds" },
+    { "action": "marker", "title": "Its round" },
     {
-      "action": "click",
-      "target": { "role": "tab", "name": "Rounds (1)" },
+      "action": "waitFor",
+      "target": { "role": "region", "name": "Rounds" },
+      "caption": "The wide card page lists the rounds in its main column.",
       "timeoutMs": 15000
     },
     {
       "action": "waitFor",
       "target": { "text": "claude-opus-5-5 · high" },
       "caption": "The round shows the model and effort it launched with.",
-      "timeoutMs": 15000
+      "timeoutMs": 15000,
+      "zoom": true
     },
     { "action": "screenshot", "name": "round-model-and-effort" },
     { "action": "wait", "ms": 1500 }
