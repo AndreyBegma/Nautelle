@@ -10,7 +10,8 @@ import type { Role } from '../auth';
  * and goes to project admins and active admins only. `card.finished` and
  * `card.waiting` come from board card workers (issue #242 D15);
  * `card.background_stalled` from a card round waiting on its own background
- * task too long (#390).
+ * task too long (#390); `card.paused` from Nautelle pausing a running round
+ * because a hard budget in its scope was reached (C-399, ADR-0100).
  * `cards.suggested` comes from card capture (issue #244 D11): suggestions are
  * content-derived, so it goes to operators and admins only, and never quotes
  * content.
@@ -47,6 +48,7 @@ export const NOTIFICATION_KINDS = [
   'card.finished',
   'card.waiting',
   'card.background_stalled',
+  'card.paused',
   'card.demo',
   'cards.suggested',
   'steward.incident',
@@ -197,6 +199,12 @@ export const NOTIFICATION_KIND_SPECS: Record<
     source: 'card.background_stalled (#390)',
     channels: BOTH,
     defaults: ON_OFF,
+  },
+  'card.paused': {
+    scope: 'project',
+    source: 'card.paused (C-399)',
+    channels: BOTH,
+    defaults: ON_ON,
   },
   'card.demo': {
     scope: 'project',

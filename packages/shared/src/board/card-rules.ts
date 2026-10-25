@@ -4,6 +4,7 @@ import {
   BOARD_ERROR,
   type BoardCardView,
   type BoardErrorCode,
+  type CardRoundBrief,
 } from './contracts';
 import type { BoardMoveRefusal } from './moves';
 import {
@@ -63,6 +64,25 @@ export const canRetry = (card: RuleCard): boolean =>
 
 export const canStop = (card: RuleCard): boolean =>
   ownsWorker(card) && isRoundActive(card.round);
+
+/**
+ * C-399 (ADR-0100): a hard budget paused the card's latest round. The retry
+ * is its Resume: it continues the same session once the budget allows.
+ */
+export const isPausedForBudget = (card: RuleCard): boolean =>
+  card.round?.phase === 'cancelled' && card.round.pausedFor === 'budget';
+
+/** What the Run action reads for a card that can run or retry. */
+export const runActionLabel = (card: RuleCard): string =>
+  isPausedForBudget(card) ? 'Resume' : canRetry(card) ? 'Run again' : 'Run';
+
+/** C-399: a round's state as a person reads it — a paused one says why. */
+export const roundStateLabel = (
+  round: Pick<CardRoundBrief, 'phase' | 'pausedFor'>,
+): string =>
+  round.phase === 'cancelled' && round.pausedFor === 'budget'
+    ? 'Paused: budget'
+    : ROUND_PHASE_LABEL[round.phase];
 
 export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
   card_running:

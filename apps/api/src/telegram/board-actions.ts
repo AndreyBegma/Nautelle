@@ -11,8 +11,9 @@ import {
   canRetry,
   canRun,
   canStop,
+  isPausedForBudget,
   MOVE_REFUSAL_TEXT,
-  ROUND_PHASE_LABEL,
+  roundStateLabel,
 } from '@nautelle/shared';
 import { callbackCodec } from './callback-data';
 import { appLink } from './markdown-v2';
@@ -130,9 +131,9 @@ export const parseColumn = (arg: string): BoardColumn | null => {
 
 /** The state a row shows: the worker's, else the column it sits in. */
 export const cardState = (card: BoardCardView): string => {
-  const phase = card.round?.phase;
-  return phase && phase !== 'finished'
-    ? ROUND_PHASE_LABEL[phase]
+  const round = card.round;
+  return round && round.phase !== 'finished'
+    ? roundStateLabel(round)
     : COLUMN_TITLE[card.column];
 };
 
@@ -244,7 +245,7 @@ const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
 /** The card's detail: what it is, where it stands, a trimmed body. */
 export const cardText = (card: BoardCardDetail, service?: string): string => {
-  const phase = card.round?.phase;
+  const round = card.round;
   const pr =
     card.prNumber !== null
       ? [
@@ -253,8 +254,9 @@ export const cardText = (card: BoardCardDetail, service?: string): string => {
           }`,
         ]
       : [];
-  const agent = phase
-    ? `Agent: ${ROUND_PHASE_LABEL[phase]} (round ${card.round?.round})`
+  // C-399: a round a hard budget paused reads "Paused: budget".
+  const agent = round
+    ? `Agent: ${roundStateLabel(round)} (round ${round.round})`
     : card.tracking
       ? `Session: tracked from a terminal${card.tracking.alive ? ', running' : ''}`
       : 'Agent: not started';
@@ -293,7 +295,11 @@ export const cardKeyboard = (
     });
     if (canRun(card) || canRetry(card)) {
       actions.push({
-        text: canRun(card) ? 'Run' : 'Retry',
+        text: canRun(card)
+          ? 'Run'
+          : isPausedForBudget(card)
+            ? 'Resume'
+            : 'Retry',
         callback_data: RUN_CALLBACK.encode(target),
       });
     }

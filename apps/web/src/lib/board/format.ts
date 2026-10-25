@@ -54,13 +54,17 @@ import { noPrText } from './pull-request';
 
 // #624: the dialog that blocks a waiting round, as notifications say it too.
 // #578: the review actions' rules, shared with the bot too.
+// C-399: a budget-paused card's Run reads Resume.
 export {
   blockingDialogText,
   canAccept,
   canGiveFeedback,
   canMarkFinished,
+  isPausedForBudget,
   isSuggestion,
   isWorktreeGoneError,
+  roundStateLabel,
+  runActionLabel,
 } from '@nautelle/shared';
 // The rules the Telegram bot offers its buttons by too live in shared.
 export {
@@ -103,6 +107,12 @@ const PHASE_PILL: Record<CardRoundPhase, RoundPill> = {
   cancelled: { status: 'idle', label: 'Stopped' },
 };
 
+/** C-399 (ADR-0100): a round a hard budget paused; Resume continues it. */
+const PAUSED_FOR_BUDGET_PILL: RoundPill = {
+  status: 'blocked',
+  label: 'Paused: budget',
+};
+
 export const phaseLabel = (phase: CardRoundPhase): string =>
   PHASE_PILL[phase].label;
 
@@ -115,6 +125,9 @@ export function roundPill(round: CardRoundBrief | null): RoundPill | null {
   // #482: a refused finish_card leaves the round active, not done.
   if (round.finishRefused && isActiveRoundPhase(round.phase)) {
     return { status: 'error', label: 'Needs attention' };
+  }
+  if (round.phase === 'cancelled' && round.pausedFor === 'budget') {
+    return PAUSED_FOR_BUDGET_PILL;
   }
   return PHASE_PILL[round.phase];
 }

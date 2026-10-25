@@ -14,12 +14,14 @@ import {
   CARD_COLLECT_ERROR_MAX,
   CARD_COLLECT_RETRY_DELAY_MS,
   CARD_FINISHED_EVENT,
+  CARD_PAUSED_EVENT,
   type CardAutoRunFailure,
   type CardCollectOutcome,
   type CardFinishedBy,
   type CardFinishedEventData,
   type CardMergeOutcome,
   type CardNeedsPersonReason,
+  type CardPausedEventData,
   type CardPrState,
   cardLabel,
   cardPullRequestBody,
@@ -45,6 +47,7 @@ import {
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { type AuditContext, SYSTEM_ACTOR } from '../audit/audit.types';
+import type { BudgetStop } from '../budgets/budget-stops';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
 import { mergeMethodOf } from '../planner/planner-instructions.service';
@@ -1669,6 +1672,74 @@ export class BoardWork implements OnModuleInit {
     });
     if (ended) this.publishRun(project.id, round.runId, 'abandoned');
     this.publish(project.id, card.id);
+  }
+
+  /**
+   * C-399 (ADR-0100): a hard budget in its scope was reached, so the card's
+   * active round is paused — the runner's `card.stop` ends the session and
+   * keeps the worktree, and the round is `cancelled` with `pausedFor:
+   * 'budget'`, so its Run resumes the same Claude session. Raises one
+   * `card.paused` per round. Returns whether it paused the round; false when
+   * it was no longer active, and a runner that could not be reached throws,
+   * leaving the round to the next evaluation.
+   */
+  async pause(
+    project: BoardProject,
+    card: CardWithRounds,
+    stop: BudgetStop,
+  ): Promise<boolean> {
+    const round = card.rounds[0];
+    if (!round || !ACTIVE_PHASES.some((p) => p === round.phase)) return false;
+    const stopped = await this.stopOnRunner(project, card, BOARD_SYSTEM_ACTOR);
+    const paused = await this.prisma.$transaction(async (tx) => {
+      if (!(await this.endRound(tx, round.id, 'cancelled', new Date()))) {
+        return false;
+      }
+      await tx.boardCardRound.update({
+        where: { id: round.id },
+        data: { pausedFor: 'budget' },
+      });
+      await this.closeRun(
+        tx,
+        round.runId,
+        RUN_STATUS_OF.cancelled,
+        'Paused: a hard budget was reached',
+      );
+      const data: CardPausedEventData = {
+        cardId: card.id,
+        number: card.number,
+        title: card.title,
+        round: round.round,
+        reason: 'budget',
+        budget: {
+          id: stop.budgetId,
+          scope: stop.scope,
+          limitUsd: stop.limitUsd,
+          resetsAt: stop.resetsAt.toISOString(),
+        },
+      };
+      await this.serverEvent(tx, project, CARD_PAUSED_EVENT, round.id, {
+        ...data,
+      });
+      return true;
+    });
+    if (!paused) return false;
+    await this.audit.record({
+      ...BOARD_SYSTEM_ACTOR.ctx,
+      action: 'card.paused',
+      target: { type: 'board_card', id: card.id },
+      projectId: project.id,
+      after: {
+        number: card.number,
+        round: round.round,
+        stopped,
+        budgetId: stop.budgetId,
+      },
+      result: 'ok',
+    });
+    this.publishRun(project.id, round.runId, 'abandoned');
+    this.publish(project.id, card.id);
+    return true;
   }
 
   /**

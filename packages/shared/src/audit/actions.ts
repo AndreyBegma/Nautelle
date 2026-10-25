@@ -175,6 +175,8 @@ export const AUDIT_ACTIONS = [
   'card.escalated',
   'card.accepted',
   'card.stopped',
+  /** C-399 (ADR-0100): a hard budget paused the card's running round. */
+  'card.paused',
   /** #243 D10: the card's Continue after design switch. */
   'card.design_continue_toggled',
   /** #244 D12: a suggestion landed in the Inbox (system actor, `meta.captureId`). */

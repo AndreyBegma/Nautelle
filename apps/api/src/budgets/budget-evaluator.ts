@@ -21,6 +21,7 @@ import {
   type BudgetOptions,
 } from './budget-options';
 import { type SpendScope, spendOf } from './budget-spend';
+import { BudgetStops } from './budget-stops';
 
 type Tx = Prisma.TransactionClient;
 type Db = Tx | PrismaService;
@@ -111,6 +112,7 @@ export class BudgetEvaluator {
     private readonly live: LiveService,
     private readonly clock: BudgetClock,
     @Inject(BUDGET_OPTIONS) private readonly options: BudgetOptions,
+    private readonly stops: BudgetStops,
   ) {}
 
   /**
@@ -181,8 +183,36 @@ export class BudgetEvaluator {
     });
     if (!result) return null;
     await this.notifications.publish(result.written);
-    if (result.current) this.publish(result.evaluated);
+    if (result.current) {
+      this.publish(result.evaluated);
+      this.stopIfReached(result.evaluated);
+    }
     return result.evaluated;
+  }
+
+  /**
+   * C-399 (ADR-0100): a hard budget at its limit, with no override, pauses
+   * the running card rounds in its scope — on every evaluation that finds
+   * it so, so a round a runner could not stop yet is stopped on the next.
+   */
+  private stopIfReached(e: Evaluated): void {
+    const { budget } = e;
+    if (
+      !budget.enabled ||
+      budget.action !== 'stop' ||
+      !e.exceeded ||
+      e.overrideActive
+    ) {
+      return;
+    }
+    this.stops.emit({
+      budgetId: budget.id,
+      scope: budget.scope,
+      projectId: budget.projectId,
+      userId: budget.userId,
+      limitUsd: budget.limitUsd.toFixed(2),
+      resetsAt: e.row.end,
+    });
   }
 
   /** D6: one notification per newly reached threshold; 100 % is `budget.exceeded`. */
@@ -205,7 +235,7 @@ export class BudgetEvaluator {
       const exceeded = t === 100;
       const what =
         budget.action === 'stop' && exceeded
-          ? ' New orchestrator starts and skill runs are refused until it resets; running workers continue.'
+          ? ' New orchestrator starts, card rounds and skill runs are refused until it resets; running card rounds are paused, other running workers continue.'
           : '';
       written.push(
         ...(await this.writer.write(
