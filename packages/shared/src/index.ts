@@ -19,6 +19,7 @@ export * from './fleet';
 export * from './github-app';
 export * from './handoff';
 export * from './history';
+export * from './inbox';
 export * from './legacy-names';
 export * from './live';
 export * from './llm';

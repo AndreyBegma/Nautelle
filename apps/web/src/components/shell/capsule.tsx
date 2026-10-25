@@ -32,6 +32,7 @@ export function Capsule({
   role,
   waitingApprovals,
   slotsNeedingAttention,
+  inboxWaiting,
 }: {
   /** Every section the role sees here. */
   sections: VisibleSection[];
@@ -45,6 +46,8 @@ export function Capsule({
   role: Role;
   waitingApprovals: number;
   slotsNeedingAttention: number;
+  /** C-390: the Inbox's items, across projects. */
+  inboxWaiting: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -108,7 +111,7 @@ export function Capsule({
           open: moreOpen,
           onOpenChange: setMoreOpen,
           // BottomCapsuleTab has no `badge` (docs/ui/glass-ui.md): the counts
-          // the rail shows on Queue and Fleet head More's sheet instead.
+          // the rail shows on Inbox, Queue and Fleet head More's sheet instead.
           children: (
             <MorePages
               sections={sections}
@@ -118,6 +121,7 @@ export function Capsule({
               projectName={projectName}
               waitingApprovals={waitingApprovals}
               slotsNeedingAttention={slotsNeedingAttention}
+              inboxWaiting={inboxWaiting}
             />
           ),
         }}

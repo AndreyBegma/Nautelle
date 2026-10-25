@@ -17,6 +17,7 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { approvalsBadge } from '../../lib/approvals/format';
 import { attentionBadge } from '../../lib/fleet/format';
+import { inboxBadge } from '../../lib/inbox/format';
 import { Logomark, Wordmark } from '../brand';
 import { useGettingStarted } from '../onboarding/getting-started-context';
 import { GETTING_STARTED_PATH } from '../onboarding/steps';
@@ -81,6 +82,7 @@ export function Rail({
   projectId,
   waitingApprovals,
   slotsNeedingAttention,
+  inboxWaiting,
   collapsed,
   onCollapsedChange,
 }: {
@@ -90,6 +92,8 @@ export function Rail({
   projectId: string | null;
   waitingApprovals: number;
   slotsNeedingAttention: number;
+  /** C-390: the Inbox's items, across projects. */
+  inboxWaiting: number;
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
 }) {
@@ -111,6 +115,7 @@ export function Rail({
   const { setup } = useGettingStarted();
 
   const badges: Record<string, RailBadge | undefined> = {
+    inbox: inboxBadge(inboxWaiting),
     // Approvals is a tab of the Queue page (C-284); its count rides Queue.
     queue: approvalsBadge(waitingApprovals),
     fleet: attentionBadge(slotsNeedingAttention),
@@ -263,6 +268,7 @@ export function Rail({
               projectName={projectName}
               waitingApprovals={waitingApprovals}
               slotsNeedingAttention={slotsNeedingAttention}
+              inboxWaiting={inboxWaiting}
               switcher={false}
             />
           </SheetContent>

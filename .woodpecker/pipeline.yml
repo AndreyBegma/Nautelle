@@ -144,10 +144,13 @@ steps:
       - bun run check
 
   # `next build` skips test files and `bun test` does not type-check, so a
-  # stale fixture only shows up here. Turbo builds `shared` first.
+  # stale fixture only shows up here. Turbo builds `shared` first. It waits for
+  # `build`: both share the workspace, and `next build` deletes and rewrites
+  # apps/web/.next/types, so a parallel `tsc` can read validator.ts without
+  # routes.d.ts ("Cannot find module './routes.js'"). It runs beside `test`.
   - name: typecheck
     image: *ci_image
-    depends_on: [install]
+    depends_on: [build]
     when:
       - event: pull_request
         path: *docs_only
