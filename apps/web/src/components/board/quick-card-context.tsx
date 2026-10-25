@@ -1,5 +1,6 @@
 'use client';
 
+import type { AttachmentView } from '@nautelle/shared';
 import {
   createContext,
   type ReactNode,
@@ -13,9 +14,14 @@ import { QuickCardDialog } from './quick-card-dialog';
 interface Target {
   projectId: string;
   text?: string;
+  attachments?: readonly AttachmentView[];
 }
 
-type OpenQuickCard = (projectId: string, text?: string) => void;
+type OpenQuickCard = (
+  projectId: string,
+  text?: string,
+  attachments?: readonly AttachmentView[],
+) => void;
 
 const QuickCardContext = createContext<OpenQuickCard>(() => {});
 
@@ -26,8 +32,8 @@ const QuickCardContext = createContext<OpenQuickCard>(() => {});
 export function QuickCardProvider({ children }: { children: ReactNode }) {
   const [target, setTarget] = useState<Target>();
   const [open, setOpen] = useState(false);
-  const show = useCallback<OpenQuickCard>((projectId, text) => {
-    setTarget({ projectId, text });
+  const show = useCallback<OpenQuickCard>((projectId, text, attachments) => {
+    setTarget({ projectId, text, attachments });
     setOpen(true);
   }, []);
   const value = useMemo(() => show, [show]);
@@ -39,6 +45,7 @@ export function QuickCardProvider({ children }: { children: ReactNode }) {
           projectId={target.projectId}
           open={open}
           initialText={target.text}
+          initialAttachments={target.attachments}
           onOpenChange={setOpen}
         />
       ) : null}
@@ -46,5 +53,5 @@ export function QuickCardProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Opens the Quick card dialog for a project, optionally with text carried over. */
+/** Opens the Quick card dialog for a project, optionally with New work's text and uploads. */
 export const useQuickCard = (): OpenQuickCard => useContext(QuickCardContext);

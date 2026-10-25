@@ -18,7 +18,25 @@ export const QUICK_DRAFT_MIN_CHARS = 12;
 /** The pause after the last keystroke before the model is asked. */
 export const QUICK_DRAFT_DEBOUNCE_MS = 900;
 
+/**
+ * How long Save waits on a suggestion still on its way. Past it, the card is
+ * saved with the text's first line: the model never holds Enter up for long.
+ */
+export const QUICK_DRAFT_WAIT_MS = 1_500;
+
 export { QUICK_CARD_TEXT_MAX };
+
+/** The draft if it arrives within `ms`, otherwise null (it is not cancelled). */
+export function draftWithin<T>(
+  draft: Promise<T | null>,
+  ms: number = QUICK_DRAFT_WAIT_MS,
+): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  return Promise.race([draft, late]).finally(() => clearTimeout(timer));
+}
 
 export const draftQuickCard = (projectId: string, text: string) =>
   api<QuickCardDraft>(
@@ -82,8 +100,7 @@ export function quickCardRequest(
 
 /**
  * How the optional Run went. `waiting`: the project has no free slot, so the
- * card stays at the top of To Do until a slot frees and a person runs it —
- * the run queue itself is C-398's.
+ * card is in the run queue (C-398, ADR-0102) and starts when one frees.
  */
 export type QuickCardRun =
   | { state: 'not_requested' }
@@ -112,10 +129,13 @@ export async function saveQuickCard(
   const card = await calls.create(projectId, quickCardRequest(input));
   if (!input.runNow) return { card, run: { state: 'not_requested' } };
   try {
-    await calls.run(projectId, card.number);
-    return { card, run: { state: 'started' } };
+    const done = await calls.run(projectId, card.number);
+    // C-398: at the worker limit Run queues the card instead of refusing it.
+    return { card, run: { state: done.queue ? 'waiting' : 'started' } };
   } catch (error) {
-    // `ApiError.code` is typed for auth codes; a board code travels in it too.
+    // An API without the run queue still refuses at the limit; the card waits
+    // in To Do either way. `ApiError.code` is typed for auth codes; a board
+    // code travels in it too.
     if (
       error instanceof ApiError &&
       (error.code as string | undefined) === BOARD_ERROR.maxRunning

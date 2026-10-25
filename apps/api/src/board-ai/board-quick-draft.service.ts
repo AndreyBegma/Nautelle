@@ -12,6 +12,9 @@ import { modelJson } from './model-json';
 /** The title and kind are a few words: the answer never needs more. */
 const DRAFT_MAX_TOKENS = 120;
 
+/** A slow provider gives way to the fallback; the person is waiting on it. */
+export const QUICK_DRAFT_TIMEOUT_MS = 8_000;
+
 /** The text the model reads; the rest of a long text adds nothing to a title. */
 const DRAFT_READ_MAX = 4_000;
 
@@ -24,7 +27,7 @@ const QUICK_DRAFT_SYSTEM = [
 
 /**
  * C-391 Quick card: the title and kind of a card from its text, written by the
- * cheapest enabled model (ADR-0060 §2) under the `title` feature tag. Best
+ * cheapest enabled model (ADR-0060 §2) under the `quick_card` feature tag. Best
  * effort: with no model, a refusal of the gateway or an answer out of
  * contract, the title is the text's first line and the kind a feature, so
  * Quick card never fails on the model.
@@ -49,7 +52,8 @@ export class BoardQuickDraft {
       if (!model) return fallback;
       const done = await this.gateway.complete({
         userId,
-        feature: 'title',
+        feature: 'quick_card',
+        signal: AbortSignal.timeout(QUICK_DRAFT_TIMEOUT_MS),
         provider: model.provider,
         request: {
           model: model.model,

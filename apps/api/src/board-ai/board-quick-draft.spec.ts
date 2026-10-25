@@ -41,6 +41,18 @@ describe('BoardQuickDraft.draft', () => {
     expect(complete).toHaveBeenCalledTimes(1);
   });
 
+  it('tags the call quick_card and bounds it with a timeout', async () => {
+    const { draft, complete } = service({ answer: '{"title":"T"}' });
+    await draft.draft('u1', 'Add dark mode');
+    const call = (
+      complete.mock.calls as unknown as [
+        { feature: string; signal?: AbortSignal },
+      ][]
+    )[0][0];
+    expect(call.feature).toBe('quick_card');
+    expect(call.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it('falls back to the first line without a model', async () => {
     const { draft, complete } = service({ model: null });
     await expect(draft.draft('u1', 'First line\nrest')).resolves.toEqual({

@@ -5,6 +5,7 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import {
+  type AttachmentView,
   type BoardSettingsView,
   type BoardView,
   type CreatePlanRequest,
@@ -110,9 +111,9 @@ export function NewCardDialog({
       busy={busy}
       setBusy={setBusy}
       onCancel={wide === false ? undefined : () => onOpenChange(false)}
-      onQuickCard={(text) => {
+      onQuickCard={(text, attachments) => {
         onOpenChange(false);
-        quickCard(projectId, text);
+        quickCard(projectId, text, attachments);
       }}
       onStarted={(id) => {
         setStartedId(id);
@@ -257,8 +258,8 @@ function StartForm({
   setBusy: (busy: boolean) => void;
   /** Absent on a phone, where the bar's Close is the way out. */
   onCancel?: () => void;
-  /** C-391: the same text as a single card, without the interview. */
-  onQuickCard: (text: string) => void;
+  /** C-391: the same text and uploads as a single card, without the interview. */
+  onQuickCard: (text: string, attachments: AttachmentView[]) => void;
   onStarted: (planId: string) => void;
 }) {
   const settings = useUserSettings(open);
@@ -380,8 +381,13 @@ function StartForm({
         ) : null}
         <Button
           variant="glass"
-          disabled={busy}
-          onClick={() => onQuickCard(what)}
+          disabled={busy || uploads.busy}
+          onClick={() => {
+            // The finished uploads move to Quick card, which claims them.
+            const attachments = uploads.done.map((d) => d.view);
+            uploads.forget(uploads.done.map((d) => d.item));
+            onQuickCard(what, attachments);
+          }}
         >
           Quick card
         </Button>

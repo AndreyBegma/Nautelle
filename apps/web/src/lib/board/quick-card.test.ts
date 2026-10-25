@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { BOARD_CARD_TITLE_MAX, type BoardCardView } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
+  draftWithin,
   mergeQuickDraft,
   type QuickCardInput,
   quickCardReady,
@@ -80,9 +81,18 @@ describe('saveQuickCard', () => {
     const result = await saveQuickCard(
       'p1',
       input({ runNow: true }),
-      calls(async () => undefined),
+      calls(async () => ({ queue: null })),
     );
     expect(result.run).toEqual({ state: 'started' });
+  });
+
+  it('reports the card queued when Run put it in the run queue', async () => {
+    const result = await saveQuickCard(
+      'p1',
+      input({ runNow: true }),
+      calls(async () => ({ queue: { position: 1 } })),
+    );
+    expect(result.run).toEqual({ state: 'waiting' });
   });
 
   it('keeps the card waiting when the project has no free slot', async () => {
@@ -138,5 +148,20 @@ describe('mergeQuickDraft', () => {
     expect(
       mergeQuickDraft(fields, { title: false, kind: false }, null),
     ).toEqual(fields);
+  });
+});
+
+describe('draftWithin', () => {
+  const draft = { title: 'Fix footer link', kind: 'bug' as const };
+
+  it('passes a draft that arrives in time', async () => {
+    expect(await draftWithin(Promise.resolve(draft), 50)).toEqual(draft);
+  });
+
+  it('gives up on a slow draft so Save is not held up', async () => {
+    const slow = new Promise<typeof draft>(() => {});
+    const started = Date.now();
+    expect(await draftWithin(slow, 20)).toBeNull();
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 });

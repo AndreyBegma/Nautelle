@@ -6,6 +6,7 @@ import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import {
+  type AttachmentView,
   BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
   type BoardCardKind,
@@ -19,6 +20,7 @@ import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploa
 import { describeBoardError } from '../../lib/board/format';
 import {
   draftQuickCard,
+  draftWithin,
   mergeQuickDraft,
   QUICK_CARD_TEXT_MAX,
   QUICK_DRAFT_DEBOUNCE_MS,
@@ -28,6 +30,7 @@ import {
   saveQuickCard,
 } from '../../lib/board/quick-card';
 import { AttachmentDropzone } from '../attachments/attachment-dropzone';
+import { AttachmentList } from '../attachments/attachment-list';
 
 const KIND_LABEL: Record<BoardCardKind, string> = {
   feature: 'Feature',
@@ -41,7 +44,7 @@ export function quickCardToast({ card, run }: QuickCardResult): string {
     case 'started':
       return `${label} is created and running.`;
     case 'waiting':
-      return `${label} is in To Do. No worker is free in this project, so it has not started.`;
+      return `${label} is in To Do, waiting for a slot. It starts when a worker is free.`;
     case 'refused':
       return `${label} is in To Do. It did not start: ${run.message}`;
     default:
@@ -59,6 +62,7 @@ export function QuickCardDialog({
   projectId,
   open,
   initialText,
+  initialAttachments,
   onOpenChange,
   onSaved,
 }: {
@@ -66,6 +70,8 @@ export function QuickCardDialog({
   open: boolean;
   /** Text carried over from New work. */
   initialText?: string;
+  /** Files already uploaded in New work, claimed by this card. */
+  initialAttachments?: readonly AttachmentView[];
   onOpenChange: (open: boolean) => void;
   onSaved?: (result: QuickCardResult) => void;
 }) {
@@ -76,6 +82,7 @@ export function QuickCardDialog({
   const [busy, setBusy] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [error, setError] = useState<string>();
+  const [carried, setCarried] = useState<readonly AttachmentView[]>([]);
   const uploads = useAttachmentUploads(projectId);
   // A field the person wrote is theirs: a later suggestion does not replace it.
   const touched = useRef({ title: false, kind: false });
@@ -88,13 +95,14 @@ export function QuickCardDialog({
   useEffect(() => {
     if (!open) return;
     setText(initialText ?? '');
+    setCarried(initialAttachments ?? []);
     setTitle('');
     setKind('feature');
     setRunNow(false);
     setError(undefined);
     touched.current = { title: false, kind: false };
     pending.current = null;
-  }, [open, initialText]);
+  }, [open, initialText, initialAttachments]);
 
   const suggest = (value: string): Promise<QuickCardDraft | null> => {
     const ticket = ++asked.current;
@@ -135,8 +143,9 @@ export function QuickCardDialog({
     setError(undefined);
     try {
       // A suggestion on its way, or one the debounce has not asked for yet, is
-      // worth the moment; its failure is not. The fields below are the render's,
-      // so the draft is merged in by hand rather than read back from state.
+      // worth a moment (`QUICK_DRAFT_WAIT_MS`); past it, or on its failure, the
+      // title is the text's first line. The fields below are the render's, so
+      // the draft is merged in by hand rather than read back from state.
       const value = text.trim();
       const bothTouched = touched.current.title && touched.current.kind;
       let request = pending.current?.text === value ? pending.current : null;
@@ -144,14 +153,18 @@ export function QuickCardDialog({
         void suggest(value);
         request = pending.current;
       }
-      const draft = request ? await request.draft : null;
+      const draft = request ? await draftWithin(request.draft) : null;
       const fields = mergeQuickDraft({ title, kind }, touched.current, draft);
       const result = await saveQuickCard(projectId, {
         text,
         ...fields,
         runNow,
-        attachmentIds: uploads.done.map((d) => d.view.id),
+        attachmentIds: [
+          ...carried.map((a) => a.id),
+          ...uploads.done.map((d) => d.view.id),
+        ],
       });
+      setCarried([]);
       uploads.forget(uploads.done.map((d) => d.item));
       toast.success(quickCardToast(result));
       onSaved?.(result);
@@ -210,6 +223,7 @@ export function QuickCardDialog({
           </Field>
           <section aria-label="Attachments" className="flex flex-col gap-1.5">
             <span className="text-sm font-medium">Attachments</span>
+            <AttachmentList attachments={carried} canRemove={false} />
             <AttachmentDropzone
               uploads={uploads}
               label="Attach files for the card"
@@ -257,7 +271,7 @@ export function QuickCardDialog({
           </div>
           <Checkbox
             label="Run now"
-            hint="Starts the card when a worker is free. If none is, it stays at the top of To Do."
+            hint="Starts the card now if a worker is free; otherwise it waits in the run queue for one."
             checked={runNow}
             disabled={busy}
             onChange={(e) => setRunNow(e.target.checked)}
