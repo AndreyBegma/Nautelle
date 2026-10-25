@@ -34,16 +34,37 @@ export const maintenanceUrl = (url: string): string => {
 export const DEMO_RUNNER_ID = 'demo-runner';
 export const DEMO_PROJECT_ID = 'demo-project';
 
+/**
+ * C-398 (ADR-0100): the demo Board runs one card worker at a time, so the
+ * running card fills it and the queued cards wait for a slot.
+ */
+export const DEMO_MAX_RUNNING = 1;
+
 /** The cards of the demo Board: a few in each working column. */
 export const DEMO_CARDS: ReadonlyArray<{
   title: string;
   column: BoardColumn;
   kind: 'feature' | 'bug';
-  /** C-359: a finished round 1 launched with this model and effort. */
-  round?: { model: string; effort: CardEffort };
+  /**
+   * C-359: round 1 launched with this model and effort, finished unless
+   * `running` (C-398: a worker still at it).
+   */
+  round?: { model: string; effort: CardEffort; running?: true };
+  /** C-398: Run was pressed on a full Board; the card waits for a slot. */
+  queued?: true;
 }> = [
-  { title: 'Export the activity feed as CSV', column: 'todo', kind: 'feature' },
-  { title: 'Dark mode for the settings page', column: 'todo', kind: 'feature' },
+  {
+    title: 'Export the activity feed as CSV',
+    column: 'todo',
+    kind: 'feature',
+    queued: true,
+  },
+  {
+    title: 'Dark mode for the settings page',
+    column: 'todo',
+    kind: 'feature',
+    queued: true,
+  },
   {
     title: 'Board search misses cards with emoji',
     column: 'todo',
@@ -53,6 +74,7 @@ export const DEMO_CARDS: ReadonlyArray<{
     title: 'Show the runner version in the header',
     column: 'in_progress',
     kind: 'feature',
+    round: { model: 'claude-sonnet-5-5', effort: 'medium', running: true },
   },
   {
     title: 'Retry a failed collect from the card',
@@ -70,7 +92,14 @@ export const DEMO_CARDS: ReadonlyArray<{
 export const seedDemo = async (
   prisma: Pick<
     PrismaClient,
-    'user' | 'runner' | 'project' | 'boardCard' | 'run' | 'boardCardRound'
+    | 'user'
+    | 'runner'
+    | 'project'
+    | 'boardSettings'
+    | 'boardCard'
+    | 'run'
+    | 'boardCardRound'
+    | 'boardRunQueueCard'
   >,
   adminEmail: string,
 ): Promise<{ projectId: string; cards: number }> => {
@@ -108,6 +137,11 @@ export const seedDemo = async (
       members: { create: { userId: admin.id, addedById: admin.id } },
     },
   });
+  await prisma.boardSettings.upsert({
+    where: { projectId: DEMO_PROJECT_ID },
+    update: {},
+    create: { projectId: DEMO_PROJECT_ID, maxRunning: DEMO_MAX_RUNNING },
+  });
 
   for (const [index, card] of DEMO_CARDS.entries()) {
     const number = index + 1;
@@ -131,7 +165,20 @@ export const seedDemo = async (
         movedAt: now,
       },
     });
+    if (card.queued) {
+      await prisma.boardRunQueueCard.upsert({
+        where: { cardId: created.id },
+        update: {},
+        create: {
+          cardId: created.id,
+          status: 'queued',
+          queuedById: admin.id,
+          queuedByRole: 'admin',
+        },
+      });
+    }
     if (card.round) {
+      const running = card.round.running === true;
       const runId = `demo-run-${number}`;
       const startedAt = new Date(now.getTime() - 20 * 60_000);
       await prisma.run.upsert({
@@ -145,11 +192,11 @@ export const seedDemo = async (
           runtime: 'claude',
           model: card.round.model,
           args: { card: number, round: 1, trigger: 'run' },
-          status: 'succeeded',
+          status: running ? 'running' : 'succeeded',
           triggeredByType: 'user',
           triggeredById: admin.id,
           startedAt,
-          endedAt: now,
+          endedAt: running ? null : now,
           updatedAt: now,
         },
       });
@@ -165,14 +212,18 @@ export const seedDemo = async (
           cardBody: '',
           cardKind: card.kind,
           authorId: admin.id,
-          phase: 'finished',
-          finishedBy: 'worker',
-          summary: 'Added a Retry collect button to the card.',
           model: card.round.model,
           effort: card.round.effort,
           startedAt,
-          finishedAt: now,
-          endedAt: now,
+          ...(running
+            ? { phase: 'running' }
+            : {
+                phase: 'finished',
+                finishedBy: 'worker',
+                summary: 'Added a Retry collect button to the card.',
+                finishedAt: now,
+                endedAt: now,
+              }),
         },
       });
     }

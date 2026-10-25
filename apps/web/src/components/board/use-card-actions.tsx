@@ -28,6 +28,7 @@ import {
 import {
   type CardConfirmation,
   cardConfirmCopy,
+  stopLeavesQueue,
 } from '../../lib/board/card-confirm';
 import { runWaitsFor } from '../../lib/board/dependencies';
 import { describeBoardError } from '../../lib/board/format';
@@ -163,7 +164,9 @@ export function useCardActions({
     if (kind === 'stop') {
       await perform(
         () => stopCard(projectId, card.number),
-        `Stopped the worker of ${card.label}.`,
+        stopLeavesQueue(card)
+          ? `Took ${card.label} out of the run queue.`
+          : `Stopped the worker of ${card.label}.`,
       );
     } else {
       await perform(async () => {

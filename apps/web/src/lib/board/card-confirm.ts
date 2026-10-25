@@ -1,4 +1,11 @@
-import type { BoardCardView } from '@nautelle/shared';
+import { type BoardCardView, isQueued, isRoundActive } from '@nautelle/shared';
+
+/**
+ * C-398 (ADR-0100): Stop on a card waiting in the run queue only takes it out
+ * of the queue — there is no worker to stop.
+ */
+export const stopLeavesQueue = (card: BoardCardView): boolean =>
+  isQueued(card) && !isRoundActive(card.round);
 
 /** A card action that waits for its confirmation dialog. */
 export type CardConfirmation =
@@ -31,6 +38,14 @@ export function cardConfirmCopy(pending: CardConfirmation): {
         verb: 'Dismiss',
       };
     case 'stop':
+      if (stopLeavesQueue(pending.card)) {
+        return {
+          title: `Take ${pending.card.label} out of the run queue?`,
+          consequence:
+            'The card stays in To Do and does not start when a slot frees; you can run it again.',
+          verb: 'Remove from queue',
+        };
+      }
       return {
         title: `Stop the worker of ${pending.card.label}?`,
         consequence:

@@ -49,9 +49,11 @@ describe('seedDemo', () => {
     user: { findUnique: jest.fn().mockResolvedValue({ id: 'u1' }) },
     runner: { upsert: jest.fn() },
     project: { upsert: jest.fn() },
+    boardSettings: { upsert: jest.fn() },
     boardCard: { upsert: jest.fn().mockResolvedValue({ id: 'c1' }) },
     run: { upsert: jest.fn() },
     boardCardRound: { upsert: jest.fn() },
+    boardRunQueueCard: { upsert: jest.fn() },
   });
 
   it('upserts the runner, the project and every card by a fixed key', async () => {
@@ -77,14 +79,41 @@ describe('seedDemo', () => {
     const withRound = DEMO_CARDS.filter((card) => card.round);
     expect(db.run.upsert).toHaveBeenCalledTimes(withRound.length);
     expect(db.boardCardRound.upsert).toHaveBeenCalledTimes(withRound.length);
-    const [round] = db.boardCardRound.upsert.mock.calls[0];
-    expect(round.update).toEqual({});
-    expect(round.create).toMatchObject({
-      cardId: 'c1',
-      phase: 'finished',
-      model: 'claude-opus-5-5',
-      effort: 'high',
+    const rounds = db.boardCardRound.upsert.mock.calls.map(([arg]) => arg);
+    for (const round of rounds) expect(round.update).toEqual({});
+    expect(rounds.map((round) => round.create)).toContainEqual(
+      expect.objectContaining({
+        cardId: 'c1',
+        phase: 'finished',
+        model: 'claude-opus-5-5',
+        effort: 'high',
+      }),
+    );
+  });
+
+  it('fills the one slot with a running card and queues two To Do cards behind it (C-398)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+
+    expect(db.boardSettings.upsert).toHaveBeenCalledWith({
+      where: { projectId: DEMO_PROJECT_ID },
+      update: {},
+      create: { projectId: DEMO_PROJECT_ID, maxRunning: 1 },
     });
+    const rounds = db.boardCardRound.upsert.mock.calls.map(([arg]) => arg);
+    expect(
+      rounds.filter((round) => round.create.phase === 'running'),
+    ).toHaveLength(1);
+    const queued = db.boardRunQueueCard.upsert.mock.calls.map(([arg]) => arg);
+    expect(queued).toHaveLength(2);
+    for (const entry of queued) {
+      expect(entry.update).toEqual({});
+      expect(entry.create).toMatchObject({
+        status: 'queued',
+        queuedById: 'u1',
+        queuedByRole: 'admin',
+      });
+    }
   });
 
   it('needs the admin to exist', async () => {

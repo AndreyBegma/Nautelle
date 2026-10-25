@@ -18,6 +18,7 @@ import {
   type DropMove,
   decideDrop,
 } from '../../lib/board/board-state';
+import { stopLeavesQueue } from '../../lib/board/card-confirm';
 import { runWaitsFor } from '../../lib/board/dependencies';
 import {
   type BoardFilter,
@@ -513,7 +514,9 @@ export function BoardColumns({
                     tone="danger"
                     onSelect={() => actions.askStop(card)}
                   >
-                    Stop worker
+                    {stopLeavesQueue(card)
+                      ? 'Remove from queue'
+                      : 'Stop worker'}
                   </MenuItem>
                 ) : null}
                 {canOperate && canDelete(card) ? (
