@@ -38,8 +38,7 @@ export const SESSION_ONLY_KEY = 'auth:session-only';
  * password, two-factor sign-in, sessions. `SessionOnly(false)` on a handler
  * re-opens it under a session-only controller.
  */
-export const SessionOnly = (only = true) =>
-  SetMetadata(SESSION_ONLY_KEY, only);
+export const SessionOnly = (only = true) => SetMetadata(SESSION_ONLY_KEY, only);
 
 export const PROJECT_SCOPED_TOKEN_KEY = 'auth:project-scoped-token';
 

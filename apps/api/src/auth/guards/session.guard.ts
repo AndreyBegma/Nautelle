@@ -2,11 +2,7 @@ import { AUTH_ERROR, SESSION_COOKIE } from '@nautelle/shared';
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import {
-  ApiTokensService,
-  bearerOf,
-  isApiToken,
-} from '../api-tokens.service';
+import { ApiTokensService, bearerOf, isApiToken } from '../api-tokens.service';
 import { authError } from '../auth-error';
 import type { AuthContext, AuthenticatedRequest } from '../auth-request';
 import {

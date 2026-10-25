@@ -85,7 +85,9 @@ export function actionGroups(actions: readonly string[]): string[] {
 }
 
 /** C-403: the personal API token a record's request came with, by name. */
-export function viaTokenName(record: Pick<AuditRecordView, 'meta'>): string | null {
+export function viaTokenName(
+  record: Pick<AuditRecordView, 'meta'>,
+): string | null {
   const meta = record.meta as { apiToken?: { name?: unknown } } | null;
   const name = meta?.apiToken?.name;
   return typeof name === 'string' ? name : null;

@@ -160,9 +160,7 @@ export class ApiTokensService {
     return {
       user: {
         ...toPublicUser(row.user),
-        ...(row.projectIds.length > 0
-          ? { projectScope: row.projectIds }
-          : {}),
+        ...(row.projectIds.length > 0 ? { projectScope: row.projectIds } : {}),
       },
       sessionId: `api-token:${row.id}`,
       apiToken: {
