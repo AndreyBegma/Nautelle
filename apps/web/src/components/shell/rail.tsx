@@ -6,6 +6,7 @@ import {
   type NavRailGroup,
   type RailBadge,
 } from '@andrewbehma/glass-ui/nav-rail';
+import { Progress } from '@andrewbehma/glass-ui/progress';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { useBreakpoint } from '@andrewbehma/glass-ui/use-breakpoint';
@@ -18,6 +19,8 @@ import { approvalsBadge } from '../../lib/approvals/format';
 import { attentionBadge } from '../../lib/fleet/format';
 import { inboxBadge } from '../../lib/inbox/format';
 import { Logomark, Wordmark } from '../brand';
+import { useGettingStarted } from '../onboarding/getting-started-context';
+import { GETTING_STARTED_PATH } from '../onboarding/steps';
 import { MorePages } from './more-pages';
 import {
   iconRailSplit,
@@ -108,6 +111,8 @@ export function Rail({
   const projectName = projects.find(
     (project) => project.id === projectId,
   )?.displayName;
+  // C-396: admins only (the provider loads nothing for others).
+  const { setup } = useGettingStarted();
 
   const badges: Record<string, RailBadge | undefined> = {
     inbox: inboxBadge(inboxWaiting),
@@ -224,6 +229,27 @@ export function Rail({
               compact={iconOnly}
             />
           </div>
+        }
+        footer={
+          // C-396: the way back to Getting started while it is unfinished;
+          // the icon-only rail has no room for it.
+          setup && !setup.complete && !iconOnly ? (
+            <Link
+              href={GETTING_STARTED_PATH}
+              className="block rounded-control px-3 py-2 hover:bg-hover"
+            >
+              <Progress
+                value={setup.done}
+                max={setup.total}
+                label={
+                  setup.project
+                    ? `Finish setup · ${setup.project.displayName}`
+                    : 'Finish setup'
+                }
+                hint={`${setup.done} / ${setup.total}`}
+              />
+            </Link>
+          ) : undefined
         }
         link={({ href, className, children: content, ...rest }) => (
           <Link href={href} className={className} {...rest}>

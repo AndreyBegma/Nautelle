@@ -29,6 +29,7 @@ import { useLiveStatus } from '../../lib/live/use-live';
 import { Assistant } from '../assistant/assistant';
 import { AskBoardDialog } from '../board-ai/ask-board-dialog';
 import { InboxProvider, useInboxSection } from '../inbox/inbox-context';
+import { GettingStartedProvider } from '../onboarding/getting-started-context';
 import { RunnerUpdateNotice } from '../runners/runner-update-notice';
 import { useRunnerUpdate } from '../runners/use-runner-update';
 import { ProductUpdateNotice } from '../updates/product-update-notice';
@@ -253,202 +254,204 @@ export function AppShell({
     <UserProvider value={user}>
       <InboxProvider value={inbox}>
         <WhatsNewProvider>
-          <PageActionsProvider>
-            <a
-              href="#main-content"
-              className="glass-strong sr-only z-overlay rounded-control px-3 py-2 text-sm text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
-            >
-              Skip to content
-            </a>
-            <div
-              // On a phone the page sits on a 16 px gutter (#213).
-              className={`flex ${fill ? 'h-screen overflow-hidden' : 'min-h-screen'} ${narrow ? 'gap-2 px-4 py-2' : 'gap-3 p-3'}`}
-            >
-              {narrow ? null : (
-                <aside className="sticky top-3 h-[calc(100vh-1.5rem)] shrink-0">
-                  <Rail
-                    sections={sections}
-                    activeId={activeId}
-                    projects={projects}
-                    projectId={projectId}
-                    waitingApprovals={waitingApprovals}
-                    slotsNeedingAttention={slotsNeedingAttention}
-                    inboxWaiting={inboxWaiting}
-                    collapsed={railCollapsed}
-                    onCollapsedChange={setRailCollapsed}
-                  />
-                </aside>
-              )}
+          <GettingStartedProvider>
+            <PageActionsProvider>
+              <a
+                href="#main-content"
+                className="glass-strong sr-only z-overlay rounded-control px-3 py-2 text-sm text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
+              >
+                Skip to content
+              </a>
+              <div
+                // On a phone the page sits on a 16 px gutter (#213).
+                className={`flex ${fill ? 'h-screen overflow-hidden' : 'min-h-screen'} ${narrow ? 'gap-2 px-4 py-2' : 'gap-3 p-3'}`}
+              >
+                {narrow ? null : (
+                  <aside className="sticky top-3 h-[calc(100vh-1.5rem)] shrink-0">
+                    <Rail
+                      sections={sections}
+                      activeId={activeId}
+                      projects={projects}
+                      projectId={projectId}
+                      waitingApprovals={waitingApprovals}
+                      slotsNeedingAttention={slotsNeedingAttention}
+                      inboxWaiting={inboxWaiting}
+                      collapsed={railCollapsed}
+                      onCollapsedChange={setRailCollapsed}
+                    />
+                  </aside>
+                )}
 
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-                <header
-                  // #654: one row of `--size-control` controls on a shared centre
-                  // line — the trail and its live dot left, one group right.
-                  className={`glass rounded-surface flex h-14 shrink-0 items-center ${narrow ? 'gap-1 px-2' : 'gap-3 pr-3 pl-4'}`}
-                >
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                    {narrow ? (
-                      // A phone has no room for the trail: the page, and a way up.
-                      <>
-                        {parent?.href ? (
-                          <Link
-                            href={parent.href}
-                            aria-label={`Back to ${parent.label}`}
-                            className="flex size-(--size-control) shrink-0 items-center justify-center rounded-control text-ink-2 hover:bg-hover hover:text-ink"
-                          >
-                            <ArrowLeft size={16} aria-hidden="true" />
-                          </Link>
-                        ) : null}
-                        <span className="truncate text-section text-ink">
-                          {crumbs.at(-1)?.label}
-                        </span>
-                      </>
-                    ) : (
-                      <Breadcrumb
-                        items={crumbs}
-                        aria-label="Breadcrumb"
-                        overflowLabel="Show the path"
-                        // The page itself is set in the section style (S-4 mockup).
-                        className="min-w-0 [&_[aria-current=page]]:text-section [&_[aria-current=page]]:font-semibold"
-                        link={({
-                          href,
-                          className,
-                          children: content,
-                          ...rest
-                        }) => (
-                          <Link href={href} className={className} {...rest}>
-                            {content}
-                          </Link>
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+                  <header
+                    // #654: one row of `--size-control` controls on a shared centre
+                    // line — the trail and its live dot left, one group right.
+                    className={`glass rounded-surface flex h-14 shrink-0 items-center ${narrow ? 'gap-1 px-2' : 'gap-3 pr-3 pl-4'}`}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      {narrow ? (
+                        // A phone has no room for the trail: the page, and a way up.
+                        <>
+                          {parent?.href ? (
+                            <Link
+                              href={parent.href}
+                              aria-label={`Back to ${parent.label}`}
+                              className="flex size-(--size-control) shrink-0 items-center justify-center rounded-control text-ink-2 hover:bg-hover hover:text-ink"
+                            >
+                              <ArrowLeft size={16} aria-hidden="true" />
+                            </Link>
+                          ) : null}
+                          <span className="truncate text-section text-ink">
+                            {crumbs.at(-1)?.label}
+                          </span>
+                        </>
+                      ) : (
+                        <Breadcrumb
+                          items={crumbs}
+                          aria-label="Breadcrumb"
+                          overflowLabel="Show the path"
+                          // The page itself is set in the section style (S-4 mockup).
+                          className="min-w-0 [&_[aria-current=page]]:text-section [&_[aria-current=page]]:font-semibold"
+                          link={({
+                            href,
+                            className,
+                            children: content,
+                            ...rest
+                          }) => (
+                            <Link href={href} className={className} {...rest}>
+                              {content}
+                            </Link>
+                          )}
+                        />
+                      )}
+                      <ConnectionDot {...live} />
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant={narrow ? 'ghost' : 'glass'}
+                        size="md"
+                        icon={narrow}
+                        onClick={() => setPaletteOpen(true)}
+                        aria-label="Open command palette"
+                        className={
+                          narrow
+                            ? undefined
+                            : 'mr-1 w-56 justify-start gap-2 px-2'
+                        }
+                      >
+                        <Search size={14} aria-hidden="true" />
+                        {narrow ? null : (
+                          <>
+                            <span className="flex-1 text-left font-normal text-ink-3">
+                              Search…
+                            </span>
+                            <KeyHint keys="mod+k" />
+                          </>
                         )}
+                      </Button>
+                      <NotificationBell />
+                      <Separator orientation="vertical" className="mx-1 h-4" />
+                      <AccountMenu
+                        displayName={displayName}
+                        role={user.role}
+                        theme={theme}
+                        onThemeChange={setTheme}
+                        onLogout={() => void logout()}
                       />
-                    )}
-                    <ConnectionDot {...live} />
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      variant={narrow ? 'ghost' : 'glass'}
-                      size="md"
-                      icon={narrow}
-                      onClick={() => setPaletteOpen(true)}
-                      aria-label="Open command palette"
-                      className={
-                        narrow
-                          ? undefined
-                          : 'mr-1 w-56 justify-start gap-2 px-2'
+                    </div>
+                  </header>
+
+                  {restarting ? (
+                    <Banner tone="warn">{RESTARTING_BANNER_TEXT}</Banner>
+                  ) : null}
+
+                  {!restarting &&
+                  live.paused &&
+                  closeCode !== LIVE_CLOSE_CODES.unauthorized ? (
+                    <Banner
+                      tone="warn"
+                      title="Live updates paused."
+                      action={
+                        <Button
+                          variant="glass"
+                          size="sm"
+                          onClick={() => window.location.reload()}
+                        >
+                          Reload
+                        </Button>
                       }
                     >
-                      <Search size={14} aria-hidden="true" />
-                      {narrow ? null : (
-                        <>
-                          <span className="flex-1 text-left font-normal text-ink-3">
-                            Search…
-                          </span>
-                          <KeyHint keys="mod+k" />
-                        </>
-                      )}
-                    </Button>
-                    <NotificationBell />
-                    <Separator orientation="vertical" className="mx-1 h-4" />
-                    <AccountMenu
-                      displayName={displayName}
-                      role={user.role}
-                      theme={theme}
-                      onThemeChange={setTheme}
-                      onLogout={() => void logout()}
+                      This page may be out of date.
+                    </Banner>
+                  ) : null}
+
+                  {productUpdate.release ? (
+                    <ProductUpdateNotice
+                      release={productUpdate.release}
+                      onDismiss={productUpdate.dismiss}
                     />
-                  </div>
-                </header>
+                  ) : null}
 
-                {restarting ? (
-                  <Banner tone="warn">{RESTARTING_BANNER_TEXT}</Banner>
-                ) : null}
+                  {runnerUpdate.notice ? (
+                    <RunnerUpdateNotice
+                      notice={runnerUpdate.notice}
+                      onDismiss={runnerUpdate.dismiss}
+                    />
+                  ) : null}
 
-                {!restarting &&
-                live.paused &&
-                closeCode !== LIVE_CLOSE_CODES.unauthorized ? (
-                  <Banner
-                    tone="warn"
-                    title="Live updates paused."
-                    action={
-                      <Button
-                        variant="glass"
-                        size="sm"
-                        onClick={() => window.location.reload()}
-                      >
-                        Reload
-                      </Button>
+                  <main
+                    id="main-content"
+                    tabIndex={-1}
+                    // A data page (the registry's `wide`) gets the wide column.
+                    className={
+                      fill
+                        ? 'flex min-h-0 w-full flex-1 flex-col focus:outline-none'
+                        : `mx-auto w-full pb-6 focus:outline-none ${wide ? 'max-w-7xl' : 'max-w-5xl'}`
                     }
                   >
-                    This page may be out of date.
-                  </Banner>
-                ) : null}
+                    {children}
+                  </main>
 
-                {productUpdate.release ? (
-                  <ProductUpdateNotice
-                    release={productUpdate.release}
-                    onDismiss={productUpdate.dismiss}
-                  />
-                ) : null}
-
-                {runnerUpdate.notice ? (
-                  <RunnerUpdateNotice
-                    notice={runnerUpdate.notice}
-                    onDismiss={runnerUpdate.dismiss}
-                  />
-                ) : null}
-
-                <main
-                  id="main-content"
-                  tabIndex={-1}
-                  // A data page (the registry's `wide`) gets the wide column.
-                  className={
-                    fill
-                      ? 'flex min-h-0 w-full flex-1 flex-col focus:outline-none'
-                      : `mx-auto w-full pb-6 focus:outline-none ${wide ? 'max-w-7xl' : 'max-w-5xl'}`
-                  }
-                >
-                  {children}
-                </main>
-
-                {narrow && !keyboard ? (
-                  // On a phone the capsule replaces the rail; its spacer keeps the
-                  // page's end clear of it. #526: the soft keyboard hides it.
-                  <Capsule
-                    sections={sections}
-                    tabs={tabs}
-                    more={more}
-                    activeId={activeId}
-                    projects={projects}
-                    projectId={projectId}
-                    projectName={projectName}
-                    role={role}
-                    waitingApprovals={waitingApprovals}
-                    slotsNeedingAttention={slotsNeedingAttention}
-                    inboxWaiting={inboxWaiting}
-                  />
-                ) : null}
+                  {narrow && !keyboard ? (
+                    // On a phone the capsule replaces the rail; its spacer keeps the
+                    // page's end clear of it. #526: the soft keyboard hides it.
+                    <Capsule
+                      sections={sections}
+                      tabs={tabs}
+                      more={more}
+                      activeId={activeId}
+                      projects={projects}
+                      projectId={projectId}
+                      projectName={projectName}
+                      role={role}
+                      waitingApprovals={waitingApprovals}
+                      slotsNeedingAttention={slotsNeedingAttention}
+                      inboxWaiting={inboxWaiting}
+                    />
+                  ) : null}
+                </div>
               </div>
-            </div>
 
-            <Assistant projects={projects} />
+              <Assistant projects={projects} />
 
-            <CommandPalette
-              open={paletteOpen}
-              onOpenChange={(open) => {
-                setPaletteOpen(open);
-                if (!open) setTyped('');
-              }}
-              search={search}
-              onSelect={onSelect}
-              placeholder="Create, find a card (C-12, #41), go to a page — or ask the Board"
-            />
-            <AskBoardDialog
-              question={asking}
-              onOpenChange={(open) => {
-                if (!open) setAsking(null);
-              }}
-            />
-          </PageActionsProvider>
+              <CommandPalette
+                open={paletteOpen}
+                onOpenChange={(open) => {
+                  setPaletteOpen(open);
+                  if (!open) setTyped('');
+                }}
+                search={search}
+                onSelect={onSelect}
+                placeholder="Create, find a card (C-12, #41), go to a page — or ask the Board"
+              />
+              <AskBoardDialog
+                question={asking}
+                onOpenChange={(open) => {
+                  if (!open) setAsking(null);
+                }}
+              />
+            </PageActionsProvider>
+          </GettingStartedProvider>
         </WhatsNewProvider>
       </InboxProvider>
     </UserProvider>

@@ -30,6 +30,7 @@ import { LiveModule } from './live/live.module';
 import { LlmModule } from './llm/llm.module';
 import { LocalModule } from './local';
 import { NotificationsModule } from './notifications';
+import { OnboardingModule } from './onboarding';
 import { PaneModule } from './pane';
 import { PlannerModule } from './planner';
 import { PrefixModule } from './prefix/prefix.module';
@@ -94,6 +95,8 @@ import { WorkflowsModule } from './workflows';
     TerminalModule,
     // Issue #281: the Terminal → Board setup checklist.
     TerminalSetupModule,
+    // C-396: the facts Getting started ticks from.
+    OnboardingModule,
     SkillsModule,
     PlannerModule,
     // Issue #272: the one runtime-profile rule and project readiness.

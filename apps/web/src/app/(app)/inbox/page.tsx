@@ -39,7 +39,7 @@ const NextLink: NonNullable<ComponentProps<typeof EmptyState>['link']> = ({
 const DESCRIPTION = 'Everything that waits on you, with the action right here.';
 
 /**
- * The Inbox (C-390, ADR-0103): every item that waits for the caller's
+ * The Inbox (C-390, ADR-0106): every item that waits for the caller's
  * decision across their projects, grouped by project, oldest first, each with
  * its action. The shell holds the read (`useInbox`), so the rail's count and
  * this page agree, and a live push removes a handled item from both.
