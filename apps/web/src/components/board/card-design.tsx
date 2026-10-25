@@ -23,7 +23,7 @@ import { useEffect, useId, useState } from 'react';
 import { api, type Described } from '../../lib/api';
 import { runCard, updateCard } from '../../lib/board/actions';
 import {
-  approveAndRun,
+  approveAndRunCard,
   approveConsequence,
   offersApproveAndRun,
 } from '../../lib/board/design-actions';
@@ -167,25 +167,18 @@ function CardDesignReview({
     onChanged();
   };
   const onApproveAndRun = offersApproveAndRun(card)
-    ? async (revisionId: string) => {
-        let approved = false;
-        try {
-          await approveAndRun(
-            {
-              approve: async (id) => {
-                await approve({ revisionId: id });
-                approved = true;
-              },
-              run: () => runCard(projectId, card.number),
-            },
-            revisionId,
-          );
-          toast.success(`Approved. Started a worker on C-${card.number}.`);
-        } catch (error) {
+    ? (revisionId: string) =>
+        approveAndRunCard(
+          {
+            approve: (id) => approve({ revisionId: id }),
+            run: () => runCard(projectId, card.number),
+          },
+          revisionId,
+          `C-${card.number}`,
+          toast,
+        ).catch(() => {
           // An approval refusal was toasted by the design hook.
-          if (approved) toast.error(describeBoardError(error));
-        }
-      }
+        })
     : undefined;
 
   return (

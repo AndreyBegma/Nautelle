@@ -5,6 +5,7 @@ import {
   designReviewState,
   frameCaption,
   isAwaitingReview,
+  showsInPlaceReview,
   thumbnailPreset,
 } from './review';
 
@@ -23,6 +24,17 @@ describe('isAwaitingReview (C-394)', () => {
     expect(isAwaitingReview(design({ activeTurnId: 'turn-1' }))).toBe(false);
     expect(isAwaitingReview(design({ status: 'approved' }))).toBe(false);
     expect(isAwaitingReview(design({ status: 'revising' }))).toBe(false);
+  });
+});
+
+describe('showsInPlaceReview (C-394)', () => {
+  test('a waiting design with a revision shows the review', () => {
+    expect(showsInPlaceReview(oneVariant())).toBe(true);
+  });
+
+  test('nothing drawn yet, or not waiting, shows none', () => {
+    expect(showsInPlaceReview(design({ revisions: [] }))).toBe(false);
+    expect(showsInPlaceReview(design({ status: 'approved' }))).toBe(false);
   });
 });
 

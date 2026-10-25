@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { ApiError } from '../api';
 import {
   approveAndRun,
+  approveAndRunCard,
   approveConsequence,
   backWithComment,
   offersApproveAndRun,
@@ -12,18 +13,33 @@ import { describeBoardError } from './format';
 describe('approveAndRun (#243 D6)', () => {
   test('approves the picked revision, then runs', async () => {
     const calls: string[] = [];
-    await approveAndRun(
+    const queued = await approveAndRun(
       {
         approve: async (id) => {
           calls.push(`approve:${id}`);
         },
         run: async () => {
           calls.push('run');
+          return { queue: null };
         },
       },
       'rev-2-1',
     );
     expect(calls).toEqual(['approve:rev-2-1', 'run']);
+    expect(queued).toBe(false);
+  });
+
+  test('says when a full Board queued the card (C-398)', async () => {
+    const queued = await approveAndRun(
+      {
+        approve: async () => {},
+        run: async () => ({
+          queue: { state: 'queued', place: 1, stack: null },
+        }),
+      },
+      'rev-1-1',
+    );
+    expect(queued).toBe(true);
   });
 
   test('a refused approval never runs the card', async () => {
@@ -36,6 +52,7 @@ describe('approveAndRun (#243 D6)', () => {
           },
           run: async () => {
             calls.push('run');
+            return { queue: null };
           },
         },
         'rev-1-1',
@@ -60,6 +77,81 @@ describe('approveAndRun (#243 D6)', () => {
       ),
     ).rejects.toThrow('max_running');
     expect(calls).toEqual(['approve']);
+  });
+});
+
+describe('approveAndRunCard (C-394, C-398)', () => {
+  const notifier = () => {
+    const said: string[] = [];
+    return {
+      said,
+      notify: {
+        success: (m: string) => said.push(`ok:${m}`),
+        error: (m: string) => said.push(`error:${m}`),
+      },
+    };
+  };
+
+  test('a started worker is announced', async () => {
+    const { said, notify } = notifier();
+    await approveAndRunCard(
+      { approve: async () => {}, run: async () => ({ queue: null }) },
+      'rev-1-1',
+      'C-7',
+      notify,
+    );
+    expect(said).toEqual(['ok:Approved. Started a worker on C-7.']);
+  });
+
+  test('a queued card says it waits for a slot, not that a worker started', async () => {
+    const { said, notify } = notifier();
+    await approveAndRunCard(
+      {
+        approve: async () => {},
+        run: async () => ({
+          queue: { state: 'queued', place: 2, stack: null },
+        }),
+      },
+      'rev-1-1',
+      'C-7',
+      notify,
+    );
+    expect(said).toEqual(['ok:Approved. C-7 is waiting for a slot.']);
+  });
+
+  test('a refused approval is rethrown untoasted', async () => {
+    const { said, notify } = notifier();
+    await expect(
+      approveAndRunCard(
+        {
+          approve: async () => {
+            throw new Error('design_busy');
+          },
+          run: async () => ({ queue: null }),
+        },
+        'rev-1-1',
+        'C-7',
+        notify,
+      ),
+    ).rejects.toThrow('design_busy');
+    expect(said).toEqual([]);
+  });
+
+  test('a refused run is toasted and the approval stands', async () => {
+    const { said, notify } = notifier();
+    await approveAndRunCard(
+      {
+        approve: async () => {},
+        run: async () => {
+          throw new Error('boom');
+        },
+      },
+      'rev-1-1',
+      'C-7',
+      notify,
+    );
+    expect(said).toHaveLength(1);
+    expect(said[0]).toStartWith('error:');
   });
 });
 

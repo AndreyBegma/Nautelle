@@ -26,6 +26,13 @@ export const isAwaitingReview = (design: TaskDesignView): boolean =>
   design.status === 'reviewing' &&
   design.activeTurnId === null;
 
+/**
+ * Whether the in-place review shows: the design waits for a person and has a
+ * revision to preview. While it shows, it is the page's one place to decide.
+ */
+export const showsInPlaceReview = (design: TaskDesignView): boolean =>
+  isAwaitingReview(design) && previewRevision(design) !== null;
+
 /** The in-place review of a design: the preview, and why its actions are off if they are. */
 export function designReviewState(
   design: TaskDesignView,
