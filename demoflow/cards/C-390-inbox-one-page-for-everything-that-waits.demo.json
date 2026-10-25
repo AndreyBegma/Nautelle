@@ -103,9 +103,13 @@
     { "action": "navigate", "path": "/inbox?kind=setup" },
     {
       "action": "waitFor",
-      "target": { "testId": "inbox-item" },
+      "target": { "text": "runner is offline, so this cannot start" },
       "state": "visible",
       "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": { "role": "link", "name": "Open Runners", "exact": true }
     },
     { "action": "screenshot", "name": "inbox-setup" },
     { "action": "wait", "ms": 3000 }
