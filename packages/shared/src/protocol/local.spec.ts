@@ -449,6 +449,30 @@ describe('the Board from a session (#845)', () => {
     }
   });
 
+  // C-412: `card_run` at the worker limit answered "internal: unexpected
+  // card.run result" although the Board had queued the card.
+  it('takes the queued answer of card.run, with its place', () => {
+    const result = localMethods['card.run'].result;
+    expect(result.parse({ number: 3, round: 2 })).toEqual({
+      number: 3,
+      round: 2,
+    });
+    expect(
+      result.parse({ number: 3, round: null, queued: true, place: 1 }),
+    ).toEqual({ number: 3, round: null, queued: true, place: 1 });
+    expect(
+      result.parse({ number: 3, round: null, queued: true, place: null }),
+    ).toEqual({ number: 3, round: null, queued: true, place: null });
+    // An API without `place` still parses.
+    expect(result.parse({ number: 3, round: null, queued: true })).toEqual({
+      number: 3,
+      round: null,
+      queued: true,
+      place: null,
+    });
+    expect(result.safeParse({ number: 3, round: null }).success).toBe(false);
+  });
+
   it('names a card by its number', () => {
     expect(parseLocalRequest('card.take', { card: 42 })).toEqual({
       ok: true,

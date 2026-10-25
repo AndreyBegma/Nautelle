@@ -87,7 +87,12 @@ export class LocalBoardHandlers {
         );
         // C-398: a full Board queued the card; it starts when a slot frees.
         if (card.queue) {
-          return { number: card.number, round: null, queued: true as const };
+          return {
+            number: card.number,
+            round: null,
+            queued: true as const,
+            place: card.queue.place,
+          };
         }
         return { number: card.number, round: this.roundOf(card) };
       }),
