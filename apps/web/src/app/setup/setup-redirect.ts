@@ -38,3 +38,26 @@ export function setupToken(
 ): string | null {
   return typeof token === 'string' && token.trim() ? token.trim() : null;
 }
+
+const SETUP_LINK_PATTERN = "grep -o 'http[^ ]*/setup?token=[^ ]*' | tail -n 1";
+
+/**
+ * C-396: where the API logged the setup link, per way of installing. The
+ * "no users yet" page shows them all; the Helm NOTES print the same command
+ * with the release's own names.
+ */
+export const SETUP_LINK_COMMANDS: readonly { label: string; command: string }[] =
+  [
+    {
+      label: 'Docker Compose',
+      command: `docker compose logs api | ${SETUP_LINK_PATTERN}`,
+    },
+    {
+      label: 'All-in-one image',
+      command: `docker logs <container> 2>&1 | ${SETUP_LINK_PATTERN}`,
+    },
+    {
+      label: 'Kubernetes (Helm)',
+      command: `kubectl -n <namespace> logs deploy/<release>-api | ${SETUP_LINK_PATTERN}`,
+    },
+  ];

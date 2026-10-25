@@ -15,9 +15,7 @@ import { type FormEvent, useState } from 'react';
 import { AuthCard } from '../../components/auth-card';
 import { ApiError, api, describeError } from '../../lib/api';
 import { HOME_PATH } from '../login/safe-next';
-import { LOGIN_PATH } from './setup-redirect';
-
-const LOG_COMMAND = 'docker compose logs api | grep /setup';
+import { LOGIN_PATH, SETUP_LINK_COMMANDS } from './setup-redirect';
 
 export function SetupForm({ token }: { token: string | null }) {
   const router = useRouter();
@@ -31,10 +29,17 @@ export function SetupForm({ token }: { token: string | null }) {
   if (!token) {
     return (
       <AuthCard
-        title="Open the setup link"
-        description="This server has no account yet. The API printed a one-time link to create the first administrator; open that link."
+        title="No users yet"
+        description="This server has no account yet. On each start the API logs a one-time link, /setup?token=…, that creates the first administrator. Find the newest one in the API log and open it."
       >
-        <CodeBlock code={LOG_COMMAND} language="sh" />
+        <div className="flex flex-col gap-3">
+          {SETUP_LINK_COMMANDS.map(({ label, command }) => (
+            <CodeBlock key={label} code={command} language={label} wrap />
+          ))}
+          <p className="text-xs text-ink-3">
+            Restarting the API logs a new link; the one before stops working.
+          </p>
+        </div>
       </AuthCard>
     );
   }
