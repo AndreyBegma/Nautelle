@@ -136,7 +136,7 @@ describe('StackFace (#480)', () => {
     expect(paused).toContain('Run paused');
   });
 
-  test('a card of a stack wears the stack label on its own face', () => {
+  test('C-392: a card of a stack leaves the stack to its sheet, not its face', () => {
     const html = renderToStaticMarkup(
       <CardFace
         projectId="p1"
@@ -145,8 +145,8 @@ describe('StackFace (#480)', () => {
         card={card(2, 'in_progress', { stack: ref(0) })}
       />,
     );
-    expect(html).toContain('S-3');
-    expect(html).toContain('part of Redesign the Settings page');
+    expect(html).not.toContain('S-3');
+    expect(html).not.toContain('part of Redesign the Settings page');
   });
 
   test('#497: the title, the stack-card titles and their control rows are touch targets', () => {
