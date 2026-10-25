@@ -131,6 +131,7 @@ import {
   AutoRunSection,
   CardOptionToggles,
 } from './card-options';
+import { CardSignals } from './card-signals';
 import {
   type CardTab,
   CardTabs,
@@ -658,14 +659,17 @@ export function CardPrChip({ card }: { card: BoardCardView }) {
 export function CardHeaderMeta({ card }: { card: BoardCardView }) {
   const pill = roundPill(card.round);
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-      <span className="font-medium">{COLUMN_TITLE[card.column]}</span>
-      {pill ? (
-        <StatusPill size="sm" status={pill.status} label={pill.label} />
-      ) : null}
-      <CardPrChip card={card} />
-      <RunMoney card={card} />
-    </div>
+    <>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <span className="font-medium">{COLUMN_TITLE[card.column]}</span>
+        {pill ? (
+          <StatusPill size="sm" status={pill.status} label={pill.label} />
+        ) : null}
+        <CardPrChip card={card} />
+        <RunMoney card={card} />
+      </div>
+      <CardSignals card={card} />
+    </>
   );
 }
 
@@ -1492,14 +1496,19 @@ export function CardDetailBody({
           ) : undefined
         }
         meta={
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
-            <span>{COLUMN_TITLE[card.column]}</span>
-            {card.round ? <span>Round {card.rounds.length}</span> : null}
-            <CardPrChip card={card} />
-            {total ? <span className="tabular-nums">{total} spent</span> : null}
-            <span>
-              Created <Time value={card.createdAt} />
-            </span>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
+              <span>{COLUMN_TITLE[card.column]}</span>
+              {card.round ? <span>Round {card.rounds.length}</span> : null}
+              <CardPrChip card={card} />
+              {total ? (
+                <span className="tabular-nums">{total} spent</span>
+              ) : null}
+              <span>
+                Created <Time value={card.createdAt} />
+              </span>
+            </div>
+            <CardSignals card={card} />
           </div>
         }
         actions={
