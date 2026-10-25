@@ -55,8 +55,8 @@ export function BudgetTab({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="max-w-prose text-sm text-ink-2">
           Spend is counted in API-equivalent dollars. A stop budget refuses new
-          orchestrator starts and skill runs once it is used up; workers that
-          are already running are never stopped.
+          orchestrator starts and skill runs once it is used up, and pauses
+          running card rounds; other running workers are never stopped.
           {isAdmin ? '' : ' Only a project admin can change budgets.'}
         </p>
         {isAdmin ? (

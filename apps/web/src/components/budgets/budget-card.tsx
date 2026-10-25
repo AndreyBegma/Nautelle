@@ -107,8 +107,8 @@ export function BudgetCard({
       ) : state === 'exceeded' && budget.action === 'stop' && current ? (
         <Banner tone="danger" title="New starts are refused">
           Orchestrator starts and skill runs wait until{' '}
-          {formatMoment(current.end, budget.timezone)}. Running workers
-          continue.
+          {formatMoment(current.end, budget.timezone)}. Running card rounds
+          are paused; other running workers continue.
         </Banner>
       ) : null}
     </section>
