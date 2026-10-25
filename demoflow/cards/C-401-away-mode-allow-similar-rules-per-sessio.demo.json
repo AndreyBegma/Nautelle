@@ -56,7 +56,7 @@
     },
     {
       "action": "waitFor",
-      "target": { "text": "Similar calls", "exact": true },
+      "target": { "role": "radiogroup", "name": "Similar calls" },
       "caption": "Besides this call, similar calls can be allowed by Claude Code's suggested rule.",
       "timeoutMs": 15000,
       "zoom": true
