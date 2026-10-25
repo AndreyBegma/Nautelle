@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { headShaSchema } from '../protocol/commands/approvals';
+import {
+  TOOL_USE_SUGGESTIONS_MAX,
+  toolRuleSchema,
+  toolRuleScopeSchema,
+} from './tool-rules';
 
 /**
  * Action requests (docs/specs/201-claude-code-integration.md D18): something a
@@ -50,7 +55,11 @@ export const ACTION_REQUEST_FINAL_STATUSES: readonly ActionRequestStatus[] = [
   'failed',
 ];
 
-/** How long a request waits for a decision (D18). */
+/**
+ * How long a request waits for a decision (D18). A `tool_use` request's is
+ * the default: the project or the requester's account may set another
+ * (C-401, `toolUseTimeoutMinutes`).
+ */
 export const ACTION_REQUEST_TTL_MS: Record<ActionRequestKind, number> = {
   tool_use: 5 * 60_000,
   orchestrator_start: 24 * 60 * 60_000,
@@ -64,8 +73,12 @@ export const ACTION_REQUEST_TTL_MS: Record<ActionRequestKind, number> = {
 
 /** The `PermissionRequest` hook polls `action.status` this often… */
 export const ACTION_REQUEST_POLL_MS = 2_000;
-/** …for at most this long, inside its 300 s hook timeout (D17). */
+/**
+ * …for the default timeout (D17); a request that waits longer (C-401) is
+ * polled at `ACTION_REQUEST_SLOW_POLL_MS` from then on.
+ */
 export const ACTION_REQUEST_HOOK_WAIT_MS = 280_000;
+export const ACTION_REQUEST_SLOW_POLL_MS = 10_000;
 
 export const ACTION_REQUEST_SUMMARY_MAX = 500;
 export const ACTION_REQUEST_NOTE_MAX = 1_000;
@@ -104,6 +117,14 @@ export const actionRequestArgsSchemas = {
         .optional(),
       /** The hook sent no tool input: the person sees the tool name only. */
       preview: z.literal('none').optional(),
+      /**
+       * C-401: the `addRules` allow suggestions Claude Code made for this
+       * call — what "allow similar" and "always allow" would remember.
+       */
+      suggestions: z
+        .array(toolRuleSchema)
+        .max(TOOL_USE_SUGGESTIONS_MAX)
+        .optional(),
     })
     .refine((args) => !(args.preview === 'none' && args.input !== undefined), {
       message: "a request with preview 'none' carries no input",
@@ -227,9 +248,14 @@ export const actionRequestSummarySchema = z.object({
 });
 export type ActionRequestSummary = z.infer<typeof actionRequestSummarySchema>;
 
-/** Body of `POST …/action-requests/:id/approve|deny`. */
+/**
+ * Body of `POST …/action-requests/:id/approve|deny`. `remember` (C-401,
+ * approve of a `tool_use` only): also allow similar calls for the rest of
+ * the session, or always in this project.
+ */
 export const actionRequestDecisionSchema = z.strictObject({
   note: z.string().max(ACTION_REQUEST_NOTE_MAX).optional(),
+  remember: toolRuleScopeSchema.optional(),
 });
 export type ActionRequestDecision = z.infer<typeof actionRequestDecisionSchema>;
 
