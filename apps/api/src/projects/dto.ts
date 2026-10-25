@@ -1,6 +1,7 @@
 import {
   type AddProjectMemberRequest,
   type ConnectProjectRequest,
+  type DiscoverProjectsRequest,
   type DocsSourceOverrideRequest,
   type InspectProjectRequest,
   type MoveProjectRequest,
@@ -85,6 +86,17 @@ export class InspectProjectDto implements InspectProjectRequest {
   @HasNoParentSegment()
   path!: string;
 }
+
+/** C-396: the runner whose allowed roots the repository picker lists. */
+export class DiscoverProjectsDto implements DiscoverProjectsRequest {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  runnerId!: string;
+}
+
+/** C-396: the checkout a push check runs in. */
+export class PushCheckDto extends InspectProjectDto {}
 
 export class ConnectProjectDto
   extends InspectProjectDto

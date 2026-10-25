@@ -5,8 +5,12 @@ import type {
   ProjectMoveResult,
   ProjectRuntimeProfile,
   ProjectSummary,
+  PushCheckView,
 } from '@nautelle/shared';
-import type { ProjectInspection } from '@nautelle/shared/protocol';
+import type {
+  ProjectDiscoverResult,
+  ProjectInspection,
+} from '@nautelle/shared/protocol';
 import {
   Body,
   Controller,
@@ -26,9 +30,11 @@ import { CurrentUser, Roles } from '../auth/decorators';
 import {
   AddProjectMemberDto,
   ConnectProjectDto,
+  DiscoverProjectsDto,
   DocsSourceOverrideDto,
   InspectProjectDto,
   MoveProjectDto,
+  PushCheckDto,
   UpdateProjectDto,
   UpdateProjectMemberDto,
 } from './dto';
@@ -55,6 +61,26 @@ export class AdminProjectsController {
     @AuditCtx() ctx: AuditContext,
   ): Promise<ProjectInspection> {
     return this.projects.inspect(dto.runnerId, dto.path, ctx);
+  }
+
+  /** C-396: the repository picker of the connect dialog. */
+  @Post('discover')
+  @HttpCode(200)
+  discover(
+    @Body() dto: DiscoverProjectsDto,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<ProjectDiscoverResult> {
+    return this.projects.discover(dto.runnerId, ctx);
+  }
+
+  /** C-396: does origin accept pushes from this checkout? */
+  @Post('push-check')
+  @HttpCode(200)
+  pushCheck(
+    @Body() dto: PushCheckDto,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<PushCheckView> {
+    return this.projects.pushCheck(dto.runnerId, dto.path, ctx);
   }
 
   @Post()
@@ -150,7 +176,7 @@ export class ProjectsController {
     return this.mover.check(access.projectId);
   }
 
-  /** C-400 (ADR-0102): the project's new runner and its root there. */
+  /** C-400 (ADR-0107): the project's new runner and its root there. */
   @Post(':projectId/move')
   @HttpCode(200)
   @Roles('admin')

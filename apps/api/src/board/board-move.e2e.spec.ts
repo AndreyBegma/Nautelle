@@ -2,7 +2,7 @@ import { ProjectInspector } from '../projects/project-inspector';
 import { inspection } from '../projects/testing/projects-e2e';
 import { BoardWorld, ROOT_A } from './testing/board-e2e';
 
-/** C-400 (ADR-0102): a moved project runs its next card on the new runner. */
+/** C-400 (ADR-0107): a moved project runs its next card on the new runner. */
 describe('board after a project move (e2e)', () => {
   const w = new BoardWorld();
   const NEW_ROOT = '/home/dev/code/widget';

@@ -7,6 +7,7 @@ import {
   describeProjectError,
   docsKindLabel,
   docsOverrideRequest,
+  filterRepositories,
   githubAppState,
   moveBlocker,
   noOnlineRunnerCopy,
@@ -108,6 +109,46 @@ describe('worktreeRemoveCommand (C-400)', () => {
     expect(worktreeRemoveCommand('/w/my app', "/w/it's")).toBe(
       `git -C '/w/my app' worktree remove '/w/it'\\''s'`,
     );
+  });
+});
+
+describe('filterRepositories (C-396)', () => {
+  const repos = [
+    { path: '/srv/dev/notes', name: 'notes', repo: null, root: '/srv/dev' },
+    {
+      path: '/srv/dev/widget',
+      name: 'widget',
+      repo: 'acme/widget',
+      root: '/srv/dev',
+    },
+    {
+      path: '/srv/work/api',
+      name: 'api',
+      repo: 'Acme/API',
+      root: '/srv/work',
+    },
+  ];
+
+  test('an empty query keeps them all, GitHub repositories first', () => {
+    expect(filterRepositories(repos, '  ').map((r) => r.name)).toEqual([
+      'widget',
+      'api',
+      'notes',
+    ]);
+  });
+
+  test('every word must match owner/name or the path, ignoring case', () => {
+    expect(filterRepositories(repos, 'acme').map((r) => r.name)).toEqual([
+      'widget',
+      'api',
+    ]);
+    expect(filterRepositories(repos, 'ACME work').map((r) => r.name)).toEqual([
+      'api',
+    ]);
+    expect(filterRepositories(repos, 'notes').map((r) => r.name)).toEqual([
+      'notes',
+    ]);
+    expect(filterRepositories(repos, 'nothing')).toEqual([]);
   });
 });
 
