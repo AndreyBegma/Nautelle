@@ -399,6 +399,9 @@ function PullRequestBlock({
   const href = githubUrl(pr.url);
   const checks = CHECKS_PILL[pr.checks];
   const base = card.prTarget?.branch ?? null;
+  // The head branch lives on `BoardCardDetail`; a list card has none.
+  const head =
+    'branch' in card && typeof card.branch === 'string' ? card.branch : null;
   return (
     <div className="flex flex-col gap-2 rounded-control bg-surface p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -419,9 +422,19 @@ function PullRequestBlock({
         ) : null}
       </div>
       <p className="font-medium">{card.title}</p>
-      {base ? (
+      {head && base ? (
+        <p className="text-xs text-ink-2">
+          <span className="font-mono">{head}</span>
+          {' → '}
+          <span className="font-mono">{base}</span>
+        </p>
+      ) : base ? (
         <p className="text-xs text-ink-2">
           Into <span className="font-mono">{base}</span>
+        </p>
+      ) : head ? (
+        <p className="text-xs text-ink-2">
+          From <span className="font-mono">{head}</span>
         </p>
       ) : null}
       {pr.state === 'open' ? (

@@ -140,4 +140,12 @@ describe('Accept dialog body (#969)', () => {
     expect(html).toContain('Has merge conflicts');
     expect(html).not.toContain('has conflicts');
   });
+
+  test('the PR block shows head → base when the card has its branch', () => {
+    const detail = card({ branch: 'feat/ship-it' } as Partial<BoardCardView>);
+    const html = body({ card: detail });
+    expect(html).toContain('feat/ship-it');
+    expect(html).toContain('→');
+    expect(body()).toContain('Into');
+  });
 });
