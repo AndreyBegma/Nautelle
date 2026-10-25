@@ -193,6 +193,32 @@ export interface InspectProjectRequest {
   path: string;
 }
 
+/**
+ * C-396: `POST /admin/projects/discover`. Answers the runner's
+ * `ProjectDiscoverResult`: the git repositories under its allowed roots.
+ */
+export interface DiscoverProjectsRequest {
+  runnerId: string;
+}
+
+/**
+ * C-396: `POST /admin/projects/push-check` — the same body as Inspect. The
+ * runner runs `git push --dry-run` to origin; the answer is stored per runner
+ * and path, so the onboarding checklist sees it once the project is connected.
+ */
+export type PushCheckRequest = InspectProjectRequest;
+
+/** C-396: what `POST /admin/projects/push-check` answers. */
+export interface PushCheckView {
+  /** origin accepted the dry-run push. */
+  ok: boolean;
+  /** origin's URL without credentials; null when the repository has none. */
+  remote: string | null;
+  /** What git said, or why the check could not run. */
+  message: string;
+  checkedAt: string;
+}
+
 /** `POST /admin/projects`. Answers a `ProjectDetail` (201). */
 export interface ConnectProjectRequest {
   runnerId: string;

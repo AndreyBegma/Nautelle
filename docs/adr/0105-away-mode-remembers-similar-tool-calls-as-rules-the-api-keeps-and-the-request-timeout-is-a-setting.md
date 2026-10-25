@@ -1,4 +1,4 @@
-# ADR-0103: Away mode remembers similar tool calls as rules the API keeps, and the request timeout is a setting
+# ADR-0105: Away mode remembers similar tool calls as rules the API keeps, and the request timeout is a setting
 
 Status: accepted · Date: 2026-10-25 · Amends [spec 201](../specs/201-claude-code-integration.md)
 D12, D17 and D18 · Relates to [ADR-0052](0052-a-remote-tool-use-request-always-carries-a-redacted-preview.md)

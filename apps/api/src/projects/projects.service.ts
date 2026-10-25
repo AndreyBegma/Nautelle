@@ -5,10 +5,12 @@ import {
   type ProjectDetail,
   type ProjectRuntimeProfile,
   type ProjectSummary,
+  type PushCheckView,
   type Role,
 } from '@nautelle/shared';
 import {
   hasParentSegment,
+  type ProjectDiscoverResult,
   type ProjectInspection,
   repoRelativeDirSchema,
 } from '@nautelle/shared/protocol';
@@ -110,6 +112,36 @@ export class ProjectsService {
   ): Promise<ProjectInspection> {
     await this.usableRunner(runnerId);
     return this.inspector.inspect(runnerId, path, ctx);
+  }
+
+  /** C-396: the git checkouts under the runner's allowed roots. */
+  async discover(
+    runnerId: string,
+    ctx: AuditContext,
+  ): Promise<ProjectDiscoverResult> {
+    await this.usableRunner(runnerId);
+    return this.inspector.discover(runnerId, ctx);
+  }
+
+  /**
+   * C-396: runs `git push --dry-run` in a checkout and keeps the latest
+   * answer per runner and path, so a check run from the connect dialog
+   * counts for the project connected from it.
+   */
+  async pushCheck(
+    runnerId: string,
+    path: string,
+    ctx: AuditContext,
+  ): Promise<PushCheckView> {
+    await this.usableRunner(runnerId);
+    const result = await this.inspector.pushCheck(runnerId, path, ctx);
+    const checkedAt = new Date();
+    await this.prisma.repositoryPushCheck.upsert({
+      where: { runnerId_rootPath: { runnerId, rootPath: path } },
+      create: { runnerId, rootPath: path, ...result, checkedAt },
+      update: { ...result, checkedAt },
+    });
+    return { ...result, checkedAt: checkedAt.toISOString() };
   }
 
   /** D1–D3, D9, D14: re-inspects, stores, and pushes the watch list. */

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Tool-use rules (C-401, ADR-0103): a person answering a remote `tool_use`
+ * Tool-use rules (C-401, ADR-0105): a person answering a remote `tool_use`
  * request may allow every similar call for the rest of the session, or for
  * the project from now on. A rule is Claude Code's own permission rule shape
  * — `Bash(npm test:*)` is `{ toolName: 'Bash', ruleContent: 'npm test:*' }` —
