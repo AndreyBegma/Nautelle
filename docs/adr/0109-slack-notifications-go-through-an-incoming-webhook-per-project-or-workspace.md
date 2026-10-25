@@ -2,6 +2,7 @@
 
 Status: accepted · Date: 2026-10-25 ·
 Spec: [`docs/specs/card-405-slack-notifications-through-an-incoming.md`](../specs/card-405-slack-notifications-through-an-incoming.md) ·
+Amends: [ADR-0108](0108-notifications-go-out-on-channels-and-email-is-one-over-smtp-from-the-environment.md) §1 (channel-scoped destinations) ·
 Relates to: [ADR-0096](0096-a-cards-demo-video-goes-to-telegram-as-a-notification-with-merge-and-feedback.md), [ADR-0014](0014-server-originated-events-live-in-events.md) ·
 Card: C-405 (stack S-16, stage 1)
 
@@ -19,6 +20,18 @@ them either.
 
 An incoming webhook URL is a bearer secret: whoever holds it posts to the
 channel.
+
+[ADR-0108](0108-notifications-go-out-on-channels-and-email-is-one-over-smtp-from-the-environment.md)
+§1 planned Slack as one more `NotificationDeliveryChannel`: a value in
+`notification_deliveries`, a per-kind rule field and a sender, with recipients,
+mutes and folding unchanged. That model is per person: a delivery row hangs on
+one person's `notifications` row, and rules, mutes and folding are that
+person's choices. A Slack channel is not a person. One message goes to it per
+notification however many people receive the notification, including when
+nobody does (a demo with `demoTelegram` off, a project with no member who
+wants the kind). Hanging it on a per-person row would post it once per
+recipient, or not at all, and would let one person's mute silence the whole
+team's channel.
 
 ## Decision
 
@@ -48,7 +61,15 @@ channel.
    request). They become notification kinds delivered in-app, to Telegram and
    to Slack under the existing rules and mutes. The draft names the card, never
    the round's error, which can quote the pane.
-5. **The outbox is fed once per notification, not per person.** A Slack
+5. **The outbox is fed once per notification, not per person — this amends
+   ADR-0108 §1.** ADR-0108 §1 stays the rule for destinations that belong to a
+   person (in-app, Telegram, email). A destination that belongs to a project
+   or the workspace — a channel — is not a `NotificationDeliveryChannel`: it
+   has its own outbox table, is fed once per notification before the writer
+   fans out to people, and is governed by its own toggles, not by people's
+   rules, mutes or folding. A replayed event still posts once: `(webhookId,
+   eventId, kind)` is unique in `slack_deliveries`, which does for a channel
+   what folding and the per-person dedupe do for a person. A Slack
    message belongs to a channel, so `NotificationWriter.write` queues at most
    one `slack_deliveries` row for the webhook covering the project, before it
    fans out to people, with the message parts (title, body, links as app
@@ -81,5 +102,14 @@ channel.
   want them mute the kinds.
 - Changing `APP_ENCRYPTION_KEY` leaves stored webhook URLs unreadable; they
   are set again, as with the other sealed secrets.
+- ADR-0108 §1 now covers per-person destinations only; a future channel-scoped
+  destination (another chat webhook) follows this ADR's §5 instead.
+- Rejected:
+  - **A `slack` value in `notification_deliveries` (ADR-0108 §1 as written).**
+    The row would hang on one recipient's notification: either one Slack
+    message per recipient, or an arbitrary "first recipient" whose mute or
+    absence decides whether the team's channel hears about the card. A
+    notification with no recipients — a demo with `demoTelegram` off — would
+    never reach Slack.
 - Interactive actions in Slack (merge, feedback) would need a Slack app with a
   request URL and signing secret; that is a separate decision.
