@@ -554,7 +554,7 @@ describe('projects (e2e)', () => {
       });
       const worktree = '/srv/dev/.wt-widget-card0001';
       await card(project.id, 1, {
-        column: 'review',
+        column: 'finished',
         branch: 'card/c1-card-1',
         worktree,
         sessionId: '6f1c2b8e-4d3a-4b9e-9a51-0c2d1e3f4a5b',
@@ -581,6 +581,7 @@ describe('projects (e2e)', () => {
         ],
       });
 
+      const askedBefore = desk.received.length;
       const response = await move(project.id, {
         runnerId: target.runnerId,
         path: NEW_ROOT,
@@ -606,10 +607,7 @@ describe('projects (e2e)', () => {
       expect(target.runner.received).toEqual([
         { name: 'project.inspect', args: { path: NEW_ROOT } },
       ]);
-      expect(desk.received.map((c) => c.name)).toEqual([
-        'project.inspect',
-        'project.inspect',
-      ]);
+      expect(desk.received.slice(askedBefore)).toEqual([]);
       expect((await desk.socket.next('config')).config.projects).toEqual([]);
       expect(
         (await target.runner.socket.next('config')).config.projects,
@@ -627,7 +625,7 @@ describe('projects (e2e)', () => {
         orderBy: { number: 'asc' },
       });
       expect(cards.map((c) => [c.number, c.column, c.branch])).toEqual([
-        [1, 'review', 'card/c1-card-1'],
+        [1, 'finished', 'card/c1-card-1'],
         [2, 'completed', null],
       ]);
       expect(cards[0]).toMatchObject({
