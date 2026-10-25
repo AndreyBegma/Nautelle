@@ -1,6 +1,6 @@
 # Product requirements — Nautelle
 
-Status: draft · Owner: Andrey Begma · Last reviewed: 2026-10-07
+Status: draft · Owner: Andrey Begma · Last reviewed: 2026-10-25
 
 ## Problem
 
@@ -45,7 +45,11 @@ It works, but:
 
 - Reimplementing the orchestrator's scheduling logic. Nautelle drives the
   `cs-orchestrator` skill and observes it (ADR-0005).
-- A task tracker of its own. GitHub issues are the queue (ADR-0004).
+- A general-purpose project tracker. Nautelle has a Board, but only for work
+  the fleet can run: a card is one unit of agent work with a worker, a pull
+  request and a review (ADR-0024). It has no estimates, sprints, custom fields
+  or non-agent tasks. GitHub issues stay the queue for the orchestrator
+  (ADR-0004), and a card's pull request lives on GitHub.
 - Prompt management, evals, LLM-as-judge, datasets.
 - Arbitrary remote shell. The runner executes a typed allowlist only (ADR-0010).
 
@@ -61,6 +65,9 @@ Delivery order is in [roadmap.md](roadmap.md).
 | **Agent fleet** | live slots: issue, branch, worktree, runtime, model, last checkpoint, PR + checks, idle/quota/prompt state |
 | **Orchestrator control** | start / stop / `next` / `status` per project through a runtime profile; stop a slot; message a worker; open a read-only live pane |
 | **Task queue** | GitHub issues with the ready label and their computed state (READY / IN FLIGHT / BLOCKED — work / BLOCKED — person / NO SPEC); create an issue from the UI |
+| **Board** | cards in columns (To Do → In progress → Review → Completed) that Nautelle owns; a dedicated interactive worker per card, with a review loop, designs, dependencies and stacks; terminal and fleet work appear as cards too (ADR-0024, ADR-0028, ADR-0030, ADR-0035, ADR-0054) |
+| **Planner & designs** | a brief becomes cards through an interview; a per-card HTML design is reviewed with pins and approved before the card runs (ADR-0022, ADR-0034, ADR-0037) |
+| **Steward** | watches cards and runs for stuck work, fixes the safe cases itself, and sends one digest a day to Telegram and Activity (ADR-0040) |
 | **Merge approval** | per-project switch; green PRs wait in an approval queue (Approve / Request changes) when on |
 | **Activity feed** | every event across projects, filterable, live |
 | **Sessions** | Claude Code and Codex sessions of connected projects (all sessions for admin): turn → LLM request / tool / subagent tree, waterfall, tokens and cost per node |
