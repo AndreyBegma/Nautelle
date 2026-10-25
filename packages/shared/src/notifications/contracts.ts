@@ -133,6 +133,11 @@ export const NOTIFICATION_ERROR_CODES = [
   'telegram_unavailable',
   'telegram_link_request_not_found',
   'telegram_chat_taken',
+  'slack_not_configured',
+  'slack_url_required',
+  'slack_url_invalid',
+  'slack_rejected',
+  'slack_unavailable',
 ] as const;
 export type NotificationErrorCode = (typeof NOTIFICATION_ERROR_CODES)[number];
 

@@ -46,6 +46,7 @@ import { SkillsModule } from './skills';
 import { StewardModule } from './steward';
 import { StewardDigestModule } from './steward-digest';
 import { SummariesModule } from './summaries';
+import { SlackModule } from './slack/slack.module';
 import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
 import { TerminalSetupModule } from './terminal-setup';
@@ -90,6 +91,7 @@ import { WorkflowsModule } from './workflows';
     // Spec 201: the `local.request` router and action requests.
     LocalModule,
     TelegramModule,
+    SlackModule,
     TerminalModule,
     // Issue #281: the Terminal → Board setup checklist.
     TerminalSetupModule,

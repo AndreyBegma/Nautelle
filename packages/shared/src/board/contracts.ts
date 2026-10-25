@@ -1357,6 +1357,34 @@ export interface CardPausedEventData {
 }
 
 /**
+ * C-405: a card's round failed — its worker could not start, or a feedback
+ * round died at once. It never carries the error text: it can quote the
+ * pane.
+ */
+export const CARD_FAILED_EVENT = 'card.failed';
+
+export interface CardFailedEventData {
+  cardId: string;
+  number: number;
+  title: string;
+  round: number;
+}
+
+/**
+ * C-405: a card's pull request merged, whoever merged it — once per card,
+ * when Nautelle first sees the merge.
+ */
+export const CARD_MERGED_EVENT = 'card.merged';
+
+export interface CardMergedEventData {
+  cardId: string;
+  number: number;
+  title: string;
+  prNumber: number;
+  prUrl: string | null;
+}
+
+/**
  * #244 D11: an extraction put cards in the Inbox. Folds per spec 22 D6. It
  * carries counts and ids only — never a title, which is content-derived.
  */

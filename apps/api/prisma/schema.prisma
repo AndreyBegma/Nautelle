@@ -108,6 +108,7 @@ model User {
   tokenEconomyTechniquesSet   TokenEconomyTechnique[]
   stewardSettingsUpdated      StewardSettings[]
   aiDigestSettingsUpdated     AiDigestSettings[]
+  slackWebhooksUpdated        SlackWebhook[]
   settings                    UserSettings?
   planCandidatesDecided       PlanCandidate[]               @relation("PlanCandidateDecidedBy")
 
@@ -528,6 +529,8 @@ model Project {
   demoSecrets            ProjectDemoSecret[]
   telegramLinks          TelegramLink[]
   telegramIntakes        TelegramIntake[]
+  slackWebhook           SlackWebhook?
+  slackDeliveries        SlackDelivery[]
 
   @@unique([runnerId, rootPath])
   @@index([githubRepoId])
@@ -2144,6 +2147,65 @@ model WebhookDelivery {
   @@index([webhookId, createdAt])
   @@index([createdAt])
   @@map("webhook_deliveries")
+}
+
+/// C-405 (ADR-0109): a Slack incoming webhook. `projectId` null is the one
+/// workspace-wide webhook (a partial unique index keeps it single); a
+/// project's own webhook replaces it for that project. The URL is the secret
+/// and is stored sealed with `APP_ENCRYPTION_KEY` only.
+model SlackWebhook {
+  id            String   @id @default(cuid())
+  projectId     String?  @unique
+  /// The webhook URL sealed with `SecretCipher` (v1 format).
+  urlCiphertext String
+  /// The last four characters of the URL, for the masked hint.
+  urlHint       String
+  /// Shared `SLACK_EVENTS` that are posted.
+  events        String[]
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project    Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy  User?           @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  deliveries SlackDelivery[]
+
+  @@map("slack_webhooks")
+}
+
+/// Mirrors `SLACK_DELIVERY_STATUSES` of the shared contract.
+enum SlackDeliveryStatus {
+  pending
+  sent
+  failed
+}
+
+/// One Slack message for one notification (C-405). `(webhookId, eventId,
+/// kind)` keeps a replayed event from posting twice; a budget notification
+/// has no event. `message` is the shared `SlackMessageParts`; links into the
+/// app are paths, made absolute with `APP_URL` when it is sent.
+model SlackDelivery {
+  id            String              @id @default(cuid())
+  webhookId     String
+  projectId     String
+  kind          String
+  eventId       BigInt?
+  message       Json
+  status        SlackDeliveryStatus @default(pending)
+  attempts      Int                 @default(0)
+  nextAttemptAt DateTime            @default(now())
+  lastAttemptAt DateTime?
+  responseCode  Int?
+  error         String?
+  createdAt     DateTime            @default(now())
+
+  webhook SlackWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([webhookId, eventId, kind])
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+  @@map("slack_deliveries")
 }
 
 /// Where the outbound dispatcher stopped (D11): one row, id `webhooks`.
