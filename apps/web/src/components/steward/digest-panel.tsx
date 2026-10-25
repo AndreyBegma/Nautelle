@@ -160,7 +160,10 @@ export function DigestPanel({ projects }: { projects: ProjectSummary[] }) {
       aria-labelledby="activity-digest-heading"
       className="flex flex-col gap-3"
     >
-      <SectionHeader title="Steward digest" headingId="activity-digest-heading" />
+      <SectionHeader
+        title="Steward digest"
+        headingId="activity-digest-heading"
+      />
       {section.data === undefined ? (
         section.error !== null ? (
           <SectionUnavailable
