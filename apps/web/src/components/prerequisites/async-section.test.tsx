@@ -8,6 +8,7 @@ const ready: Section<string[]> = {
   error: null,
   loading: false,
   retry: () => undefined,
+  refresh: () => undefined,
   setData: () => undefined,
 };
 

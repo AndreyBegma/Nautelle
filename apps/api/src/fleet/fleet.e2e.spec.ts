@@ -1,5 +1,6 @@
 import {
   FLEET_LIVE_EVENT,
+  type FleetsView,
   type FleetView,
   type RoundView,
   type SlotDetail,
@@ -90,6 +91,56 @@ describe('fleet routes (e2e)', () => {
       for (const path of routes(a).filter((p) => !p.endsWith('/i42'))) {
         expect((await memberOfA.get(path)).status).toBe(200);
       }
+    });
+  });
+
+  describe('GET /fleet (every visible project in one call)', () => {
+    it('answers 401 to an anonymous caller', async () => {
+      expect((await ctx.http().get('/fleet')).status).toBe(401);
+    });
+
+    it('returns only the projects the caller is a member of, equal to their own fleet', async () => {
+      await project(
+        stream.next(
+          'session.appeared',
+          { name: 'cs-i42' },
+          { slot: 'i42', issue: 42 },
+        ),
+      );
+      const response = await memberOfA.get('/fleet');
+      expect(response.status).toBe(200);
+      const { items } = response.body as FleetsView;
+      expect(items.map((f) => f.projectId)).toEqual([a]);
+      const own = (await memberOfA.get(`/projects/${a}/fleet`))
+        .body as FleetView;
+      expect(items[0]).toEqual(own);
+      expect(items[0].slots.map((s) => s.name)).toEqual(['i42']);
+    });
+
+    it('lets an admin see every project, each with its own slots', async () => {
+      await createUser(ctx.prisma, 'root@example.com', 'admin');
+      const admin = await login(ctx, 'root@example.com');
+      await project(
+        stream.next('session.appeared', { name: 'cs-i42' }, { slot: 'i42' }),
+        stream.next(
+          'session.appeared',
+          { name: 'cs-i7' },
+          { slot: 'i7', root: OTHER_ROOT },
+        ),
+      );
+      const { items } = (await admin.get('/fleet')).body as FleetsView;
+      expect(items.map((f) => f.projectId).sort()).toEqual([a, b].sort());
+      for (const fleet of items) {
+        const own = (await admin.get(`/projects/${fleet.projectId}/fleet`))
+          .body as FleetView;
+        expect(fleet).toEqual(own);
+      }
+    });
+
+    it('answers an empty list to a caller with no project', async () => {
+      await createUser(ctx.prisma, 'lonely@example.com', 'viewer');
+      const lonely = await login(ctx, 'lonely@example.com');
+      expect((await lonely.get('/fleet')).body).toEqual({ items: [] });
     });
   });
 

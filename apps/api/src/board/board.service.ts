@@ -50,9 +50,12 @@ import { demoFactsFor } from './board-demo-facts';
 import { BoardDependencies } from './board-dependencies.service';
 import { boardError, cardNotFound } from './board-error';
 import {
+  type CardFace,
   type CardFacts,
   type CardWithRounds,
   cardDesignSelect,
+  cardFaceOmit,
+  cardFaceRoundSelect,
   prTargetOf,
   toCardDetail,
   toCardView,
@@ -205,34 +208,46 @@ export class BoardService implements OnModuleInit {
     role?: Role,
   ): Promise<BoardView> {
     const inbox = seesInbox(role);
-    const include = {
-      rounds: { orderBy: { round: 'desc' as const } },
-      design: cardDesignSelect,
+    // C-364: only what a card face reads; the detail loads the rest.
+    const face = {
+      omit: cardFaceOmit,
+      include: {
+        rounds: {
+          orderBy: { round: 'desc' as const },
+          select: cardFaceRoundSelect,
+        },
+        design: cardDesignSelect,
+      },
     };
-    const [open, completed, settings, running] = await Promise.all([
-      this.prisma.boardCard.findMany({
-        where: {
-          projectId,
-          column: inbox
-            ? { not: 'completed' }
-            : { notIn: ['completed', 'inbox'] },
-        },
-        include,
-        orderBy: [{ position: 'asc' }, { number: 'asc' }],
-      }),
-      this.prisma.boardCard.findMany({
-        where: {
-          projectId,
-          column: 'completed',
-          ...(completedBefore ? { completedAt: { lt: completedBefore } } : {}),
-        },
-        include,
-        orderBy: [{ completedAt: 'desc' }, { number: 'desc' }],
-        take: BOARD_COMPLETED_PAGE_SIZE + 1,
-      }),
-      this.prisma.boardSettings.findUnique({ where: { projectId } }),
-      this.running(projectId),
-    ]);
+    const [open, completed, settings, running, project, stacks] =
+      await Promise.all([
+        this.prisma.boardCard.findMany({
+          where: {
+            projectId,
+            column: inbox
+              ? { not: 'completed' }
+              : { notIn: ['completed', 'inbox'] },
+          },
+          ...face,
+          orderBy: [{ position: 'asc' }, { number: 'asc' }],
+        }),
+        this.prisma.boardCard.findMany({
+          where: {
+            projectId,
+            column: 'completed',
+            ...(completedBefore
+              ? { completedAt: { lt: completedBefore } }
+              : {}),
+          },
+          ...face,
+          orderBy: [{ completedAt: 'desc' }, { number: 'desc' }],
+          take: BOARD_COMPLETED_PAGE_SIZE + 1,
+        }),
+        this.prisma.boardSettings.findUnique({ where: { projectId } }),
+        this.running(projectId),
+        this.work.project(projectId),
+        this.stacks.views(projectId),
+      ]);
     const page = completed.slice(0, BOARD_COMPLETED_PAGE_SIZE);
     const facts = await this.facts([...open, ...page]);
     const shown = BOARD_COLUMNS.filter((column) => inbox || column !== 'inbox');
@@ -251,10 +266,6 @@ export class BoardService implements OnModuleInit {
             hasMore: false,
           },
     );
-    const [project, stacks] = await Promise.all([
-      this.work.project(projectId),
-      this.stacks.views(projectId),
-    ]);
     return {
       projectId,
       columns,
@@ -355,7 +366,7 @@ export class BoardService implements OnModuleInit {
   }
 
   /** Round costs (#21 usage by run) and which card sessions hooks reached. */
-  private async facts(cards: CardWithRounds[]): Promise<CardFacts> {
+  private async facts(cards: CardFace[]): Promise<CardFacts> {
     const runIds = cards.flatMap((c) => c.rounds.map((r) => r.runId));
     const sessionIds = cards
       .map((c) => c.sessionId)
@@ -383,6 +394,11 @@ export class BoardService implements OnModuleInit {
       runs,
       projects,
       stacks,
+      tokenSaver,
+      steward,
+      prTargets,
+      review,
+      demos,
     ] = await Promise.all([
       usageByRun(this.prisma, runIds),
       sessionIds.length === 0
@@ -417,6 +433,19 @@ export class BoardService implements OnModuleInit {
             select: { id: true, runner: { select: { capabilities: true } } },
           }),
       this.stacks.refsOf(cards.map((c) => c.id)),
+      // #445: each round run's savings and artifact-guard flag.
+      // #748 D1: and the figure of each card's tracked session.
+      tokenSaverFactsOf(this.prisma, runIds, trackedIds),
+      // #447 D15: the live Steward incident of each card's latest round.
+      stewardChipsFor(
+        this.prisma,
+        cards.flatMap((c) => (c.rounds[0] ? [c.rounds[0].id] : [])),
+      ),
+      this.prTargets(cards),
+      // #884: the review strip of each card.
+      reviewFactsFor(this.prisma, cards),
+      // C-371: the demo chip of each card.
+      demoFactsFor(this.prisma, cards),
     ]);
     const runProfileKeys = new Map<string, string>();
     for (const run of runs) {
@@ -447,19 +476,11 @@ export class BoardService implements OnModuleInit {
       attachmentCounts,
       dependencies: deps,
       stacks,
-      // #445: each round run's savings and artifact-guard flag.
-      // #748 D1: and the figure of each card's tracked session.
-      tokenSaver: await tokenSaverFactsOf(this.prisma, runIds, trackedIds),
-      // #447 D15: the live Steward incident of each card's latest round.
-      steward: await stewardChipsFor(
-        this.prisma,
-        cards.flatMap((c) => (c.rounds[0] ? [c.rounds[0].id] : [])),
-      ),
-      prTargets: await this.prTargets(cards),
-      // #884: the review strip of each card.
-      ...(await reviewFactsFor(this.prisma, cards)),
-      // C-371: the demo chip of each card.
-      ...(await demoFactsFor(this.prisma, cards)),
+      tokenSaver,
+      steward,
+      prTargets,
+      ...review,
+      ...demos,
       now: new Date(),
     };
   }
@@ -469,7 +490,7 @@ export class BoardService implements OnModuleInit {
    * on, else its project's base; absent before the card has a branch.
    */
   private async prTargets(
-    cards: readonly CardWithRounds[],
+    cards: readonly CardFace[],
   ): Promise<Map<string, CardPrTarget>> {
     const targets = new Map<string, CardPrTarget>();
     const branched = cards.filter((c) => c.branch !== null);

@@ -33,6 +33,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: '0.17.1',
+    date: '2026-10-25',
+    items: [
+      {
+        kind: 'fixed',
+        text: 'Every image of the release, including the all-in-one image, is now available on Docker Hub as well as on ghcr.io.',
+      },
+    ],
+  },
+  {
     version: '0.17.0',
     date: '2026-10-24',
     items: [
