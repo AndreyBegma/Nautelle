@@ -5,7 +5,10 @@
   "viewport": { "width": 1440, "height": 900 },
   "steps": [
     { "action": "marker", "title": "Sign in" },
-    { "action": "navigate", "path": "/login?next=/projects/demo-project/board" },
+    {
+      "action": "navigate",
+      "path": "/login?next=/projects/demo-project/board"
+    },
     { "action": "wait", "ms": 3000 },
     {
       "action": "fill",
