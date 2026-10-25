@@ -27,7 +27,7 @@ export const SESSION_MESSAGE_OUTCOME: Record<
   },
   not_at_input: {
     tone: 'warn',
-    text: 'The session shows a dialog or a permission prompt; nothing was sent.',
+    text: 'The session did not take it: a dialog or a permission prompt is up, or the question stayed on screen.',
   },
   no_option: {
     tone: 'warn',
