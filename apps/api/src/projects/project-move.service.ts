@@ -241,11 +241,20 @@ export class ProjectMoveService {
     // The old runner drops the root from its watch list, the new one adds it.
     await this.watchList.push(from.runnerId);
     await this.watchList.push(dto.runnerId);
+    const pushCheck = await this.prisma.repositoryPushCheck.findUnique({
+      where: {
+        runnerId_rootPath: {
+          runnerId: updated.runnerId,
+          rootPath: updated.rootPath,
+        },
+      },
+    });
     return {
       project: toProjectDetail(
         updated,
         this.presence.status(updated.runner),
         'admin',
+        pushCheck,
       ),
       from,
       worktrees,
