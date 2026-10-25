@@ -70,6 +70,10 @@ Accept and Stop open the card on its Board with `?accept=1` / `?stop=1`, and the
 card's own confirmation dialog asks. Only operators see Run, Accept and Stop,
 and only for Board cards; a fleet or Inbox row can be opened. "Inbox" is a page
 row that points at `/work?status=inbox` until the Inbox page lands (C-390).
+Settings search is a stopgap too: typing "settings" lists one "<Project> ›
+Settings" row per project (the project pages the palette already offers), each
+opening that project's Settings page. Searching inside the settings blocks
+belongs to the settings card (C-395) and is not part of this one.
 
 **Board keyboard** (C-393, `components/board/use-board-shortcuts.ts`). j/k or
 ↓/↑ move a cursor (an accent ring) over the cards in Board order, Enter opens

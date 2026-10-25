@@ -71,6 +71,7 @@ import {
   findPlanTask,
   parsePlanTaskParam,
 } from '../../../../../lib/board/plan-tasks';
+import { linkIntentStep } from '../../../../../lib/board/shortcuts';
 import { fetchTriageCounts } from '../../../../../lib/board-ai/client';
 import { useUrlFilters } from '../../../../../lib/filters/use-url-filters';
 import { useLive } from '../../../../../lib/live/use-live';
@@ -316,15 +317,33 @@ function BoardScreen() {
     : params.has('stop')
       ? 'stop'
       : undefined;
-  const { accept: askAccept, askStop } = actions;
+  // The action closures are new every render; read them through a ref so the
+  // effect depends on the link alone and handles each link once.
+  const intentActions = useRef({
+    accept: actions.accept,
+    askStop: actions.askStop,
+  });
+  intentActions.current = { accept: actions.accept, askStop: actions.askStop };
+  const handledIntent = useRef<string | undefined>(undefined);
+  const selectedNumber = selectedCard?.number;
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per link; `setParams` is re-made every render
   useEffect(() => {
-    if (!intent || !selectedCard) return;
+    const step = linkIntentStep({
+      intent,
+      cardNumber: selectedNumber,
+      projectLoaded: project !== undefined,
+      handled: handledIntent.current,
+    });
+    if (step.kind === 'wait' || !selectedCard) return;
+    handledIntent.current = step.key;
     setParams({ accept: undefined, stop: undefined });
     if (!canOperate) return;
-    if (intent === 'accept') askAccept(selectedCard);
-    else askStop(selectedCard);
-  }, [intent, selectedCard, canOperate, askAccept, askStop]);
+    if (intent === 'accept') intentActions.current.accept(selectedCard);
+    else intentActions.current.askStop(selectedCard);
+  }, [intent, selectedCard, selectedNumber, project, canOperate]);
+  useEffect(() => {
+    if (!intent) handledIntent.current = undefined;
+  }, [intent]);
 
   const terminal: TerminalAccess = canAttach
     ? {

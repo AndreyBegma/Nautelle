@@ -83,3 +83,22 @@ export function moveCursor(
   if (at === -1) return step === 1 ? order[0] : order.at(-1);
   return order[Math.min(order.length - 1, Math.max(0, at + step))];
 }
+
+/**
+ * What the Board does with a `?accept=1` / `?stop=1` link (⌘K). It waits for
+ * the card and the project detail (the role comes from it, and a viewer's
+ * default would drop the question), and handles each link once.
+ */
+export function linkIntentStep(input: {
+  intent: 'accept' | 'stop' | undefined;
+  cardNumber: number | undefined;
+  projectLoaded: boolean;
+  handled: string | undefined;
+}): { kind: 'wait' } | { kind: 'handle'; key: string } {
+  const { intent, cardNumber, projectLoaded, handled } = input;
+  if (!intent || cardNumber === undefined || !projectLoaded) {
+    return { kind: 'wait' };
+  }
+  const key = `${intent}:${cardNumber}`;
+  return key === handled ? { kind: 'wait' } : { kind: 'handle', key };
+}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { moveCursor, SHORTCUT_GROUPS } from './shortcuts';
+import { linkIntentStep, moveCursor, SHORTCUT_GROUPS } from './shortcuts';
 
 describe('moveCursor (C-393)', () => {
   const order = [3, 7, 9];
@@ -33,5 +33,37 @@ describe('SHORTCUT_GROUPS', () => {
     for (const key of ['j', 'k', 'Enter', 'r', 'a', 'n', '?', 'K']) {
       expect(keys).toContain(key);
     }
+  });
+});
+
+describe('linkIntentStep (C-393)', () => {
+  const base = {
+    intent: 'stop' as const,
+    cardNumber: 12,
+    projectLoaded: true,
+    handled: undefined,
+  };
+
+  test('waits while the project detail has not arrived', () => {
+    expect(linkIntentStep({ ...base, projectLoaded: false })).toEqual({
+      kind: 'wait',
+    });
+  });
+
+  test('handles the link once the card and the project are there', () => {
+    expect(linkIntentStep(base)).toEqual({ kind: 'handle', key: 'stop:12' });
+  });
+
+  test('does not handle the same link twice', () => {
+    expect(linkIntentStep({ ...base, handled: 'stop:12' })).toEqual({
+      kind: 'wait',
+    });
+  });
+
+  test('waits without a card or an intent', () => {
+    expect(linkIntentStep({ ...base, cardNumber: undefined }).kind).toBe(
+      'wait',
+    );
+    expect(linkIntentStep({ ...base, intent: undefined }).kind).toBe('wait');
   });
 });
