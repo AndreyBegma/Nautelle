@@ -78,7 +78,11 @@ export const runCard = (
   projectId: string,
   number: number,
   body: RunBoardCardRequest = {},
-) => api(`${cardPath(projectId, number)}/run`, { method: 'POST', body });
+) =>
+  api<BoardCardDetail>(`${cardPath(projectId, number)}/run`, {
+    method: 'POST',
+    body,
+  });
 
 /** #337 D8: the cards this one runs after, with their columns. */
 export const fetchDependencies = (projectId: string, number: number) =>

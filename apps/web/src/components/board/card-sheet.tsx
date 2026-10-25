@@ -39,6 +39,7 @@ import {
 } from '../../lib/attachments/format';
 import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploads';
 import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
+import { stopLeavesQueue } from '../../lib/board/card-confirm';
 import { runWaitsFor } from '../../lib/board/dependencies';
 import {
   escalationAsk,
@@ -928,7 +929,7 @@ export function CardDetailBody({
           disabled={actions.busy}
           onClick={() => actions.askStop(card)}
         >
-          Stop
+          {stopLeavesQueue(card) ? 'Remove from queue' : 'Stop'}
         </Button>
       ) : null}
       {card.sessionId ? (

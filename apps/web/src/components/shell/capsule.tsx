@@ -4,10 +4,11 @@ import { ActionList } from '@andrewbehma/glass-ui/action-list';
 import { BottomCapsule } from '@andrewbehma/glass-ui/bottom-capsule';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import type { ProjectSummary, Role } from '@nautelle/shared';
-import { Plus, SquarePen } from 'lucide-react';
+import { Plus, SquarePen, Zap } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { boardNewWorkHref } from '../../lib/board/href';
+import { useQuickCard } from '../board/quick-card-context';
 import { MorePages, renderLink } from './more-pages';
 import type { VisibleEntry, VisibleSection } from './nav';
 import { capsuleAction, type PageAction } from './page-actions';
@@ -32,6 +33,7 @@ export function Capsule({
   role,
   waitingApprovals,
   slotsNeedingAttention,
+  inboxWaiting,
 }: {
   /** Every section the role sees here. */
   sections: VisibleSection[];
@@ -45,6 +47,8 @@ export function Capsule({
   role: Role;
   waitingApprovals: number;
   slotsNeedingAttention: number;
+  /** C-390: the Inbox's items, across projects. */
+  inboxWaiting: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -70,7 +74,23 @@ export function Capsule({
         : null,
     [projectId, router],
   );
-  const plus = capsuleAction(registered, role, fallback);
+  const quickCard = useQuickCard();
+  const always = useMemo<PageAction[]>(
+    () =>
+      projectId
+        ? [
+            {
+              id: 'quick-card',
+              label: 'Quick card',
+              icon: Zap,
+              onSelect: () => quickCard(projectId),
+              operatorOnly: true,
+            },
+          ]
+        : [],
+    [projectId, quickCard],
+  );
+  const plus = capsuleAction(registered, role, fallback, always);
 
   return (
     <>
@@ -108,7 +128,7 @@ export function Capsule({
           open: moreOpen,
           onOpenChange: setMoreOpen,
           // BottomCapsuleTab has no `badge` (docs/ui/glass-ui.md): the counts
-          // the rail shows on Queue and Fleet head More's sheet instead.
+          // the rail shows on Inbox, Queue and Fleet head More's sheet instead.
           children: (
             <MorePages
               sections={sections}
@@ -118,6 +138,7 @@ export function Capsule({
               projectName={projectName}
               waitingApprovals={waitingApprovals}
               slotsNeedingAttention={slotsNeedingAttention}
+              inboxWaiting={inboxWaiting}
             />
           ),
         }}

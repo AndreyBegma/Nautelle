@@ -1,4 +1,5 @@
 export { ReadinessModule } from './readiness.module';
+export { ReadinessService } from './readiness.service';
 export {
   type NoProfileFailure,
   type ProfileProject,

@@ -1,8 +1,14 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CryptoModule } from '../common/crypto';
 import { SettingsModule } from '../settings/settings.module';
+import { ApiTokenScopeInterceptor } from './api-token-scope.interceptor';
+import {
+  AdminApiTokensController,
+  ApiTokensController,
+} from './api-tokens.controller';
+import { ApiTokensService } from './api-tokens.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { CsrfGuard } from './guards/csrf.guard';
@@ -21,10 +27,11 @@ import { TwoFactorService } from './two-factor.service';
     // (spec D8) and the password change (C-109).
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 10 }]),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, ApiTokensController, AdminApiTokensController],
   providers: [
     AuthService,
     SessionService,
+    ApiTokensService,
     LoginThrottle,
     LoginThrottleAlerts,
     TwoFactorService,
@@ -32,6 +39,8 @@ import { TwoFactorService } from './two-factor.service';
     { provide: APP_GUARD, useClass: SessionGuard },
     { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    // C-403: after every guard, a project-limited token's last check.
+    { provide: APP_INTERCEPTOR, useClass: ApiTokenScopeInterceptor },
   ],
   exports: [SessionService, LoginThrottleAlerts, TwoFactorService],
 })

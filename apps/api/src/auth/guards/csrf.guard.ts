@@ -3,6 +3,7 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { authError } from '../auth-error';
+import { getAuth } from '../auth-request';
 import { BEARER_BODY_KEY, IS_PUBLIC_KEY } from '../decorators';
 import { csrfTokenFor } from '../session.service';
 import { safeEqual } from '../tokens';
@@ -16,6 +17,9 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * rather than against a cookie an attacker might plant. Public routes have no
  * session, but a state-changing request must be JSON: a cross-site form cannot
  * send that without a CORS preflight.
+ *
+ * C-403: a request the session guard authenticated with a personal API token
+ * needs no CSRF token — a cross-site page cannot set `Authorization`.
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {
@@ -40,6 +44,8 @@ export class CsrfGuard implements CanActivate {
       }
       return true;
     }
+
+    if (getAuth(request)?.apiToken) return true;
 
     const cookies = request.cookies as Record<string, string | undefined>;
     const sessionToken = cookies[SESSION_COOKIE];

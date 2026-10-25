@@ -14,6 +14,7 @@ import { RuntimeProfileResolver } from './runtime-profile.resolver';
   imports: [ProjectsModule, RunnersModule],
   controllers: [ReadinessController],
   providers: [ReadinessService, RuntimeProfileResolver],
-  exports: [RuntimeProfileResolver],
+  // C-390: the Inbox lists each project's Run blockers.
+  exports: [ReadinessService, RuntimeProfileResolver],
 })
 export class ReadinessModule {}

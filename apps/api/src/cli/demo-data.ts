@@ -1,4 +1,7 @@
-import { captureFingerprint } from '@nautelle/shared';
+import {
+  type CardNeedsPersonReason,
+  captureFingerprint,
+} from '@nautelle/shared';
 import type { BoardColumn, CardEffort, PrismaClient } from '@prisma/client';
 
 /**
@@ -34,24 +37,53 @@ export const maintenanceUrl = (url: string): string => {
 export const DEMO_RUNNER_ID = 'demo-runner';
 export const DEMO_PROJECT_ID = 'demo-project';
 
+/**
+ * C-398 (ADR-0102): the demo Board runs one card worker at a time, so the
+ * running card fills it and the queued cards wait for a slot.
+ */
+export const DEMO_MAX_RUNNING = 1;
+
 /** The cards of the demo Board: a few in each working column. */
 export const DEMO_CARDS: ReadonlyArray<{
   title: string;
   column: BoardColumn;
   kind: 'feature' | 'bug';
   /**
-   * C-359: a round 1 launched with this model and effort. It finished, or
-   * (C-399) a hard budget paused it.
+   * C-359: round 1 launched with this model and effort. It finished, or
+   * (C-399) a hard budget paused it, or (C-398) a worker is still at it.
    */
-  round?: { model: string; effort: CardEffort; paused?: true };
+  round?: {
+    model: string;
+    effort: CardEffort;
+    paused?: true;
+    running?: true;
+  };
+  /** C-398: Run was pressed on a full Board; the card waits for a slot. */
+  queued?: true;
   /**
    * C-389: a PR recorded as merged into the project base while the card sat
    * in Finished — the API's sweep moves it to Completed by itself.
    */
   mergedPr?: number;
+  /** C-390: an open PR on `branch`, so the card waits in the Inbox to merge. */
+  openPr?: { number: number; branch: string };
+  /** C-390: the card needs a person, so the Inbox lists it with Retry. */
+  needsPerson?: CardNeedsPersonReason;
+  /** C-394: a design drawn and waiting for approval, with one frame. */
+  design?: true;
 }> = [
-  { title: 'Export the activity feed as CSV', column: 'todo', kind: 'feature' },
-  { title: 'Dark mode for the settings page', column: 'todo', kind: 'feature' },
+  {
+    title: 'Export the activity feed as CSV',
+    column: 'todo',
+    kind: 'feature',
+    queued: true,
+  },
+  {
+    title: 'Dark mode for the settings page',
+    column: 'todo',
+    kind: 'feature',
+    queued: true,
+  },
   {
     title: 'Board search misses cards with emoji',
     column: 'todo',
@@ -61,6 +93,7 @@ export const DEMO_CARDS: ReadonlyArray<{
     title: 'Show the runner version in the header',
     column: 'in_progress',
     kind: 'feature',
+    round: { model: 'claude-sonnet-5-5', effort: 'medium', running: true },
   },
   {
     title: 'Retry a failed collect from the card',
@@ -75,12 +108,37 @@ export const DEMO_CARDS: ReadonlyArray<{
     mergedPr: 42,
   },
   {
+    title: 'Gift cards in the cart',
+    column: 'finished',
+    kind: 'feature',
+    openPr: { number: 43, branch: 'card/c7-gift-cards' },
+  },
+  {
+    title: 'Order history pages past 100 orders',
+    column: 'finished',
+    kind: 'bug',
+    openPr: { number: 44, branch: 'card/c8-order-history' },
+    needsPerson: 'ci_still_failing',
+  },
+  {
     title: 'Import products from a CSV file',
     column: 'in_progress',
     kind: 'feature',
     round: { model: 'claude-sonnet-5-5', effort: 'medium', paused: true },
   },
+  {
+    title: 'Redesign the order summary',
+    column: 'todo',
+    kind: 'feature',
+    design: true,
+  },
 ];
+
+const DEMO_DESIGN_FRAME_HTML =
+  '<!doctype html><html><body style="margin:0;font-family:sans-serif;background:#f4f4f5">' +
+  '<header style="padding:16px 24px;background:#18181b;color:#fff"><b>Order summary</b></header>' +
+  '<main style="padding:24px"><div style="background:#fff;border-radius:12px;padding:16px">' +
+  '<p>2 items</p><p><b>Total: $48.00</b></p></div></main></body></html>';
 
 /**
  * C-389: runs that failed an hour ago. Needs you lists the card's; the
@@ -114,7 +172,19 @@ export const DEMO_FAILED_RUNS: ReadonlyArray<{
 export const seedDemo = async (
   prisma: Pick<
     PrismaClient,
-    'user' | 'runner' | 'project' | 'boardCard' | 'run' | 'boardCardRound'
+    | 'user'
+    | 'runner'
+    | 'project'
+    | 'boardSettings'
+    | 'repositoryPushCheck'
+    | 'boardCard'
+    | 'run'
+    | 'boardCardRound'
+    | 'boardRunQueueCard'
+    | 'taskDesign'
+    | 'planTurn'
+    | 'designRevision'
+    | 'designFrame'
   >,
   adminEmail: string,
 ): Promise<{ projectId: string; cards: number }> => {
@@ -147,10 +217,35 @@ export const seedDemo = async (
       defaultBranch: 'main',
       hasClaudeMd: true,
       hasAgentsMd: false,
+      // C-395: what the Ready to run block reads; the runner stays offline.
+      hasDemoflowConfig: true,
       lastInspectedAt: now,
       createdById: admin.id,
       members: { create: { userId: admin.id, addedById: admin.id } },
     },
+  });
+  // C-395: the push check Ready to run reads (C-396 keeps it per runner and path).
+  await prisma.repositoryPushCheck.upsert({
+    where: {
+      runnerId_rootPath: {
+        runnerId: DEMO_RUNNER_ID,
+        rootPath: '/srv/demo/acme-shop',
+      },
+    },
+    update: {},
+    create: {
+      runnerId: DEMO_RUNNER_ID,
+      rootPath: '/srv/demo/acme-shop',
+      ok: true,
+      remote: 'git@github.com:acme/shop.git',
+      message: 'origin accepts pushes from this checkout.',
+      checkedAt: now,
+    },
+  });
+  await prisma.boardSettings.upsert({
+    where: { projectId: DEMO_PROJECT_ID },
+    update: {},
+    create: { projectId: DEMO_PROJECT_ID, maxRunning: DEMO_MAX_RUNNING },
   });
 
   for (const [index, card] of DEMO_CARDS.entries()) {
@@ -189,9 +284,108 @@ export const seedDemo = async (
               prState: 'merged' as const,
               mergedAt: new Date(now.getTime() - 10 * 60_000),
             }),
+        ...(card.openPr === undefined
+          ? {}
+          : {
+              branch: card.openPr.branch,
+              prNumber: card.openPr.number,
+              prUrl: `https://github.com/acme/shop/pull/${card.openPr.number}`,
+              prState: 'open' as const,
+            }),
+        ...(card.needsPerson === undefined
+          ? {}
+          : { needsPerson: true, needsPersonReason: card.needsPerson }),
       },
     });
+    if (card.design) {
+      const runId = `demo-run-design-${number}`;
+      const drawnAt = new Date(now.getTime() - 10 * 60_000);
+      await prisma.run.upsert({
+        where: { id: runId },
+        update: {},
+        create: {
+          id: runId,
+          kind: 'plan',
+          projectId: DEMO_PROJECT_ID,
+          title: `C-${number} design`,
+          runtime: 'claude',
+          status: 'succeeded',
+          triggeredByType: 'user',
+          triggeredById: admin.id,
+          startedAt: new Date(drawnAt.getTime() - 3 * 60_000),
+          endedAt: drawnAt,
+          updatedAt: drawnAt,
+        },
+      });
+      const design = await prisma.taskDesign.upsert({
+        where: { cardId: created.id },
+        update: {},
+        create: {
+          cardId: created.id,
+          needed: true,
+          status: 'reviewing',
+        },
+      });
+      const turn = await prisma.planTurn.upsert({
+        where: { runId },
+        update: {},
+        create: {
+          cardId: created.id,
+          runId,
+          action: 'design',
+          authorId: admin.id,
+          input: {},
+          phase: 'succeeded',
+          finishedAt: drawnAt,
+        },
+      });
+      const revision = await prisma.designRevision.upsert({
+        where: {
+          designId_variant_revision: {
+            designId: design.id,
+            variant: 1,
+            revision: 1,
+          },
+        },
+        update: {},
+        create: {
+          designId: design.id,
+          variant: 1,
+          revision: 1,
+          title: 'Order summary',
+          rationale: 'A compact card with the total on its own line.',
+          turnId: turn.id,
+        },
+      });
+      await prisma.designFrame.upsert({
+        where: {
+          revisionId_position: { revisionId: revision.id, position: 0 },
+        },
+        update: {},
+        create: {
+          revisionId: revision.id,
+          position: 0,
+          name: 'Screen',
+          slug: 'screen',
+          html: DEMO_DESIGN_FRAME_HTML,
+          kind: 'screen',
+        },
+      });
+    }
+    if (card.queued) {
+      await prisma.boardRunQueueCard.upsert({
+        where: { cardId: created.id },
+        update: {},
+        create: {
+          cardId: created.id,
+          status: 'queued',
+          queuedById: admin.id,
+          queuedByRole: 'admin',
+        },
+      });
+    }
     if (card.round) {
+      const running = card.round.running === true;
       const paused = card.round.paused === true;
       const runId = `demo-run-${number}`;
       const startedAt = new Date(now.getTime() - 20 * 60_000);
@@ -206,12 +400,12 @@ export const seedDemo = async (
           runtime: 'claude',
           model: card.round.model,
           args: { card: number, round: 1, trigger: 'run' },
-          status: paused ? 'abandoned' : 'succeeded',
+          status: running ? 'running' : paused ? 'abandoned' : 'succeeded',
           ...(paused ? { outcome: 'Paused: a hard budget was reached' } : {}),
           triggeredByType: 'user',
           triggeredById: admin.id,
           startedAt,
-          endedAt: now,
+          endedAt: running ? null : now,
           updatedAt: now,
         },
       });
@@ -227,18 +421,20 @@ export const seedDemo = async (
           cardBody: '',
           cardKind: card.kind,
           authorId: admin.id,
-          ...(paused
-            ? { phase: 'cancelled', pausedFor: 'budget' }
-            : {
-                phase: 'finished',
-                finishedBy: 'worker',
-                summary: 'Added a Retry collect button to the card.',
-                endedAt: now,
-              }),
+          ...(running
+            ? { phase: 'running' }
+            : paused
+              ? { phase: 'cancelled', pausedFor: 'budget' }
+              : {
+                  phase: 'finished',
+                  finishedBy: 'worker',
+                  summary: 'Added a Retry collect button to the card.',
+                  finishedAt: now,
+                  endedAt: now,
+                }),
           model: card.round.model,
           effort: card.round.effort,
           startedAt,
-          finishedAt: now,
         },
       });
     }

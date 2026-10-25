@@ -74,9 +74,13 @@ export const repoNameSchema = z
   .string()
   .regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/, 'must be owner/name');
 
-/** Where the base branch came from, in the order D4 tries them. */
+/**
+ * Where the base branch came from, in the order D4 tries them. `develop`
+ * (C-396): `origin/develop` exists and had a commit lately.
+ */
 export const baseSourceSchema = z.enum([
   'config',
+  'develop',
   'origin_head',
   'gh',
   'default',
@@ -177,6 +181,8 @@ export const projectInspectionSchema = z.object({
   }),
   hasClaudeMd: z.boolean(),
   hasAgentsMd: z.boolean(),
+  /** C-395: `demoflow.config.json` at the root. Absent from a runner older than the field. */
+  hasDemoflowConfig: z.boolean().optional(),
   docs: docsSourceSchema,
   /** Human-readable notes for the preview. */
   warnings: z.array(z.string()),

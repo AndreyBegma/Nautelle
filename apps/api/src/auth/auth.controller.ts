@@ -32,7 +32,12 @@ import { AuthService } from './auth.service';
 import { authError, SourceThrottledFilter } from './auth-error';
 import type { AuthenticatedRequest, AuthUser } from './auth-request';
 import { clearSessionCookies, setSessionCookies } from './cookies';
-import { AllowedBeforeTwoFactorSetup, Public } from './decorators';
+import {
+  AllowedBeforeTwoFactorSetup,
+  ProjectScopedTokenAllowed,
+  Public,
+  SessionOnly,
+} from './decorators';
 import {
   ChangePasswordDto,
   LoginDto,
@@ -46,7 +51,9 @@ import { TwoFactorService } from './two-factor.service';
 
 // An admin who must still set up two-factor sign-in (C-189) can do it here,
 // see who they are, change their password and sign out — nothing else.
+// C-403: an API token may only ask who it is.
 @AllowedBeforeTwoFactorSetup()
+@SessionOnly()
 @Controller('auth')
 @UseFilters(SourceThrottledFilter)
 export class AuthController {
@@ -109,8 +116,10 @@ export class AuthController {
   }
 
   @Get('me')
+  @SessionOnly(false)
+  @ProjectScopedTokenAllowed()
   async me(@Req() request: AuthenticatedRequest): Promise<CurrentUserResponse> {
-    const user: AuthUser = request.auth.user;
+    const { projectScope: _, ...user }: AuthUser = request.auth.user;
     return {
       ...user,
       twoFactorSetupRequired:
