@@ -404,6 +404,8 @@ enum BaseSource {
   origin_head
   gh
   default
+  /// C-396: `origin/develop` exists and had a commit lately.
+  develop
 }
 
 enum DocsSourceKind {

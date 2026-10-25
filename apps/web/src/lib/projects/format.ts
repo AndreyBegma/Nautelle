@@ -44,6 +44,7 @@ export const DOCS_RULE_LABEL: Record<DocsRule, string> = {
 
 export const BASE_SOURCE_LABEL: Record<BaseSource, string> = {
   config: 'orchestrator.base in the config',
+  develop: 'develop is in use',
   origin_head: 'origin/HEAD',
   gh: 'GitHub default branch',
   default: 'fallback default',
