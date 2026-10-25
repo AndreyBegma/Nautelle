@@ -53,36 +53,6 @@ const design = (status: 'reviewing' | 'approved'): BoardCardView['design'] => ({
   busySince: null,
 });
 
-describe('CardFace taken by a session (#845 D2, D10)', () => {
-  test('a taken card names its session', () => {
-    const html = render('in_progress', {
-      taken: { sessionId: 'abcdef123456', alive: true, branch: null },
-    });
-    expect(html).toContain('taken by abcdef12');
-    expect(html).not.toContain('session ended');
-  });
-
-  test('says "session ended" once the session is gone', () => {
-    const html = render('in_progress', {
-      taken: { sessionId: 'abcdef123456', alive: false, branch: null },
-    });
-    expect(html).toContain('taken by abcdef12');
-    expect(html).toContain('session ended');
-  });
-
-  test('a queued card names the session it waits for', () => {
-    expect(render('todo', { queuedForSessionId: 'zzzzzzzz9999' })).toContain(
-      'queued for zzzzzzzz',
-    );
-  });
-
-  test('an ordinary card shows neither', () => {
-    const html = render('todo');
-    expect(html).not.toContain('taken by');
-    expect(html).not.toContain('queued for');
-  });
-});
-
 describe('CardFace pull request link (#329 D6)', () => {
   for (const column of COLUMNS) {
     test(`shows PR #7 with its state in ${column}`, () => {
@@ -100,263 +70,146 @@ describe('CardFace pull request link (#329 D6)', () => {
     expect(unknown).toContain('PR #7<');
     expect(unknown).not.toContain('·');
   });
-
-  test('a card without a PR shows the issue link only', () => {
-    const html = render('finished', {
-      prNumber: null,
-      prUrl: null,
-      prState: null,
-      issueNumber: 3,
-      issueUrl: 'https://github.com/o/r/issues/3',
-    });
-    expect(html).not.toContain('PR #');
-    expect(html).toContain('Issue #3');
-  });
 });
 
-describe('CardFace usage limit (#741)', () => {
-  test('says the round waits for the limit, and nothing without one', () => {
-    const waiting = render('in_progress', {
-      round: round('running', {
-        quotaWait: { limit: 'session', resetsAt: '2026-10-21T15:00:00.000Z' },
-      }),
-    });
-    expect(waiting).toContain('Waiting for the limit until');
-    expect(render('in_progress', { round: round('running') })).not.toContain(
-      'the limit',
-    );
-  });
-});
-
-describe('CardFace escalation tag (#750)', () => {
-  const face = (card: BoardCardView) =>
-    renderToStaticMarkup(
-      <CardFace
-        projectId="p1"
-        canOperate
-        onOpen={() => undefined}
-        card={card}
-      />,
-    );
-
-  test('an escalated card wears → Opus; any other, or a view from before #750, does not', () => {
-    // `escalated` lands on the view with i750-api; set as the API will.
-    const escalated = Object.assign(fixtureCard(7, 'in_progress'), {
-      escalated: true,
-    });
-    expect(face(escalated)).toContain('→ Opus');
-    expect(face(escalated)).toContain('title="The worker asked for Opus"');
-    expect(face(fixtureCard(7, 'in_progress'))).not.toContain('→ Opus');
-  });
-});
-
-describe('CardFace shipping state (#359)', () => {
-  test('red CI shows the dot and Fixing CI (n/3)', () => {
-    const html = render('in_progress', { ciState: 'red', ciFixAttempts: 2 });
-    expect(html).toContain('aria-label="Checks failed"');
-    expect(html).toContain('Fixing CI (2/3)');
-  });
-
-  test('a merged card in Finished is badged Merged', () => {
-    const html = render('finished', { mergedAt: '2026-10-16T10:00:00.000Z' });
-    expect(html).toContain('Merged');
-  });
-
-  test('no checks, no dot', () => {
-    expect(render('in_progress')).not.toContain('Checks');
-  });
-
-  test('a failed collect is badged Not pushed in the status row (#630)', () => {
-    const html = render('finished', {
-      collectState: 'failed',
-      collectError: 'card.collect failed on the runner',
-    });
-    expect(row(html, 'status')).toContain('Not pushed');
-    expect(render('finished')).not.toContain('Not pushed');
-  });
-
-  test('a diverged branch needs a person and says why, once (#630)', () => {
-    const html = render('finished', {
-      collectState: 'failed',
-      collectError:
-        'origin/x (ab12cd34) has commits the card’s branch never had',
-      needsPerson: true,
-      needsPersonReason: 'branch_diverged',
-    });
-    expect(row(html, 'status')).toContain(
-      'Branch diverged on origin; not pushed',
-    );
-    expect(html).not.toContain('Not pushed');
-  });
-});
-
-describe('CardFace rows (C-35, #423, #778)', () => {
-  const busy = {
-    kind: 'bug' as const,
-    attachmentCount: 2,
-    dependsOn: [{ number: 3, label: 'C-3', column: 'todo' as const }],
-    costUsd: '4.81',
-    stack: {
-      number: 12,
-      label: 'S-12',
-      title: 'Rate limiting',
-      stage: 0,
-      stageTitle: 'Stage 1',
-      gate: null,
-    },
-    readiness: {
-      state: 'waiting' as const,
-      satisfied: 0,
-      total: 1,
-      open: [{ number: 3, label: 'C-3', column: 'todo' as const }],
-    },
-    autoRunWhenReady: true,
+describe('CardFace thin face (C-392)', () => {
+  const failure = {
+    code: 'unknown' as const,
+    message: 'boom',
+    at: '2026-10-16T10:00:00.000Z',
   };
-  const face = (extra: Partial<BoardCardView>, hints?: number) =>
-    renderToStaticMarkup(
-      <CardFace
-        projectId="p1"
-        canOperate
-        menu={MENU}
-        hints={hints}
-        onOpen={() => undefined}
-        card={fixtureCard(7, 'todo', {
-          prNumber: 7,
-          prUrl: 'https://github.com/o/r/pull/7',
-          prState: 'open',
-          ...extra,
-        })}
-      />,
-    );
 
-  test('the header holds only label, Bug and the menu at its end', () => {
-    const html = face(busy, 2);
-    const header = row(html, 'header') ?? '';
-    const order = ['C-7', 'Bug', 'data-menu-trigger'].map((text) =>
-      header.indexOf(text),
-    );
-    for (const at of order) expect(at).toBeGreaterThan(-1);
-    expect(order).toEqual([...order].sort((a, b) => a - b));
-    for (const moved of ['S-12', 'hint', 'attachment', 'after C-3', '$4.81'])
-      expect(header).not.toContain(moved);
-  });
-
-  test('the status row leads with readiness, then the dependency, Auto-run, stack and hints', () => {
-    const status = row(face(busy, 2), 'status') ?? '';
-    const order = [
-      'Waiting · 0 of 1',
-      'after C-3',
-      '>Waits for C-3<',
-      'Auto-run',
-      'title="Part of S-12 Rate limiting"',
-      'title="Triage hints: open the card to apply or dismiss them"',
-    ].map((text) => status.indexOf(text));
-    for (const at of order) expect(at).toBeGreaterThan(-1);
-    expect(order).toEqual([...order].sort((a, b) => a - b));
-  });
-
-  test('the footer holds PR on the left and attachments then cost at its right end', () => {
-    const footer = row(face(busy), 'footer') ?? '';
-    const order = [
-      'PR #7 · Open',
-      'ms-auto',
-      'aria-label="2 attachments"',
-      '$4.81',
-    ].map((text) => footer.indexOf(text));
-    for (const at of order) expect(at).toBeGreaterThan(-1);
-    expect(order).toEqual([...order].sort((a, b) => a - b));
-  });
-
-  test('a cost or attachments alone still draw the footer; nothing at all draws none', () => {
-    const bare = { prNumber: null, prUrl: null, prState: null };
-    expect(row(face({ ...bare, costUsd: '0.12' }), 'footer')).toContain(
-      '$0.12',
-    );
-    expect(row(face({ ...bare, attachmentCount: 1 }), 'footer')).toContain(
-      '1 attachment',
-    );
-    expect(row(face(bare), 'footer')).toBeNull();
-  });
-
-  test('the menu is placed once, in the header, and nowhere else', () => {
-    const html = render('todo', busy);
-    expect(html.split('data-menu-trigger').length).toBe(2);
-    expect(row(html, 'status') ?? '').not.toContain('data-menu-trigger');
-  });
-
-  test('without a menu the header has no end group', () => {
-    const header = row(render('todo', {}, { menu: false }), 'header') ?? '';
-    expect(header).not.toContain('ms-auto');
-  });
-
-  test('the footer carries PR and Issue above a hairline', () => {
-    const extra = {
-      issueNumber: 3,
-      issueUrl: 'https://github.com/o/r/issues/3',
-    };
-    const footer = row(render('in_progress', extra), 'footer') ?? '';
-    expect(footer).toContain('border-t');
-    expect(footer).toContain('PR #7 · Open');
-    expect(footer).toContain('Issue #3');
-    expect(render('in_progress')).not.toContain('Issue #3');
-  });
-
-  test('round, design, hooks, auto-run failure and shipping share the status row', () => {
-    const status =
+  test('the header holds the label, the kind icon, the icons and the menu', () => {
+    const header =
       row(
         render('in_progress', {
+          kind: 'bug',
           design: design('approved'),
-          round: round('running', { hooksMissing: true }),
-          autoRunFailure: {
-            code: 'unknown',
-            message: 'boom',
-            at: '2026-10-16T10:00:00.000Z',
-          },
-          ciState: 'red',
-          ciFixAttempts: 1,
         }),
-        'status',
+        'header',
       ) ?? '';
-    expect(status).toContain('Design approved');
-    expect(status).toContain('Running');
-    expect(status).toContain('Didn’t start');
-    expect(status).toContain('Fixing CI (1/3)');
+    expect(header.indexOf('C-7')).toBeLessThan(
+      header.indexOf('data-kind-icon'),
+    );
+    expect(header).toContain('aria-label="Bug"');
+    expect(header).toContain('aria-label="Design approved"');
+    expect(header.indexOf('data-design-icon')).toBeLessThan(
+      header.indexOf('data-menu-trigger'),
+    );
+    expect(header).not.toContain('>Bug<');
+  });
+
+  test('a dependency and a ready demo are icons with accessible names', () => {
+    const header =
+      row(
+        render('todo', {
+          dependsOn: [{ label: 'C-3', column: 'in_progress' }] as never,
+          demo: { status: 'ready', durationMs: 42_000 } as never,
+        }),
+        'header',
+      ) ?? '';
+    expect(header).toContain('data-dependency-icon');
+    expect(header).toContain('aria-label="Runs after C-3.');
+    expect(header).toContain('data-demo-icon');
+    expect(header).toContain('aria-label="Demo ready');
+  });
+
+  test('a card with nothing to flag draws no icons and no state', () => {
+    const html = render('todo');
+    expect(html).not.toContain('data-design-icon');
+    expect(html).not.toContain('data-dependency-icon');
+    expect(html).not.toContain('data-demo-icon');
+    expect(html).not.toContain('data-face-state');
+  });
+
+  test('a running round is the one state signal', () => {
+    const status =
+      row(render('in_progress', { round: round('running') }), 'status') ?? '';
+    expect(status).toContain('data-face-state="running"');
+    expect(status.split('data-face-state').length).toBe(2);
+  });
+
+  test('the PR with its CI dot is the footer; the issue, cost and attachments are not', () => {
+    const html = render('in_progress', {
+      ciState: 'green',
+      costUsd: '0.3',
+      attachmentCount: 2,
+      issueNumber: 3,
+      issueUrl: 'https://github.com/o/r/issues/3',
+    });
+    const footer = row(html, 'footer') ?? '';
+    expect(footer).toContain('PR #7 · Open');
+    expect(footer).toContain('aria-label="Checks passed"');
+    expect(html).not.toContain('$0.30');
+    expect(html).not.toContain('Issue #3');
+    expect(html).not.toContain('Paperclip');
+  });
+
+  test('a card without a PR draws no footer', () => {
+    const html = render('todo', { prNumber: null, prUrl: null, prState: null });
+    expect(html).not.toContain('data-card-row="footer"');
+  });
+
+  test('what left the face does not come back', () => {
+    const html = render('in_progress', {
+      round: round('running', { hooksMissing: true }),
+      autoRunWhenReady: true,
+      steward: {
+        status: 'open',
+        kind: 'api_error',
+        attempts: 1,
+        max: 2,
+      } as never,
+      restartMode: 'resume',
+      ciState: 'pending',
+      costUsd: '0.3',
+      tokenSaved: { estimateUsd: 0.004, estimateTokens: 1_000 },
+    });
+    for (const gone of [
+      'Auto-run',
+      'Stuck',
+      'resumed',
+      'Checks running',
+      'saved ≈',
+      'Hooks',
+    ]) {
+      expect(row(html, 'status') ?? '').not.toContain(gone);
+    }
+  });
+
+  test('a failed auto-run is the Failed state', () => {
+    const status =
+      row(render('todo', { autoRunFailure: failure }), 'status') ?? '';
+    expect(status).toContain('data-face-state="error"');
+    expect(status).toContain('Failed');
   });
 
   test('the approve offer sits under the status row, not in the header', () => {
     const html = render('todo', { design: design('reviewing') });
-    expect(row(html, 'status') ?? '').toContain('Design in review');
     expect(html).toContain('Approve &amp; run');
     expect(row(html, 'header') ?? '').not.toContain('Approve');
   });
 
-  test('a terminal card puts its badges in the status row and its Session link below', () => {
+  test('a terminal card keeps its Session link; its badges are in the sheet', () => {
     const html = render('in_progress', {
       source: 'terminal',
       tracking: { sessionId: 's-1', alive: true },
-      autoCollect: true,
     });
-    const status = row(html, 'status') ?? '';
-    expect(status).toContain('Terminal');
-    expect(status).toContain('Session running');
-    expect(status).toContain('Automatic work');
     expect(html).toContain('>Session<');
+    expect(row(html, 'status') ?? '').not.toContain('Terminal');
   });
 
-  test('a fleet card shows its badges, its slot line and the Fleet link', () => {
+  test('a fleet card keeps its slot line and the Fleet link', () => {
     const html = render('in_progress', {
       source: 'fleet',
       fleet: {
         issue: 12,
         slot: 'i12-web',
         stage: 'pr_open',
-        slotGone: true,
+        slotGone: false,
         detached: false,
       },
     });
-    const status = row(html, 'status') ?? '';
-    expect(status).toContain('Fleet');
-    expect(status).toContain('Slot gone');
     expect(html).toContain('i12-web · PR open');
     expect(html).toContain('Open in Fleet');
   });
@@ -375,6 +228,19 @@ describe('CardFace rows (C-35, #423, #778)', () => {
     expect(status).toContain('82% sure');
     expect(html).toContain('The session hit three 429s.');
     expect(html).toContain('Source session');
+  });
+
+  test('the title and the PR link are touch targets', () => {
+    const html = render('in_progress');
+    expect(html.split(TAP).length - 1).toBe(2);
+  });
+
+  test('the header grows to the touch target only when it holds the menu', () => {
+    const coarse = 'pointer-coarse:h-(--size-tap)';
+    expect(row(render('todo'), 'header')).toContain(coarse);
+    expect(row(render('todo', {}, { menu: false }), 'header')).not.toContain(
+      coarse,
+    );
   });
 });
 
@@ -402,109 +268,6 @@ describe('PlanTaskFace with the inline menu (C-35)', () => {
     expect(html.indexOf('data-menu-trigger')).toBeLessThan(
       html.indexOf('Task t1'),
     );
-  });
-});
-
-describe('CardFace readiness and Auto-run (#443)', () => {
-  const dep = (number: number, column: BoardColumn) => ({
-    number,
-    label: `C-${number}`,
-    column,
-  });
-
-  test('a ready card shows Ready', () => {
-    const status = row(
-      render('todo', {
-        readiness: { state: 'ready', satisfied: 2, total: 2, open: [] },
-      }),
-      'status',
-    );
-    expect(status).toContain('Ready');
-    expect(status).not.toContain('Waiting');
-  });
-
-  test('a waiting card shows Waiting and what it waits for', () => {
-    const status = row(
-      render('todo', {
-        readiness: {
-          state: 'waiting',
-          satisfied: 1,
-          total: 2,
-          open: [dep(84, 'in_progress')],
-        },
-      }),
-      'status',
-    );
-    expect(status).toContain('Waiting · 1 of 2');
-    expect(status).toContain('Waits for C-84');
-  });
-
-  test('the dependency chip reads a Finished dependency as satisfied (#638)', () => {
-    const status = (column: BoardColumn) =>
-      row(render('todo', { dependsOn: [dep(3, column)] }), 'status') ?? '';
-    expect(status('finished')).toContain('Runs after C-3, all ready.');
-    expect(status('in_progress')).toContain('No ready pull request yet: C-3.');
-  });
-
-  test('the Auto-run marker shows only with the switch on', () => {
-    expect(row(render('todo', { autoRunWhenReady: true }), 'status')).toContain(
-      'Auto-run',
-    );
-    expect(render('todo')).not.toContain('Auto-run');
-  });
-
-  test('a refused auto-run says it did not start', () => {
-    const html = render('todo', {
-      autoRunFailure: {
-        code: 'max_running',
-        message: '1 of 1 card workers are running in this project',
-        at: '2026-10-16T10:00:00.000Z',
-        after: 84,
-      },
-    });
-    expect(row(html, 'status')).toContain('Didn’t start');
-  });
-});
-
-describe('CardFace touch targets (#497)', () => {
-  test('the title and the footer links are touch targets', () => {
-    const html = render('in_progress', {
-      issueNumber: 3,
-      issueUrl: 'https://github.com/o/r/issues/3',
-    });
-    expect(html.split(TAP).length - 1).toBe(3);
-    expect(row(html, 'footer')?.split(TAP).length).toBe(3);
-  });
-
-  test('the header grows to the touch target only when it holds the menu', () => {
-    const coarse = 'pointer-coarse:h-(--size-tap)';
-    expect(row(render('todo'), 'header')).toContain(coarse);
-    expect(row(render('todo', {}, { menu: false }), 'header')).not.toContain(
-      coarse,
-    );
-  });
-});
-
-describe('CardFace without the token-saver badge (#778)', () => {
-  const tokenSaved = { estimateUsd: 0.004, estimateTokens: 1_000 };
-
-  test('a card that saved tokens shows no saving and no saved line on its face', () => {
-    const html = render('completed', { costUsd: '0.3', tokenSaved });
-    expect(html).not.toContain('saved ≈');
-    expect(html).not.toContain('Token saver kept');
-    expect(html).not.toContain('data-card-row="saved"');
-    expect(row(html, 'footer')).toContain('$0.30');
-  });
-
-  test('a narrow card keeps the label whole: nothing in the header shrinks', () => {
-    const header =
-      row(
-        render('todo', { kind: 'bug', costUsd: '0.3', tokenSaved }),
-        'header',
-      ) ?? '';
-    expect(render('todo')).toContain('@container');
-    expect(header).not.toContain('truncate');
-    expect(header).not.toContain('@max-[15rem]');
   });
 });
 
@@ -563,55 +326,5 @@ describe('the selection slot (#596)', () => {
     );
     expect(html).toContain('size-4');
     expect(html).not.toContain('invisible');
-  });
-});
-
-describe('CardFace review stage (#891)', () => {
-  const rv = (over: Partial<NonNullable<BoardCardView['review']>> = {}) => ({
-    state: 'running' as const,
-    currentStep: 'Security',
-    stepIndex: 1,
-    stepCount: 3,
-    fixRound: 0,
-    fixLimit: 3,
-    steps: [],
-    ...over,
-  });
-  test('running shows the step and position in a truncating chip', () => {
-    const html = render('in_progress', { ciState: 'green', review: rv() });
-    expect(row(html, 'status')).toContain('Reviewing · Security (2/3)');
-    expect(html).toContain('data-review-chip');
-    expect(html).toContain('truncate');
-  });
-  test('fixing shows the round and limit', () => {
-    const html = render('in_progress', {
-      ciState: 'green',
-      review: rv({ state: 'fixing', fixRound: 2 }),
-    });
-    expect(row(html, 'status')).toContain('Fixing review (2/3)');
-  });
-  test('needs-person names the review, not CI', () => {
-    const html = render('in_progress', {
-      ciState: 'green',
-      needsPerson: true,
-      needsPersonReason: 'review_still_blocking',
-      review: rv({ state: 'needs_person', fixRound: 3 }),
-    });
-    expect(row(html, 'status')).toContain(
-      'Review still blocking after 3 fixes',
-    );
-    expect(html).not.toContain('CI still failing');
-  });
-  test('a passed Finished card shows the readiness line', () => {
-    const html = render('finished', {
-      ciState: 'green',
-      review: rv({ state: 'passed', fixRound: 1 }),
-    });
-    expect(html).toContain('CI passed · Review passed · Fixes done');
-  });
-  test('review off looks as before', () => {
-    const html = render('in_progress', { ciState: 'pending', review: null });
-    expect(html).not.toContain('data-review');
-    expect(html).toContain('Checks running');
   });
 });
