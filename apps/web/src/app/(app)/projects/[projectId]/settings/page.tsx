@@ -35,6 +35,7 @@ import { useTabParam } from '../../../../../lib/projects/use-tab-param';
 import { STATUS_TONE } from '../../../../../lib/runners/format';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { AiDigestTab } from './ai-digest-tab';
+import { AwayTab } from './away-tab';
 import { BoardTab } from './board-tab';
 import { BudgetTab } from './budget/budget-tab';
 import { DemoVideosTab } from './demo-videos-tab';
@@ -139,6 +140,14 @@ const BLOCKS: Readonly<
   ),
   sessions: ({ project, isAdmin, reload }) => (
     <SessionsTab project={project} isAdmin={isAdmin} onChanged={reload} />
+  ),
+  away: ({ project, isAdmin, canOperate, reload }) => (
+    <AwayTab
+      project={project}
+      isAdmin={isAdmin}
+      canOperate={canOperate}
+      onChanged={reload}
+    />
   ),
 };
 

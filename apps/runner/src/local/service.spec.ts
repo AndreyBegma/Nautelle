@@ -386,6 +386,31 @@ describe('LocalService — requests (spec 201 D6, D9, D17)', () => {
     expect(toolArgs(relayed).sha256).not.toBe('f'.repeat(64));
   });
 
+  it('redacts the suggested rules like the input, and drops what is not a rule (C-401)', async () => {
+    const { service, relayed } = setup(false);
+    const request = toolUse(`{"command":"echo ${GHP}"}`);
+    Object.assign(request.args.args, {
+      suggestions: [
+        { toolName: 'Bash', ruleContent: `echo ${GHP}` },
+        { toolName: 'Bash', ruleContent: 'npm test:*' },
+        { toolName: 'WebFetch' },
+        { type: 'setMode', mode: 'acceptEdits' },
+        'Bash(*)',
+      ],
+    });
+    await service.handle('request', request, as('s-1'));
+    const { suggestions } = toolArgs(relayed);
+    expect(JSON.stringify(suggestions)).not.toContain('ghp_');
+    expect(suggestions).toEqual([
+      { toolName: 'Bash', ruleContent: `echo ${MASK}` },
+      { toolName: 'Bash', ruleContent: 'npm test:*' },
+      { toolName: 'WebFetch' },
+    ]);
+    // None suggested, none sent.
+    await service.handle('request', toolUse('{"command":"ls"}'), as('s-1'));
+    expect(toolArgs(relayed.slice(1))).not.toHaveProperty('suggestions');
+  });
+
   it('answers ping with away mode, liveness and the project of the token', async () => {
     const { service } = setup(false, false);
     expect(

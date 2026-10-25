@@ -8,7 +8,12 @@ import { validNote } from '../handoff/testing';
 import { type LocalHandler, LocalSocketServer } from '../local/server';
 import type { LocalResult } from '../local/types';
 import { fakeExec, memoryLogger, tempDir } from '../testing/fixtures';
-import { clipToolInput, PERMISSION_TOOL_INPUT_MAX } from './permission';
+import {
+  clipToolInput,
+  PERMISSION_TOOL_INPUT_MAX,
+  PERMISSION_WAIT_MAX_MS,
+  waitMsOf,
+} from './permission';
 import { type HookDeps, runHook } from './run';
 
 const fixture = (name: string): string =>
@@ -17,6 +22,7 @@ const fixture = (name: string): string =>
 const summary = (
   status: ActionRequestSummary['status'],
   note: string | null = null,
+  extra: Partial<ActionRequestSummary> = {},
 ): ActionRequestSummary => ({
   id: 'ar_1',
   projectId: 'prj_app',
@@ -32,6 +38,7 @@ const summary = (
   note,
   expiresAt: '2026-10-14T10:05:00.000Z',
   createdAt: '2026-10-14T10:00:00.000Z',
+  ...extra,
 });
 
 interface Call {
@@ -462,8 +469,8 @@ describe('nautelle-runner hook (spec 201 D11–D17)', () => {
         return 'ok' in next ? next : { ok: true, data: next };
       });
 
-    const run = () =>
-      runHook(['permission-request'], deps(fixture('permission-request')));
+    const run = (stdin = fixture('permission-request')) =>
+      runHook(['permission-request'], deps(stdin));
 
     it('with away mode off reports the event and decides nothing, at once', async () => {
       away(false, []);
@@ -532,14 +539,79 @@ describe('nautelle-runner hook (spec 201 D11–D17)', () => {
       expect(stdout).toEqual([]);
     });
 
-    it('gives up after ACTION_REQUEST_HOOK_WAIT_MS of pending', async () => {
+    it('gives up when a pending request expires, polling slower after 280 s', async () => {
       clock = 0;
       away(true, []);
       await run();
       expect(stdout).toEqual([]);
       const polls = calls.filter((c) => c.args.method === 'action.status');
-      expect(polls).toHaveLength(140);
-      expect(clock).toBe(280_000);
+      // 140 polls 2 s apart, then two 10 s apart, to the five-minute expiry.
+      expect(polls).toHaveLength(142);
+      expect(clock).toBe(300_000);
+    });
+
+    it('forwards Claude’s addRules allows, and nothing else it suggests (C-401)', async () => {
+      const input = JSON.parse(fixture('permission-request'));
+      input.permission_suggestions.push(
+        { type: 'setMode', mode: 'acceptEdits', destination: 'session' },
+        {
+          type: 'addRules',
+          rules: [{ toolName: 'Bash', ruleContent: 'rm:*' }],
+          behavior: 'deny',
+          destination: 'localSettings',
+        },
+      );
+      away(true, [summary('approved')]);
+      await run(JSON.stringify(input));
+      const request = calls.find((c) => c.args.method === 'action.request');
+      expect(
+        (request?.args.args as { args: Record<string, unknown> }).args
+          .suggestions,
+      ).toEqual([{ toolName: 'Bash', ruleContent: 'rm -rf node_modules' }]);
+    });
+
+    it('allows at once a request a stored rule approved (C-401)', async () => {
+      away(true, [], {
+        ok: true,
+        data: summary('approved', 'Allowed by the session rule Bash(ls:*)', {
+          ruleId: 'tr_1',
+        }),
+      });
+      await run();
+      expect(calls.filter((c) => c.args.method === 'action.status')).toEqual(
+        [],
+      );
+      expect(JSON.parse(stdout.join('')).hookSpecificOutput.decision).toEqual({
+        behavior: 'allow',
+      });
+    });
+
+    it('keeps an unattended session waiting as long as the request lives (C-401)', async () => {
+      clock = 0;
+      const hour = { expiresAt: '2026-10-14T11:00:00.000Z' };
+      away(true, [], { ok: true, data: summary('pending', null, hour) });
+      await run();
+      expect(stdout).toEqual([]);
+      expect(clock).toBe(3_600_000);
+      expect(
+        calls.filter((c) => c.args.method === 'action.status'),
+      ).toHaveLength(140 + (3_600_000 - 280_000) / 10_000);
+    });
+
+    it('reads the wait off the API clock, within the hook timeout (C-401)', () => {
+      expect(waitMsOf(summary('pending'))).toBe(300_000);
+      expect(
+        waitMsOf(
+          summary('pending', null, {
+            createdAt: '2026-10-14T10:00:00.000Z',
+            expiresAt: '2026-10-15T10:00:00.000Z',
+          }),
+        ),
+      ).toBe(PERMISSION_WAIT_MAX_MS);
+      expect(PERMISSION_WAIT_MAX_MS).toBeGreaterThanOrEqual(12 * 3_600_000);
+      expect(
+        waitMsOf(summary('pending', null, { expiresAt: 'not a date' })),
+      ).toBe(280_000);
     });
   });
 });

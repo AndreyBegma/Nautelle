@@ -158,6 +158,11 @@ export interface ProjectDetail extends ProjectSummary {
   /** ADR-0021; optional until the API returns them (spec 201). */
   shipSessionContent?: boolean;
   sessionContentRetentionDays?: number;
+  /**
+   * C-401: how long a tool-use request of this project waits for a person,
+   * in minutes; null leaves it to the requester's account (default 5).
+   */
+  toolUseTimeoutMinutes: number | null;
   /** What the project's runner said it serves in its latest hello (#233); null = unknown. Names only, never paths or versions. */
   runnerCommands: RunnerCommands | null;
 }
@@ -285,6 +290,8 @@ export interface UpdateProjectRequest {
   shipSessionContent?: boolean;
   /** 1–365 (`SESSION_CONTENT_RETENTION_DAYS`). */
   sessionContentRetentionDays?: number;
+  /** C-401: 1–720 (`TOOL_USE_TIMEOUT_*_MINUTES`); null clears it. */
+  toolUseTimeoutMinutes?: number | null;
 }
 
 /**

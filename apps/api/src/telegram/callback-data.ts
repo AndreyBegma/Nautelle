@@ -25,10 +25,19 @@ export const CALLBACK_DATA_MAX = 64;
 
 /**
  * Prefixes the hand-written codecs already use on buttons out in chats:
- * `a`/`r` approvals (#82), `x`/`y` action requests (spec 201 D18), `q`
- * question options (#489). A new codec may not take one.
+ * `a`/`r` approvals (#82), `x`/`y` action requests (spec 201 D18) with
+ * `xs`/`xp` for their remembered approvals (C-401), `q` question options
+ * (#489). A new codec may not take one.
  */
-export const LEGACY_CALLBACK_PREFIXES = ['a', 'r', 'x', 'y', 'q'] as const;
+export const LEGACY_CALLBACK_PREFIXES = [
+  'a',
+  'r',
+  'x',
+  'y',
+  'xs',
+  'xp',
+  'q',
+] as const;
 
 /** What a field holds, its shape, and its longest encoding. */
 const FIELDS = {

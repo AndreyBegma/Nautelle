@@ -24,6 +24,7 @@ export const SETTINGS_SECTIONS = [
       { id: 'review', label: 'Review' },
       { id: 'demo-videos', label: 'Demo videos' },
       { id: 'sessions', label: 'Sessions' },
+      { id: 'away', label: 'Away mode' },
       { id: 'steward', label: 'Steward' },
     ],
   },

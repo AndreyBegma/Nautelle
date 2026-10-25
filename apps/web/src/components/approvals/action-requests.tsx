@@ -16,6 +16,7 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   ACTION_REQUEST_NOTE_MAX,
   type ActionRequestSummary,
+  type ToolRuleScope,
 } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
@@ -27,7 +28,9 @@ import {
   issueQueueArgs,
   KIND_LABEL,
   prApproveArgs,
+  REMEMBERED_TOAST,
   recentRequests,
+  rememberOptions,
   requestTitle,
   resultMessage,
   STATUS_LABEL,
@@ -41,7 +44,11 @@ import {
 } from '../../lib/approvals/tool-use-review';
 import { Time } from '../../lib/format/time';
 import { useErrorToast } from '../../lib/section/use-error-toast';
-import { RevealedInput, ToolUseDialogBody } from './tool-use-review';
+import {
+  RememberChoice,
+  RevealedInput,
+  ToolUseDialogBody,
+} from './tool-use-review';
 
 export type Decision = 'approve' | 'deny';
 
@@ -165,6 +172,7 @@ export function useActionRequestDecisions(
   }>();
   const [note, setNote] = useState('');
   const [typed, setTyped] = useState('');
+  const [remember, setRemember] = useState<ToolRuleScope>();
   const [busy, setBusy] = useState(false);
   const showError = useErrorToast();
 
@@ -172,18 +180,26 @@ export function useActionRequestDecisions(
     request: ActionRequestSummary,
     decision: Decision,
     text: string,
+    scope?: ToolRuleScope,
   ) => {
     setBusy(true);
     try {
       const done = await api<ActionRequestSummary & { result?: unknown }>(
         `/projects/${projectId}/action-requests/${request.id}/${decision}`,
-        { method: 'POST', body: text ? { note: text } : {} },
+        {
+          method: 'POST',
+          body: {
+            ...(text ? { note: text } : {}),
+            ...(scope ? { remember: scope } : {}),
+          },
+        },
       );
       if (decision === 'deny') toast.success('Request denied');
       else if (done.status === 'failed') {
         const why = resultMessage(done.result);
         toast.error(`Approved, but it could not run${why ? `: ${why}` : '.'}`);
-      } else toast.success('Request approved');
+      } else if (scope) toast.success(REMEMBERED_TOAST[scope]);
+      else toast.success('Request approved');
     } catch (err) {
       showError(describeActionRequestError(err));
     } finally {
@@ -191,6 +207,7 @@ export function useActionRequestDecisions(
       setAsking(undefined);
       setNote('');
       setTyped('');
+      setRemember(undefined);
       // A refusal such as "already decided" leaves the list stale too.
       onChanged();
     }
@@ -204,6 +221,7 @@ export function useActionRequestDecisions(
     }
     setNote('');
     setTyped('');
+    setRemember(undefined);
     setAsking({ request, decision });
   };
 
@@ -212,6 +230,7 @@ export function useActionRequestDecisions(
       ? asking.request
       : undefined;
   const toolReview = toolAsk ? reviewToolUse(toolAsk) : null;
+  const toolRemember = toolAsk ? rememberOptions(toolAsk) : null;
   const verb = asking?.decision === 'approve' ? 'Approve' : 'Deny';
 
   const dialogs = (
@@ -241,7 +260,7 @@ export function useActionRequestDecisions(
                   busy || !toolReview || !toolUseConfirmable(toolReview, typed)
                 }
                 onClick={() => {
-                  if (toolAsk) void decide(toolAsk, 'approve', '');
+                  if (toolAsk) void decide(toolAsk, 'approve', '', remember);
                 }}
               >
                 Approve
@@ -250,11 +269,21 @@ export function useActionRequestDecisions(
           }
         >
           {toolReview ? (
-            <ToolUseDialogBody
-              review={toolReview}
-              typed={typed}
-              onTyped={setTyped}
-            />
+            <div className="flex flex-col gap-4">
+              <ToolUseDialogBody
+                review={toolReview}
+                typed={typed}
+                onTyped={setTyped}
+              />
+              {toolRemember ? (
+                <RememberChoice
+                  options={toolRemember}
+                  value={remember}
+                  disabled={busy}
+                  onChange={setRemember}
+                />
+              ) : null}
+            </div>
           ) : (
             <p>
               This request’s input could not be read, so it cannot be approved.

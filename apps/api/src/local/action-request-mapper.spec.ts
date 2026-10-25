@@ -27,6 +27,7 @@ const row = (extra: Partial<ActionRequest> = {}): ActionRequest => ({
   decidedAt: null,
   note: null,
   result: null,
+  ruleId: null,
   expiresAt: new Date('2026-10-18T10:00:00.000Z'),
   createdAt: new Date('2026-10-17T10:00:00.000Z'),
   ...extra,

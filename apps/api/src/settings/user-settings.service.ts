@@ -2,6 +2,7 @@ import {
   APP_VERSION,
   isPlanningModel,
   resolvePlanningModel,
+  type UpdateUserSettingsRequest,
   type UserSettingsView,
   type WhatsNewView,
   whatsNewView,
@@ -25,9 +26,12 @@ export class UserSettingsService {
   async get(userId: string): Promise<UserSettingsView> {
     const row = await this.prisma.userSettings.findUnique({
       where: { userId },
-      select: { planningModel: true },
+      select: { planningModel: true, toolUseTimeoutMinutes: true },
     });
-    return { planningModel: resolvePlanningModel(row?.planningModel) };
+    return {
+      planningModel: resolvePlanningModel(row?.planningModel),
+      toolUseTimeoutMinutes: row?.toolUseTimeoutMinutes ?? null,
+    };
   }
 
   /** The model New Card and New Plan preselect, and a plan takes by default. */
@@ -35,30 +39,43 @@ export class UserSettingsService {
     return (await this.get(userId)).planningModel;
   }
 
-  /** `null` clears the setting back to `PLANNING_MODEL_DEFAULT`. */
+  /**
+   * Writes the fields given; `null` clears one back to its default
+   * (`PLANNING_MODEL_DEFAULT`, the five-minute tool-use timeout).
+   */
   async update(
     userId: string,
-    planningModel: string | null,
+    change: UpdateUserSettingsRequest,
     ctx: AuditContext,
   ): Promise<UserSettingsView> {
-    if (!isPlanningModel(planningModel)) {
+    const { planningModel, toolUseTimeoutMinutes } = change;
+    if (planningModel === undefined && toolUseTimeoutMinutes === undefined) {
+      throw new BadRequestException(
+        'Give planningModel or toolUseTimeoutMinutes',
+      );
+    }
+    if (planningModel !== undefined && !isPlanningModel(planningModel)) {
       throw new BadRequestException(
         'planningModel must be a model of the catalog, or null',
       );
     }
+    const data = {
+      ...(planningModel !== undefined ? { planningModel } : {}),
+      ...(toolUseTimeoutMinutes !== undefined ? { toolUseTimeoutMinutes } : {}),
+    };
     const before = await this.get(userId);
     await this.prisma.userSettings.upsert({
       where: { userId },
-      update: { planningModel },
-      create: { userId, planningModel },
+      update: data,
+      create: { userId, ...data },
     });
     const after = await this.get(userId);
     await this.audit.record({
       ...ctx,
       action: 'user.update',
       target: { type: 'user', id: userId },
-      before: { planningModel: before.planningModel },
-      after: { planningModel: after.planningModel },
+      before,
+      after,
       result: 'ok',
     });
     return after;

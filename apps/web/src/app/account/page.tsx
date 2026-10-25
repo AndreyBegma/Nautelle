@@ -27,6 +27,7 @@ import { Time } from '../../lib/format/time';
 import { useErrorToast } from '../../lib/section/use-error-toast';
 import { useSection } from '../../lib/section/use-section';
 import { ApiTokensCard } from './api-tokens-card';
+import { AwayTimeoutCard } from './away-timeout-card';
 import { PlanningModelCard } from './planning-model-card';
 import { TwoFactorCard } from './two-factor-card';
 import { parseUserAgent } from './user-agent';
@@ -245,11 +246,12 @@ export default function AccountPage() {
     <div>
       <PageHeader
         title="Account"
-        description="Your profile, planning model, password, two-factor sign-in, the devices signed in as you and your API tokens."
+        description="Your profile, planning model, away mode timeout, password, two-factor sign-in, the devices signed in as you and your API tokens."
       />
       <div className="flex flex-col gap-6">
         <Profile user={user} />
         <PlanningModelCard />
+        <AwayTimeoutCard />
         <PasswordCard />
         <TwoFactorCard />
         <SessionsCard />

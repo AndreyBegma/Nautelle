@@ -1,4 +1,7 @@
 import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { Radio, RadioGroup } from '@andrewbehma/glass-ui/radio-group';
+import type { ToolRuleScope } from '@nautelle/shared';
+import type { rememberOptions } from '../../lib/approvals/action-requests';
 import {
   type InputSegment,
   REDACTION_MASK,
@@ -94,5 +97,59 @@ export function ToolUseDialogBody({
         </div>
       ) : null}
     </div>
+  );
+}
+
+const SCOPE_LABEL: Record<ToolRuleScope, string> = {
+  session: 'Allow similar in this session',
+  project: 'Always allow in this project',
+};
+
+const SCOPE_HINT: Record<ToolRuleScope, string> = {
+  session: 'Until the session ends',
+  project: 'Until you remove the rule in project settings',
+};
+
+/**
+ * C-401: approve this call only, or also allow similar calls — for the rest
+ * of the session or always in this project — by the rules shown; or why
+ * this call always asks.
+ */
+export function RememberChoice({
+  options,
+  value,
+  disabled,
+  onChange,
+}: {
+  options: NonNullable<ReturnType<typeof rememberOptions>>;
+  value: ToolRuleScope | undefined;
+  disabled: boolean;
+  onChange: (value: ToolRuleScope | undefined) => void;
+}) {
+  if (options.reason) {
+    return <p className="text-sm text-ink-3">{options.reason}.</p>;
+  }
+  const rules = options.rules.join(', ');
+  return (
+    <RadioGroup label="Similar calls">
+      <Radio
+        name="tool-use-remember"
+        label="Allow this call only"
+        checked={value === undefined}
+        disabled={disabled}
+        onChange={() => onChange(undefined)}
+      />
+      {options.scopes.map((scope) => (
+        <Radio
+          key={scope}
+          name="tool-use-remember"
+          label={SCOPE_LABEL[scope]}
+          hint={`${SCOPE_HINT[scope]}: ${rules}`}
+          checked={value === scope}
+          disabled={disabled}
+          onChange={() => onChange(scope)}
+        />
+      ))}
+    </RadioGroup>
   );
 }

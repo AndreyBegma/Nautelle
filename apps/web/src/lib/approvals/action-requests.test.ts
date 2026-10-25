@@ -8,6 +8,7 @@ import {
   pendingRequests,
   prApproveArgs,
   recentRequests,
+  rememberOptions,
   requestTitle,
   resultMessage,
   secondsLeft,
@@ -230,5 +231,40 @@ describe('describeActionRequestError', () => {
       /own request/,
     );
     expect(describeActionRequestError(failure(403))).toMatch(/operators/);
+    expect(
+      describeActionRequestError(failure(409, 'not_rememberable')),
+    ).toMatch(/cannot be remembered/);
+  });
+});
+
+describe('rememberOptions (C-401)', () => {
+  const rules = { ok: true as const, rules: ['Bash(npm test:*)'] };
+  test('offers the session and the project for a call from a session', () => {
+    expect(rememberOptions(row({ sessionId: 's', remember: rules }))).toEqual({
+      scopes: ['session', 'project'],
+      rules: ['Bash(npm test:*)'],
+      reason: null,
+    });
+  });
+  test('offers only the project for a call without a session', () => {
+    expect(rememberOptions(row({ remember: rules }))?.scopes).toEqual([
+      'project',
+    ]);
+  });
+  test('says why a call cannot be remembered', () => {
+    expect(
+      rememberOptions(
+        row({
+          sessionId: 's',
+          remember: { ok: false, reason: 'Always asks: deletes files' },
+        }),
+      ),
+    ).toEqual({ scopes: [], rules: [], reason: 'Always asks: deletes files' });
+  });
+  test('is null for another kind, or without the field', () => {
+    expect(rememberOptions(row({ remember: null }))).toBeNull();
+    expect(
+      rememberOptions(row({ kind: 'orchestrator_start', remember: rules })),
+    ).toBeNull();
   });
 });

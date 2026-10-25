@@ -1,4 +1,9 @@
-import type { AuditResult } from '@nautelle/shared';
+import {
+  type AuditResult,
+  TOOL_RULE_SCOPES,
+  type ToolRuleScope,
+  toolUseRememberOf,
+} from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit';
 import { ANONYMOUS_ACTOR, userActor } from '../audit/audit.types';
@@ -84,13 +89,22 @@ export class TelegramActionRequestService {
         status: 'pending',
         expiresAt: { gt: new Date() },
       },
-      select: { id: true },
+      select: { kind: true, args: true, sessionId: true },
     });
     if (!row) return null;
+    // C-401: a call that may be remembered also offers the rule buttons; a
+    // session rule needs the session the call came from.
+    const rememberable = toolUseRememberOf(row)?.ok === true;
+    const remember: ToolRuleScope[] = rememberable
+      ? TOOL_RULE_SCOPES.filter(
+          (scope) => scope !== 'session' || row.sessionId !== null,
+        )
+      : [];
     return {
       inline_keyboard: actionRequestKeyboard({
         notificationId,
         actionRequestId,
+        remember,
       }),
     };
   }
@@ -118,6 +132,8 @@ export class TelegramActionRequestService {
         authorized.decider,
         press.actionRequestId,
         press.action,
+        undefined,
+        press.remember,
       );
       const failure =
         decided.status === 'failed' &&
@@ -128,7 +144,12 @@ export class TelegramActionRequestService {
           ? decided.result.error
           : null;
       return answer(
-        actionRequestDecidedText(press.action, decided.status, failure),
+        actionRequestDecidedText(
+          press.action,
+          decided.status,
+          failure,
+          press.remember,
+        ),
       );
     } catch (error) {
       // The service audited its own refusal.
@@ -189,6 +210,7 @@ export class TelegramActionRequestService {
       after: {
         decision: press.action === 'approve' ? 'approved' : 'denied',
         notificationId: String(press.notificationId),
+        ...(press.remember ? { remember: press.remember } : {}),
       },
       result,
       meta: {

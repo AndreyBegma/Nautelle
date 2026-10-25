@@ -34,9 +34,9 @@ describe('project settings sections (#704)', () => {
     const items: string[] = SETTINGS_SECTIONS.flatMap(({ items }) =>
       items.map(({ id }) => id),
     );
-    // Review (#890), Demo videos (C-371) and Slack (C-405) were never tabs.
+    // Review (#890), Demo videos (C-371), Slack (C-405) and Away mode (C-401) were never tabs.
     expect([...items].sort()).toEqual(
-      [...FORMER_TABS, 'review', 'demo-videos', 'slack'].sort(),
+      [...FORMER_TABS, 'review', 'demo-videos', 'slack', 'away'].sort(),
     );
   });
 
@@ -45,6 +45,7 @@ describe('project settings sections (#704)', () => {
     expect(SETTINGS_ITEM_SECTION['token-saver']).toBe('cost');
     expect(SETTINGS_ITEM_SECTION.sessions).toBe('automation');
     expect(SETTINGS_ITEM_SECTION.orchestrator).toBe('automation');
+    expect(SETTINGS_ITEM_SECTION.away).toBe('automation');
     expect(SETTINGS_ITEM_SECTION.design).toBe('planning');
     expect(SETTINGS_ITEM_SECTION.docs).toBe('project');
     expect(SETTINGS_ITEM_SECTION.general).toBe('project');

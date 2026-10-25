@@ -53,6 +53,7 @@ model User {
   sessionsOwned               AgentSession[]                @relation("SessionOwner")
   actionRequestsRequested     ActionRequest[]               @relation("ActionRequestRequestedBy")
   actionRequestsDecided       ActionRequest[]               @relation("ActionRequestDecidedBy")
+  toolUseRulesCreated         ToolUseRule[]
   projectsCreated             Project[]
   memberships                 ProjectMember[]               @relation("ProjectMembership")
   membersAdded                ProjectMember[]               @relation("ProjectMemberAddedBy")
@@ -121,13 +122,16 @@ model User {
 /// #337 D9: a person's own settings. No row: the defaults (shared
 /// `USER_SETTINGS_DEFAULTS`).
 model UserSettings {
-  userId        String   @id
+  userId                String   @id
   /// The model New Card and New Plan preselect; null: `PLANNING_MODEL_DEFAULT`.
-  planningModel String?
+  planningModel         String?
   /// C-294: the last `APP_VERSION` this person opened What's new on; null:
   /// never. The shell shows an unread dot while it differs.
-  seenVersion   String?
-  updatedAt     DateTime @updatedAt
+  seenVersion           String?
+  /// C-401: minutes a tool-use request of this person's sessions waits for
+  /// a decision where the project sets none; null: 5 (1–720, by the API).
+  toolUseTimeoutMinutes Int?
+  updatedAt             DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -514,6 +518,9 @@ model Project {
   shipSessionContent          Boolean    @default(false)
   /// 1–365, validated by the DTO.
   sessionContentRetentionDays Int        @default(30)
+  /// C-401: minutes a tool-use request waits for a decision; null: the
+  /// requester's own setting, else 5. 1–720, validated by the DTO.
+  toolUseTimeoutMinutes       Int?
   /// The `orchestrator` block of `.code-analyzer-config.json` and/or its parse error.
   codeSentinelConfig          Json?
   hasClaudeMd                 Boolean
@@ -562,6 +569,7 @@ model Project {
   plans                  Plan[]
   sessionContents        SessionContent[]
   actionRequests         ActionRequest[]
+  toolUseRules           ToolUseRule[]
   uiProfiles             UiProfile[]
   designSettings         DesignSettings?
   designTemplates        DesignTemplate[]
@@ -890,6 +898,7 @@ model AgentSession {
   spawnedBy            ToolCall[]            @relation("ToolCallChild")
   compactions          SessionCompaction[]
   errors               SessionError[]
+  toolUseRules         ToolUseRule[]
   workflow             SessionWorkflow?
   workflowMark         SessionWorkflowMark?
   contents             SessionContent[]
@@ -1171,6 +1180,9 @@ model ActionRequest {
   decidedAt     DateTime?
   note          String?
   result        Json?
+  /// C-401: the stored rule that approved this `tool_use` request without a
+  /// person. Null for a person's decision, or once the rule is removed.
+  ruleId        String?
   expiresAt     DateTime
   createdAt     DateTime            @default(now())
 
@@ -1179,10 +1191,49 @@ model ActionRequest {
   session     AgentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   requestedBy User?         @relation("ActionRequestRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
   decidedBy   User?         @relation("ActionRequestDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  rule        ToolUseRule?  @relation("ToolUseRuleAnswered", fields: [ruleId], references: [id], onDelete: SetNull)
+  rulesMade   ToolUseRule[] @relation("ToolUseRuleSource")
 
   @@index([projectId, status, createdAt])
   @@index([status, expiresAt])
   @@map("action_requests")
+}
+
+enum ToolUseRuleScope {
+  session
+  project
+}
+
+/// C-401: "allow similar in this session" or "always allow in this project"
+/// — a Claude Code permission rule (`Bash(npm test:*)`) the API answers later
+/// `tool_use` requests with. Never for a dangerous call (shared
+/// `toolUseDanger`); every use is audited (`tool_rule.used`).
+model ToolUseRule {
+  id              String           @id @default(cuid())
+  projectId       String
+  scope           ToolUseRuleScope
+  /// `session` rules only: the session they hold for.
+  sessionId       String?
+  toolName        String
+  /// The part in parentheses; null: the whole tool.
+  ruleContent     String?
+  /// Nullable so deleting the person keeps the rule.
+  createdById     String?
+  /// The request whose decision stored it.
+  sourceRequestId String?
+  useCount        Int              @default(0)
+  lastUsedAt      DateTime?
+  createdAt       DateTime         @default(now())
+
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session       AgentSession?   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdBy     User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  sourceRequest ActionRequest?  @relation("ToolUseRuleSource", fields: [sourceRequestId], references: [id], onDelete: SetNull)
+  answered      ActionRequest[] @relation("ToolUseRuleAnswered")
+
+  @@index([projectId, scope, createdAt])
+  @@index([sessionId])
+  @@map("tool_use_rules")
 }
 
 // ─── Tokens and API-equivalent cost (docs/specs/13) ─────────────────────────
@@ -1888,8 +1939,8 @@ model Run {
   /// #751 B4: the card type of a card session's round; null elsewhere.
   cardType           String?
 
-  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  slot              Slot?              @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  project           Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot              Slot?               @relation(fields: [slotId], references: [id], onDelete: Cascade)
   skillRun          SkillRun?
   planTurn          PlanTurn?
   uiProfiles        UiProfile[]
@@ -4657,7 +4708,7 @@ model ProjectReviewStep {
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project  Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// #884: the runs of this step on cards; kept when the step is deleted.
   cardRuns BoardCardReviewRun[]
 

@@ -157,6 +157,13 @@ export const AUDIT_ACTIONS = [
   'action_request.created',
   'action_request.decided',
   'action_request.executed',
+  /**
+   * C-401: a "allow similar" / "always allow" rule stored, a `tool_use`
+   * request it answered (`meta` `{ruleId, actionRequestId}`), and one removed.
+   */
+  'tool_rule.created',
+  'tool_rule.used',
+  'tool_rule.deleted',
   'session_content.purged',
   'card.created',
   'card.updated',

@@ -1,7 +1,14 @@
 import {
+  rememberableToolRules,
+  toolUseCallOf,
+  toolUseDanger,
+} from '@nautelle/shared';
+import {
+  DEMO_AWAY_SESSION_ID,
   DEMO_CARDS,
   DEMO_FAILED_RUNS,
   DEMO_PROJECT_ID,
+  DEMO_TOOL_CALLS,
   DemoDataError,
   demoDatabaseUrl,
   isDemoDatabase,
@@ -55,6 +62,9 @@ describe('seedDemo', () => {
     boardCard: { upsert: jest.fn().mockResolvedValue({ id: 'c1' }) },
     run: { upsert: jest.fn() },
     boardCardRound: { upsert: jest.fn() },
+    agentSession: { upsert: jest.fn() },
+    actionRequest: { upsert: jest.fn() },
+    toolUseRule: { upsert: jest.fn() },
     taskDesign: { upsert: jest.fn().mockResolvedValue({ id: 'd1' }) },
     planTurn: { upsert: jest.fn().mockResolvedValue({ id: 't1' }) },
     designRevision: { upsert: jest.fn().mockResolvedValue({ id: 'r1' }) },
@@ -187,6 +197,40 @@ describe('seedDemo', () => {
       .filter((run) => run.status === 'failed')
       .map((run) => run.kind);
     expect(failed).toEqual(['card', 'steward']);
+  });
+
+  it('seeds an away session waiting on tool calls and a project rule (C-401)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    const [project] = db.project.upsert.mock.calls[0];
+    expect(project.create.toolUseTimeoutMinutes).toBe(240);
+    expect(db.agentSession.upsert).toHaveBeenCalledTimes(1);
+    const requests = db.actionRequest.upsert.mock.calls.map(
+      ([args]) => args.create,
+    );
+    expect(requests).toHaveLength(DEMO_TOOL_CALLS.length);
+    for (const request of requests) {
+      expect(request).toMatchObject({
+        kind: 'tool_use',
+        sessionId: DEMO_AWAY_SESSION_ID,
+      });
+      expect(toolUseCallOf(request.args)).not.toBeNull();
+    }
+    // The first offers its suggested rule; reading `.env` always asks.
+    const [suggested, secret] = requests;
+    expect(
+      rememberableToolRules(
+        toolUseCallOf(suggested.args),
+        suggested.args.suggestions,
+      ),
+    ).toEqual({
+      ok: true,
+      rules: [{ toolName: 'Bash', ruleContent: 'bun run test:*' }],
+    });
+    const secretCall = toolUseCallOf(secret.args);
+    expect(secretCall && toolUseDanger(secretCall)?.kind).toBe('secret_read');
+    const [rule] = db.toolUseRule.upsert.mock.calls[0];
+    expect(rule.create).toMatchObject({ scope: 'project', toolName: 'Bash' });
   });
 
   it('seeds a card whose design waits for approval (C-394)', async () => {
