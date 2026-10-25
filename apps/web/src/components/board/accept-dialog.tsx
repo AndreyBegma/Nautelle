@@ -5,6 +5,10 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Radio, RadioGroup } from '@andrewbehma/glass-ui/radio-group';
+import {
+  SegmentedControl,
+  SegmentedControlItem,
+} from '@andrewbehma/glass-ui/segmented-control';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import type {
@@ -17,7 +21,10 @@ import { useEffect, useState } from 'react';
 import {
   type AcceptChoice,
   type AcceptOptions,
+  type AcceptPath,
   acceptChoice,
+  acceptDescription,
+  acceptPrimaryLabel,
   BRANCH_CLEANUP_HINT,
   type BranchCleanupGate,
   branchCleanupGate,
@@ -75,6 +82,7 @@ export function AcceptDialog({
   const [options, setOptions] = useState<AcceptOptions>(
     defaultAcceptOptions({ source: 'manual' }),
   );
+  const [path, setPath] = useState<AcceptPath>('merge');
   const number = card?.number;
   const source = card?.source;
 
@@ -82,6 +90,7 @@ export function AcceptDialog({
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset per card
   useEffect(() => {
     setOptions(defaultAcceptOptions({ source: source ?? 'manual' }));
+    setPath('merge');
   }, [number, source]);
   const fleet = card?.source === 'fleet';
   const hasPr = card?.prNumber != null && !fleet;
@@ -123,13 +132,27 @@ export function AcceptDialog({
 
   // #329 D7/D8/D9: the branch and close choices, gated by the runner's advert.
   const gate = branchCleanupGate(runnerCommands);
+  // Only a mergeable PR has two paths; every other choice is its single path.
+  const effectivePath: AcceptPath =
+    choice?.kind === 'merge' ? path : 'no_merge';
   const canClose = !!card && !fleet && pr?.state === 'open';
-  const closing = canClose && gate === 'ok' && options.closePr;
-  const deleteControl = card
-    ? deleteBranchControl(card, options, gate)
-    : { checked: false, disabled: true, hint: null };
-  const acceptWithoutMerge = (c: BoardCardView) =>
-    onAccept(c, noMergeRequest(c, options, gate));
+  const closing =
+    canClose &&
+    gate === 'ok' &&
+    options.closePr &&
+    effectivePath === 'no_merge';
+
+  const accept = () => {
+    if (!card || !choice) return;
+    if (choice.kind === 'already_merged') {
+      // Already merged: the merge request is what closes the issue (D13).
+      onAccept(card, { merge: { headSha: choice.headSha } });
+    } else if (choice.kind === 'merge' && effectivePath === 'merge') {
+      onAccept(card, mergeRequest(card, choice.headSha, options, gate));
+    } else {
+      onAccept(card, noMergeRequest(card, options, gate));
+    }
+  };
 
   return (
     <DialogRoot
@@ -140,7 +163,7 @@ export function AcceptDialog({
     >
       <DialogContent
         title={`Accept ${card?.label ?? 'the card'}?`}
-        description="Accepting moves the card to Completed and closes its worker."
+        description={acceptDescription(choice, effectivePath)}
         footer={
           unlanded !== null && card ? (
             <>
@@ -161,40 +184,12 @@ export function AcceptDialog({
                 Cancel
               </Button>
               <Button
-                variant={choice?.kind === 'merge' ? 'glass' : 'solid'}
+                variant="solid"
                 disabled={busy || choice === null || !card}
-                onClick={() => {
-                  if (!card) return;
-                  // Already merged: the merge request is what closes the issue (D13).
-                  if (choice?.kind === 'already_merged') {
-                    onAccept(card, { merge: { headSha: choice.headSha } });
-                  } else {
-                    acceptWithoutMerge(card);
-                  }
-                }}
+                onClick={accept}
               >
-                {choice?.kind === 'already_merged'
-                  ? 'Accept'
-                  : closing
-                    ? busy
-                      ? 'Closing…'
-                      : 'Close pull request and accept'
-                    : 'Accept without merging'}
+                {acceptPrimaryLabel(choice, effectivePath, closing, busy)}
               </Button>
-              {choice?.kind === 'merge' && card ? (
-                <Button
-                  variant="solid"
-                  disabled={busy}
-                  onClick={() =>
-                    onAccept(
-                      card,
-                      mergeRequest(card, choice.headSha, options, gate),
-                    )
-                  }
-                >
-                  {busy ? 'Merging…' : 'Merge pull request'}
-                </Button>
-              ) : null}
             </>
           )
         }
@@ -204,51 +199,119 @@ export function AcceptDialog({
         ) : choice === null || !card ? (
           <Skeleton className="h-20 w-full" />
         ) : (
-          <div className="flex flex-col gap-3 text-sm">
-            {pr ? <PullRequestBlock pr={pr} /> : null}
-            {choice.kind === 'merge' ? (
-              <>
-                <p className="text-ink-2">
-                  The pull request is merged through the runner, then the card
-                  moves to Completed and its issue is closed.
-                </p>
-                <Checkbox
-                  label="Delete the branch on GitHub"
-                  hint={deleteControl.hint ?? undefined}
-                  checked={deleteControl.checked}
-                  disabled={busy || deleteControl.disabled}
-                  onChange={(e) =>
-                    setOptions({ ...options, deleteBranch: e.target.checked })
-                  }
-                />
-              </>
-            ) : null}
-            {canClose ? (
-              <ClosePrChoice
-                card={card}
-                options={options}
-                gate={gate}
-                busy={busy}
-                onChange={setOptions}
-              />
-            ) : null}
-            {choice.kind === 'already_merged' ? (
-              <Banner tone="ok" title="Already merged">
-                Accepting closes the card’s issue.
-              </Banner>
-            ) : null}
-            {choice.kind === 'accept_only' ? (
-              <Banner tone="info" title="Nothing to merge here">
-                {choice.reason}{' '}
-                {closing
-                  ? 'Accepting closes the pull request, then moves the card.'
-                  : 'Accepting only moves the card; the pull request and the issue are left as they are.'}
-              </Banner>
-            ) : null}
-          </div>
+          <AcceptBody
+            card={card}
+            pr={pr}
+            choice={choice}
+            path={effectivePath}
+            options={options}
+            gate={gate}
+            canClose={canClose}
+            closing={closing}
+            busy={busy}
+            onPath={setPath}
+            onOptions={setOptions}
+          />
         )}
       </DialogContent>
     </DialogRoot>
+  );
+}
+
+const PATH_LABEL: Record<AcceptPath, string> = {
+  merge: 'Merge pull request',
+  no_merge: 'Accept without merging',
+};
+
+/**
+ * The dialog's body: the pull request, the action selector when the PR can be
+ * merged, and only the selected path's options.
+ */
+export function AcceptBody({
+  card,
+  pr,
+  choice,
+  path,
+  options,
+  gate,
+  canClose,
+  closing,
+  busy,
+  onPath,
+  onOptions,
+}: {
+  card: BoardCardView;
+  pr: CardPullRequestView | null;
+  choice: AcceptChoice;
+  path: AcceptPath;
+  options: AcceptOptions;
+  gate: BranchCleanupGate;
+  canClose: boolean;
+  closing: boolean;
+  busy: boolean;
+  onPath: (path: AcceptPath) => void;
+  onOptions: (options: AcceptOptions) => void;
+}) {
+  const deleteControl = deleteBranchControl(card, options, gate);
+  const twoPaths = choice.kind === 'merge';
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      {pr ? <PullRequestBlock pr={pr} card={card} /> : null}
+      {twoPaths ? (
+        <SegmentedControl role="group" aria-label="What Accept does">
+          {(['merge', 'no_merge'] as const).map((p) => (
+            <SegmentedControlItem
+              key={p}
+              active={path === p}
+              layoutId="accept-path"
+            >
+              <button
+                type="button"
+                aria-pressed={path === p}
+                disabled={busy}
+                className="w-full px-3 py-1.5 text-sm whitespace-nowrap"
+                onClick={() => onPath(p)}
+              >
+                {PATH_LABEL[p]}
+              </button>
+            </SegmentedControlItem>
+          ))}
+        </SegmentedControl>
+      ) : null}
+      {twoPaths && path === 'merge' ? (
+        <Checkbox
+          label="Delete the branch on GitHub"
+          hint={deleteControl.hint ?? undefined}
+          checked={deleteControl.checked}
+          disabled={busy || deleteControl.disabled}
+          onChange={(e) =>
+            onOptions({ ...options, deleteBranch: e.target.checked })
+          }
+        />
+      ) : null}
+      {canClose && path === 'no_merge' ? (
+        <ClosePrChoice
+          card={card}
+          options={options}
+          gate={gate}
+          busy={busy}
+          onChange={onOptions}
+        />
+      ) : null}
+      {choice.kind === 'already_merged' ? (
+        <Banner tone="ok" title="Already merged">
+          Accepting closes the card’s issue.
+        </Banner>
+      ) : null}
+      {choice.kind === 'accept_only' ? (
+        <Banner tone="info" title="Nothing to merge here">
+          {choice.reason}{' '}
+          {closing
+            ? 'Accepting closes the pull request, then moves the card.'
+            : 'Accepting only moves the card; the pull request and the issue are left as they are.'}
+        </Banner>
+      ) : null}
+    </div>
   );
 }
 
@@ -326,9 +389,16 @@ function ClosePrChoice({
   );
 }
 
-function PullRequestBlock({ pr }: { pr: CardPullRequestView }) {
+function PullRequestBlock({
+  pr,
+  card,
+}: {
+  pr: CardPullRequestView;
+  card: BoardCardView;
+}) {
   const href = githubUrl(pr.url);
   const checks = CHECKS_PILL[pr.checks];
+  const base = card.prTarget?.branch ?? null;
   return (
     <div className="flex flex-col gap-2 rounded-control bg-surface p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -348,11 +418,21 @@ function PullRequestBlock({ pr }: { pr: CardPullRequestView }) {
           <StatusPill size="sm" status={checks.status} label={checks.label} />
         ) : null}
       </div>
+      <p className="font-medium">{card.title}</p>
+      {base ? (
+        <p className="text-xs text-ink-2">
+          Into <span className="font-mono">{base}</span>
+        </p>
+      ) : null}
       {pr.state === 'open' ? (
         <p className="text-xs text-ink-2">
           Method: {mergeMethodText(pr.method)}
-          {pr.mergeable === 'CONFLICTING' ? ' · has conflicts' : ''}
         </p>
+      ) : null}
+      {pr.state === 'open' && pr.mergeable === 'CONFLICTING' ? (
+        <Banner tone="warn" title="Has merge conflicts">
+          GitHub cannot merge this pull request until they are resolved.
+        </Banner>
       ) : null}
     </div>
   );
