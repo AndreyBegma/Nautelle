@@ -141,7 +141,7 @@ function DigestCard({ project, digest }: ProjectDigest) {
 }
 
 /**
- * #447 D14: the latest Steward digest of each project on Overview. `prose` is
+ * #447 D14: the latest Steward digest of each project on Activity. `prose` is
  * haiku's summary; when the runner was offline it is `null` and the digest is
  * the template's counts and lines. A project without a digest yet is left out.
  */
@@ -155,8 +155,12 @@ export function DigestPanel({ projects }: { projects: ProjectSummary[] }) {
   }, [retry]);
 
   return (
-    <section aria-labelledby="overview-digest" className="flex flex-col gap-3">
-      <SectionHeader title="Digest" headingId="overview-digest" />
+    <section
+      id="activity-digest"
+      aria-labelledby="activity-digest-heading"
+      className="flex flex-col gap-3"
+    >
+      <SectionHeader title="Steward digest" headingId="activity-digest-heading" />
       {section.data === undefined ? (
         section.error !== null ? (
           <SectionUnavailable

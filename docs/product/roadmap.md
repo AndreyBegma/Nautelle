@@ -43,10 +43,43 @@ GitHub issue via `/code-sentinel:spec`; large rows split into waves there.
 | M3.9 | Design stage: a per-task HTML mockup from a cached UI profile, reviewed with pins and approved before the fleet builds it | ADR-0022 · [#223](https://github.com/AndreyBegma/Nautelle/issues/223) |
 | M3.10 | Project Board: AgentDock-owned cards, automatic and manual column moves, a review loop, Run a dedicated interactive worker per card | ADR-0024 · [#242](https://github.com/AndreyBegma/Nautelle/issues/242) |
 
-## M4 — Codex
+## M4 — Codex (frozen)
+
+Codex is not developed further ([spec 741](../specs/741-one-quota-detector-and-resume-at-reset.md), person, 2026-10-21). The rows stay as the design of record; nothing here is scheduled.
 
 | # | Item | Notes |
 |---|---|---|
 | M4.1 | code-sentinel: `dispatch.sh --runtime codex` | ADR-0013 |
 | M4.2 | Codex worker fence: worktree + sandbox + pre-merge ownership check | ADR-0013 |
 | M4.3 | Codex as orchestrator (skill port) | |
+
+## M5 — The Board era
+
+Shipped between M3.10 and v0.17.0 (see [releases](../releases/README.md)). The Board
+became the one work surface; the fleet and the queue became views onto it.
+
+| # | Item | Notes |
+|---|---|---|
+| M5.1 | Cards that ship themselves: review steps, auto-merge when every check passed, a demo video recorded by DemoFlow | ADR-0035, ADR-0080, ADR-0084, ADR-0090 |
+| M5.2 | Stacks, dependencies and stacked pull requests | ADR-0044, ADR-0054, ADR-0064, ADR-0065 |
+| M5.3 | Steward: stuck-work detection, safe fixes, daily digest | ADR-0040 |
+| M5.4 | Telegram bot and Mini App act on the Board; voice input; assistant | ADR-0046, ADR-0055, ADR-0057, ADR-0061 |
+| M5.5 | Token saver and context handoff | ADR-0039, ADR-0042, ADR-0074 |
+| M5.6 | Open-source install: one command, signed multi-arch images, Helm chart, documentation site | ADR-0088, ADR-0091, ADR-0092, ADR-0093, ADR-0097 |
+
+## M6 — Core and UX plan (2026-10-25)
+
+Settled with the person in a grilling session. The four stages go in order:
+speed → daily flow → fleet scale → team. Nothing is removed in this iteration:
+pages and routes stay; roles and entry points may change. Each row is one card
+with a spec in `docs/specs/`.
+
+| Stage | Items |
+|---|---|
+| **1. Speed** | live updates instead of polling (C-388) · a card whose pull request merged completes by itself (C-389) · the Board page loads fast ([#933](https://github.com/AndreyBegma/Nautelle/issues/933)) |
+| **2. Daily flow** | Inbox for everything that waits on you (C-390) · quick card (C-391) · thin card face (C-392) · ⌘K and keyboard navigation (C-393) · approve a design from the sheet (C-394) · settings search (C-395) · onboarding to the first card (C-396) |
+| **3. Fleet scale** | one work model: cards everywhere, Fleet as the live view, Queue as incoming issues (C-397) · run queue at the worker limit (C-398) · hard budget pauses rounds (C-399) · move a project to another runner (C-400) |
+| **4. Team** | away-mode "allow similar" rules (C-401) · password and 2FA reset (C-402) · personal API tokens (C-403) · email notifications (C-404) · Slack notifications (C-405) |
+
+Housekeeping (C-406): the Steward digest is shown in Activity, shipped issues
+are closed, and this PRD and roadmap match the product.

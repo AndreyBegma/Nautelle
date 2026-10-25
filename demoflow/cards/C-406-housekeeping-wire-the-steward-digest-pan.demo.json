@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "name": "The Steward digest in Activity",
+  "steps": [
+    { "action": "marker", "title": "Sign in" },
+    { "action": "navigate", "path": "/login?next=/activity" },
+    { "action": "wait", "ms": 3000 },
+    {
+      "action": "fill",
+      "target": { "label": "Email" },
+      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+    },
+    {
+      "action": "fill",
+      "target": { "label": "Password" },
+      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
+    },
+    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
+    { "action": "marker", "title": "The latest Steward digest" },
+    {
+      "action": "assertText",
+      "target": { "role": "heading", "name": "Steward digest", "exact": true },
+      "text": "Steward digest",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    { "action": "wait", "ms": 2000 }
+  ]
+}
