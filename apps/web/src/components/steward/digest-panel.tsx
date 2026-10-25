@@ -32,7 +32,7 @@ interface ProjectDigest {
   digest: StewardDigestView;
 }
 
-async function loadDigests(
+export async function loadDigests(
   projects: ProjectSummary[],
 ): Promise<{ digests: ProjectDigest[]; failed: number }> {
   const results = await Promise.allSettled(
