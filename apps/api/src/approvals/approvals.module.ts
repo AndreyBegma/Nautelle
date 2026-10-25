@@ -10,6 +10,7 @@ import { ApprovalsService } from './approvals.service';
 import { ApprovalsProjector } from './approvals-projector.service';
 import { ApprovalsQueryService } from './approvals-query.service';
 import { ApprovalsSink } from './approvals-sink';
+import { ApprovalsSweep } from './approvals-sweep';
 
 /**
  * The merge approval queue (docs/specs/20): approval rows, their ingest and
@@ -27,6 +28,7 @@ import { ApprovalsSink } from './approvals-sink';
     ApprovalsQueryService,
     ApprovalsService,
     ApprovalsSink,
+    ApprovalsSweep,
   ],
   exports: [ApprovalsService, ApprovalsQueryService],
 })

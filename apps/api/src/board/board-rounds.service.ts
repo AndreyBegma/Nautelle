@@ -345,7 +345,7 @@ export class BoardRoundsService {
    * `POST …/run`: round 1, or a retry after failed / ended / cancelled.
    * #443: Auto-run when ready calls it too, with `autoRunAfter` that
    * dependency's number — C-181: as the person who armed the switch.
-   * C-398 (ADR-0100): a To Do card refused with `max_running` is put in the
+   * C-398 (ADR-0101): a To Do card refused with `max_running` is put in the
    * run queue instead — Waiting for a slot — and `BoardRunQueue` starts it,
    * as `actor` with `dto`, when a slot frees. The answer is the card, its
    * `queue` set.

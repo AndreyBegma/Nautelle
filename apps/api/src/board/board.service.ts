@@ -1366,7 +1366,10 @@ export class BoardService implements OnModuleInit {
     deleteBranch: boolean,
     actor: BoardActor,
   ): Promise<CardMergeOutcome> {
-    return this.work.mergePr(project, card, headSha, deleteBranch, actor);
+    // C-389: Accept moves the card to Completed itself, as the person's Accept.
+    return this.work.mergePr(project, card, headSha, deleteBranch, actor, {
+      complete: false,
+    });
   }
 
   /**
@@ -1419,7 +1422,7 @@ export class BoardService implements OnModuleInit {
     const project = await this.work.project(projectId);
     const card = await this.work.card(projectId, number);
     if (!isActiveRoundPhase(card.rounds[0]?.phase)) {
-      // C-398 (ADR-0100): Stop on a queued card takes it out of the run queue.
+      // C-398 (ADR-0101): Stop on a queued card takes it out of the run queue.
       const removed = await this.prisma.boardRunQueueCard.deleteMany({
         where: { cardId: card.id, status: { in: ['queued', 'waiting'] } },
       });

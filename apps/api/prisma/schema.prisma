@@ -3583,7 +3583,7 @@ enum BoardRunQueueStatus {
   started
 }
 
-/// #652, C-398 (ADR-0100): one card of the Board's run queue — a card of a
+/// #652, C-398 (ADR-0101): one card of the Board's run queue — a card of a
 /// stack run (`runId`), or a To Do card a Run at `maxRunning` left waiting
 /// for a slot (`runId` null). Queued cards start in To Do order.
 model BoardRunQueueCard {

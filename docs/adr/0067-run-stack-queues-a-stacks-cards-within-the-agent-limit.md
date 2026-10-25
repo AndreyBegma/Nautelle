@@ -3,7 +3,7 @@
 Status: accepted · Date: 2026-10-19 · Amends [ADR-0044](0044-stacks-staged-cards-under-one-shared-design.md) ·
 Card: C-269 · Issue: #652 ·
 Spec: [`docs/specs/652-add-a-run-stack-button-that-queues-cards.md`](../specs/652-add-a-run-stack-button-that-queues-cards.md) ·
-Amended by [ADR-0100](0100-run-at-the-agent-limit-queues-the-card-in-to-do-order.md) (§2: the queue is the Board's run queue, `board_run_queue`, and starts cards in To Do order; §3: a single card's Run at the limit is queued too)
+Amended by [ADR-0101](0101-run-at-the-agent-limit-queues-the-card-in-to-do-order.md) (§2: the queue is the Board's run queue, `board_run_queue`, and starts cards in To Do order; §3: a single card's Run at the limit is queued too)
 
 ## Context
 

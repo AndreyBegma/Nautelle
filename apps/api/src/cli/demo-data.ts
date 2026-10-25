@@ -35,7 +35,7 @@ export const DEMO_RUNNER_ID = 'demo-runner';
 export const DEMO_PROJECT_ID = 'demo-project';
 
 /**
- * C-398 (ADR-0100): the demo Board runs one card worker at a time, so the
+ * C-398 (ADR-0101): the demo Board runs one card worker at a time, so the
  * running card fills it and the queued cards wait for a slot.
  */
 export const DEMO_MAX_RUNNING = 1;
@@ -52,6 +52,11 @@ export const DEMO_CARDS: ReadonlyArray<{
   round?: { model: string; effort: CardEffort; running?: true };
   /** C-398: Run was pressed on a full Board; the card waits for a slot. */
   queued?: true;
+  /**
+   * C-389: a PR recorded as merged into the project base while the card sat
+   * in Finished — the API's sweep moves it to Completed by itself.
+   */
+  mergedPr?: number;
 }> = [
   {
     title: 'Export the activity feed as CSV',
@@ -81,6 +86,36 @@ export const DEMO_CARDS: ReadonlyArray<{
     column: 'finished',
     kind: 'feature',
     round: { model: 'claude-opus-5-5', effort: 'high' },
+  },
+  {
+    title: 'Coupon codes at checkout',
+    column: 'finished',
+    kind: 'feature',
+    mergedPr: 42,
+  },
+];
+
+/**
+ * C-389: runs that failed an hour ago. Needs you lists the card's; the
+ * Steward's is a service failure, so it stays in the project's history only.
+ */
+export const DEMO_FAILED_RUNS: ReadonlyArray<{
+  id: string;
+  kind: 'card' | 'steward';
+  title: string;
+  trigger: 'user' | 'schedule';
+}> = [
+  {
+    id: 'demo-run-failed-card',
+    kind: 'card',
+    title: 'C-2 Dark mode for the settings page',
+    trigger: 'user',
+  },
+  {
+    id: 'demo-run-failed-steward',
+    kind: 'steward',
+    title: 'Steward digest',
+    trigger: 'schedule',
   },
 ];
 
@@ -163,6 +198,15 @@ export const seedDemo = async (
         createdById: admin.id,
         movedById: admin.id,
         movedAt: now,
+        ...(card.mergedPr === undefined
+          ? {}
+          : {
+              branch: `card/c${number}-coupon-codes`,
+              prNumber: card.mergedPr,
+              prUrl: `https://github.com/acme/shop/pull/${card.mergedPr}`,
+              prState: 'merged' as const,
+              mergedAt: new Date(now.getTime() - 10 * 60_000),
+            }),
       },
     });
     if (card.queued) {
@@ -227,6 +271,26 @@ export const seedDemo = async (
         },
       });
     }
+  }
+  const failedAt = new Date(now.getTime() - 60 * 60_000);
+  for (const run of DEMO_FAILED_RUNS) {
+    await prisma.run.upsert({
+      where: { id: run.id },
+      update: {},
+      create: {
+        id: run.id,
+        kind: run.kind,
+        projectId: DEMO_PROJECT_ID,
+        title: run.title,
+        runtime: 'claude',
+        status: 'failed',
+        triggeredByType: run.trigger,
+        triggeredById: run.trigger === 'user' ? admin.id : null,
+        startedAt: new Date(failedAt.getTime() - 5 * 60_000),
+        endedAt: failedAt,
+        updatedAt: failedAt,
+      },
+    });
   }
   return { projectId: DEMO_PROJECT_ID, cards: DEMO_CARDS.length };
 };

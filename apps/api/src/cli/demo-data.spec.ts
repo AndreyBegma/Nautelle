@@ -1,5 +1,6 @@
 import {
   DEMO_CARDS,
+  DEMO_FAILED_RUNS,
   DEMO_PROJECT_ID,
   DemoDataError,
   demoDatabaseUrl,
@@ -77,7 +78,9 @@ describe('seedDemo', () => {
     const db = prisma();
     await seedDemo(db as never, 'demo@example.com');
     const withRound = DEMO_CARDS.filter((card) => card.round);
-    expect(db.run.upsert).toHaveBeenCalledTimes(withRound.length);
+    expect(db.run.upsert).toHaveBeenCalledTimes(
+      withRound.length + DEMO_FAILED_RUNS.length,
+    );
     expect(db.boardCardRound.upsert).toHaveBeenCalledTimes(withRound.length);
     const rounds = db.boardCardRound.upsert.mock.calls.map(([arg]) => arg);
     for (const round of rounds) expect(round.update).toEqual({});
@@ -114,6 +117,27 @@ describe('seedDemo', () => {
         queuedByRole: 'admin',
       });
     }
+  });
+
+  it('seeds a Finished card whose PR merged, for the sweep to complete (C-389)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    const merged = db.boardCard.upsert.mock.calls
+      .map(([args]) => args.create)
+      .filter((card) => card.prState === 'merged');
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ column: 'finished', prNumber: 42 });
+    expect(merged[0].mergedAt).toBeInstanceOf(Date);
+  });
+
+  it('seeds a failed card run and a failed Steward run (C-389)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    const failed = db.run.upsert.mock.calls
+      .map(([args]) => args.create)
+      .filter((run) => run.status === 'failed')
+      .map((run) => run.kind);
+    expect(failed).toEqual(['card', 'steward']);
   });
 
   it('needs the admin to exist', async () => {

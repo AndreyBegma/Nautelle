@@ -1,7 +1,7 @@
 import { type BoardCardView, isQueued, isRoundActive } from '@nautelle/shared';
 
 /**
- * C-398 (ADR-0100): Stop on a card waiting in the run queue only takes it out
+ * C-398 (ADR-0101): Stop on a card waiting in the run queue only takes it out
  * of the queue — there is no worker to stop.
  */
 export const stopLeavesQueue = (card: BoardCardView): boolean =>

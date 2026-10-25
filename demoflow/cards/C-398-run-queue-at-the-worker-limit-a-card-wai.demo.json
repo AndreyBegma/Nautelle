@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "Run at the worker limit waits for a slot",
-  "description": "C-398 (ADR-0100): on a full Board, Run puts a To Do card in the run queue instead of refusing it; the Board header, the card faces and Fleet show the queue, and Remove from queue takes a card out.",
+  "description": "C-398 (ADR-0101): on a full Board, Run puts a To Do card in the run queue instead of refusing it; the Board header, the card faces and Fleet show the queue, and Remove from queue takes a card out.",
   "steps": [
     { "action": "marker", "title": "Sign in" },
     { "action": "navigate", "path": "/login?next=/projects/demo-project" },

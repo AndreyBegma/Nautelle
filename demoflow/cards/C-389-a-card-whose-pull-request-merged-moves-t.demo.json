@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "name": "A merged card completes itself and Needs you clears itself",
+  "steps": [
+    {
+      "action": "navigate",
+      "path": "/login?next=/projects/demo-project/board"
+    },
+    { "action": "wait", "ms": 3000 },
+    {
+      "action": "fill",
+      "target": { "label": "Email" },
+      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+    },
+    {
+      "action": "fill",
+      "target": { "label": "Password" },
+      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
+    },
+    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
+    {
+      "action": "waitFor",
+      "target": { "text": "To Do", "exact": true },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "marker",
+      "title": "A card whose pull request merged moves to Completed by itself"
+    },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Expand Completed" }
+    },
+    {
+      "action": "waitFor",
+      "target": { "text": "Coupon codes at checkout" },
+      "state": "visible",
+      "timeoutMs": 60000
+    },
+    { "action": "assertVisible", "target": { "text": "PR #42 · Merged" } },
+    { "action": "screenshot", "name": "merged-card-in-completed" },
+    { "action": "wait", "ms": 2000 },
+    {
+      "action": "marker",
+      "title": "Needs you lists only what still needs a person"
+    },
+    { "action": "navigate", "path": "/" },
+    {
+      "action": "waitFor",
+      "target": { "text": "Needs you", "exact": true },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": { "text": "C-2 Dark mode for the settings page" }
+    },
+    {
+      "action": "waitFor",
+      "target": { "text": "Steward digest" },
+      "state": "hidden",
+      "timeoutMs": 5000
+    },
+    { "action": "screenshot", "name": "needs-you-without-service-failure" },
+    { "action": "wait", "ms": 2000 },
+    {
+      "action": "marker",
+      "title": "The Steward failure stays in the project's history"
+    },
+    { "action": "navigate", "path": "/projects/demo-project/history" },
+    {
+      "action": "waitFor",
+      "target": { "text": "Steward digest" },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    { "action": "screenshot", "name": "steward-failure-in-history" },
+    { "action": "wait", "ms": 2000 }
+  ]
+}

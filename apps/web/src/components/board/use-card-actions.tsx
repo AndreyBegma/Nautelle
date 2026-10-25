@@ -189,7 +189,7 @@ export function useCardActions({
       toast.error(`${card.label} cannot run yet. ${waits}.`);
       return false;
     }
-    // C-398 (ADR-0100): a full Board queues the card instead of refusing it.
+    // C-398 (ADR-0101): a full Board queues the card instead of refusing it.
     setBusy(true);
     try {
       const done = await runCard(projectId, card.number, request);

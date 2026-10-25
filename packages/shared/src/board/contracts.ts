@@ -315,7 +315,7 @@ export interface BoardCardView {
    */
   stack?: CardStackRef | null;
   /**
-   * C-398 (ADR-0100): the card's place in the run queue — "Waiting for a
+   * C-398 (ADR-0101): the card's place in the run queue — "Waiting for a
    * slot". Optional like `stack`; absent or `null` when it is not queued.
    */
   queue?: CardQueueView | null;
@@ -379,7 +379,7 @@ export interface BoardCardView {
 }
 
 /**
- * C-398 (ADR-0100): a To Do card in the run queue. Run at `maxRunning`, or
+ * C-398 (ADR-0101): a To Do card in the run queue. Run at `maxRunning`, or
  * Run stack, puts it there; when a slot frees, the topmost queued card in To
  * Do order starts. Stop takes it out.
  */
@@ -472,7 +472,7 @@ export interface BoardView {
   /** Active rounds now, against `settings.maxRunning`. */
   running: number;
   /**
-   * C-398 (ADR-0100): To Do cards in the run queue — the header's "3 waiting
+   * C-398 (ADR-0101): To Do cards in the run queue — the header's "3 waiting
    * for a slot". Optional so older fixtures stay valid; absent reads as 0.
    */
   queued?: number;

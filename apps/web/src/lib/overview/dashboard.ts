@@ -1,13 +1,14 @@
-import type {
-  ActivityItem,
-  ApprovalsView,
-  FleetView,
-  OrchestratorStatus,
-  ProjectSummary,
-  RunSummary,
-  SlotStatus,
-  SlotSummary,
-  UsageTimeseriesResponse,
+import {
+  type ActivityItem,
+  type ApprovalsView,
+  type FleetView,
+  isServiceRun,
+  type OrchestratorStatus,
+  type ProjectSummary,
+  type RunSummary,
+  type SlotStatus,
+  type SlotSummary,
+  type UsageTimeseriesResponse,
 } from '@nautelle/shared';
 import { orchestratorSettingsHref } from '../control/reasons';
 import { ORCHESTRATOR_STATUS_LABEL } from '../fleet/format';
@@ -195,6 +196,9 @@ function runTitle(run: RunSummary): string {
  * of a runtime profile, then, oldest first, runs that failed in the last 24
  * hours, slots whose last checkpoint is `blocked`, slots whose pane sits on a
  * permission or launch prompt, and pull requests waiting for a merge approval.
+ * An item leaves by itself when its subject does (C-389): only live slots
+ * count, a service's failed run is not listed, and the API closes the
+ * approval of a PR that merged or closed.
  */
 export function needsYou(
   projects: ProjectSummary[],
@@ -217,7 +221,8 @@ export function needsYou(
       });
     }
     for (const run of failedRuns?.get(project.id) ?? []) {
-      if (run.status !== 'failed') continue;
+      // A service's failure (Steward's digest prose) is Activity's, not yours.
+      if (run.status !== 'failed' || isServiceRun(run)) continue;
       const ended = run.endedAt ?? run.updatedAt;
       if (now - Date.parse(ended) > FAILED_RUN_WINDOW_MS) continue;
       items.push({
@@ -231,7 +236,8 @@ export function needsYou(
       });
     }
     for (const slot of fleets.get(project.id)?.slots ?? []) {
-      if (slot.status === 'ended') continue;
+      // A stale or dispatched slot has no session left to unblock (C-389).
+      if (!isAlive(slot)) continue;
       const title = slotTitle(slot);
       if (slot.lastCheckpoint === 'blocked') {
         items.push({

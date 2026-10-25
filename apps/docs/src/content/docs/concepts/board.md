@@ -15,8 +15,8 @@ planner and accepted by a person. Cards are numbered per project, `C-1`,
 | **Inbox** | Suggestions waiting for a person. A suggestion leaves the Inbox only when someone accepts it. |
 | **To Do** | Accepted work, ready to run. |
 | **In progress** | A worker is on it. |
-| **Finished** | The worker is done and the checks are green. |
-| **Completed** | A person accepted the result. Only a person completes a card. |
+| **Finished** | The worker is done and the checks are green. The pull request is not merged yet. |
+| **Completed** | The pull request merged, or a person accepted the result. |
 
 ## Running a card
 
@@ -33,6 +33,12 @@ runner:
    CI and sends the worker back to fix a failure, up to three times.
 4. The card is **Finished** when the work is done and every check passed. If
    the project has auto-merge on, Nautelle merges the pull request then.
+5. When the pull request merges into the project's base branch, the card
+   moves to **Completed** by itself. It does not matter whether auto-merge,
+   **Accept** or someone on GitHub merged it. A merge on GitHub is seen
+   within about five minutes. A pull request of a stacked
+   card that merged into its dependency's branch has not landed yet, so that
+   card stays in Finished.
 
 Each Run or piece of feedback is a **round**, with its own phase: Queued,
 Starting, Running, Waiting for you, Running in background, Finished, Ended,
@@ -49,8 +55,10 @@ A waiting card whose dependency is not ready yet lets the next one start.
 **Stop** takes a waiting card out of the queue.
 
 **Feedback** on a finished card starts a new round on a new branch and pull
-request. **Completed** closes the worker and removes its worktree; it never
-merges anything by itself.
+request. To follow up on a merged card, move it back from Completed first.
+**Completed** closes the worker and removes its worktree; it never merges
+anything by itself. **Accept** is for a card whose work does not end in a
+merge.
 
 ## Demo videos
 
@@ -143,10 +151,11 @@ The runner records two demos at a time and queues the rest; set
 
 - [ADR-0024](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0024-board-cards-and-dedicated-card-workers.md): Board cards and dedicated card workers.
 - [ADR-0035](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0035-a-card-ships-itself.md): a card ships itself — draft pull request, CI fix rounds, auto-merge.
+- [ADR-0100](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0100-a-merged-card-completes-itself-and-needs-you-clears-itself.md): a merged card completes itself.
 - [ADR-0058](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0058-new-work-cards-are-candidates-until-accepted.md): new work cards are candidates until accepted.
 - [ADR-0080](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0080-auto-merge-needs-every-check-passed.md): auto-merge needs every check passed.
 - [ADR-0084](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0084-a-card-passes-its-review-steps-before-finished.md): a card passes its review steps before Finished.
 - [ADR-0090](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0090-a-finished-card-may-carry-a-demo-video-recorded-by-demoflow-on-the-runner.md): a finished card may carry a demo video recorded by DemoFlow on the runner.
 - [ADR-0099](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0099-a-cards-demo-is-recorded-when-its-head-reads-green-before-review.md): a card's demo is recorded when its head reads green, before review.
-- [ADR-0100](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0100-run-at-the-agent-limit-queues-the-card-in-to-do-order.md): Run at the agent limit queues the card, in To Do order.
+- [ADR-0101](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0101-run-at-the-agent-limit-queues-the-card-in-to-do-order.md): Run at the agent limit queues the card, in To Do order.
 - [All decisions](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/README.md).
