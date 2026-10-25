@@ -20,7 +20,11 @@ import {
 import type { AuditContext } from '../audit/audit.types';
 import { AuditCtx } from '../audit/audit-context';
 import type { AuthUser } from '../auth/auth-request';
-import { CurrentUser, Roles } from '../auth/decorators';
+import {
+  CurrentUser,
+  ProjectScopedTokenAllowed,
+  Roles,
+} from '../auth/decorators';
 import {
   AddProjectMemberDto,
   ConnectProjectDto,
@@ -90,7 +94,9 @@ export class ProjectsController {
     private readonly members: ProjectMembersService,
   ) {}
 
+  // C-403: `visibleWhere` narrows the list to a project-limited token's own.
   @Get()
+  @ProjectScopedTokenAllowed()
   list(@CurrentUser() user: AuthUser): Promise<ProjectSummary[]> {
     return this.projects.list(user);
   }

@@ -84,14 +84,24 @@ export function actionGroups(actions: readonly string[]): string[] {
   return [...new Set(actions.map((a) => `${a.split('.')[0]}.`))];
 }
 
+/** C-403: the personal API token a record's request came with, by name. */
+export function viaTokenName(record: Pick<AuditRecordView, 'meta'>): string | null {
+  const meta = record.meta as { apiToken?: { name?: unknown } } | null;
+  const name = meta?.apiToken?.name;
+  return typeof name === 'string' ? name : null;
+}
+
 /** The actor by name (rule R2): an id is never the text, only a tooltip. */
 export function actorLabel(
   record: AuditRecordView,
   index: NameIndex = new Map(),
 ): string {
   switch (record.actorType) {
-    case 'user':
-      return record.actorEmail ?? 'deleted user';
+    case 'user': {
+      const user = record.actorEmail ?? 'deleted user';
+      const token = viaTokenName(record);
+      return token ? `${user} via token ${token}` : user;
+    }
     case 'runner':
       return runnerActorName(record, index);
     case 'system':

@@ -45,6 +45,8 @@ model User {
   recoveryCodes               UserRecoveryCode[]
   approvedUsers               User[]                        @relation("UserApprovals")
   sessions                    UserSession[]
+  apiTokens                   ApiToken[]                    @relation("ApiTokenOwner")
+  apiTokensRevoked            ApiToken[]                    @relation("ApiTokenRevokedBy")
   settingsUpdated             Setting[]
   runnersCreated              Runner[]                      @relation("RunnerCreatedBy")
   runnersLocal                Runner[]                      @relation("RunnerLocalUser")
@@ -178,6 +180,40 @@ model UserSession {
 
   @@index([userId])
   @@map("user_sessions")
+}
+
+enum ApiTokenScope {
+  owner
+  read_only
+}
+
+/// C-403: a personal API token — `Authorization: Bearer` on the REST API. It
+/// acts as its owner with the owner's current role; `read_only` refuses every
+/// write. Only the SHA-256 of the token is stored.
+model ApiToken {
+  id          String        @id @default(cuid())
+  userId      String
+  name        String
+  tokenHash   String        @unique
+  /// The token's first characters, shown so two tokens can be told apart.
+  hint        String
+  scope       ApiTokenScope
+  /// Empty: every project the owner can see. Otherwise only these; a deleted
+  /// project's id stays and matches nothing.
+  projectIds  String[]
+  /// Null: never expires.
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  lastUsedIp  String?
+  revokedAt   DateTime?
+  revokedById String?
+  createdAt   DateTime      @default(now())
+
+  user      User  @relation("ApiTokenOwner", fields: [userId], references: [id], onDelete: Cascade)
+  revokedBy User? @relation("ApiTokenRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("api_tokens")
 }
 
 model Setting {
