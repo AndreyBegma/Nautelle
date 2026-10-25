@@ -85,6 +85,10 @@ export class LocalBoardHandlers {
           { model: args.model, effort: args.effort },
           actorOf(call),
         );
+        // C-398: a full Board queued the card; it starts when a slot frees.
+        if (card.queue) {
+          return { number: card.number, round: null, queued: true as const };
+        }
         return { number: card.number, round: this.roundOf(card) };
       }),
     'card.move': (args, call) =>

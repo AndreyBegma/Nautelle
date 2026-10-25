@@ -6,7 +6,7 @@ import {
   type StackCardRunState,
 } from '@nautelle/shared';
 import { BudgetGate } from '../budgets/budget-gate';
-import { BoardStackRuns } from './board-stack-runs';
+import { BoardRunQueue } from './board-run-queue';
 import { BoardWorld } from './testing/board-e2e';
 
 /**
@@ -15,7 +15,8 @@ import { BoardWorld } from './testing/board-e2e';
  * as they become ready — in parallel within `maxRunning`, stage 2 after its
  * dependency under the stacked-branch rules. A `max_running` refusal keeps
  * a card queued; any other refusal or a failed round pauses the run. Stop
- * removes the queue and leaves running cards alone.
+ * removes the queue and leaves running cards alone. C-398 (ADR-0100): the
+ * queue is the Board's run queue, and it starts cards in To Do order.
  */
 describe('Run stack (e2e, #652)', () => {
   const w = new BoardWorld();
@@ -63,12 +64,25 @@ describe('Run stack (e2e, #652)', () => {
     return ids.map((id) => byId.get(id));
   };
 
+  /**
+   * `count` new cards, each moved to the bottom of To Do: C-398 (ADR-0100)
+   * starts queued cards in To Do order, so that order is the order they were
+   * made in.
+   */
   const cards = async (count: number) => {
     const made: { id: string; number: number }[] = [];
     for (let i = 0; i < count; i += 1) {
-      made.push(
-        await w.createCard({ title: `Part ${i + 1}`, specOnRun: false }),
+      const card = await w.createCard({
+        title: `Part ${i + 1}`,
+        specOnRun: false,
+      });
+      const moved = await w.operator.send(
+        'post',
+        `${w.path()}/board/cards/${card.number}/move`,
+        { column: 'todo', index: 1_000_000 },
       );
+      expect(moved.status).toBe(200);
+      made.push(card);
     }
     return made;
   };
@@ -380,7 +394,7 @@ describe('Run stack (e2e, #652)', () => {
       },
     });
 
-    await w.ctx.app.get(BoardStackRuns).resumeAll();
+    await w.ctx.app.get(BoardRunQueue).resumeAll();
     expect(await started()).toEqual([a.number, b.number]);
     expect((await w.card(a.number)).rounds[0].authorId).toBe(w.operatorId);
   });

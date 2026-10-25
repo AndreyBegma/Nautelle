@@ -2,11 +2,16 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import type { BoardCardView, CardRoundBrief } from '@nautelle/shared';
+import {
+  type BoardCardView,
+  type CardRoundBrief,
+  cardQueueText,
+} from '@nautelle/shared';
 import {
   Check,
   Clock,
   GitMerge,
+  Hourglass,
   Layers,
   Paperclip,
   Sparkles,
@@ -74,7 +79,8 @@ const TEXT_LINK = `${TAP} text-xs text-accent-ink underline-offset-2 hover:under
  * the card's full width — the **header** (selection box or unselectable mark,
  * label, Bug, and the menu trigger at its end; nothing else, so it never
  * truncates), the **title**, the **status** (one wrapping row: readiness, the
- * dependency, Auto-run, stack, triage hints, → Opus, then the process state;
+ * dependency, Auto-run, stack, run queue, triage hints, → Opus, then the
+ * process state;
  * below it the approve offer, detail lines and the face's links) and the
  * **footer** (PR and Issue, with the attachment count and the cost at its right
  * end, above a hairline). The token saving is in the card's Run section, not on the face.
@@ -201,6 +207,23 @@ export function CardFace({
             >
               <Layers aria-hidden="true" className="size-3" />
               {card.stack.label}
+            </Chip>
+          ) : null}
+          {card.queue ? (
+            // C-398: in the run queue — it starts when a slot frees.
+            <Chip
+              size="sm"
+              tone={card.queue.state === 'queued' ? 'neutral' : 'warn'}
+              title={
+                card.queue.stack !== null
+                  ? `Queued by Run stack S-${card.queue.stack}; Stop takes it out of the queue`
+                  : 'Starts when a slot frees; Stop takes it out of the queue'
+              }
+              data-card-queue={card.queue.state}
+              className="gap-1"
+            >
+              <Hourglass aria-hidden="true" className="size-3" />
+              {cardQueueText(card.queue)}
             </Chip>
           ) : null}
           {hints ? (

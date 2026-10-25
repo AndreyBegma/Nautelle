@@ -314,6 +314,11 @@ export interface BoardCardView {
    * its stack's design sets. Optional like `readiness`; absent reads as null.
    */
   stack?: CardStackRef | null;
+  /**
+   * C-398 (ADR-0100): the card's place in the run queue — "Waiting for a
+   * slot". Optional like `stack`; absent or `null` when it is not queued.
+   */
+  queue?: CardQueueView | null;
   /** #282 D1: set for a `terminal` card, `null` for any other source. */
   tracking: CardTrackingView | null;
   /** #282 D4: set for a `fleet` card, `null` for any other source. */
@@ -372,6 +377,29 @@ export interface BoardCardView {
    */
   warmupSavedUsd?: string | null;
 }
+
+/**
+ * C-398 (ADR-0100): a To Do card in the run queue. Run at `maxRunning`, or
+ * Run stack, puts it there; when a slot frees, the topmost queued card in To
+ * Do order starts. Stop takes it out.
+ */
+export interface CardQueueView {
+  /** `queued` waits for a free slot; `waiting` for a dependency first. */
+  state: 'queued' | 'waiting';
+  /**
+   * 1-based place among the project's `queued` cards, in To Do order — the
+   * card that starts next is 1. `null` while `waiting`.
+   */
+  place: number | null;
+  /** The stack whose Run stack queued it; `null` when Run did. */
+  stack: number | null;
+}
+
+/** C-398: what a queued card's face says — "Waiting for a slot · #2". */
+export const cardQueueText = (queue: CardQueueView): string =>
+  queue.state === 'waiting'
+    ? 'Queued · waiting for a dependency'
+    : `Waiting for a slot${queue.place !== null ? ` · #${queue.place}` : ''}`;
 
 /** #337 D8: a card another one depends on, as the face and Run's warning name it. */
 export interface CardDependencyRef {
@@ -443,6 +471,11 @@ export interface BoardView {
   columns: BoardColumnView[];
   /** Active rounds now, against `settings.maxRunning`. */
   running: number;
+  /**
+   * C-398 (ADR-0100): To Do cards in the run queue — the header's "3 waiting
+   * for a slot". Optional so older fixtures stay valid; absent reads as 0.
+   */
+  queued?: number;
   settings: BoardSettingsView;
   /**
    * #480 (ADR-0044): the project's stacks, each with the column its collapsed
@@ -1105,6 +1138,8 @@ export const isCardAutoRunCode = (
 /** #273 D8: what Continue after design did when the design was approved. */
 export type CardAutoRun =
   | { status: 'started'; round: number }
+  /** C-398: the Board was full — the card waits in the run queue for a slot. */
+  | { status: 'queued' }
   | {
       status: 'run_failed';
       code: CardAutoRunFailure['code'];

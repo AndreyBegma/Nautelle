@@ -136,6 +136,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'card.deleted': 'Deleted a board card',
   'card.fleet_removed': 'Removed a fleet card whose issue left the queue',
   'card.moved': 'Moved a board card',
+  'card.run_queued': 'Queued a board card for a free slot',
+  'card.run_dequeued': 'Took a board card out of the run queue',
   'card.run_started': 'Started a card worker',
   'card.feedback': 'Sent feedback on a card',
   'card.finished': 'Finished a card round',

@@ -15,7 +15,7 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
-import type { BoardStackRun } from '@prisma/client';
+import type { BoardStackRun, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
@@ -28,8 +28,9 @@ import { BoardRoundsService } from './board-rounds.service';
 import { shippingAutoStart } from './board-shipping';
 import { BoardStacks } from './board-stacks';
 import { ACTIVE_PHASES, type BoardActor, BoardWork } from './board-work';
+import type { RunBoardCardDto } from './dto';
 
-/** #652: how often a running stack run is re-evaluated without a card change. */
+/** #652: how often the run queue is re-evaluated without a card change. */
 export const STACK_RUN_SWEEP_MS = 60_000;
 
 /** #652: a round the run started that ended in one of these paused it. */
@@ -43,29 +44,39 @@ const WAITS_FOR_DEPENDENCY: ReadonlySet<string> = new Set([
 
 const MESSAGE_MAX = 500;
 
-/** What a tick reads of a running stack run. */
-const RUN_INCLUDE = {
-  stack: { select: { id: true, number: true } },
-  cards: {
+/** What a tick reads of a queued card. */
+const ENTRY_SELECT = {
+  id: true,
+  status: true,
+  roundId: true,
+  card: {
     select: {
       id: true,
-      status: true,
-      roundId: true,
-      card: {
-        select: {
-          id: true,
-          number: true,
-          column: true,
-          stage: { select: { position: true } },
-          rounds: {
-            orderBy: { round: 'desc' },
-            take: 1,
-            select: { id: true, phase: true },
-          },
-        },
+      number: true,
+      column: true,
+      position: true,
+      rounds: {
+        orderBy: { round: 'desc' },
+        take: 1,
+        select: { id: true, phase: true },
       },
     },
   },
+} as const;
+
+/** What a tick reads of a running stack run. */
+const RUN_INCLUDE = {
+  stack: { select: { id: true, number: true } },
+  cards: { select: ENTRY_SELECT },
+} as const;
+
+/** C-398: what a tick reads of a card queued on its own. */
+const SOLO_SELECT = {
+  ...ENTRY_SELECT,
+  queuedById: true,
+  queuedByRole: true,
+  options: true,
+  autoRunAfter: true,
 } as const;
 
 type RunEntry = {
@@ -76,41 +87,68 @@ type RunEntry = {
     id: string;
     number: number;
     column: string;
-    stage: { position: number } | null;
+    position: number;
     rounds: { id: string; phase: CardRoundPhase }[];
   };
 };
 
-/** The person who pressed Run stack, as the queued cards start. */
-const actorOf = (run: Pick<BoardStackRun, 'startedById' | 'startedByRole'>) =>
+type SoloEntry = RunEntry & {
+  queuedById: string | null;
+  queuedByRole: string | null;
+  options: Prisma.JsonValue;
+  autoRunAfter: number | null;
+};
+
+type RunWithCards = BoardStackRun & {
+  stack: { id: string; number: number };
+  cards: RunEntry[];
+};
+
+/** A queued card a tick may start: of a stack run, or queued on its own. */
+type Candidate =
+  | { run: RunWithCards; entry: RunEntry }
+  | { run: null; entry: SoloEntry };
+
+/** The person who pressed Run stack, or Run, as the queued cards start. */
+const actorOf = (userId: string | null, role: string | null) =>
   ({
-    userId: run.startedById,
-    role: (run.startedByRole === 'admin' ? 'admin' : 'operator') as Role,
-    ctx: {
-      actor:
-        run.startedById !== null
-          ? systemActorFor(run.startedById)
-          : SYSTEM_ACTOR,
-    },
+    userId,
+    role: (role === 'admin' ? 'admin' : 'operator') as Role,
+    ctx: { actor: userId !== null ? systemActorFor(userId) : SYSTEM_ACTOR },
   }) satisfies BoardActor;
 
+const runActorOf = (
+  run: Pick<BoardStackRun, 'startedById' | 'startedByRole'>,
+) => actorOf(run.startedById, run.startedByRole);
+
+/** C-398: the stored launch choices of a card queued on its own. */
+const optionsOf = (options: Prisma.JsonValue): RunBoardCardDto =>
+  options !== null && typeof options === 'object' && !Array.isArray(options)
+    ? (options as RunBoardCardDto)
+    : {};
+
 /**
- * Run stack (#652): pressing it puts the stack's To Do cards in a persisted
- * queue (`board_stack_run_cards`). On every card change of the project — a
- * round finishing, a PR opening, a merge, an acceptance, a slot freeing —
- * the queue is re-evaluated: a card whose dependencies allow it under the
- * stacked-branch rules (`assertRunnable`) starts through
- * `BoardRoundsService.run`, in stage then number order, while the project
- * has room under `maxRunning`. A `max_running` refusal leaves it queued; any
- * other refusal, or a round the run started that fails, pauses the run until
- * a person presses Run stack again. Stop removes the queue and leaves running
- * cards alone. The queue survives a restart: bootstrap resumes it.
+ * The Board's run queue (#652, C-398 — ADR-0067, ADR-0100). Two things put a
+ * card in it (`board_run_queue`): Run stack, which queues the stack's To Do
+ * cards under the stack's run, and a Run refused with `max_running`, which
+ * queues that To Do card on its own (`BoardRoundsService.run`). On every card
+ * change of the project — a round finishing, a PR opening, a merge, an
+ * acceptance, a slot freeing, a card dragged within To Do — the queue is
+ * re-evaluated: a card whose dependencies allow it under the stacked-branch
+ * rules (`assertRunnable`) starts through `BoardRoundsService.runNow`, in To
+ * Do order, while the project has room under `maxRunning`. A `max_running`
+ * refusal leaves it queued and an open dependency leaves it waiting. Any
+ * other refusal, or a round a stack run started that fails, pauses that stack
+ * run until a person presses Run stack again; a card queued on its own leaves
+ * the queue with the refusal stored on the card. Stop removes queued cards
+ * and leaves running ones alone. The queue survives a restart: bootstrap
+ * resumes it.
  */
 @Injectable()
-export class BoardStackRuns
+export class BoardRunQueue
   implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy
 {
-  private readonly logger = new Logger(BoardStackRuns.name);
+  private readonly logger = new Logger(BoardRunQueue.name);
   /** Each project's evaluation in flight; one at a time per project. */
   private readonly ticking = new Map<string, Promise<void>>();
   /** Projects changed while their evaluation ran: it runs once more. */
@@ -134,12 +172,12 @@ export class BoardStackRuns
     });
     // A run waits while its runner is away; it goes on when the runner is back.
     this.connectHooks.register({
-      name: 'board-stack-runs',
+      name: 'board-run-queue',
       connected: (runnerId) => this.resumeAll(runnerId),
     });
   }
 
-  /** Resumes every running stack run, then sweeps them now and then. */
+  /** Resumes the run queue, then sweeps it now and then. */
   onApplicationBootstrap(): void {
     if (!shippingAutoStart()) return;
     void this.resumeAll();
@@ -151,21 +189,31 @@ export class BoardStackRuns
     clearInterval(this.timer);
   }
 
-  /** Every project with a running stack run — of `runnerId`, if given — is evaluated. */
+  /**
+   * Every project with a running stack run or a card queued on its own — of
+   * `runnerId`, if given — is evaluated.
+   */
   async resumeAll(runnerId?: string): Promise<void> {
     try {
-      const runs = await this.prisma.boardStackRun.findMany({
-        where: {
-          state: 'running',
-          ...(runnerId ? { stack: { project: { runnerId } } } : {}),
-        },
-        select: { stack: { select: { projectId: true } } },
-      });
-      const projects = new Set(runs.map((r) => r.stack.projectId));
+      const of = runnerId ? { project: { runnerId } } : {};
+      const [runs, solo] = await Promise.all([
+        this.prisma.boardStackRun.findMany({
+          where: { state: 'running', stack: of },
+          select: { stack: { select: { projectId: true } } },
+        }),
+        this.prisma.boardRunQueueCard.findMany({
+          where: { runId: null, card: of },
+          select: { card: { select: { projectId: true } } },
+        }),
+      ]);
+      const projects = new Set([
+        ...runs.map((r) => r.stack.projectId),
+        ...solo.map((e) => e.card.projectId),
+      ]);
       await Promise.all([...projects].map((p) => this.nudge(p)));
     } catch (error) {
       this.logger.error(
-        'resuming stack runs failed',
+        'resuming the run queue failed',
         error instanceof Error ? error.stack : String(error),
       );
     }
@@ -233,7 +281,7 @@ export class BoardStackRuns
         },
       });
       // A card the run started earlier whose round is over is history now.
-      const entries = await tx.boardStackRunCard.findMany({
+      const entries = await tx.boardRunQueueCard.findMany({
         where: { runId: run.id },
         select: {
           id: true,
@@ -258,7 +306,7 @@ export class BoardStackRuns
         (e) => e.roundId === null || !live.has(e.roundId),
       );
       if (over.length > 0) {
-        await tx.boardStackRunCard.deleteMany({
+        await tx.boardRunQueueCard.deleteMany({
           where: { id: { in: over.map((e) => e.id) } },
         });
       }
@@ -267,7 +315,11 @@ export class BoardStackRuns
       );
       const add = todo.filter((c) => !kept.has(c.id));
       if (add.length > 0) {
-        await tx.boardStackRunCard.createMany({
+        // C-398: a card queued on its own joins the stack's run.
+        await tx.boardRunQueueCard.deleteMany({
+          where: { runId: null, cardId: { in: add.map((c) => c.id) } },
+        });
+        await tx.boardRunQueueCard.createMany({
           data: add.map((c) => ({ runId: run.id, cardId: c.id })),
           skipDuplicates: true,
         });
@@ -305,11 +357,11 @@ export class BoardStackRuns
     if (run) {
       const removed = await this.prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM board_stack_runs WHERE id = ${run.id} FOR UPDATE`;
-        const queued = await tx.boardStackRunCard.findMany({
+        const queued = await tx.boardRunQueueCard.findMany({
           where: { runId: run.id, status: { in: ['queued', 'waiting'] } },
           select: { id: true, card: { select: { number: true } } },
         });
-        await tx.boardStackRunCard.deleteMany({
+        await tx.boardRunQueueCard.deleteMany({
           where: { id: { in: queued.map((q) => q.id) } },
         });
         await tx.boardStackRun.update({
@@ -338,8 +390,8 @@ export class BoardStackRuns
   }
 
   /**
-   * Evaluates the project's running stack runs — at once, or once more after
-   * the evaluation in flight. Resolves when the project is evaluated.
+   * Evaluates the project's run queue — at once, or once more after the
+   * evaluation in flight. Resolves when the project is evaluated.
    */
   nudge(projectId: string): Promise<void> {
     const ticking = this.ticking.get(projectId);
@@ -355,7 +407,7 @@ export class BoardStackRuns
     })()
       .catch((error: unknown) => {
         this.logger.error(
-          `the stack runs of project ${projectId} were not evaluated`,
+          `the run queue of project ${projectId} was not evaluated`,
           error instanceof Error ? error.stack : String(error),
         );
       })
@@ -368,15 +420,22 @@ export class BoardStackRuns
     return work;
   }
 
-  /** One evaluation of the project's running stack runs. */
+  /** One evaluation of the project's run queue. */
   private async tick(projectId: string): Promise<void> {
-    const runs = await this.prisma.boardStackRun.findMany({
-      where: { state: 'running', stack: { projectId } },
-      include: RUN_INCLUDE,
-      orderBy: { stack: { number: 'asc' } },
-    });
-    if (runs.length === 0) return;
+    const [runs, solo] = await Promise.all([
+      this.prisma.boardStackRun.findMany({
+        where: { state: 'running', stack: { projectId } },
+        include: RUN_INCLUDE,
+        orderBy: { stack: { number: 'asc' } },
+      }),
+      this.prisma.boardRunQueueCard.findMany({
+        where: { runId: null, card: { projectId } },
+        select: SOLO_SELECT,
+      }),
+    ]);
+    if (runs.length === 0 && solo.length === 0) return;
     const changed = new Set<string>();
+    const changedCards = new Set<string>();
     const paused = new Set<string>();
 
     // A round the run started that failed pauses it.
@@ -417,52 +476,82 @@ export class BoardStackRuns
         }
         const latest = entry.card.rounds[0];
         if (latest && ACTIVE_PHASES.some((p) => p === latest.phase)) {
-          await this.prisma.boardStackRunCard.update({
+          await this.prisma.boardRunQueueCard.update({
             where: { id: entry.id },
             data: { status: 'started', roundId: latest.id },
           });
           entry.status = 'started';
           entry.roundId = latest.id;
         } else {
-          await this.prisma.boardStackRunCard.delete({
+          await this.prisma.boardRunQueueCard.delete({
             where: { id: entry.id },
           });
         }
         changed.add(run.stack.id);
       }
     }
+    // C-398: a card queued on its own that left To Do leaves the queue.
+    const left = solo.filter((e) => e.card.column !== 'todo');
+    if (left.length > 0) {
+      await this.prisma.boardRunQueueCard.deleteMany({
+        where: { id: { in: left.map((e) => e.id) } },
+      });
+      for (const entry of left) changedCards.add(entry.card.id);
+    }
 
-    // Start what is ready, in stack, stage then number order, while there is room.
-    const candidates = runs
-      .flatMap((run) =>
+    // Start what is ready, in To Do order, while there is room.
+    const candidates: Candidate[] = [
+      ...runs.flatMap((run) =>
         run.cards
           .filter((e) => e.status !== 'started' && e.card.column === 'todo')
           .map((entry) => ({ run, entry })),
-      )
-      .sort(
-        (a, b) =>
-          a.run.stack.number - b.run.stack.number ||
-          (a.entry.card.stage?.position ?? 0) -
-            (b.entry.card.stage?.position ?? 0) ||
-          a.entry.card.number - b.entry.card.number,
-      );
+      ),
+      ...solo
+        .filter((e) => e.card.column === 'todo')
+        .map((entry) => ({ run: null, entry })),
+    ].sort(
+      (a, b) =>
+        a.entry.card.position - b.entry.card.position ||
+        a.entry.card.number - b.entry.card.number,
+    );
     // Without its runner nothing starts, and nothing pauses: the run waits.
     const { runnerId } = await this.work.project(projectId);
     let held = !this.commands.isConnected(runnerId);
-    for (const { run, entry } of candidates) {
-      if (paused.has(run.id)) continue;
+    for (const candidate of candidates) {
+      const { run, entry } = candidate;
+      if (run !== null && paused.has(run.id)) continue;
+      const touched = () =>
+        run !== null
+          ? changed.add(run.stack.id)
+          : changedCards.add(entry.card.id);
       const ready = await this.isReady(entry.card.id);
       if (!ready) {
-        if (await this.setStatus(entry, 'waiting')) changed.add(run.stack.id);
+        if (await this.setStatus(entry, 'waiting')) touched();
         continue;
       }
-      if (await this.setStatus(entry, 'queued')) changed.add(run.stack.id);
+      if (await this.setStatus(entry, 'queued')) touched();
       if (held || !(await this.hasRoom(projectId))) {
         held = true;
         continue;
       }
       try {
-        await this.rounds.run(projectId, entry.card.number, {}, actorOf(run));
+        if (candidate.run !== null) {
+          await this.rounds.runNow(
+            projectId,
+            entry.card.number,
+            {},
+            runActorOf(candidate.run),
+          );
+        } else {
+          const solo = candidate.entry;
+          await this.rounds.runNow(
+            projectId,
+            entry.card.number,
+            optionsOf(solo.options),
+            actorOf(solo.queuedById, solo.queuedByRole),
+            solo.autoRunAfter,
+          );
+        }
       } catch (error) {
         const { code, message } = autoRunFailureOf(error);
         if (code === BOARD_ERROR.maxRunning) {
@@ -470,16 +559,29 @@ export class BoardStackRuns
           continue;
         }
         if (WAITS_FOR_DEPENDENCY.has(code)) {
-          if (await this.setStatus(entry, 'waiting')) {
-            changed.add(run.stack.id);
-          }
+          if (await this.setStatus(entry, 'waiting')) touched();
           continue;
         }
-        this.logger.warn(
-          `${stackLabel(run.stack.number)}: ${cardLabel(entry.card.number)} did not start: ${message}`,
-        );
-        await this.pause(projectId, run, entry.card, { code, message });
-        paused.add(run.id);
+        if (candidate.run !== null) {
+          this.logger.warn(
+            `${stackLabel(candidate.run.stack.number)}: ${cardLabel(entry.card.number)} did not start: ${message}`,
+          );
+          await this.pause(projectId, candidate.run, entry.card, {
+            code,
+            message,
+          });
+          paused.add(candidate.run.id);
+        } else {
+          await this.refuse(projectId, candidate.entry, { code, message });
+        }
+        continue;
+      }
+      if (candidate.run === null) {
+        // C-398: a card queued on its own is done with the queue once it runs.
+        await this.prisma.boardRunQueueCard.deleteMany({
+          where: { id: entry.id },
+        });
+        changedCards.add(entry.card.id);
         continue;
       }
       const round = await this.prisma.boardCardRound.findFirst({
@@ -487,13 +589,13 @@ export class BoardStackRuns
         orderBy: { round: 'desc' },
         select: { id: true },
       });
-      await this.prisma.boardStackRunCard.update({
+      await this.prisma.boardRunQueueCard.update({
         where: { id: entry.id },
         data: { status: 'started', roundId: round?.id ?? null },
       });
       entry.status = 'started';
       entry.roundId = round?.id ?? null;
-      changed.add(run.stack.id);
+      changed.add(candidate.run.stack.id);
     }
 
     // A run with nothing left to start and nothing it started still running is done.
@@ -515,6 +617,52 @@ export class BoardStackRuns
     }
 
     for (const stackId of changed) this.work.publishStack(projectId, stackId);
+    for (const cardId of changedCards) this.work.publish(projectId, cardId);
+  }
+
+  /**
+   * C-398: a card queued on its own whose start was refused for a reason
+   * other than a full Board or an open dependency leaves the queue; the
+   * refusal is stored on the card (`autoRunFailure`) and audited, like a
+   * refused Auto-run.
+   */
+  private async refuse(
+    projectId: string,
+    entry: SoloEntry,
+    reason: { code: string; message: string },
+  ): Promise<void> {
+    const message = reason.message.slice(0, MESSAGE_MAX);
+    this.logger.warn(
+      `queued ${cardLabel(entry.card.number)} did not start: ${message}`,
+    );
+    await this.prisma.$transaction([
+      this.prisma.boardRunQueueCard.deleteMany({ where: { id: entry.id } }),
+      this.prisma.boardCard.update({
+        where: { id: entry.card.id },
+        data: {
+          autoRunError: reason.code,
+          autoRunMessage: message,
+          autoRunFailedAt: new Date(),
+          autoRunAfter: entry.autoRunAfter,
+          autoRunStack: null,
+        },
+      }),
+    ]);
+    await this.audit.record({
+      ...actorOf(entry.queuedById, entry.queuedByRole).ctx,
+      action: 'card.auto_run_failed',
+      target: { type: 'board_card', id: entry.card.id },
+      projectId,
+      // `code` is a redacted audit key (auth codes): the refusal goes as `error`.
+      after: {
+        number: entry.card.number,
+        error: reason.code,
+        after: entry.autoRunAfter,
+        queued: true,
+      },
+      result: 'error',
+      meta: { message },
+    });
   }
 
   /**
@@ -554,7 +702,7 @@ export class BoardStackRuns
     status: 'queued' | 'waiting',
   ): Promise<boolean> {
     if (entry.status === status) return false;
-    await this.prisma.boardStackRunCard.update({
+    await this.prisma.boardRunQueueCard.update({
       where: { id: entry.id },
       data: { status },
     });
@@ -598,7 +746,7 @@ export class BoardStackRuns
       });
     }
     await this.audit.record({
-      ...actorOf(run).ctx,
+      ...runActorOf(run).ctx,
       action: 'stack.run_paused',
       target: { type: 'board_stack', id: run.stack.id },
       projectId,

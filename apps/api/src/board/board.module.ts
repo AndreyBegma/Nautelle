@@ -18,11 +18,11 @@ import { BoardPlanCards } from './board-plan-cards';
 import { BoardPrincipals } from './board-principal';
 import { BoardReview } from './board-review';
 import { BoardRoundsService } from './board-rounds.service';
+import { BoardRunQueue } from './board-run-queue';
 import { BoardSessionService } from './board-session.service';
 import { BoardSessionMessages } from './board-session-message.service';
 import { BoardShipping } from './board-shipping';
 import { BoardSink } from './board-sink';
-import { BoardStackRuns } from './board-stack-runs';
 import { BoardStacks } from './board-stacks';
 import { BoardTerminalService } from './board-terminal.service';
 import { BoardWaitService } from './board-wait.service';
@@ -75,7 +75,7 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardShipping,
     BoardSink,
     // #652: Run stack — a stack's cards queued within the agent limit.
-    BoardStackRuns,
+    BoardRunQueue,
     // #480: stacks — staged cards under one shared design.
     BoardStacks,
     BoardTerminalService,
@@ -89,7 +89,7 @@ import { CollectRetryTimer } from './collect-retry-timer';
   // `BoardSessionMessages`: Telegram answers a card's question (#489).
   // `BoardStacks`: a confirmed intake makes a stack (#480).
   // `BoardReview`: a review session's `report_review` (#884).
-  // `BoardDependencies`, `BoardStackRuns`: a person's session sets them (C-377).
+  // `BoardDependencies`, `BoardRunQueue`: a person's session sets them (C-377).
   exports: [
     // #578: the Telegram bot accepts and dismisses suggestions.
     BoardDependencies,
@@ -100,7 +100,7 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardSessionMessages,
     BoardService,
     BoardSessionService,
-    BoardStackRuns,
+    BoardRunQueue,
     BoardStacks,
     BoardTerminalService,
     BoardWaitService,

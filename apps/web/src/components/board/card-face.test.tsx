@@ -83,6 +83,26 @@ describe('CardFace taken by a session (#845 D2, D10)', () => {
   });
 });
 
+describe('CardFace run queue (C-398)', () => {
+  test('a card in the run queue says it waits for a slot, with its place', () => {
+    const html = render('todo', {
+      queue: { state: 'queued', place: 2, stack: null },
+    });
+    expect(html).toContain('data-card-queue="queued"');
+    expect(html).toContain('Waiting for a slot · #2');
+  });
+
+  test('a queued card whose dependency is open says so', () => {
+    expect(
+      render('todo', { queue: { state: 'waiting', place: null, stack: 4 } }),
+    ).toContain('Queued · waiting for a dependency');
+  });
+
+  test('a card out of the queue shows no chip', () => {
+    expect(render('todo')).not.toContain('data-card-queue');
+  });
+});
+
 describe('CardFace pull request link (#329 D6)', () => {
   for (const column of COLUMNS) {
     test(`shows PR #7 with its state in ${column}`, () => {

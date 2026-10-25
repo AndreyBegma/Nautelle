@@ -186,10 +186,23 @@ export function useCardActions({
       toast.error(`${card.label} cannot run yet. ${waits}.`);
       return false;
     }
-    return perform(
-      () => runCard(projectId, card.number, request),
-      `Started a worker on ${card.label}.`,
-    );
+    // C-398 (ADR-0100): a full Board queues the card instead of refusing it.
+    setBusy(true);
+    try {
+      const done = await runCard(projectId, card.number, request);
+      toast.success(
+        done.queue
+          ? `${card.label} is waiting for a slot.`
+          : `Started a worker on ${card.label}.`,
+      );
+      return true;
+    } catch (err) {
+      toast.error(describeBoardError(err, runnerName));
+      return false;
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
   };
 
   return {

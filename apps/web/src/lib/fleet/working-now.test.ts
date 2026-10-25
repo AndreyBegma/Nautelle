@@ -28,6 +28,7 @@ describe('workingNow (C-397)', () => {
         key: 'worker:card-4',
         kind: 'worker',
         number: 4,
+        place: null,
         label: 'C-4',
         title: 'Card 4',
         state: 'Waiting for you',
@@ -112,5 +113,24 @@ describe('workingNow (C-397)', () => {
       ]),
     );
     expect(rows.map((r) => r.label)).toEqual(['C-3', 'C-2', 'C-1']);
+  });
+
+  test('lists the run queue last, in the order its cards start (C-398)', () => {
+    const rows = workingNow(
+      boardView([
+        card(1, 'in_progress', { round: round('running') }),
+        card(2, 'todo', {
+          queue: { state: 'waiting', place: null, stack: 3 },
+        }),
+        card(3, 'todo', { queue: { state: 'queued', place: 2, stack: null } }),
+        card(4, 'todo', { queue: { state: 'queued', place: 1, stack: null } }),
+      ]),
+    );
+    expect(rows.map((r) => [r.kind, r.label, r.state, r.status])).toEqual([
+      ['worker', 'C-1', 'Running', 'running'],
+      ['queued', 'C-4', 'Waiting for a slot · #1', 'idle'],
+      ['queued', 'C-3', 'Waiting for a slot · #2', 'idle'],
+      ['queued', 'C-2', 'Queued · waiting for a dependency', 'blocked'],
+    ]);
   });
 });
