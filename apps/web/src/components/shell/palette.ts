@@ -14,12 +14,14 @@ import {
   type LucideIcon,
   Palette,
   Play,
+  SlidersHorizontal,
   Sparkles,
   SquareTerminal,
   User,
 } from 'lucide-react';
 import { runHref } from '../../lib/history/format';
 import { planHref } from '../../lib/planner/href';
+import { searchSettings } from '../../lib/projects/settings-search';
 import { planLabel, runLabel, sessionLabel } from './crumbs';
 import { type VisibleSection, visibleNav } from './nav';
 
@@ -69,6 +71,27 @@ const PROJECT_PAGES_MAX = 12;
 
 /** Plans listed: the newest, or the newest that match the query. */
 const PLANS_MAX = 5;
+
+/** Settings listed: one row per block, the best match in it. */
+const SETTINGS_MAX = 6;
+
+/**
+ * C-395: the current project's settings the query names, each opening the
+ * block that edits it — the same jump as the search on the Settings page.
+ * A block lists once: its rows would all open the same place.
+ */
+function settingItems(projectId: string, query: string): Item[] {
+  const seen = new Set<string>();
+  return searchSettings(query)
+    .filter((entry) => !seen.has(entry.item) && seen.add(entry.item))
+    .slice(0, SETTINGS_MAX)
+    .map((entry) => ({
+      id: `go:/projects/${projectId}/settings?tab=${entry.item}`,
+      label: entry.label,
+      hint: entry.where,
+      icon: SlidersHorizontal,
+    }));
+}
 
 /** Every word of the query appears in the text, in any order. */
 function matcher(query: string): (text: string) => boolean {
@@ -202,6 +225,9 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
     .filter((item) => matches(`plan ${item.label}`))
     .slice(0, PLANS_MAX);
 
+  const settings =
+    searching && current ? settingItems(current.id, input.query) : [];
+
   const actions: Item[] = [
     {
       id: 'action:theme',
@@ -215,6 +241,7 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
   return [
     ...group('pages', 'Go to', pages),
     ...group('project-pages', 'Project pages', subPages),
+    ...group('settings', 'Settings', settings),
     ...group('projects', 'Projects', projects),
     ...group('plans', 'Plans', plans),
     ...group('recent', 'Recent', recent),
