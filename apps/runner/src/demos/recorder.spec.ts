@@ -124,7 +124,7 @@ const api = (
     return answer ? answer(req) : new Response(null, { status: 201 });
   }) as typeof fetch;
 
-const ready: DemoflowStatus = { version: '0.6.0', ready: true };
+const ready: DemoflowStatus = { version: '0.7.0', ready: true };
 
 const setup = (
   options: {
@@ -416,7 +416,7 @@ describe('DemoRecorder', () => {
 
   it('skips when DemoFlow is not ready (C-370)', async () => {
     const { recorder, args, events, calls } = setup({
-      provisioned: { version: '0.6.0', ready: false, reason: 'no Chromium' },
+      provisioned: { version: '0.7.0', ready: false, reason: 'no Chromium' },
     });
     recorder.command(args());
     await recorder.idle();

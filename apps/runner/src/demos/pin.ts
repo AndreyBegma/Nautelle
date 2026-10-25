@@ -3,7 +3,7 @@
  * installed globally: every call goes through `npx --yes demoflow@<pin>`, so
  * a bump is a deliberate change here and a runner release.
  */
-export const DEMOFLOW_VERSION = '0.6.0';
+export const DEMOFLOW_VERSION = '0.7.0';
 export const DEMOFLOW_PACKAGE = `demoflow@${DEMOFLOW_VERSION}`;
 
 /** DemoFlow needs Node 22 or later for `npx` to run it. */
