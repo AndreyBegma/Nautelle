@@ -1259,6 +1259,9 @@ export class BoardRoundsService {
           // #449 D3: the session it launches with; a `fresh` start replaces
           // it (`round.restart`), and the earlier rounds keep theirs.
           sessionId,
+          // C-359: what `card.run` launches with, defaults resolved.
+          model,
+          effort,
         },
       });
       await this.attachments.claim(
