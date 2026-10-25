@@ -34,6 +34,7 @@ describe('visibleNav', () => {
 
   test('an admin gets the workspace and the Admin pages, Integrations once', () => {
     expect(labels('admin', '/')).toEqual([
+      'workspace/Inbox',
       'workspace/Overview',
       'workspace/Projects',
       'workspace/Work',
@@ -60,6 +61,14 @@ describe('visibleNav', () => {
       .flatMap((section) => section.entries)
       .find((entry) => entry.id === 'integrations');
     expect(integrations?.resolvedHref).toBe('/admin/integrations');
+  });
+
+  test('the Inbox leads the workspace for an operator; a viewer has none (C-390)', () => {
+    const first = visibleNav('operator', '/')[0]?.entries[0];
+    expect(first?.id).toBe('inbox');
+    expect(first?.resolvedHref).toBe('/inbox');
+    expect(labels('viewer', '/').join()).not.toContain('Inbox');
+    expect(activeAt('admin', '/inbox')).toBe('inbox');
   });
 
   test('a viewer sees Usage but never Prices', () => {
@@ -206,18 +215,18 @@ describe('tabBarSplit', () => {
     };
   };
 
-  test('outside a project: the workspace three, the rest behind More', () => {
+  test('outside a project: the Inbox, Overview and Projects, the rest behind More (C-390)', () => {
     expect(split('admin', '/')).toEqual({
-      tabs: ['Overview', 'Projects', 'Work'],
-      more: ['workspace: Activity, Sessions, Usage, Workflows, Skills'],
+      tabs: ['Inbox', 'Overview', 'Projects'],
+      more: ['workspace: Work, Activity, Sessions, Usage, Workflows, Skills'],
     });
   });
 
-  test('inside a project: Board, Queue and Activity; the project first in More (C-282)', () => {
+  test('inside a project: the Inbox, Board and Fleet; the project first in More (C-390)', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
-      tabs: ['Board', 'Queue', 'Activity'],
+      tabs: ['Inbox', 'Board', 'Fleet'],
       more: [
-        'project: Fleet, Settings, Project home, Planner, Schedules, Skills, Token saver',
+        'project: Queue, Activity, Settings, Project home, Planner, Schedules, Skills, Token saver',
         'workspace: Overview, Projects, Work, Activity, Sessions, Usage, Workflows, Skills',
       ],
     });
@@ -229,10 +238,15 @@ describe('tabBarSplit', () => {
     expect(more.join()).not.toContain('admin');
   });
 
-  test('a viewer gets three tabs and no Admin; the rest waits behind More', () => {
+  test('a viewer, with no Inbox, still gets three tabs; the rest waits behind More', () => {
     const { tabs, more } = split('viewer', '/');
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toEqual(['Overview', 'Projects', 'Work']);
     expect(more).toEqual(['workspace: Activity, Sessions, Usage, Workflows']);
+    expect(split('viewer', '/projects/p1').tabs).toEqual([
+      'Board',
+      'Fleet',
+      'Queue',
+    ]);
   });
 
   test('tabs resolve the project id', () => {
@@ -323,7 +337,7 @@ describe('railGroups (C-247)', () => {
     });
   });
 
-  test('Workspace keeps Overview, Projects and Work; each More folds; no Admin', () => {
+  test('Workspace keeps the Inbox, Overview, Projects and Work; each More folds; no Admin', () => {
     expect(
       groups('admin', '/projects/p1').map((g) => [g.id, g.collapsible]),
     ).toEqual([
@@ -333,6 +347,7 @@ describe('railGroups (C-247)', () => {
       ['project-more', true],
     ]);
     expect(groups('admin', '/')[0]?.entries).toEqual([
+      'Inbox',
       'Overview',
       'Projects',
       'Work',
@@ -372,7 +387,7 @@ describe('iconRailSplit (C-282)', () => {
   test('a tablet shows the primary entries and puts the rest behind More', () => {
     expect(split('/projects/p1/board')).toEqual({
       shown: [
-        'workspace: Overview, Projects, Work',
+        'workspace: Inbox, Overview, Projects, Work',
         'project: Board, Fleet, Queue, Activity, Settings',
       ],
       more: [

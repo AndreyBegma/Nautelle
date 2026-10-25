@@ -181,6 +181,8 @@ export const projectInspectionSchema = z.object({
   }),
   hasClaudeMd: z.boolean(),
   hasAgentsMd: z.boolean(),
+  /** C-395: `demoflow.config.json` at the root. Absent from a runner older than the field. */
+  hasDemoflowConfig: z.boolean().optional(),
   docs: docsSourceSchema,
   /** Human-readable notes for the preview. */
   warnings: z.array(z.string()),

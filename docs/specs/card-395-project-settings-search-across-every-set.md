@@ -45,9 +45,9 @@ This is part of the core plan of 2026-10-25, settled with the person in a grilli
 - No new ADR is needed.
 
 ## Acceptance criteria
-- [ ] Typing "budget" or "profile" finds the setting and jumps to it.
-- [ ] A project that cannot run says why at the top of Settings, with a link to each fix.
-- [ ] Each duplicated entry point leads to the single editing place.
+- [x] Typing "budget" or "profile" finds the setting and jumps to it.
+- [x] A project that cannot run says why at the top of Settings, with a link to each fix.
+- [x] Each duplicated entry point leads to the single editing place.
 
 ## Tests
 - Web: the search index covers every setting, and the Ready to run states.

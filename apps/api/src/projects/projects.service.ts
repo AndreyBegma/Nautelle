@@ -87,6 +87,8 @@ export const inspectionData = (inspection: ProjectInspection) => ({
   codeSentinelConfig: inspection.codeSentinelConfig as Prisma.InputJsonValue,
   hasClaudeMd: inspection.hasClaudeMd,
   hasAgentsMd: inspection.hasAgentsMd,
+  // C-395: a runner older than the field leaves it unknown.
+  hasDemoflowConfig: inspection.hasDemoflowConfig ?? null,
   lastInspectedAt: new Date(),
 });
 
@@ -486,8 +488,26 @@ export class ProjectsService {
     return project;
   }
 
-  private toDetail(project: ProjectWithRelations, role: Role): ProjectDetail {
-    return toProjectDetail(project, this.presence.status(project.runner), role);
+  private async toDetail(
+    project: ProjectWithRelations,
+    role: Role,
+  ): Promise<ProjectDetail> {
+    // C-395: Ready to run reads the push check C-396 keeps per runner and
+    // path — git's own answer, not a second signal stored on the project.
+    const pushCheck = await this.prisma.repositoryPushCheck.findUnique({
+      where: {
+        runnerId_rootPath: {
+          runnerId: project.runnerId,
+          rootPath: project.rootPath,
+        },
+      },
+    });
+    return toProjectDetail(
+      project,
+      this.presence.status(project.runner),
+      role,
+      pushCheck,
+    );
   }
 
   private async usableRunner(runnerId: string): Promise<void> {
