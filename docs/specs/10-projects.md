@@ -46,7 +46,7 @@ The person delegated all decisions on 2026-10-07. Each entry below is the defaul
 | D1 | Only an admin connects or deletes a project. The admin picks a runner (online) and an absolute path. The API sends `project.inspect`, shows the result as a preview, and stores the project only on confirm | ADR-0010 (inspect is admin-only in runner-protocol.md) |
 | D2 | `project.inspect` resolves `git rev-parse --path-format=absolute --git-common-dir` and requires the path to be the **main checkout**: its parent equals the toplevel. A linked worktree (e.g. `.wt-<repo>-<slot>`) is refused with `not_main_checkout` and the main checkout's path is suggested. The runner reports it rather than failing: `isMainCheckout: false` with `root` set to the main checkout, and docs detection skipped. The API refuses to connect it (409 `not_main_checkout`). A subdirectory of the main checkout is reported the same way | orchestrator SKILL "Where things are" [Confirmed] |
 | D3 | The repo comes from `origin`: `git@github.com:owner/name(.git)` or `https://github.com/owner/name(.git)` → `owner/name`. Any other host is returned with `forge: "unsupported"` and the API refuses to connect it (`unsupported_forge`). cockpit (`gitlab-fwg`) is the known example | ADR-0004; cockpit remote [Confirmed] |
-| D4 | The base branch comes from `orchestrator.base` in `.code-analyzer-config.json`. If that is absent, from `origin/HEAD`. If that is absent, `gh repo view --json defaultBranchRef`. If that fails, `main`. The project stores it and can override it | orchestrator SKILL configuration table [Confirmed] |
+| D4 | The base branch comes from `orchestrator.base` in `.code-analyzer-config.json`. If that is absent and `origin/develop` exists with a tip committed in the last 90 days, it is `develop` (ADR-0101). Otherwise from `origin/HEAD`. If that is absent, `gh repo view --json defaultBranchRef`. If that fails, `main`. The project stores it and can override it | orchestrator SKILL configuration table [Confirmed], ADR-0101 |
 | D5 | `.code-analyzer-config.json` is parsed and its `orchestrator` block stored as a JSON snapshot. Invalid JSON is reported (`configError`), not fatal. The presence of `CLAUDE.md` and `AGENTS.md` is reported | data-model.md |
 | D6 | Docs-source detection runs in this order and stops at the first hit. Every hit records `detectedBy` and evidence (file + line, or URL). The full list of candidates checked is returned for the preview:<br>1. `orchestrator.specDir`: a relative path inside the repository, a relative path outside it (`../x-documentation/prs`), or a GitHub URL<br>2. sibling folder `<parent>/<name>-documentation`, then `<parent>/<name>-docs`<br>3. same-owner remote `owner/<name>-documentation` or `owner/<name>-docs` via `gh repo view` (marked `remote_repo`, `localPath: null`)<br>4. GitHub URLs or local paths containing `documentation` or `docs` in `AGENTS.md`, `CLAUDE.md`, `README.md` (e.g. denitsa-app's `AGENTS.md` link to `denitsa-documentation`). A GitHub URL counts when it is a same-owner repo or a folder of that name sits beside the project; a local path counts only when it resolves to a direct child of the parent whose name contains `docs` / `documentation`<br>5. back-link: a sibling `*-documentation` / `*-docs` folder whose `README.md` names this repo or its path (luna-studio, cockpit). "Names" means the README contains `owner/name`, the absolute root, or the root's folder name as a whole word (not inside a longer word or hyphenated name)<br>6. in-repo `docs/` | ADR-0012; earlier findings for denitsa / luna / cockpit [Confirmed] |
 | D7 | Classification inside the found docs root goes one level deep, plus known nested names:<br>specs ← `specs/`, `prs/`, `stages/`, `docs/specs/`<br>adr ← `adr/`, `decisions/`, `decisions.md`, `*adr*`<br>roadmap ← `roadmap.md`, `ROADMAP.md`, `spec-queue.md`, `docs/roadmap*`<br>reports ← `bug-reports/`, `fixes/`, `verifications/`, `feature-plans/`<br>Each kind keeps every match (relative to the docs root). `isGitRepo` and the docs repo's own `owner/name` (if any) are recorded. Non-git folders (cockpit-docs) are `isGitRepo: false` | ADR-0012; denitsa-documentation and cockpit-docs layouts [Confirmed] |
@@ -69,6 +69,8 @@ Owned by i10-runner, in `packages/shared/src/protocol/projects.ts`, with both co
 |---|---|---|---|
 | `project.inspect` | `{ path }` | admin | `ProjectInspection` |
 | `project.refresh` | `{ projectId, root }` | operator | `ProjectInspection` |
+| `project.discover` | `{}` | admin | `ProjectDiscoverResult`: the git repositories under the allowed roots (ADR-0101) |
+| `project.push_check` | `{ path }` | admin | `ProjectPushCheckResult`: `{ ok, remote, message }` from `git push --dry-run` (ADR-0101) |
 
 `ProjectInspection`:
 
@@ -76,7 +78,7 @@ Owned by i10-runner, in `packages/shared/src/protocol/projects.ts`, with both co
 - `gitCommonDir`
 - `isMainCheckout`
 - `remote`: `{ url, forge: "github" | "unsupported", repo: "owner/name" | null }`. With no `origin`, `url` is null and `forge` is `unsupported`
-- `baseBranch`, plus `baseSource`: `config` | `origin_head` | `gh` | `default`
+- `baseBranch`, plus `baseSource`: `config` | `develop` | `origin_head` | `gh` | `default`
 - `codeSentinelConfig`: `{ orchestrator?: object, error?: string }`
 - `hasClaudeMd`, `hasAgentsMd`
 - `docs`, with these fields:
@@ -109,6 +111,8 @@ Migration directory: `apps/api/prisma/migrations/20261011000000_projects/`. All 
 | Method | Path | Who | Behaviour |
 |---|---|---|---|
 | POST | `/admin/projects/inspect` | admin | `{ runnerId, path }` → `ProjectInspection` (no write). Runner offline → 409 `runner_offline` |
+| POST | `/admin/projects/discover` | admin | `{ runnerId }` → `ProjectDiscoverResult` (no write; ADR-0101) |
+| POST | `/admin/projects/push-check` | admin | `{ runnerId, path }` → `PushCheckView`; stores the latest answer per runner and path in `repository_push_checks` (ADR-0101) |
 | POST | `/admin/projects` | admin | `{ runnerId, path, displayName? }`. Re-inspects, then stores the project and its docs source, and pushes the watch list. Errors: 409 `not_main_checkout`, 422 `unsupported_forge`, 409 `already_connected` |
 | DELETE | `/admin/projects/:projectId` | admin | D15 |
 | GET | `/projects` | session | projects visible per D11, with the effective role on each |
@@ -127,8 +131,8 @@ These pages sit in the application shell from #9 (route group `(app)`):
 - **`/projects`**: a table with name, repo, runner (with a status dot), base, docs source kind, and your role. An admin also sees a **Connect project** button.
 - **Connect dialog** (admin):
   1. Pick an online runner.
-  2. Enter an absolute path.
-  3. **Inspect** shows a preview: repo, base and its source, config found, CLAUDE.md/AGENTS.md, the docs source with its evidence, and the candidate checklist (hit/miss), plus any warnings or a refusal reason.
+  2. Pick one of the repositories the runner found under its allowed roots (search, **Use repository**), or enter an absolute path (ADR-0101).
+  3. **Inspect** shows a preview: repo, base and its source, push access (a push check runs after a successful inspection), config found, CLAUDE.md/AGENTS.md, the docs source with its evidence, and the candidate checklist (hit/miss), plus any warnings or a refusal reason.
   4. **Connect**.
 - **`/projects/[projectId]/settings`** has these tabs:
   - General: display name, base override, ready-label override, merge approval, default runtime profile (from that runner's profiles).
