@@ -141,8 +141,11 @@ const SKIPPING_ERRORS: ReadonlySet<CommandErrorCode> = new Set([
   'busy',
 ]);
 
-/** Cards and heads whose PR touches no UI path, so `pr.inspect` runs once. */
-const NO_UI_MEMO_MAX = 1_000;
+/**
+ * Cards and heads whose PR touches no UI path, so `pr.inspect` runs once —
+ * and, #946, the skips already logged, so a head is logged once.
+ */
+const MEMO_MAX = 1_000;
 
 const clipReason = (reason: string): string =>
   reason.length > DEMO_REASON_MAX
@@ -167,6 +170,7 @@ export class CardDemosService {
   private readonly logger = new Logger(CardDemosService.name);
   private readonly settledListeners: ((cardId: string) => void)[] = [];
   private readonly noUi = new Set<string>();
+  private readonly told = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -311,12 +315,14 @@ export class CardDemosService {
   }
 
   /**
-   * C-370: the Board's trigger, on a feature card's green head that passed
-   * review. Once per head, whatever came of it, so nothing retries: a head
-   * with a demo — automatic or "Record again" — is left alone. The PR's
-   * changed files decide: one that touches no `demoUiPaths` glob gets no
-   * demo (a list `pr.inspect` truncated counts as what it shows). Never
-   * throws for the runner, and never blocks the card.
+   * C-370: the Board's trigger, on a feature card's green head — #946: as
+   * soon as it reads green, before the review steps decide. Once per head,
+   * whatever came of it, so nothing retries: a head with a demo — automatic
+   * or "Record again" — is left alone. The PR's changed files decide: one
+   * that touches no `demoUiPaths` glob gets no demo (a list `pr.inspect`
+   * truncated counts as what it shows). Every head it does not record is
+   * logged once with the reason (#946). Never throws for the runner, and
+   * never blocks the card.
    */
   async autoRecord(
     project: DemoProject,
@@ -324,19 +330,30 @@ export class CardDemosService {
     headSha: string,
     inspect: () => Promise<DemoPrFiles>,
   ): Promise<void> {
-    if (card.kind !== 'feature') return;
+    if (card.kind !== 'feature') {
+      this.skip(card, headSha, 'only a feature card records one');
+      return;
+    }
     const memo = `${card.id}:${headSha}`;
     if (this.noUi.has(memo)) return;
     const settings = await this.settings.view(project.id);
-    if (!settings.enabled) return;
+    if (!settings.enabled) {
+      this.skip(card, headSha, 'demo videos are off for the project');
+      return;
+    }
     const recorded = await this.prisma.cardDemo.count({
       where: { cardId: card.id, headSha },
     });
     if (recorded > 0) return;
     const pr = await inspect();
     if ('files' in pr && !touchesDemoUiPaths(pr.files, settings.uiPaths)) {
-      if (this.noUi.size >= NO_UI_MEMO_MAX) this.noUi.clear();
+      if (this.noUi.size >= MEMO_MAX) this.noUi.clear();
       this.noUi.add(memo);
+      this.skip(
+        card,
+        headSha,
+        `the PR changes no UI path (${settings.uiPaths.join(', ')})`,
+      );
       return;
     }
     const row = await this.prisma.$transaction(async (tx) => {
@@ -344,13 +361,13 @@ export class CardDemosService {
       const again = await tx.cardDemo.count({
         where: { cardId: card.id, headSha },
       });
-      if (again > 0) return null;
+      if (again > 0) return 'recorded' as const;
       const latest = await tx.boardCardRound.findFirst({
         where: { cardId: card.id },
         orderBy: { round: 'desc' },
         select: { round: true },
       });
-      if (!latest) return null;
+      if (!latest) return 'no_round' as const;
       return tx.cardDemo.create({
         data: {
           cardId: card.id,
@@ -361,7 +378,11 @@ export class CardDemosService {
         },
       });
     });
-    if (!row) return;
+    if (row === 'recorded') return;
+    if (row === 'no_round') {
+      this.skip(card, headSha, 'the card has never run');
+      return;
+    }
     this.logger.log(
       `${cardLabel(card.number)}: demo ${row.id} of ${headSha.slice(0, 8)} queued`,
     );
@@ -375,6 +396,26 @@ export class CardDemosService {
       await this.dispatch(project, card, row, { actor: SYSTEM_ACTOR });
     }
     this.publish(project.id, card.id);
+  }
+
+  /**
+   * #946: the Board does not ask for a feature card's green head — its PR
+   * conflicts, so a fix round replaces the head — and says so once, as
+   * `autoRecord` does for every head it does not record.
+   */
+  deferred(card: DemoCard, headSha: string, reason: string): void {
+    if (card.kind === 'feature') this.skip(card, headSha, reason);
+  }
+
+  /** #946: why a head gets no automatic demo, logged once per head and reason. */
+  private skip(card: DemoCard, headSha: string, reason: string): void {
+    const key = `${card.id}:${headSha}:${reason}`;
+    if (this.told.has(key)) return;
+    if (this.told.size >= MEMO_MAX) this.told.clear();
+    this.told.add(key);
+    this.logger.log(
+      `${cardLabel(card.number)}: no demo of ${headSha.slice(0, 8)}: ${reason}`,
+    );
   }
 
   /**

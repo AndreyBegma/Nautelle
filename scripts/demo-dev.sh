@@ -5,6 +5,9 @@
 # `bun run db:setup`, so every demo starts from the same data whatever the dev
 # database holds.
 #
+# The dev settings come from apps/api/.env, or — in a card worktree, which has
+# none — from the project's Demo env (DATABASE_URL), #946.
+#
 # The database is agentdock_demo_<id> for a card worktree (NAUTELLE_CARD, else
 # the worktree's `card-<id>` suffix) and agentdock_demo elsewhere. Each start
 # recreates it, applies this checkout's migrations, creates the admin
@@ -27,9 +30,18 @@ WEB="http://127.0.0.1:$WEB_PORT"
 
 : "${DEMO_LOGIN_EMAIL:?set it in the project'\''s Demo env}"
 : "${DEMO_LOGIN_PASSWORD:?set it in the project'\''s Demo env}"
+# #946: a fresh card worktree has no apps/api/.env. The project's Demo env —
+# which the runner hands to DemoFlow — then gives DATABASE_URL, a database on
+# the dev PostgreSQL server the demo database is made next to; the rest has
+# the dev defaults below. A variable set in the environment wins over
+# apps/api/.env, which dotenv and Nest never override.
 if [ ! -f "$ROOT/apps/api/.env" ]; then
-  echo "demo-dev: apps/api/.env is missing; copy the dev one into this worktree" >&2
-  exit 1
+  if [ -z "${DATABASE_URL:-}" ]; then
+    echo "demo-dev: apps/api/.env is missing and DATABASE_URL is not set; add DATABASE_URL (the dev PostgreSQL) to the project's Demo env" >&2
+    exit 1
+  fi
+  export APP_ENV="${APP_ENV:-development}"
+  export TRUST_PROXY="${TRUST_PROXY:-loopback}"
 fi
 if curl -fsS -o /dev/null --max-time 2 "$API/health" 2>/dev/null; then
   echo "demo-dev: an API already answers on $API; set DEMO_API_PORT to a free port" >&2
@@ -85,7 +97,7 @@ bun run --silent --cwd apps/api demo:db seed "$DEMO_DB"
 
 # The dev API on this machine runs the schedules, webhooks and activity
 # projector; this one only serves the recording.
-PORT="$API_PORT" WEB_URL="$WEB" APP_URL="$WEB" SCHEDULER_ENABLED=false \
+PORT="$API_PORT" API_URL="$API" WEB_URL="$WEB" APP_URL="$WEB" SCHEDULER_ENABLED=false \
   WEBHOOKS_WORKER_ENABLED=false ACTIVITY_POLL_MS=0 \
   bun run --cwd apps/api start:dev &
 PIDS="$!"
