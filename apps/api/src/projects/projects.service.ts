@@ -340,6 +340,7 @@ export class ProjectsService {
       'mergeApproval',
       'shipSessionContent',
       'sessionContentRetentionDays',
+      'toolUseTimeoutMinutes',
     ] as const;
     const before: Record<string, unknown> = {};
     const after: Record<string, unknown> = {};

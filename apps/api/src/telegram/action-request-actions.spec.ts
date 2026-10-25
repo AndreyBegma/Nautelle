@@ -4,6 +4,8 @@ import {
 } from '../local/action-request-mapper';
 import {
   actionRequestDecidedText,
+  actionRequestErrorText,
+  actionRequestKeyboard,
   decodeActionRequestCallback,
   encodeActionRequestCallback,
   isActionRequestCallback,
@@ -30,6 +32,68 @@ describe('action-request buttons (spec 201 D18)', () => {
     }
   });
 
+  it('round-trips the remembered approvals as `xs`/`xp` within 64 bytes (C-401)', () => {
+    for (const [remember, code] of [
+      ['session', 'xs:'],
+      ['project', 'xp:'],
+    ] as const) {
+      const press = {
+        action: 'approve' as const,
+        remember,
+        notificationId: 9_223_372_036_854_775_807n,
+        actionRequestId: 'A'.repeat(40),
+      };
+      const data = encodeActionRequestCallback(press);
+      expect(data.startsWith(code)).toBe(true);
+      expect(Buffer.byteLength(data)).toBeLessThanOrEqual(64);
+      expect(decodeActionRequestCallback(data)).toEqual(press);
+      expect(isActionRequestCallback(data)).toBe(true);
+      expect(decodeCallback(data)).toBeNull();
+    }
+    // A deny never remembers.
+    expect(
+      encodeActionRequestCallback({
+        action: 'deny',
+        remember: 'project',
+        notificationId: 1n,
+        actionRequestId: ID,
+      }),
+    ).toBe(`y:1:${ID}`);
+  });
+
+  it('offers the rule buttons only for the scopes given (C-401)', () => {
+    const target = { notificationId: 7n, actionRequestId: ID };
+    const texts = (rows: { text: string }[][]) =>
+      rows.map((row) => row.map((button) => button.text));
+    expect(texts(actionRequestKeyboard(target))).toEqual([['Approve', 'Deny']]);
+    const both = actionRequestKeyboard({
+      ...target,
+      remember: ['session', 'project'],
+    });
+    expect(texts(both)).toEqual([
+      ['Approve', 'Deny'],
+      ['Allow similar in this session'],
+      ['Always allow in this project'],
+    ]);
+    expect(both[1]?.[0]?.callback_data).toBe(`xs:7:${ID}`);
+    expect(both[2]?.[0]?.callback_data).toBe(`xp:7:${ID}`);
+    expect(
+      texts(actionRequestKeyboard({ ...target, remember: ['project'] })),
+    ).toEqual([['Approve', 'Deny'], ['Always allow in this project']]);
+  });
+
+  it('answers a remembered approval and a refused one (C-401)', () => {
+    expect(
+      actionRequestDecidedText('approve', 'approved', null, 'session'),
+    ).toBe('Approved. Similar calls in this session are allowed from now on.');
+    expect(
+      actionRequestDecidedText('approve', 'approved', null, 'project'),
+    ).toContain('removed in Settings');
+    expect(actionRequestErrorText('not_rememberable')).toContain(
+      'cannot be remembered',
+    );
+  });
+
   it('decodes nothing it did not encode', () => {
     for (const data of [
       undefined,
@@ -39,6 +103,8 @@ describe('action-request buttons (spec 201 D18)', () => {
       `x:-1:${ID}`,
       `x:1:${ID}/../`,
       `a:1:2:${'A'.repeat(27)}`,
+      `xx:1:${ID}`,
+      `ys:1:${ID}`,
     ]) {
       expect(decodeActionRequestCallback(data)).toBeNull();
     }

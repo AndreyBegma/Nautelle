@@ -178,6 +178,19 @@ export const SETTINGS_CATALOGUE: readonly SettingEntry[] = [
     help: 'Content older than this is deleted every night.',
   },
   { item: 'sessions', label: 'Purge content' },
+  // Automation › Away mode
+  {
+    item: 'away',
+    label: 'Request timeout',
+    help: 'How long a tool call asked in away mode waits for an answer.',
+    keywords: 'permission approval minutes hours',
+  },
+  {
+    item: 'away',
+    label: 'Allowed tool calls',
+    help: 'Rules made by “Allow similar in this session” and “Always allow in this project”.',
+    keywords: 'permission rule remember tool use',
+  },
   // Automation › Steward
   {
     item: 'steward',

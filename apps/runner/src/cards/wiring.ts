@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { RUNNER_MCP_SERVER } from '@nautelle/shared';
+import { PERMISSION_HOOK_TIMEOUT_S, RUNNER_MCP_SERVER } from '@nautelle/shared';
 import type {
   CardRunWiring,
   CardRunWiringReason,
@@ -35,7 +35,8 @@ const HOOKS: readonly HookEntry[] = [
   {
     event: 'PermissionRequest',
     subcommand: 'permission-request',
-    timeout: 300,
+    // C-401: a request may wait up to 12 hours for a person.
+    timeout: PERMISSION_HOOK_TIMEOUT_S,
   },
   { event: 'UserPromptSubmit', subcommand: 'user-prompt-submit', async: true },
   { event: 'PostToolUse', subcommand: 'post-tool-use', async: true },
