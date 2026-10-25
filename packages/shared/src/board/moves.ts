@@ -13,9 +13,12 @@ import {
 
 /**
  * - `person` — a drag, or a button that moves the card (Accept, Mark finished);
- * - `automatic` — the work moving it: Run → In progress, done → Finished.
+ * - `automatic` — the work moving it: Run → In progress, done → Finished;
+ * - `merged` — the card's pull request merged into the project base (C-389,
+ *   ADR-0100): In progress or Finished → Completed. The merge was a person's
+ *   decision — on GitHub, through Accept, or by turning auto-merge on.
  */
-export type BoardMoveSource = 'person' | 'automatic';
+export type BoardMoveSource = 'person' | 'automatic' | 'merged';
 
 /**
  * What the API does besides writing the new column, in this order:
@@ -40,12 +43,13 @@ export type BoardMoveEffect =
 /**
  * - `card_running` — a round is active and the move would take the card out
  *   of In progress, not to Finished and without `stopWorker`;
- * - `automatic_to_completed` — only a person completes a card;
+ * - `automatic_to_completed` — only a person, or a merge, completes a card;
  * - `card_completed` — automation never moves a Completed card, so a late
  *   event cannot pull back a card the person accepted;
  * - `invalid_move` — into or out of Inbox other than a person's Inbox → To Do
  *   (#244 D9): a suggestion enters To Do only by Accept, and nothing else
- *   enters the Inbox;
+ *   enters the Inbox; a merge moving a card anywhere but from In progress or
+ *   Finished to Completed;
  * - `plan_task_derived` — the item is a plan task projected onto the board
  *   (#270 D5, ADR-0028): its column follows its plan and its issue, so no
  *   move, reorder or column change of it is ever allowed.
@@ -128,6 +132,12 @@ export const boardMoveRule = (move: BoardMoveInput): BoardMoveDecision => {
   }
   if (source === 'automatic' && from === 'completed') {
     return refuse('card_completed');
+  }
+  if (
+    source === 'merged' &&
+    (to !== 'completed' || (from !== 'in_progress' && from !== 'finished'))
+  ) {
+    return refuse('invalid_move');
   }
   if (from === to) return { allowed: true, effects: [], offerRun: false };
   const cardSource = move.cardSource ?? 'manual';

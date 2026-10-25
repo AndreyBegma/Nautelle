@@ -90,7 +90,8 @@ describe('a Finished card whose CI settles later (e2e, #894)', () => {
     const [merge] = w.sent('card.merge');
     expect(merge).toMatchObject({ pr: 77, deleteBranch: true });
     expect(await w.card(1)).toMatchObject({
-      column: 'finished',
+      // C-389 (ADR-0100): the merge completes it.
+      column: 'completed',
       ciState: 'green',
     });
     expect((await w.card(1)).mergedAt).not.toBeNull();

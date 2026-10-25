@@ -39,8 +39,16 @@ export const DEMO_CARDS: ReadonlyArray<{
   title: string;
   column: BoardColumn;
   kind: 'feature' | 'bug';
-  /** C-359: a finished round 1 launched with this model and effort. */
-  round?: { model: string; effort: CardEffort };
+  /**
+   * C-359: a round 1 launched with this model and effort. It finished, or
+   * (C-399) a hard budget paused it.
+   */
+  round?: { model: string; effort: CardEffort; paused?: true };
+  /**
+   * C-389: a PR recorded as merged into the project base while the card sat
+   * in Finished — the API's sweep moves it to Completed by itself.
+   */
+  mergedPr?: number;
 }> = [
   { title: 'Export the activity feed as CSV', column: 'todo', kind: 'feature' },
   { title: 'Dark mode for the settings page', column: 'todo', kind: 'feature' },
@@ -59,6 +67,42 @@ export const DEMO_CARDS: ReadonlyArray<{
     column: 'finished',
     kind: 'feature',
     round: { model: 'claude-opus-5-5', effort: 'high' },
+  },
+  {
+    title: 'Coupon codes at checkout',
+    column: 'finished',
+    kind: 'feature',
+    mergedPr: 42,
+  },
+  {
+    title: 'Import products from a CSV file',
+    column: 'in_progress',
+    kind: 'feature',
+    round: { model: 'claude-sonnet-5-5', effort: 'medium', paused: true },
+  },
+];
+
+/**
+ * C-389: runs that failed an hour ago. Needs you lists the card's; the
+ * Steward's is a service failure, so it stays in the project's history only.
+ */
+export const DEMO_FAILED_RUNS: ReadonlyArray<{
+  id: string;
+  kind: 'card' | 'steward';
+  title: string;
+  trigger: 'user' | 'schedule';
+}> = [
+  {
+    id: 'demo-run-failed-card',
+    kind: 'card',
+    title: 'C-2 Dark mode for the settings page',
+    trigger: 'user',
+  },
+  {
+    id: 'demo-run-failed-steward',
+    kind: 'steward',
+    title: 'Steward digest',
+    trigger: 'schedule',
   },
 ];
 
@@ -129,9 +173,26 @@ export const seedDemo = async (
         createdById: admin.id,
         movedById: admin.id,
         movedAt: now,
+        // C-399: a paused card keeps its worktree branch and its session.
+        ...(card.round?.paused
+          ? {
+              branch: `card/c${number}-import-products-from-a-csv-file`,
+              sessionId: '0000c399-0000-4000-8000-000000000007',
+            }
+          : {}),
+        ...(card.mergedPr === undefined
+          ? {}
+          : {
+              branch: `card/c${number}-coupon-codes`,
+              prNumber: card.mergedPr,
+              prUrl: `https://github.com/acme/shop/pull/${card.mergedPr}`,
+              prState: 'merged' as const,
+              mergedAt: new Date(now.getTime() - 10 * 60_000),
+            }),
       },
     });
     if (card.round) {
+      const paused = card.round.paused === true;
       const runId = `demo-run-${number}`;
       const startedAt = new Date(now.getTime() - 20 * 60_000);
       await prisma.run.upsert({
@@ -145,7 +206,8 @@ export const seedDemo = async (
           runtime: 'claude',
           model: card.round.model,
           args: { card: number, round: 1, trigger: 'run' },
-          status: 'succeeded',
+          status: paused ? 'abandoned' : 'succeeded',
+          ...(paused ? { outcome: 'Paused: a hard budget was reached' } : {}),
           triggeredByType: 'user',
           triggeredById: admin.id,
           startedAt,
@@ -165,17 +227,41 @@ export const seedDemo = async (
           cardBody: '',
           cardKind: card.kind,
           authorId: admin.id,
-          phase: 'finished',
-          finishedBy: 'worker',
-          summary: 'Added a Retry collect button to the card.',
+          ...(paused
+            ? { phase: 'cancelled', pausedFor: 'budget' }
+            : {
+                phase: 'finished',
+                finishedBy: 'worker',
+                summary: 'Added a Retry collect button to the card.',
+                endedAt: now,
+              }),
           model: card.round.model,
           effort: card.round.effort,
           startedAt,
           finishedAt: now,
-          endedAt: now,
         },
       });
     }
+  }
+  const failedAt = new Date(now.getTime() - 60 * 60_000);
+  for (const run of DEMO_FAILED_RUNS) {
+    await prisma.run.upsert({
+      where: { id: run.id },
+      update: {},
+      create: {
+        id: run.id,
+        kind: run.kind,
+        projectId: DEMO_PROJECT_ID,
+        title: run.title,
+        runtime: 'claude',
+        status: 'failed',
+        triggeredByType: run.trigger,
+        triggeredById: run.trigger === 'user' ? admin.id : null,
+        startedAt: new Date(failedAt.getTime() - 5 * 60_000),
+        endedAt: failedAt,
+        updatedAt: failedAt,
+      },
+    });
   }
   return { projectId: DEMO_PROJECT_ID, cards: DEMO_CARDS.length };
 };

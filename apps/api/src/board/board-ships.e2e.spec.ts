@@ -206,7 +206,7 @@ describe('a card ships itself (e2e, #359)', () => {
   });
 
   describe('D7: Finished = done + green, then auto-merge', () => {
-    it('green CI and a finished worker move the card to Finished and merge it (base develop)', async () => {
+    it('green CI and a finished worker move the card to Finished, merge it (base develop) and complete it (C-389)', async () => {
       await started();
       await ended();
       expect(w.commands.checks).toHaveBeenCalledWith(
@@ -223,7 +223,7 @@ describe('a card ships itself (e2e, #359)', () => {
       });
       const card = await detail();
       expect(card).toMatchObject({
-        column: 'finished',
+        column: 'completed',
         prState: 'merged',
         ciState: 'green',
       });
@@ -233,6 +233,11 @@ describe('a card ships itself (e2e, #359)', () => {
       ]);
       const [record] = await w.audit('card.merged');
       expect(record).toMatchObject({ actorType: 'system', result: 'ok' });
+      // C-389 (ADR-0100): the auto-merge completes the card, and cleans up.
+      const [completed] = await w.audit('card.completed_by_merge');
+      expect(completed).toMatchObject({ actorType: 'system', result: 'ok' });
+      expect(completed.after).toEqual({ number: 1, pr: 77 });
+      expect(w.sent('card.close')).toHaveLength(1);
     });
 
     it('the worker finishing — not only the session ending — runs the same gate', async () => {
@@ -246,7 +251,7 @@ describe('a card ships itself (e2e, #359)', () => {
           'Done.',
         );
       await w.work.settled();
-      expect((await w.card(1)).column).toBe('finished');
+      expect((await w.card(1)).column).toBe('completed');
       expect(w.sent('card.merge')).toHaveLength(1);
     });
 
@@ -350,7 +355,7 @@ describe('a card ships itself (e2e, #359)', () => {
       await shipping.poll();
       await w.work.settled();
       card = await detail();
-      expect(card).toMatchObject({ column: 'finished', ciState: 'green' });
+      expect(card).toMatchObject({ column: 'completed', ciState: 'green' });
       expect(w.sent('card.merge')).toHaveLength(1);
     });
 
@@ -493,7 +498,7 @@ describe('a card ships itself (e2e, #359)', () => {
       checksAnswer({});
       await shipping.poll();
       await w.work.settled();
-      expect((await w.card(1)).column).toBe('finished');
+      expect((await w.card(1)).column).toBe('completed');
       expect(w.sent('card.merge')).toHaveLength(1);
     });
 
@@ -728,7 +733,10 @@ describe('a card ships itself (e2e, #359)', () => {
       await shipping.poll();
       await w.work.settled();
       card = await w.card(1);
-      expect(card).toMatchObject({ column: 'finished', ciHeadSha: MERGE_HEAD });
+      expect(card).toMatchObject({
+        column: 'completed',
+        ciHeadSha: MERGE_HEAD,
+      });
       expect(card.rounds).toHaveLength(2);
     });
 
@@ -832,11 +840,17 @@ describe('a card ships itself (e2e, #359)', () => {
     });
   });
 
-  describe('D8: a merged card stays, and a follow-up opens a second PR', () => {
-    it('Send back on a merged card resumes the session on <branch>-2 from the base, and lists both PRs', async () => {
+  describe('D8: a follow-up on a merged card opens a second PR', () => {
+    it('Send back on a merged card moved back from Completed resumes the session on <branch>-2 from the base, and lists both PRs', async () => {
       await started();
       await ended();
+      // C-389 (ADR-0100): the merge completed the card; a person moves it
+      // back for the follow-up.
+      expect(await w.card(1)).toMatchObject({ column: 'completed' });
       expect((await w.card(1)).mergedAt).not.toBeNull();
+      expect(
+        (await post(1, 'move', { column: 'finished', index: 0 })).status,
+      ).toBe(200);
 
       w.handlers['card.collect'] = () =>
         ok({
@@ -879,11 +893,11 @@ describe('a card ships itself (e2e, #359)', () => {
       expect(card.prUrl).toBe('https://github.com/acme/widget/pull/78');
     });
 
-    it('Completed runs the cleanup: card.close removes the worktree', async () => {
+    it('Completed by the merge runs the cleanup: card.close removes the worktree', async () => {
       await started();
       await ended();
-      expect((await post(1, 'accept')).status).toBe(200);
       await w.work.settled();
+      expect((await w.card(1)).column).toBe('completed');
       expect(w.sent('card.close')).toEqual([
         expect.objectContaining({ removeWorktree: true }),
       ]);
