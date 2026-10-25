@@ -30,7 +30,12 @@ const project = (overrides: Partial<ProjectDetail> = {}): ProjectDetail => ({
   hasClaudeMd: true,
   hasAgentsMd: false,
   hasDemoflowConfig: true,
-  canPush: true,
+  pushCheck: {
+    ok: true,
+    remote: 'git@github.com:acme/widget.git',
+    message: 'git@github.com:acme/widget.git accepts pushes.',
+    checkedAt: '2026-10-24T00:00:00Z',
+  },
   lastInspectedAt: '2026-10-25T00:00:00Z',
   createdAt: '2026-10-25T00:00:00Z',
   updatedAt: '2026-10-25T00:00:00Z',
@@ -71,6 +76,7 @@ const facts = (overrides: Partial<ReadyFacts> = {}): ReadyFacts => ({
   terminalSetup: setup([plugin('done')]),
   demos: { enabled: true, uiPaths: [], telegram: false },
   isAdmin: true,
+  now: Date.parse('2026-10-25T00:00:00Z'),
   ...overrides,
 });
 
@@ -160,13 +166,37 @@ describe('Ready to run (C-395)', () => {
     ).toMatchObject({ state: 'ok', detail: 'main, set in General' });
   });
 
-  test('push access comes from the runner; unknown until it reports', () => {
+  test('push access is the push check: git’s message on failure, a rerun when missing or stale', () => {
+    const failed = project({
+      pushCheck: {
+        ok: false,
+        remote: null,
+        message: 'Permission denied (publickey).',
+        checkedAt: '2026-10-24T00:00:00Z',
+      },
+    });
+    expect(byId(facts({ project: failed })).push).toMatchObject({
+      state: 'gap',
+      blocking: true,
+      detail: 'Permission denied (publickey).',
+      run: { kind: 'push_check', label: 'Check again' },
+    });
     expect(
-      byId(facts({ project: project({ canPush: false }) })).push,
-    ).toMatchObject({ state: 'gap', blocking: true });
+      byId(facts({ project: project({ pushCheck: null }) })).push,
+    ).toMatchObject({
+      state: 'unknown',
+      run: { kind: 'push_check', label: 'Run push check' },
+    });
     expect(
-      byId(facts({ project: project({ canPush: null }) })).push,
-    ).toMatchObject({ state: 'unknown' });
+      byId(facts({ now: Date.parse('2026-11-10T00:00:00Z') })).push,
+    ).toMatchObject({
+      state: 'unknown',
+      detail: 'Passed 17 days ago; run it again to be sure.',
+      run: { label: 'Check again' },
+    });
+    const member = byId(facts({ isAdmin: false, project: failed })).push;
+    expect(member?.run).toBeUndefined();
+    expect(member?.detail).toContain('Ask an admin');
   });
 
   test('the plugin: a missing profile names it and links Sessions', () => {

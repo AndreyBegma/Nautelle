@@ -1,3 +1,2 @@
 -- AlterTable
-ALTER TABLE "projects" ADD COLUMN     "canPush" BOOLEAN,
-ADD COLUMN     "hasDemoflowConfig" BOOLEAN;
+ALTER TABLE "projects" ADD COLUMN     "hasDemoflowConfig" BOOLEAN;

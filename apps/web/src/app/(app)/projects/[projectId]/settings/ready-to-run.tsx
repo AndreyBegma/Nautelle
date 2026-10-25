@@ -6,6 +6,7 @@ import { Section } from '@andrewbehma/glass-ui/section';
 import type {
   DemoSettingsView,
   ProjectDetail,
+  PushCheckRequest,
   TerminalSetupView,
 } from '@nautelle/shared';
 import {
@@ -45,8 +46,8 @@ const STATE_LABEL: Record<ReadyState, string> = {
 /**
  * C-395: the top of project Settings — what a card needs to run here, each
  * row green or with the one place that fixes it. Refresh re-inspects the
- * project on its runner, for the facts only the runner can see (push access,
- * the DemoFlow config).
+ * project on its runner, for the facts only the runner can see (the DemoFlow
+ * config); push access is C-396's push check, run here in place.
  */
 export function ReadyToRun({
   project,
@@ -77,6 +78,7 @@ export function ReadyToRun({
     terminalSetup: setup.data ?? null,
     demos: demos.data ?? null,
     isAdmin,
+    now: Date.now(),
   });
   const summary = readySummary(checks);
 
@@ -88,6 +90,22 @@ export function ReadyToRun({
       readiness.refresh();
       setup.refresh();
       demos.refresh();
+    } catch (err) {
+      showError(describeProjectError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runPushCheck = async () => {
+    setBusy(true);
+    try {
+      const body: PushCheckRequest = {
+        runnerId: project.runnerId,
+        path: project.rootPath,
+      };
+      await api('/admin/projects/push-check', { method: 'POST', body });
+      onRefreshed();
     } catch (err) {
       showError(describeProjectError(err));
     } finally {
@@ -148,6 +166,15 @@ export function ReadyToRun({
               >
                 {check.fix.label}
               </Link>
+            ) : check.run ? (
+              <Button
+                variant="glass"
+                size="sm"
+                disabled={busy}
+                onClick={() => void runPushCheck()}
+              >
+                {busy ? 'Checking…' : check.run.label}
+              </Button>
             ) : null}
           </li>
         ))}

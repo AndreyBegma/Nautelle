@@ -70,7 +70,7 @@
     {
       "action": "fill",
       "target": {
-        "placeholder": "Go to a page, a project or a run — or ask the Board"
+        "placeholder": "Create, find a card (C-12, #41), go to a page — or ask the Board"
       },
       "value": "orchestrator profile",
       "caption": "Settings of the current project are listed in the palette"

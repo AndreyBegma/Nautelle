@@ -4,6 +4,7 @@ import { ApiError } from '../api';
 import {
   budgetExceededOf,
   budgetFormProblem,
+  budgetSettingsHref,
   describeBudgetExceededError,
   describeBudgetsError,
   emptyBudgetForm,
@@ -79,6 +80,19 @@ describe('money and labels', () => {
     expect(unpricedHint(0)).toBeUndefined();
     expect(unpricedHint(1)).toBe('1 unpriced request');
     expect(unpricedHint(4)).toBe('4 unpriced requests');
+  });
+});
+
+describe('budgetSettingsHref (C-395)', () => {
+  test('a project budget is edited in its project Settings; a user budget is not', () => {
+    expect(budgetSettingsHref(budget())).toBe(
+      '/projects/p1/settings?tab=budget',
+    );
+    expect(
+      budgetSettingsHref(
+        budget({ scope: 'user', projectId: null, userId: 'u1' }),
+      ),
+    ).toBeNull();
   });
 });
 

@@ -35,6 +35,7 @@ import {
 import { runHref } from '../../lib/history/format';
 import { planHref } from '../../lib/planner/href';
 import { searchSettings } from '../../lib/projects/settings-search';
+import { settingsItemHref } from '../../lib/projects/settings-sections';
 import { planLabel, runLabel, sessionLabel } from './crumbs';
 import { type VisibleSection, visibleNav } from './nav';
 
@@ -123,7 +124,7 @@ function settingItems(projectId: string, query: string): Item[] {
     .filter((entry) => !seen.has(entry.item) && seen.add(entry.item))
     .slice(0, SETTINGS_MAX)
     .map((entry) => ({
-      id: `go:/projects/${projectId}/settings?tab=${entry.item}`,
+      id: `go:${settingsItemHref(projectId, entry.item)}`,
       label: entry.label,
       hint: entry.where,
       icon: SlidersHorizontal,

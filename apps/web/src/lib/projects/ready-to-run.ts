@@ -7,7 +7,7 @@ import type {
 import { RUNNERS_PAGE } from '../prerequisites/copy';
 import { readinessCopy } from '../readiness/copy';
 import { BASE_SOURCE_LABEL } from './format';
-import type { SettingsItemId } from './settings-sections';
+import { settingsItemHref } from './settings-sections';
 
 /**
  * - `ok` — in place;
@@ -33,6 +33,8 @@ export interface ReadyCheck {
   detail: string;
   /** The one place that fixes it. */
   fix?: { label: string; href: string };
+  /** A fix the block runs in place instead of a link: the push check (C-396). */
+  run?: { kind: 'push_check'; label: string };
   /** A gap here keeps cards from running at all. */
   blocking: boolean;
 }
@@ -44,10 +46,13 @@ export interface ReadyFacts {
   terminalSetup: TerminalSetupView | null;
   demos: DemoSettingsView | null;
   isAdmin: boolean;
+  /** Epoch ms, to tell a stale push check. */
+  now: number;
 }
 
-const settingsHref = (projectId: string, item: SettingsItemId): string =>
-  `/projects/${projectId}/settings?tab=${item}`;
+/** A push check older than this may no longer hold: keys and tokens change. */
+export const PUSH_CHECK_STALE_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const REFRESH_HINT = 'Refresh the project once its runner reports it.';
 
@@ -142,34 +147,49 @@ function baseCheck({ project, isAdmin }: ReadyFacts): ReadyCheck {
       ? {
           fix: {
             label: 'Set the base branch',
-            href: settingsHref(project.id, 'general'),
+            href: settingsItemHref(project.id, 'general'),
           },
         }
       : {}),
   };
 }
 
-function pushCheck({ project }: ReadyFacts): ReadyCheck {
+/**
+ * Push access is C-396's push check: `git push --dry-run` on the runner with
+ * the credentials a card worker pushes with, kept per runner and path.
+ */
+function pushCheck({ project, isAdmin, now }: ReadyFacts): ReadyCheck {
   const base = { id: 'push', label: 'Push access', blocking: true } as const;
-  if (project.canPush === true) {
+  const check = project.pushCheck;
+  const run = (label: string) =>
+    isAdmin ? { run: { kind: 'push_check', label } as const } : {};
+  const askAdmin = isAdmin ? '' : ' Ask an admin to run the push check.';
+  if (!check) {
     return {
       ...base,
-      state: 'ok',
-      detail: `The runner’s GitHub login can push to ${project.repo}.`,
+      state: 'unknown',
+      detail: `No push check has run on this checkout yet.${askAdmin}`,
+      ...run('Run push check'),
     };
   }
-  if (project.canPush === false) {
+  if (!check.ok) {
     return {
       ...base,
       state: 'gap',
-      detail: `The runner’s GitHub login cannot push to ${project.repo}, so a card cannot open its pull request. Run gh auth login on the runner with an account that can, then refresh.`,
+      detail: `${check.message}${askAdmin}`,
+      ...run('Check again'),
     };
   }
-  return {
-    ...base,
-    state: 'unknown',
-    detail: `Not reported yet. ${REFRESH_HINT}`,
-  };
+  const age = now - Date.parse(check.checkedAt);
+  if (age > PUSH_CHECK_STALE_DAYS * DAY_MS) {
+    return {
+      ...base,
+      state: 'unknown',
+      detail: `Passed ${Math.floor(age / DAY_MS)} days ago; run it again to be sure.${askAdmin}`,
+      ...run('Check again'),
+    };
+  }
+  return { ...base, state: 'ok', detail: check.message };
 }
 
 function pluginCheck({ project, terminalSetup }: ReadyFacts): ReadyCheck {
@@ -180,7 +200,7 @@ function pluginCheck({ project, terminalSetup }: ReadyFacts): ReadyCheck {
   } as const;
   const fix = {
     label: 'Set up the plugin',
-    href: settingsHref(project.id, 'sessions'),
+    href: settingsItemHref(project.id, 'sessions'),
   };
   if (!terminalSetup) return { ...base, state: 'unknown', detail: 'Checking…' };
   const plugins = terminalSetup.items.filter((item) => item.id === 'plugin');
@@ -212,7 +232,7 @@ function demosCheck({ project, demos, isAdmin }: ReadyFacts): ReadyCheck {
   const base = { id: 'demos', label: 'Demo videos', blocking: false } as const;
   const fix = {
     label: isAdmin && demos && !demos.enabled ? 'Turn on' : 'Open Demo videos',
-    href: settingsHref(project.id, 'demo-videos'),
+    href: settingsItemHref(project.id, 'demo-videos'),
   };
   if (!demos) return { ...base, state: 'unknown', detail: 'Checking…' };
   if (!demos.enabled) {

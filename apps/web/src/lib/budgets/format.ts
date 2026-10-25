@@ -17,6 +17,7 @@ import {
   normalizeThresholds,
 } from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
+import { settingsItemHref } from '../projects/settings-sections';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -112,6 +113,17 @@ export const refusingBudget = (
   budgets.find(
     (b) => b.enabled && b.action === 'stop' && b.current?.state === 'exceeded',
   );
+
+/**
+ * C-395: where a project budget is edited — its project's Budget block in
+ * Settings; null for a user budget, which only Admin › Budgets edits.
+ */
+export const budgetSettingsHref = (
+  budget: Pick<BudgetView, 'scope' | 'projectId'>,
+): string | null =>
+  budget.scope === 'project' && budget.projectId
+    ? settingsItemHref(budget.projectId, 'budget')
+    : null;
 
 /** The scope a budget covers, in words. */
 export const scopeName = (budget: BudgetView): string =>
