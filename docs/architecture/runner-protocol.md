@@ -642,7 +642,7 @@ start until the person sets a policy.
 
 | Rule | Default | Refuses |
 |---|---|---|
-| `allowedRoots` | none | a `root` anywhere in a command's args, or `project.inspect`'s / `project.scan_rules`'s `path`, whose real path is outside every allowed root (a symlink out included); and every watch-list root that is outside them or is not a git main checkout — that project is not watched |
+| `allowedRoots` | none | a `root` anywhere in a command's args, or `project.inspect`'s / `project.scan_rules`'s / `project.push_check`'s `path`, whose real path is outside every allowed root (a symlink out included); and every watch-list root that is outside them or is not a git main checkout — that project is not watched |
 | `maxPermissionMode` | `auto` | `card.run`, `card.resume`, `skill.run`, `orchestrator.start` with a `permissionMode` above it (`manual` < `acceptEdits` < `auto` < `bypassPermissions`) |
 | `terminal.write` | `false` | `terminal.attach` with `mode: "write"`, and the input of a write attach already open once it is turned off |
 | `skills.profileInstall` | `false` | `skill.install` with `target.scope: "profile"` |
@@ -967,6 +967,8 @@ handler.
 | `project.inspect` | `path` | admin | implemented: → `ProjectInspection`, timeout 45 s |
 | `project.refresh` | `projectId, root` | operator | implemented: → `ProjectInspection`, timeout 45 s |
 | `project.scan_rules` | `path` | admin | implemented (#584, `commands/project-rules.ts`): → `{ candidates: [{ title, description, source }], scanned, warnings }`, timeout 15 s |
+| `project.discover` | — | admin | implemented (C-396, `commands/project-connect.ts`): → `{ roots, repositories: [{ path, name, repo, root }], truncated }`, timeout 15 s |
+| `project.push_check` | `path` | admin | implemented (C-396, `commands/project-connect.ts`): → `{ ok, remote, message }`, timeout 30 s |
 | `orchestrator.start` | `projectId, root, profileId, model, permissionMode, mode: start\|next` | operator | implemented (`commands/control.ts`): → `{ session, startedAt }`, timeout 30 s |
 | `orchestrator.stop` | `projectId, root` | operator | implemented: → `{ stopped }`, timeout 10 s |
 | `orchestrator.status` | `projectId, root` | viewer | implemented: → `{ present, state, session?, startedAt? }`, timeout 5 s |
@@ -1024,6 +1026,19 @@ D2–D8 and D10.
   other file is read. Admin-only, like `project.inspect`, and checked against
   the policy's `allowedRoots` the same way. Nothing is stored: the API
   creates rules only from the candidates a person accepts.
+- `project.discover {}` (C-396, ADR-0103) walks the policy's `allowedRoots`
+  — at most 3 folders deep, 5000 folders and 200 repositories — and answers
+  the git main checkouts it finds (`.git` is a directory) with their
+  GitHub `owner/name`, read from `.git/config` as text. It runs no git and
+  reads no other file; linked worktrees, hidden folders, symlinks and build
+  folders are skipped. `truncated` says a limit was hit.
+- `project.push_check { path }` (C-396, ADR-0103) runs
+  `git push --dry-run --porcelain origin HEAD:refs/heads/nautelle/push-check`
+  with the runner's usual git settings and answers
+  `{ ok, remote, message }`: whether origin accepts pushes from this runner,
+  without sending anything. Admin-only and checked against `allowedRoots`
+  like `project.inspect`. A failure is a result (`ok: false` with git's last
+  lines, credentials removed), not a command error.
 - `remote.forge` is `github` for an `origin` on github.com, else
   `unsupported` (also when there is no `origin`, `url: null`). The API refuses
   to connect `unsupported` (`422 unsupported_forge`).

@@ -43,7 +43,7 @@ import { TelegramWebAppService } from './telegram-web-app.service';
 /**
  * The caller's own Telegram link (spec 22 D9). No user id in any path.
  * C-403: session-only — a linked chat signs in the Mini App with a browser
- * session, so an API token must not be able to link one (ADR-0103).
+ * session, so an API token must not be able to link one (ADR-0104).
  */
 @SessionOnly()
 @Controller('notifications/telegram/link')

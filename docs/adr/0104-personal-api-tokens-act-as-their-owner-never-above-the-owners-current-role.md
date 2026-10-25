@@ -1,4 +1,4 @@
-# ADR-0103: Personal API tokens act as their owner, never above the owner's current role
+# ADR-0104: Personal API tokens act as their owner, never above the owner's current role
 
 Status: accepted · Date: 2026-10-25 ·
 Card: C-403 ·

@@ -35,8 +35,10 @@ import type { PlannerHandlers } from '../planner';
 import type { Realpath } from '../policy/roots';
 import type { PolicyConfig } from '../policy/schema';
 import type { PrefixHandlers } from '../prefix';
+import { discoverProjects } from '../projects/discover';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
+import { pushCheck } from '../projects/push-check';
 import { scanProjectRules } from '../projects/rule-scan';
 import type { RepoHandlers } from '../repo';
 import type { SessionMessenger } from '../session';
@@ -214,6 +216,9 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'project.refresh': (args) =>
       refreshProject(args, context.watchedProjects(), deps),
     'project.scan_rules': ({ path }) => scanProjectRules(path, deps),
+    'project.discover': () =>
+      discoverProjects(context.policy().allowedRoots, context.fs),
+    'project.push_check': ({ path }) => pushCheck(path, deps),
     'session.backfill': (args) =>
       sessionBackfill(args, {
         backfill: context.backfillSessions,

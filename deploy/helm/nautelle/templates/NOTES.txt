@@ -18,6 +18,9 @@ administrator (each API start logs a new one):
 
   kubectl -n {{ .Release.Namespace }} logs deploy/{{ $fullname }}-api | grep -o 'http[^ ]*/setup?token=[^ ]*' | tail -n 1
 
+Until then {{ $url }}/setup shows a "No users yet" page with the same command.
+After you sign in, Getting started on the Overview walks you to the first card.
+
 Runners stay on the machines that hold your repositories:
 
   nautelle-runner pair --server {{ $url }}/api --code XXXX-XXXX --allow-root ~/dev
