@@ -1,39 +1,43 @@
 {
   "schemaVersion": 1,
   "name": "The Steward digest in Activity",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/activity"
+      }
+    }
+  ],
   "steps": [
-    { "action": "marker", "title": "Sign in" },
-    { "action": "navigate", "path": "/login?next=/activity" },
     {
       "action": "waitFor",
-      "target": { "role": "button", "name": "Sign in" },
+      "target": {
+        "role": "heading",
+        "name": "Activity",
+        "exact": true
+      },
       "timeoutMs": 60000
     },
-    { "action": "wait", "ms": 5000 },
     {
-      "action": "fill",
-      "target": { "label": "Email" },
-      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+      "action": "marker",
+      "title": "The latest Steward digest"
     },
-    {
-      "action": "fill",
-      "target": { "label": "Password" },
-      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
-    },
-    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
-    {
-      "action": "waitFor",
-      "target": { "role": "heading", "name": "Activity", "exact": true },
-      "timeoutMs": 60000
-    },
-    { "action": "marker", "title": "The latest Steward digest" },
     {
       "action": "assertText",
-      "target": { "role": "heading", "name": "Steward digest", "exact": true },
+      "target": {
+        "role": "heading",
+        "name": "Steward digest",
+        "exact": true
+      },
       "text": "Steward digest",
       "match": "exact",
       "timeoutMs": 30000
     },
-    { "action": "wait", "ms": 2000 }
+    {
+      "action": "wait",
+      "ms": 2000
+    }
   ]
 }

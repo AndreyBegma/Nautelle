@@ -117,18 +117,23 @@ effect on a production build.
 
 The card's worker writes the scenario and commits it with its pull request as
 `demoflow/cards/C-<n>-<slug>.demo.json`. A scenario is a list of browser
-steps; `valueFrom.env` reads a Demo env secret:
+steps; `valueFrom.env` reads a Demo env secret.
+
+Steps nobody needs to watch, such as signing in, go in `setup`: DemoFlow runs
+them off camera first, and the video opens on the page they end on, already
+signed in. Steps several scenarios share live in a fragment under
+`demoflow/fragments/`, which a scenario runs with an `include`. Nautelle's own
+`demoflow/fragments/sign-in.json` signs in as the Demo env account and opens
+the path given as `next`:
 
 ```json
 {
   "schemaVersion": 1,
-  "name": "Sign in and open the Board",
+  "name": "Open the Board",
+  "setup": [
+    { "action": "include", "fragment": "sign-in", "with": { "next": "/projects/demo-project" } }
+  ],
   "steps": [
-    { "action": "navigate", "path": "/login?next=/projects/demo-project" },
-    { "action": "wait", "ms": 3000 },
-    { "action": "fill", "target": { "label": "Email" }, "valueFrom": { "env": "DEMO_LOGIN_EMAIL" } },
-    { "action": "fill", "target": { "label": "Password" }, "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" } },
-    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
     { "action": "click", "target": { "role": "link", "name": "Board", "exact": true } },
     { "action": "assertText", "target": { "role": "heading", "name": "Board", "exact": true }, "text": "Board" }
   ]
@@ -142,7 +147,7 @@ the recording, at most 15 minutes, because it changes the worktree the video is
 recorded from. A card that changes no UI path, a bug card, and a head that
 conflicts with its base record none, and the API's log says why.
 
-Run one by hand with `npx demoflow@0.6.0 run <scenario>`. A demo that fails or
+Run one by hand with `npx demoflow@0.7.0 run <scenario>`. A demo that fails or
 is skipped shows its reason on the card; it never holds up Finished or a merge.
 The runner records two demos at a time and queues the rest; set
 `demos.maxConcurrent` in `runner.json` (1 to 8) to change that.

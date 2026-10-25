@@ -2,51 +2,80 @@
   "schemaVersion": 1,
   "name": "The Board shows its columns instead of the skeleton",
   "description": "C-364 (#933): the Board loads its columns even while live events keep arriving, and a reload refreshes it in place.",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
   "steps": [
-    { "action": "marker", "title": "Sign in" },
-    { "action": "navigate", "path": "/login?next=/projects/demo-project" },
-    { "action": "wait", "ms": 3000 },
     {
-      "action": "fill",
-      "target": { "label": "Email" },
-      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+      "action": "marker",
+      "title": "Open the Board"
     },
-    {
-      "action": "fill",
-      "target": { "label": "Password" },
-      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
-    },
-    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
-    { "action": "marker", "title": "Open the Board" },
     {
       "action": "click",
-      "target": { "role": "link", "name": "Board", "exact": true },
+      "target": {
+        "role": "link",
+        "name": "Board",
+        "exact": true
+      },
       "timeoutMs": 30000
     },
     {
       "action": "waitFor",
-      "target": { "text": "To Do", "exact": true },
+      "target": {
+        "text": "To Do",
+        "exact": true
+      },
       "caption": "The columns replace the skeleton.",
       "timeoutMs": 15000
     },
     {
       "action": "assertVisible",
-      "target": { "text": "In progress", "exact": true }
+      "target": {
+        "text": "In progress",
+        "exact": true
+      }
     },
     {
       "action": "assertVisible",
-      "target": { "text": "Completed", "exact": true }
+      "target": {
+        "text": "Completed",
+        "exact": true
+      }
     },
-    { "action": "screenshot", "name": "board-columns" },
-    { "action": "marker", "title": "Reload the page" },
-    { "action": "navigate", "path": "/projects/demo-project/board" },
+    {
+      "action": "screenshot",
+      "name": "board-columns"
+    },
+    {
+      "action": "marker",
+      "title": "Reload the page"
+    },
+    {
+      "action": "navigate",
+      "path": "/projects/demo-project/board"
+    },
     {
       "action": "waitFor",
-      "target": { "text": "To Do", "exact": true },
+      "target": {
+        "text": "To Do",
+        "exact": true
+      },
       "caption": "A fresh load shows the columns again.",
       "timeoutMs": 15000
     },
-    { "action": "screenshot", "name": "board-columns-after-reload" },
-    { "action": "wait", "ms": 1500 }
+    {
+      "action": "screenshot",
+      "name": "board-columns-after-reload"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    }
   ]
 }

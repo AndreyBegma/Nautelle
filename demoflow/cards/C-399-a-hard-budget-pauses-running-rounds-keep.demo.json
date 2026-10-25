@@ -2,62 +2,89 @@
   "schemaVersion": 1,
   "name": "A hard budget pauses a running round, and Resume continues it",
   "description": "C-399: when a hard budget is reached, the running card round in its scope is stopped with its worktree and session kept. The card reads Paused: budget, and its Run action reads Resume.",
-  "viewport": { "width": 1440, "height": 900 },
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
   "steps": [
-    { "action": "marker", "title": "Sign in" },
-    { "action": "navigate", "path": "/login?next=/projects/demo-project" },
-    { "action": "wait", "ms": 3000 },
     {
-      "action": "fill",
-      "target": { "label": "Email" },
-      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+      "action": "marker",
+      "title": "The paused card on the Board"
     },
-    {
-      "action": "fill",
-      "target": { "label": "Password" },
-      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
-    },
-    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
-    { "action": "marker", "title": "The paused card on the Board" },
     {
       "action": "click",
-      "target": { "role": "link", "name": "Board", "exact": true },
+      "target": {
+        "role": "link",
+        "name": "Board",
+        "exact": true
+      },
       "timeoutMs": 30000
     },
     {
       "action": "waitFor",
-      "target": { "text": "Import products from a CSV file" },
+      "target": {
+        "text": "Import products from a CSV file"
+      },
       "caption": "C-7 was running when the project's hard budget was reached.",
       "timeoutMs": 30000
     },
     {
       "action": "waitFor",
-      "target": { "text": "Paused: budget", "exact": true },
+      "target": {
+        "text": "Paused: budget",
+        "exact": true
+      },
       "caption": "Its worker was stopped; the card reads Paused: budget.",
       "timeoutMs": 15000,
       "zoom": true
     },
-    { "action": "screenshot", "name": "board-paused-budget" },
+    {
+      "action": "screenshot",
+      "name": "board-paused-budget"
+    },
     {
       "action": "marker",
       "title": "The card keeps its round and offers Resume"
     },
-    { "action": "navigate", "path": "/projects/demo-project/board/cards/6" },
+    {
+      "action": "navigate",
+      "path": "/projects/demo-project/board/cards/6"
+    },
     {
       "action": "waitFor",
-      "target": { "text": "Round 1 · run · Paused: budget" },
+      "target": {
+        "text": "Round 1 · run · Paused: budget"
+      },
       "caption": "The round is kept, with its worktree and Claude session.",
       "timeoutMs": 30000,
       "zoom": true
     },
     {
       "action": "waitFor",
-      "target": { "role": "button", "name": "Resume" },
+      "target": {
+        "role": "button",
+        "name": "Resume"
+      },
       "caption": "Resume continues the same session once the budget allows.",
       "timeoutMs": 15000,
       "zoom": true
     },
-    { "action": "screenshot", "name": "card-resume" },
-    { "action": "wait", "ms": 1500 }
+    {
+      "action": "screenshot",
+      "name": "card-resume"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    }
   ]
 }
