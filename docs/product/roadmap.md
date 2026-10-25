@@ -71,15 +71,16 @@ became the one work surface; the fleet and the queue became views onto it.
 
 Settled with the person in a grilling session. The four stages go in order:
 speed → daily flow → fleet scale → team. Nothing is removed in this iteration:
-pages and routes stay; roles and entry points may change. Each row is one card
-with a spec in `docs/specs/`.
+pages and routes stay; roles and entry points may change. Each stage is one
+stack on the Board; each item is one card with a spec in `docs/specs/`, which
+names its stack.
 
-| Stage | Items |
-|---|---|
-| **1. Speed** | live updates instead of polling (C-388) · a card whose pull request merged completes by itself (C-389) · the Board page loads fast ([#933](https://github.com/AndreyBegma/Nautelle/issues/933)) |
-| **2. Daily flow** | Inbox for everything that waits on you (C-390) · quick card (C-391) · thin card face (C-392) · ⌘K and keyboard navigation (C-393) · approve a design from the sheet (C-394) · settings search (C-395) · onboarding to the first card (C-396) |
-| **3. Fleet scale** | one work model: cards everywhere, Fleet as the live view, Queue as incoming issues (C-397) · run queue at the worker limit (C-398) · hard budget pauses rounds (C-399) · move a project to another runner (C-400) |
-| **4. Team** | away-mode "allow similar" rules (C-401) · password and 2FA reset (C-402) · personal API tokens (C-403) · email notifications (C-404) · Slack notifications (C-405) |
+| Stage | Stack | Items |
+|---|---|---|
+| **1. Speed** | S-13 "Core 1 — Speed and reliability" | live updates instead of polling (C-388) · a card whose pull request merged completes by itself (C-389) · the Board page loads fast ([#933](https://github.com/AndreyBegma/Nautelle/issues/933)) |
+| **2. Daily flow** | S-14 "Core 2 — Daily flow" | one work model: cards everywhere, Fleet as the live view, Queue as incoming issues (C-397) · thin card face (C-392) · Inbox for everything that waits on you (C-390) · quick card (C-391) · ⌘K and keyboard navigation (C-393) · approve a design from the sheet (C-394) · settings search (C-395) · onboarding to the first card (C-396) |
+| **3. Fleet scale** | S-15 "Core 3 — Fleet scale" | run queue at the worker limit (C-398) · hard budget pauses rounds (C-399) · move a project to another runner (C-400) · away-mode "allow similar" rules (C-401) |
+| **4. Team** | S-16 "Core 4 — Team" | email notifications (C-404) · personal API tokens (C-403) · Slack notifications (C-405) · password and 2FA reset (C-402) |
 
 Housekeeping (C-406): the Steward digest is shown in Activity, shipped issues
 are closed, and this PRD and roadmap match the product.
