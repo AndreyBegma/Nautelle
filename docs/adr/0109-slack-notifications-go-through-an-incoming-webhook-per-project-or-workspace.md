@@ -60,9 +60,11 @@ channel.
    pull request; when its demo video is ready, `demo` posts the card, its pull
    request and a link that opens the demo on the Board. Each has its own
    toggle. No buttons: an incoming webhook cannot receive their presses.
-7. **Delivery with retries.** `SlackDeliveryService` claims due rows with
-   `FOR UPDATE SKIP LOCKED` behind a lease, so two API instances never post one
-   twice. A 2xx is sent. A 400, 401, 403, 404 or 410 — a revoked webhook, an
+7. **Delivery with retries.** `SlackDeliveryService` claims the oldest due row
+   with `FOR UPDATE SKIP LOCKED`, leases it for one request's timeout plus a
+   minute, posts it, and only then claims the next one. A row is leased only
+   while it is being sent, so two API instances never post one twice, and the
+   result is recorded only while the lease still holds. A 2xx is sent. A 400, 401, 403, 404 or 410 — a revoked webhook, an
    archived channel — fails at once; anything else retries with an exponential
    backoff from 30 s (or Slack's `Retry-After` on a 429, capped at an hour), up
    to five attempts. The settings show the last delivery and its redacted error.

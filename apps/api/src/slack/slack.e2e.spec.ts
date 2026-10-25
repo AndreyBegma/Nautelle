@@ -1,13 +1,16 @@
 import { createHash } from 'node:crypto';
 import type { CardDemoView, SlackWebhookStatus } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import {
   FILES,
   useTempAttachmentsDir,
 } from '../attachments/testing/attachments-e2e';
 import { AuditService } from '../audit/audit.service';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
-import { BoardWorld } from '../board/testing/board-e2e';
+import { BoardWorld, ROOT_A } from '../board/testing/board-e2e';
+import { BudgetSweep } from '../budgets/budget-sweep';
+import { Feed, seedSnapshotPrices } from '../budgets/testing/budgets-e2e';
 import { SecretCipher } from '../common/crypto';
 import { NotificationMatcher } from '../notifications/notification-matcher';
 import { resetNotifications } from '../notifications/testing/notifications-e2e';
@@ -16,6 +19,8 @@ import {
   hashRunnerToken,
   tokenPrefix,
 } from '../runners/credentials';
+import { ingest } from '../usage/testing/usage-e2e';
+import { SlackClient } from './slack-client';
 import { SlackDeliveryService } from './slack-delivery.service';
 import { SLACK_OPTIONS, type SlackOptions } from './slack-options';
 import { SlackWebhooksService } from './slack-webhooks.service';
@@ -48,8 +53,9 @@ describe('Slack: notifications through an incoming webhook (C-405, e2e)', () => 
   let delivery: SlackDeliveryService;
   let options: SlackOptions;
   let posts: Post[];
-  /** What the fake Slack answers next: status and body. */
+  /** What the fake Slack answers: `answers` in turn, then `answer`. */
   let answer: { status: number; body: string };
+  let answers: { status: number; body: string }[];
   let previousKey: string | undefined;
 
   beforeAll(async () => {
@@ -65,7 +71,8 @@ describe('Slack: notifications through an incoming webhook (C-405, e2e)', () => 
         url: String(input),
         text: (JSON.parse(String(init?.body)) as { text: string }).text,
       });
-      return new Response(answer.body, { status: answer.status });
+      const { status, body } = answers.shift() ?? answer;
+      return new Response(body, { status });
     };
   });
   afterAll(async () => {
@@ -79,6 +86,7 @@ describe('Slack: notifications through an incoming webhook (C-405, e2e)', () => 
     await w.reset();
     posts = [];
     answer = { status: 200, body: 'ok' };
+    answers = [];
     // The first pass only places the matcher's cursor.
     await matcher.tick();
   });
@@ -439,6 +447,227 @@ describe('Slack: notifications through an incoming webhook (C-405, e2e)', () => 
       expect((await w.viewer.get(projectUrl())).body).toMatchObject({
         lastDelivery: { status: 'failed', error: 'channel_not_found' },
       });
+    });
+
+    it('a refused message does not stop the next one, nor reach the other channels', async () => {
+      await configure(projectUrl(), {
+        url: PROJECT_HOOK,
+        events: ['finished', 'demo'],
+      });
+      await finishedCard({ enabled: true });
+      await readyDemo();
+
+      answers = [{ status: 404, body: 'no_service' }];
+      expect(await deliver()).toBe(2);
+      expect(
+        (
+          await w.ctx.prisma.slackDelivery.findMany({
+            orderBy: { createdAt: 'asc' },
+          })
+        ).map((d) => [d.kind, d.status]),
+      ).toEqual([
+        ['card.finished', 'failed'],
+        ['card.demo', 'sent'],
+      ]);
+      // The people's own notification of the finished card is there.
+      expect(
+        await w.ctx.prisma.notification.count({
+          where: { kind: 'card.finished' },
+        }),
+      ).toBeGreaterThan(0);
+    });
+
+    it('holds only the delivery it is sending, so a second instance sends the next one, each once', async () => {
+      await configure(projectUrl(), {
+        url: PROJECT_HOOK,
+        events: ['finished', 'demo'],
+      });
+      await finishedCard({ enabled: true });
+      await readyDemo();
+      for (let i = 0; i < 20; i += 1) {
+        if ((await matcher.tick()) === 0) break;
+      }
+      expect(await w.ctx.prisma.slackDelivery.count()).toBe(2);
+
+      const other = new SlackDeliveryService(
+        w.ctx.prisma,
+        w.ctx.app.get(SecretCipher),
+        w.ctx.app.get(SlackClient),
+        w.ctx.app.get(SchedulerRegistry),
+        options,
+      );
+      // The first post hangs until released; the next ones answer at once.
+      const fast = options.fetch;
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let sending = () => {};
+      const started = new Promise<void>((resolve) => {
+        sending = resolve;
+      });
+      options.fetch = async (input, init) => {
+        options.fetch = fast;
+        sending();
+        await gate;
+        return fast(input, init);
+      };
+      try {
+        const start = new Date();
+        const first = delivery.tick(start);
+        await started;
+        // The first instance is sending the finished card; the other one
+        // takes the demo, and nothing else.
+        expect(await other.tick(start)).toBe(1);
+        release();
+        expect(await first).toBe(1);
+
+        expect(posts.map((p) => p.text.includes('Watch the demo'))).toEqual([
+          true,
+          false,
+        ]);
+        const rows = await w.ctx.prisma.slackDelivery.findMany({
+          orderBy: { createdAt: 'asc' },
+        });
+        expect(rows.map((d) => [d.kind, d.status, d.attempts])).toEqual([
+          ['card.finished', 'sent', 1],
+          ['card.demo', 'sent', 1],
+        ]);
+        // The late attempt is timed when it happened, not when its pass began.
+        expect(rows[0]?.lastAttemptAt?.getTime()).toBeGreaterThan(
+          start.getTime(),
+        );
+        expect(await delivery.tick()).toBe(0);
+        expect(await other.tick()).toBe(0);
+        expect(posts).toHaveLength(2);
+      } finally {
+        options.fetch = fast;
+        release();
+      }
+    });
+  });
+
+  describe('every event kind', () => {
+    const ALL = ['finished', 'demo', 'question', 'failed', 'budget', 'merged'];
+    const round = async () => {
+      const card = await w.card(1);
+      return { card, runId: card.rounds[0].runId as string };
+    };
+    const phase = (cardId: string, runId: string, data: object) =>
+      w.deliver('card_run.phase_changed', {
+        cardId,
+        runId,
+        projectId: w.a,
+        at: new Date().toISOString(),
+        ...data,
+      });
+    /** What was posted, as the kinds of the deliveries sent. */
+    const sentKinds = async () =>
+      (
+        await w.ctx.prisma.slackDelivery.findMany({
+          where: { status: 'sent' },
+          orderBy: { createdAt: 'asc' },
+        })
+      ).map((d) => d.kind);
+
+    it('posts a merged pull request once, with its PR', async () => {
+      await configure(projectUrl(), { url: PROJECT_HOOK, events: ALL });
+      await finishedCard();
+      await deliver();
+      posts = [];
+
+      const { card } = await round();
+      await w.work.markMerged(card.id, 77, null, { complete: false });
+      await w.work.markMerged(card.id, 77, null, { complete: false });
+      expect(await deliver()).toBe(1);
+      expect(posts).toHaveLength(1);
+      expect(posts[0]?.text).toContain(
+        `*<${cardLink()}|C-1 "Add login" is merged>*`,
+      );
+      expect(posts[0]?.text).toContain(PR_LINK);
+    });
+
+    it('posts a failed round without its error', async () => {
+      await configure(projectUrl(), { url: PROJECT_HOOK, events: ALL });
+      await w.createCard();
+      expect((await w.runCard(1)).status).toBe(200);
+      const { card, runId } = await round();
+      await phase(card.id, runId, {
+        phase: 'failed',
+        error: 'worktree exists',
+      });
+
+      expect(await deliver()).toBe(1);
+      expect(await sentKinds()).toEqual(['card.failed']);
+      expect(posts[0]?.text).toContain(
+        `*<${cardLink()}|C-1 "Add login" failed>*`,
+      );
+      expect(posts[0]?.text).not.toContain('worktree');
+    });
+
+    it('posts a question the card waits on', async () => {
+      await configure(projectUrl(), { url: PROJECT_HOOK, events: ALL });
+      await w.createCard();
+      expect((await w.runCard(1)).status).toBe(200);
+      const { card, runId } = await round();
+      await phase(card.id, runId, { phase: 'running' });
+      await w.deliver('card_run.question', {
+        cardId: card.id,
+        runId,
+        projectId: w.a,
+        at: new Date().toISOString(),
+      });
+
+      expect(await deliver()).toBe(1);
+      expect(await sentKinds()).toEqual(['card.waiting']);
+      expect(posts[0]?.text).toContain(
+        `*<${cardLink()}|C-1 "Add login" is waiting for you>*`,
+      );
+    });
+
+    it('posts a reached budget and the card it paused', async () => {
+      await seedSnapshotPrices(w.ctx.prisma);
+      await configure(projectUrl(), { url: PROJECT_HOOK, events: ['budget'] });
+      await w.createCard();
+      expect((await w.runCard(1)).status).toBe(200);
+      const card = await w.card(1);
+      const run = await w.ctx.prisma.run.findUniqueOrThrow({
+        where: { id: card.rounds[0].runId as string },
+      });
+      const ts = (ms: number) =>
+        new Date(run.startedAt.getTime() + ms).toISOString();
+      const feed = new Feed();
+      const session = card.sessionId as string;
+      await ingest(w.ctx, w.runnerId, [
+        feed.session(session, `${ROOT_A}-card-1`, ts(1000), {
+          projectId: w.a,
+        }),
+        feed.spend(session, 'r-1', ts(2000)),
+      ]);
+      await w.ctx.prisma.budget.create({
+        data: {
+          scope: 'project',
+          projectId: w.a,
+          period: 'day',
+          timezone: 'UTC',
+          limitUsd: '1',
+          thresholds: [100],
+          action: 'stop',
+        },
+      });
+      await w.ctx.app.get(BudgetSweep).sweep();
+      await w.work.settled();
+
+      expect(await deliver()).toBe(2);
+      expect((await sentKinds()).sort()).toEqual([
+        'budget.exceeded',
+        'card.paused',
+      ]);
+      const budgetLink = `${APP_URL}/projects/${w.a}/settings/budget`;
+      expect(posts.map((p) => p.text).join('\n')).toContain(
+        `*<${budgetLink}|Budget exceeded`,
+      );
+      expect(posts.map((p) => p.text).join('\n')).toContain(cardLink());
     });
   });
 });

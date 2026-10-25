@@ -14,19 +14,26 @@ import { type SlackMessageParts, slackText } from './slack-message';
 import { SLACK_OPTIONS, type SlackOptions } from './slack-options';
 
 const JOB_NAME = 'slack-delivery-worker';
-/** Deliveries one pass claims. */
-const CLAIM_BATCH = 20;
+/** Deliveries one pass attempts at most. */
+const PASS_LIMIT = 20;
 /** A claimed delivery waits this far past the request timeout before a retry. */
 const CLAIM_LEASE_EXTRA_MS = 60_000;
 /** The longest `error` kept. */
 const ERROR_MAX = 200;
 
+/** A delivery a pass holds, and until when. */
+interface Claim {
+  id: string;
+  lease: Date;
+}
+
 /**
- * Sends the queued Slack messages (C-405, ADR-0109). Every pass claims due
- * `pending` deliveries with `FOR UPDATE SKIP LOCKED`, pushes their
- * `nextAttemptAt` past a lease — so two API instances never send one twice
- * and a worker that dies mid-send leaves it to be retried — and then posts
- * them oldest first, one at a time, so a channel reads in order.
+ * Sends the queued Slack messages (C-405, ADR-0109). A pass claims the oldest
+ * due `pending` delivery with `FOR UPDATE SKIP LOCKED`, pushes its
+ * `nextAttemptAt` past a lease longer than one request can take, posts it,
+ * and only then claims the next one. A delivery is leased only while it is
+ * being sent — so two API instances never send one twice and a worker that
+ * dies mid-send leaves it to be retried — and a channel reads in order.
  */
 @Injectable()
 export class SlackDeliveryService
@@ -64,21 +71,28 @@ export class SlackDeliveryService
   }
 
   /**
-   * One pass: claims what is due and attempts each once. Returns how many it
-   * attempted; `null` while a pass is running. Tests call it directly.
+   * One pass: claims and attempts what is due, one delivery at a time. Returns
+   * how many it attempted; `null` while a pass is running. Tests call it
+   * directly; `now` is the pass's start, and the pass's clock runs on from it
+   * so every claim and attempt is timed when it happens.
    */
   async tick(now = new Date()): Promise<number | null> {
     if (this.running) return null;
     this.running = true;
+    const started = Date.now();
+    const clock = () => new Date(now.getTime() + Date.now() - started);
     try {
-      const claimed = await this.claim(now);
-      for (const id of claimed) {
-        await this.deliver(id, now).catch((error: unknown) => {
+      let attempted = 0;
+      while (attempted < PASS_LIMIT) {
+        const claimed = await this.claim(clock());
+        if (!claimed) break;
+        attempted += 1;
+        await this.deliver(claimed, clock).catch((error: unknown) => {
           const reason = error instanceof Error ? error.message : String(error);
-          this.logger.error(`slack delivery ${id} failed: ${reason}`);
+          this.logger.error(`slack delivery ${claimed.id} failed: ${reason}`);
         });
       }
-      return claimed.length;
+      return attempted;
     } finally {
       this.running = false;
     }
@@ -89,29 +103,31 @@ export class SlackDeliveryService
     return this.client.post(this.cipher.decrypt(urlCiphertext), text);
   }
 
-  private claim(now: Date): Promise<string[]> {
+  /** The oldest due delivery, leased for one send; `null` when none is due. */
+  private claim(now: Date): Promise<Claim | null> {
     const lease = new Date(
       now.getTime() + this.options.timeoutMs + CLAIM_LEASE_EXTRA_MS,
     );
     return this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<{ id: string }[]>`
+      const [row] = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM slack_deliveries
          WHERE status = 'pending' AND "nextAttemptAt" <= ${now}
          ORDER BY "createdAt", id
-         LIMIT ${CLAIM_BATCH}
+         LIMIT 1
            FOR UPDATE SKIP LOCKED`;
-      const ids = rows.map((r) => r.id);
-      if (ids.length > 0) {
-        await tx.slackDelivery.updateMany({
-          where: { id: { in: ids } },
-          data: { nextAttemptAt: lease },
-        });
-      }
-      return ids;
+      if (!row) return null;
+      await tx.slackDelivery.update({
+        where: { id: row.id },
+        data: { nextAttemptAt: lease },
+      });
+      return { id: row.id, lease };
     });
   }
 
-  private async deliver(id: string, now: Date): Promise<void> {
+  private async deliver(
+    { id, lease }: Claim,
+    clock: () => Date,
+  ): Promise<void> {
     const delivery = await this.prisma.slackDelivery.findUnique({
       where: { id },
       include: { webhook: { select: { urlCiphertext: true } } },
@@ -134,10 +150,13 @@ export class SlackDeliveryService
         retryAfterMs: null,
       };
     }
+    const now = clock();
     const attempts = delivery.attempts + 1;
     const next = slackAfterAttempt(result, attempts, now);
+    // Only while this pass still holds the lease: a delivery claimed again
+    // after it lapsed is the other claimant's to record.
     await this.prisma.slackDelivery.updateMany({
-      where: { id, status: 'pending' },
+      where: { id, status: 'pending', nextAttemptAt: lease },
       data: {
         status: next.status,
         nextAttemptAt: next.nextAttemptAt,
