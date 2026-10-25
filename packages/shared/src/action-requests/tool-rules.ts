@@ -10,8 +10,9 @@ import { z } from 'zod';
  * them, so every call still reaches the API and is checked and audited.
  *
  * A dangerous call is never remembered and never answered by a rule:
- * destructive shell, pushes that may reach a protected branch, and reading
- * secrets or credential files (`toolUseDanger`).
+ * destructive shell (inline code in a shell or interpreter included), pushes
+ * that may reach a protected branch, reading secrets or credential files, and
+ * changing agent, hook, git or shell configuration (`toolUseDanger`).
  */
 
 export const TOOL_RULE_TOOL_NAME_MAX = 200;
@@ -138,7 +139,8 @@ const stringField = (
 export type ToolUseDangerKind =
   | 'destructive_shell'
   | 'protected_push'
-  | 'secret_read';
+  | 'secret_read'
+  | 'config_write';
 
 export interface ToolUseDanger {
   kind: ToolUseDangerKind;
@@ -205,52 +207,251 @@ export const isSecretPath = (raw: string): boolean => {
   return SECRET_PATHS.some((pattern) => pattern.test(path));
 };
 
-/** Shell operators: a command holding one runs more than one program. */
-const SHELL_OPERATOR = /[;&|<>`\n\r]|\$\(/;
+/**
+ * Paths whose change can run commands or switch this check off: agent and
+ * plugin settings and hooks, git hooks and config, shell start-up files.
+ * A shell word or a written file naming one always asks.
+ */
+const CONFIG_PATHS: readonly RegExp[] = [
+  /(?:^|\/)\.(?:claude|codex|husky|claude-plugin)(?:\/|$)/i,
+  /(?:^|\/)hooks\/hooks\.json$/i,
+  /(?:^|\/)\.mcp\.json$/i,
+  /(?:^|\/)\.git\/(?:hooks(?:\/|$)|config$)/i,
+  /(?:^|\/)\.gitconfig$/i,
+  /(?:^|\/)\.config\/(?:git|fish|nautelle)(?:\/|$)/i,
+  /(?:^|\/)\.(?:bashrc|bash_profile|bash_login|bash_logout|profile|zshrc|zshenv|zprofile|zlogin|zlogout|kshrc|cshrc|tcshrc|envrc|inputrc)$/i,
+];
+
+/** Whether a path (or a shell word holding one) names agent, git or shell config. */
+export const isConfigPath = (raw: string): boolean => {
+  const path = raw.replace(/\\/g, '/').replace(/^['"]|['"]$/g, '');
+  return CONFIG_PATHS.some((pattern) => pattern.test(path));
+};
+
+/**
+ * Shell operators: a command holding one runs more than one program, or runs
+ * it in a subshell or group.
+ */
+const SHELL_OPERATOR = /[;&|<>`\n\r(){}]/;
 
 /** A command that is one program with its arguments, nothing chained. */
 export const isSimpleShellCommand = (command: string): boolean =>
   command.trim().length > 0 && !SHELL_OPERATOR.test(command);
 
-/** The commands of a shell line, split at operators and substitutions. */
+/**
+ * A shell word as the shell reads it, near enough: quotes and `\` escapes
+ * removed, so `\rm`, `'rm'` and `r""m` are all `rm`.
+ */
+const unquoted = (word: string): string =>
+  word.replace(/\\(.)/gs, '$1').replace(/['"\\]/g, '');
+
+/** The commands of a shell line, split at operators, substitutions and groups. */
 const shellSegments = (command: string): string[][] =>
   command
-    .split(/&&|\|\||[;&|\n\r`]|\$\(|\)/)
+    .split(/&&|\|\||[;&|\n\r`(){}]/)
     .map((segment) =>
       segment
         .trim()
         .split(/\s+/)
+        .map(unquoted)
         .filter((word) => word.length > 0),
     )
     .filter((words) => words.length > 0);
 
-/** Words that run the program after them. */
-const WRAPPERS = new Set([
-  'env',
-  'command',
-  'builtin',
-  'exec',
-  'nohup',
-  'time',
-  'nice',
-  'xargs',
+const baseName = (word: string): string =>
+  word.slice(word.lastIndexOf('/') + 1);
+
+interface Wrapper {
+  /** Options that take the next word as their value. */
+  valued?: readonly string[];
+  /** Options whose value is a command line run through a shell. */
+  runsString?: readonly string[];
+  /** Positional words before the program (`timeout 60 …`). */
+  positional?: number;
+}
+
+const PACKAGE_EXEC: Wrapper = {
+  valued: ['-p', '--package'],
+  runsString: ['-c', '--call'],
+};
+
+/** Words that run the program after them, by name or by `name subcommand`. */
+const WRAPPERS: ReadonlyMap<string, Wrapper> = new Map<string, Wrapper>([
+  [
+    'env',
+    {
+      valued: ['-u', '--unset', '-C', '--chdir'],
+      runsString: ['-S', '--split-string'],
+    },
+  ],
+  ['command', {}],
+  ['builtin', {}],
+  ['exec', { valued: ['-a'] }],
+  ['nohup', {}],
+  ['setsid', {}],
+  ['time', { valued: ['-f', '--format', '-o', '--output'] }],
+  ['nice', { valued: ['-n', '--adjustment'] }],
+  ['ionice', { valued: ['-c', '--class', '-n', '--classdata', '-p', '--pid'] }],
+  ['stdbuf', { valued: ['-i', '-o', '-e'] }],
+  [
+    'timeout',
+    { valued: ['-s', '--signal', '-k', '--kill-after'], positional: 1 },
+  ],
+  ['watch', { valued: ['-n', '--interval'] }],
+  [
+    'xargs',
+    {
+      valued: [
+        '-I',
+        '-n',
+        '-P',
+        '-d',
+        '-L',
+        '-s',
+        '-E',
+        '-a',
+        '--max-args',
+        '--max-procs',
+        '--delimiter',
+        '--arg-file',
+        '--replace',
+      ],
+    },
+  ],
+  ['npx', PACKAGE_EXEC],
+  ['bunx', PACKAGE_EXEC],
+  ['pnpx', PACKAGE_EXEC],
+  ['npm exec', PACKAGE_EXEC],
+  ['npm x', PACKAGE_EXEC],
+  ['pnpm exec', {}],
+  ['pnpm dlx', PACKAGE_EXEC],
+  ['yarn exec', {}],
+  ['yarn dlx', PACKAGE_EXEC],
+  ['bun x', PACKAGE_EXEC],
 ]);
 
+interface Program {
+  /** The program and its arguments; empty when only wrappers were given. */
+  words: string[];
+  /** The wrapper option that runs a string as a command line, if any. */
+  runsString: string | null;
+}
+
 /**
- * The program and its arguments, past leading `VAR=value` and wrappers
- * (`env`, `nohup`, `xargs` …). A bare `env` — which prints the environment —
- * leaves no words.
+ * The program and its arguments, past leading `VAR=value` and wrappers with
+ * their options (`env -i`, `timeout 60`, `nice -n 5`, `npm exec --` …). A
+ * bare `env` — which prints the environment — leaves no words.
  */
-const programWords = (words: string[]): string[] => {
+const programOf = (words: readonly string[]): Program => {
   let i = 0;
-  while (
-    i < words.length &&
-    (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i] ?? '') ||
-      WRAPPERS.has(words[i] ?? ''))
-  ) {
-    i += 1;
+  while (i < words.length) {
+    const word = words[i] ?? '';
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(word)) {
+      i += 1;
+      continue;
+    }
+    const pair = WRAPPERS.get(`${baseName(word)} ${words[i + 1] ?? ''}`);
+    const wrapper = pair ?? WRAPPERS.get(baseName(word));
+    if (wrapper === undefined) break;
+    i += pair ? 2 : 1;
+    let positional = wrapper.positional ?? 0;
+    while (i < words.length) {
+      const arg = words[i] ?? '';
+      if (arg === '--') {
+        i += 1;
+        break;
+      }
+      if (arg.startsWith('-') && arg.length > 1) {
+        const option = arg.split('=')[0] ?? arg;
+        if (wrapper.runsString?.includes(option)) {
+          return { words: [], runsString: `${word} ${option}` };
+        }
+        i += wrapper.valued?.includes(arg) ? 2 : 1;
+        continue;
+      }
+      if (positional > 0) {
+        positional -= 1;
+        i += 1;
+        continue;
+      }
+      break;
+    }
   }
-  return words.slice(i);
+  return { words: words.slice(i), runsString: null };
+};
+
+/**
+ * Inline-code options and subcommands of shells and interpreters: what
+ * follows them is a program, not a file (`bash -c`, `node -e`, `deno eval`).
+ */
+const INLINE_CODE: ReadonlyMap<string, readonly string[]> = new Map([
+  ['sh', ['-c']],
+  ['bash', ['-c']],
+  ['zsh', ['-c']],
+  ['dash', ['-c']],
+  ['ksh', ['-c']],
+  ['fish', ['-c', '--command']],
+  ['pwsh', ['-c', '-command', '-encodedcommand']],
+  ['powershell', ['-c', '-command', '-encodedcommand']],
+  ['python', ['-c']],
+  ['node', ['-e', '--eval', '-p', '--print']],
+  ['bun', ['-e', '--eval', '-p', '--print', 'exec']],
+  ['deno', ['eval']],
+  ['perl', ['-e', '-E']],
+  ['ruby', ['-e']],
+  ['php', ['-r']],
+]);
+
+/** `python3.12` is `python`. */
+const interpreterName = (name: string): string =>
+  /^python[\d.]*$/.test(name) ? 'python' : name;
+
+/** The inline-code option or subcommand a call passes, if any. */
+const inlineCode = (name: string, rest: readonly string[]): string | null => {
+  const forms = INLINE_CODE.get(interpreterName(name));
+  if (forms === undefined) return null;
+  // Options before the first positional word belong to the interpreter.
+  for (const word of rest) {
+    if (!word.startsWith('-')) {
+      return forms.includes(word) ? word : null;
+    }
+    const option = word.split('=')[0]?.toLowerCase() ?? word;
+    if (forms.includes(option)) return option;
+    if (
+      /^-[A-Za-z]+$/.test(word) &&
+      forms.some((f) => /^-[A-Za-z]$/.test(f) && word.includes(f.slice(1)))
+    ) {
+      return word;
+    }
+  }
+  return null;
+};
+
+/** Git config keys whose value is a command git runs. */
+const GIT_RUNS_COMMAND =
+  /^(?:alias\.|credential\.|core\.(?:sshcommand|pager|editor|hookspath|fsmonitor|askpass|gitproxy)\b|[^=]*\.(?:command|cmd|helper|textconv|program|process|clean|smudge)(?:=|$))/i;
+
+/** A git call's global `-c` values, its subcommand and the subcommand's arguments. */
+const gitCall = (
+  rest: readonly string[],
+): { configs: string[]; sub: string | undefined; args: string[] } => {
+  const configs: string[] = [];
+  let i = 0;
+  while (i < rest.length && rest[i]?.startsWith('-')) {
+    const option = rest[i] ?? '';
+    if (option === '-c' || option === '--config-env') {
+      configs.push(rest[i + 1] ?? '');
+      i += 2;
+    } else if (option.startsWith('--config-env=')) {
+      configs.push(option.slice('--config-env='.length));
+      i += 1;
+    } else {
+      i += ['-C', '--git-dir', '--work-tree', '--namespace'].includes(option)
+        ? 2
+        : 1;
+    }
+  }
+  return { configs, sub: rest[i], args: rest.slice(i + 1) };
 };
 
 const PIPE_TO_INTERPRETER =
@@ -266,9 +467,17 @@ const hasFlag = (words: string[], short: string, long: string): boolean =>
 
 const destructiveShell = (words: string[]): string | null => {
   const [program, ...rest] = words;
-  const name = program?.slice(program.lastIndexOf('/') + 1) ?? '';
+  const name = baseName(program ?? '');
+  if (/[$*?[]/.test(program ?? '')) {
+    return 'runs a program named by a variable, substitution or pattern';
+  }
   if (name === 'sudo' || name === 'su' || name === 'doas') {
     return 'runs a command as another user';
+  }
+  if (name === 'eval') return 'runs a string as a command line (eval)';
+  const inline = inlineCode(name, rest);
+  if (inline !== null) {
+    return `runs inline code in a shell or interpreter (${name} ${inline})`;
   }
   if (
     name === 'rm' &&
@@ -293,7 +502,16 @@ const destructiveShell = (words: string[]): string | null => {
     return 'deletes or runs commands on found files (find -delete/-exec)';
   }
   if (name === 'git') {
-    const sub = rest.find((w) => !w.startsWith('-'));
+    const { configs, sub, args } = gitCall(rest);
+    if (configs.some((c) => GIT_RUNS_COMMAND.test(c))) {
+      return 'runs a command through git configuration (git -c)';
+    }
+    if (
+      sub === 'config' &&
+      args.some((a) => !a.startsWith('-') && GIT_RUNS_COMMAND.test(a))
+    ) {
+      return 'sets git configuration that runs commands (git config)';
+    }
     if (sub === 'reset' && rest.includes('--hard')) {
       return 'throws away uncommitted work (git reset --hard)';
     }
@@ -402,6 +620,33 @@ const pushDanger = (words: string[]): string | null => {
 
 const SHELL_TOOLS = new Set(['Bash', 'BashOutput', 'PowerShell']);
 
+/** Tools that write the file they name. */
+const WRITE_TOOLS = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit']);
+
+/** Tools whose call names one file, by this key. */
+const FILE_KEYS: Record<string, string> = {
+  Read: 'file_path',
+  Edit: 'file_path',
+  MultiEdit: 'file_path',
+  Write: 'file_path',
+  NotebookEdit: 'notebook_path',
+  NotebookRead: 'notebook_path',
+};
+
+/** Tools a tool-wide rule may cover: they read, search or delegate only. */
+const TOOL_WIDE_TOOLS = new Set([
+  'Grep',
+  'Glob',
+  'LS',
+  'WebSearch',
+  'TodoWrite',
+  'Task',
+  'Agent',
+]);
+
+const CONFIG_REASON =
+  'changes agent, hook, git or shell configuration, which can switch this check off';
+
 /** Tools whose path arguments are known; any other tool's strings are all read. */
 const PATH_KEYS: Record<string, readonly string[]> = {
   Read: ['file_path'],
@@ -433,8 +678,15 @@ const strings = (value: unknown, depth = 0): string[] => {
 export const toolUseDanger = (call: ToolUseCall): ToolUseDanger | null => {
   if (SHELL_TOOLS.has(call.toolName)) {
     const command = stringField(call.input, 'command') ?? '';
-    for (const segment of shellSegments(command)) {
-      const words = programWords(segment);
+    const segments = shellSegments(command);
+    for (const segment of segments) {
+      const { words, runsString } = programOf(segment);
+      if (runsString !== null) {
+        return {
+          kind: 'destructive_shell',
+          reason: `runs a string as a command line (${runsString})`,
+        };
+      }
       const push = pushDanger(words);
       if (push) return { kind: 'protected_push', reason: push };
       const destructive = destructiveShell(words);
@@ -458,11 +710,14 @@ export const toolUseDanger = (call: ToolUseCall): ToolUseDanger | null => {
         reason: 'pipes into a shell or interpreter',
       };
     }
-    if (shellSegments(command).flat().some(isSecretPath)) {
+    if (segments.flat().some(isSecretPath)) {
       return {
         kind: 'secret_read',
         reason: 'touches a secret or credential file',
       };
+    }
+    if (segments.flat().some(isConfigPath)) {
+      return { kind: 'config_write', reason: CONFIG_REASON };
     }
     return null;
   }
@@ -473,11 +728,19 @@ export const toolUseDanger = (call: ToolUseCall): ToolUseDanger | null => {
       : keys
           .map((key) => stringField(call.input, key))
           .filter((v): v is string => v !== null);
-  if (values.some((v) => v.split(/[\s,{}]+/).some(isSecretPath))) {
+  const words = values.flatMap((v) => v.split(/[\s,{}]+/));
+  if (words.some(isSecretPath)) {
     return {
       kind: 'secret_read',
       reason: 'touches a secret or credential file',
     };
+  }
+  // Reading agent or shell config is harmless; changing it is not.
+  if (
+    (keys === undefined || WRITE_TOOLS.has(call.toolName)) &&
+    words.some(isConfigPath)
+  ) {
+    return { kind: 'config_write', reason: CONFIG_REASON };
   }
   return null;
 };
@@ -493,6 +756,10 @@ const shellPrefix = (content: string): string | null =>
 const normalizeCommand = (command: string): string =>
   command.trim().replace(/\s+/g, ' ');
 
+/** A file as a Claude Code path rule names it: `//abs/path` for an absolute one. */
+const pathRuleContent = (path: string): string =>
+  path.startsWith('/') ? `/${path}` : path;
+
 const hostOf = (url: string): string | null => {
   try {
     return new URL(url).hostname.toLowerCase();
@@ -503,7 +770,8 @@ const hostOf = (url: string): string | null => {
 
 /**
  * Whether a rule covers a call, by a subset of Claude Code's own rule
- * semantics: a tool-wide rule; for a shell, one exact command or a word
+ * semantics: a tool-wide rule (never for a shell or a tool that writes
+ * files); for a file tool, the exact path; for a shell, one exact command or a word
  * prefix (`npm test:*` covers `npm test` and `npm test -- x`, never
  * `npm testing`), and only for a command with no shell operators; for
  * `WebFetch`, `domain:<host>`. Any other rule content covers only a call
@@ -512,7 +780,14 @@ const hostOf = (url: string): string | null => {
 export const toolRuleMatches = (rule: ToolRule, call: ToolUseCall): boolean => {
   if (rule.toolName !== call.toolName) return false;
   const shell = SHELL_TOOLS.has(call.toolName);
-  if (rule.ruleContent === undefined) return !shell;
+  if (rule.ruleContent === undefined) {
+    return !shell && !WRITE_TOOLS.has(call.toolName);
+  }
+  const fileKey = FILE_KEYS[call.toolName];
+  if (fileKey !== undefined) {
+    const path = stringField(call.input, fileKey);
+    return path !== null && rule.ruleContent === pathRuleContent(path);
+  }
   if (shell) {
     const command = stringField(call.input, 'command');
     if (command === null || !isSimpleShellCommand(command)) return false;
@@ -558,53 +833,83 @@ export const toolRuleAllowing = <R extends ToolRule>(
 
 // ─── Remembering ────────────────────────────────────────────────────────────
 
-/** Programs that run whatever their arguments say: never a one-word prefix rule. */
+/**
+ * Programs that run whatever their arguments say: never the start of a
+ * prefix rule, whatever follows (`bash -c:*`, `python3 -m:*`, `ssh host:*`).
+ */
 const RUNS_ANYTHING = new Set([
   'sh',
   'bash',
   'zsh',
   'dash',
+  'ksh',
   'fish',
+  'pwsh',
+  'powershell',
   'python',
-  'python3',
   'node',
-  'bun',
-  'bunx',
-  'deno',
-  'npx',
-  'pnpx',
   'perl',
   'ruby',
   'php',
   'eval',
-  'exec',
-  'env',
-  'xargs',
+  'source',
+  '.',
   'sudo',
+  'su',
+  'doas',
   'ssh',
   'docker',
   'kubectl',
 ]);
 
+/**
+ * Package managers and git: a prefix rule may name a script or subcommand,
+ * never stop at the tool, at `run`, or at a subcommand that runs code.
+ */
+const CODE_SUBCOMMANDS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['bun', ['exec', '-e', '--eval', '-p', '--print']],
+  ['deno', ['eval', '-e', '--eval']],
+  ['npm', ['exec', 'x']],
+  ['pnpm', ['exec', 'dlx']],
+  ['yarn', ['exec', 'dlx']],
+  ['git', ['-c', '--config-env', 'config']],
+]);
+const RUN_SUBCOMMANDS = ['run', 'run-script'];
+
 /** A rule that would allow far more than the call it came from. */
 const tooBroad = (rule: ToolRule): boolean => {
   if (!SHELL_TOOLS.has(rule.toolName)) {
-    return rule.ruleContent !== undefined && /^[*/]*$/.test(rule.ruleContent);
+    if (rule.ruleContent === undefined) return WRITE_TOOLS.has(rule.toolName);
+    return /^[*/]*$/.test(rule.ruleContent);
   }
   if (rule.ruleContent === undefined || /^[\s*:]*$/.test(rule.ruleContent)) {
     return true;
   }
   const prefix = shellPrefix(rule.ruleContent);
   if (prefix === null) return false;
-  const words = normalizeCommand(prefix).split(' ');
+  const all = normalizeCommand(prefix).split(' ').map(unquoted);
+  if (all[0] === '' || all[0] === '*') return true;
+  // Past wrappers: `timeout 60:*` or `npm exec:*` leave no program at all.
+  const { words, runsString } = programOf(all);
+  const [program, sub] = words;
+  if (runsString !== null || program === undefined) return true;
+  const name = interpreterName(baseName(program));
+  if (RUNS_ANYTHING.has(name) || /[$*?[]/.test(program)) return true;
+  const code = CODE_SUBCOMMANDS.get(name);
+  if (code === undefined) return false;
   return (
-    words[0] === '' ||
-    words[0] === '*' ||
-    (words.length === 1 && RUNS_ANYTHING.has(words[0] ?? ''))
+    sub === undefined ||
+    code.includes(sub) ||
+    (words.length === 2 && name !== 'git' && RUN_SUBCOMMANDS.includes(sub))
   );
 };
 
-/** The rule for a call Claude Code suggested none for: the call itself. */
+/**
+ * The rule for a call Claude Code suggested none for: the call itself — the
+ * exact command, the file path, the WebFetch domain. Only a tool that reads,
+ * searches or delegates gets a tool-wide rule; any other call (an MCP tool,
+ * say) is allowed once.
+ */
 const derivedRules = (call: ToolUseCall): ToolRule[] => {
   if (SHELL_TOOLS.has(call.toolName)) {
     const command = stringField(call.input, 'command');
@@ -620,7 +925,18 @@ const derivedRules = (call: ToolUseCall): ToolRule[] => {
       ? [{ toolName: 'WebFetch', ruleContent: `domain:${host}` }]
       : [];
   }
-  return [{ toolName: call.toolName }];
+  const fileKey = FILE_KEYS[call.toolName];
+  if (fileKey !== undefined) {
+    const path = stringField(call.input, fileKey);
+    if (path === null || path.length === 0) return [];
+    const content = pathRuleContent(path);
+    return content.length <= TOOL_RULE_CONTENT_MAX
+      ? [{ toolName: call.toolName, ruleContent: content }]
+      : [];
+  }
+  return TOOL_WIDE_TOOLS.has(call.toolName)
+    ? [{ toolName: call.toolName }]
+    : [];
 };
 
 export type ToolRuleOffer =
@@ -653,7 +969,12 @@ export const rememberableToolRules = (
     if (!rules.some((r) => sameToolRule(r, rule))) rules.push(rule);
   }
   if (rules.length === 0) {
-    return { ok: false, reason: 'No rule describes a chained command' };
+    return {
+      ok: false,
+      reason: SHELL_TOOLS.has(call.toolName)
+        ? 'No rule describes a chained command'
+        : 'No rule describes this call, so it is allowed once',
+    };
   }
   const broad = rules.find(tooBroad);
   if (broad) {

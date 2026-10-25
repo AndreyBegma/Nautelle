@@ -54,6 +54,41 @@ describe('toolUseDanger', () => {
     'npm test && rm -rf ~',
     'echo $(rm -rf /)',
     'FOO=1 xargs rm -rf',
+    // Quoting, escaping, groups and eval (review of C-401).
+    '\\rm -rf build',
+    "'rm' -rf build",
+    '"rm" -rf build',
+    'r""m -rf build',
+    '(rm -rf build)',
+    '{ rm -rf build; }',
+    'eval rm -rf build',
+    'bash -c "rm -rf x"',
+    'bash -c "echo hi"',
+    'sh -lc "ls"',
+    'python3 -c "print(1)"',
+    'node -e "process.exit()"',
+    'perl -ne print',
+    'bun -e "1"',
+    'deno eval "1"',
+    'env -S "rm -rf x"',
+    '$CMD -rf x',
+    // Wrappers with options and arguments.
+    'timeout 60 rm -rf dist',
+    'timeout -s KILL 60 rm -rf dist',
+    'nice -n 5 rm -rf dist',
+    'ionice -c 3 rm -rf dist',
+    'stdbuf -oL rm -rf dist',
+    'nohup rm -rf dist',
+    'xargs -I {} rm -rf {}',
+    'npm exec -- rm -rf /',
+    'npx -- rm -rf /',
+    'npx -c "rm -rf /"',
+    'pnpm dlx rimraf && rm -rf x',
+    'bun x rm -rf /',
+    'git -c alias.x=!rm x',
+    'git -c core.sshCommand=evil fetch',
+    'git config alias.wipe "!rm -rf ."',
+    'git -C /repo reset --hard',
   ])('flags destructive shell: %s', (command) => {
     expect(toolUseDanger(bash(command))?.kind).toBe('destructive_shell');
   });
@@ -108,6 +143,29 @@ describe('toolUseDanger', () => {
     expect(isSecretPath(path)).toBe(true);
   });
 
+  it.each([
+    '/home/me/.claude/settings.json',
+    '/repo/.claude/settings.local.json',
+    '/repo/.claude/agents/x.md',
+    '/home/me/.codex/config.toml',
+    '/repo/plugins/nautelle/hooks/hooks.json',
+    '/repo/.git/hooks/pre-commit',
+    '/repo/.git/config',
+    '/repo/.husky/pre-push',
+    '/home/me/.bashrc',
+    '/home/me/.zshrc',
+    '/home/me/.gitconfig',
+    '/repo/.mcp.json',
+  ])('flags changing agent, hook, git or shell config: %s', (file_path) => {
+    for (const toolName of ['Write', 'Edit', 'MultiEdit']) {
+      expect(toolUseDanger({ toolName, input: { file_path } })?.kind).toBe(
+        'config_write',
+      );
+    }
+    expect(toolUseDanger(bash(`cp x ${file_path}`))?.kind).toBe('config_write');
+    expect(toolUseDanger(read(file_path))).toBeNull();
+  });
+
   it('reads the paths of Grep and Glob, and every string of an unknown tool', () => {
     expect(
       toolUseDanger({
@@ -138,6 +196,11 @@ describe('toolUseDanger', () => {
     'env FOO=1 bun test',
     'git checkout feature',
     'git restore --staged a.ts',
+    'python3 -m pytest tests',
+    'bash scripts/build.sh',
+    'npx prisma generate',
+    'timeout 60 bun test',
+    'git -c color.ui=never status',
   ])('lets a harmless command through: %s', (command) => {
     expect(toolUseDanger(bash(command))).toBeNull();
   });
@@ -226,10 +289,24 @@ describe('toolRuleMatches', () => {
     expect(toolRuleMatches(rule('npm test:*'), bash('npm test > out'))).toBe(
       false,
     );
+    expect(toolRuleMatches(rule('npm test:*'), bash('(npm test)'))).toBe(false);
   });
 
-  it('never honours a tool-wide shell rule', () => {
+  it('never honours a tool-wide shell or file-writing rule', () => {
     expect(toolRuleMatches(rule(), bash('ls'))).toBe(false);
+    const write = { toolName: 'Write', input: { file_path: '/repo/a.ts' } };
+    expect(toolRuleMatches(rule(undefined, 'Write'), write)).toBe(false);
+  });
+
+  it('matches a file rule by its exact path', () => {
+    const edit = (file_path: string): ToolUseCall => ({
+      toolName: 'Edit',
+      input: { file_path, old_string: 'a', new_string: 'b' },
+    });
+    const file = rule('//repo/a.ts', 'Edit');
+    expect(toolRuleMatches(file, edit('/repo/a.ts'))).toBe(true);
+    expect(toolRuleMatches(file, edit('/repo/b.ts'))).toBe(false);
+    expect(toolRuleMatches(file, read('/repo/a.ts'))).toBe(false);
   });
 
   it('matches a tool-wide rule of another tool, and the tool only', () => {
@@ -295,6 +372,40 @@ describe('toolRuleAllowing', () => {
     expect(toolRuleAllowing(broad, read('/repo/a.ts'))?.id).toBe('r5');
   });
 
+  it('never lets an interpreter or wrapper rule run destructive shell', () => {
+    const rules = [
+      { id: 'b', toolName: 'Bash', ruleContent: 'bash -c:*' },
+      { id: 'p', toolName: 'Bash', ruleContent: 'python3 -c:*' },
+      { id: 't', toolName: 'Bash', ruleContent: 'timeout:*' },
+      { id: 'n', toolName: 'Bash', ruleContent: 'npm exec:*' },
+      { id: 'r', toolName: 'Bash', ruleContent: 'rm -rf build' },
+    ];
+    for (const command of [
+      'bash -c "rm -rf ~"',
+      'python3 -c "import shutil"',
+      'timeout 60 rm -rf dist',
+      'npm exec -- rm -rf /',
+      '\\rm -rf build',
+      "'rm' -rf build",
+    ]) {
+      expect(toolRuleAllowing(rules, bash(command))).toBeNull();
+    }
+  });
+
+  it('never answers a write to agent config, even under a stored rule', () => {
+    const settings = '/home/me/.claude/settings.json';
+    const rules = [
+      { id: 'w', toolName: 'Write' },
+      { id: 'f', toolName: 'Write', ruleContent: `/${settings}` },
+    ];
+    expect(
+      toolRuleAllowing(rules, {
+        toolName: 'Write',
+        input: { file_path: settings, content: '{}' },
+      }),
+    ).toBeNull();
+  });
+
   it('never answers a call it cannot judge or a chained command', () => {
     expect(toolRuleAllowing(stored, null)).toBeNull();
     expect(
@@ -321,8 +432,20 @@ describe('rememberableToolRules', () => {
     });
     expect(rememberableToolRules(read('/repo/a.ts'))).toEqual({
       ok: true,
-      rules: [{ toolName: 'Read' }],
+      rules: [{ toolName: 'Read', ruleContent: '//repo/a.ts' }],
     });
+    expect(
+      rememberableToolRules({
+        toolName: 'Edit',
+        input: { file_path: '/repo/a.ts', old_string: 'a', new_string: 'b' },
+      }),
+    ).toEqual({
+      ok: true,
+      rules: [{ toolName: 'Edit', ruleContent: '//repo/a.ts' }],
+    });
+    expect(
+      rememberableToolRules({ toolName: 'Grep', input: { pattern: 'x' } }),
+    ).toEqual({ ok: true, rules: [{ toolName: 'Grep' }] });
     expect(
       rememberableToolRules({
         toolName: 'WebFetch',
@@ -364,7 +487,65 @@ describe('rememberableToolRules', () => {
     );
     expect(
       rememberableToolRules(bash('python3 scripts/x.py'), [
-        { toolName: 'Bash', ruleContent: 'python3 scripts/x.py:*' },
+        { toolName: 'Bash', ruleContent: 'python3 scripts/x.py' },
+      ]).ok,
+    ).toBe(true);
+  });
+
+  it.each([
+    ['bash -c "echo hi"', 'bash -c:*'],
+    ['python3 -c "print(1)"', 'python3 -c:*'],
+    ['python3 scripts/x.py', 'python3 scripts/x.py:*'],
+    ['node -v', 'node -v:*'],
+    ['timeout 60 bun test', 'timeout:*'],
+    ['timeout 60 bun test', 'timeout 60:*'],
+    ['nice -n 5 make', 'nice -n 5:*'],
+    ['npm exec prisma', 'npm exec:*'],
+    ['pnpm dlx prisma', 'pnpm dlx:*'],
+    ['bun x prisma', 'bun x:*'],
+    ['yarn dlx prisma', 'yarn dlx:*'],
+    ['npx prisma', 'npx:*'],
+    ['git -c color.ui=never status', 'git -c:*'],
+    ['git status', 'git:*'],
+    ['npm run lint', 'npm run:*'],
+    ['bun run lint', 'bun:*'],
+    ['ssh host uptime', 'ssh host:*'],
+  ])('refuses an interpreter, wrapper or runner prefix: %s as %s', (command, ruleContent) => {
+    expect(
+      rememberableToolRules(bash(command), [{ toolName: 'Bash', ruleContent }])
+        .ok,
+    ).toBe(false);
+  });
+
+  it('keeps a prefix that pins a script or subcommand', () => {
+    for (const [command, ruleContent] of [
+      ['bun run lint', 'bun run lint:*'],
+      ['npm test', 'npm test:*'],
+      ['git status', 'git status:*'],
+      ['npx prisma generate', 'npx prisma:*'],
+    ] as const) {
+      expect(
+        rememberableToolRules(bash(command), [
+          { toolName: 'Bash', ruleContent },
+        ]).ok,
+      ).toBe(true);
+    }
+  });
+
+  it('never stores a tool-wide rule for a tool that writes files, or for an unknown tool without a suggestion', () => {
+    const write = {
+      toolName: 'Write',
+      input: { file_path: '/repo/a.ts', content: 'x' },
+    };
+    expect(rememberableToolRules(write, [{ toolName: 'Write' }]).ok).toBe(
+      false,
+    );
+    expect(
+      rememberableToolRules({ toolName: 'mcp__x__do', input: { a: 'b' } }).ok,
+    ).toBe(false);
+    expect(
+      rememberableToolRules({ toolName: 'mcp__x__do', input: { a: 'b' } }, [
+        { toolName: 'mcp__x__do' },
       ]).ok,
     ).toBe(true);
   });
