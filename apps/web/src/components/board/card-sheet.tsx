@@ -73,8 +73,9 @@ import {
   isTerminalCard,
   noPrBanner,
   ownsWorker,
-  phaseLabel,
   roundPill,
+  roundStateLabel,
+  runActionLabel,
   SLOT_GONE_TEXT,
   sessionHref,
   TRACKED_TEXT,
@@ -222,7 +223,7 @@ function roundItems(
               : round.trigger === 'review_fix'
                 ? 'review fix'
                 : 'run'}{' '}
-            · {phaseLabel(round.phase)}
+            · {roundStateLabel(round)}
           </span>
           {round.autoRunAfter != null ? (
             // #443: Auto-run when ready started it, not a person's Run.
@@ -863,7 +864,7 @@ export function CardDetailBody({
           projectId={projectId}
           card={card}
           kind="work"
-          label={canRetry(card) ? 'Run again' : 'Run'}
+          label={runActionLabel(card)}
           variant={card.column === 'todo' ? 'solid' : 'glass'}
           disabled={
             actions.busy ||

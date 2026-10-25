@@ -58,6 +58,30 @@ shows a page-shaped skeleton (`app/(app)/loading.tsx`); one that throws shows
 "Project › Page", the project's Plans (newest five), Recent sessions and runs,
 and Admin as a group of its own, so no group label repeats on its rows.
 
+**Palette actions and card lookup** (C-393, `components/shell/palette.ts`).
+Above the pages, ⌘K offers "New card" (`?quickCard=1` on the Board) and "New
+work" (the interview, `?newWork=1`) for the open project, or per project (five
+at most) when none is open; viewers get neither. Typing `C-12`, `#41` (an issue
+or pull request number) or part of a title looks the card up across every
+project through `GET /work?q=`; the hits are listed under "Cards", and a single
+hit (or any `C-12`/`#41` reference) adds its actions: Run (todo, finished),
+Accept (finished), Stop (in progress) and Open. Run goes straight to the API;
+Accept and Stop open the card on its Board with `?accept=1` / `?stop=1`, and the
+card's own confirmation dialog asks. Only operators see Run, Accept and Stop,
+and only for Board cards; a fleet or Inbox row can be opened. "Inbox" is a page
+row that points at `/work?status=inbox` until the Inbox page lands (C-390).
+Settings search is a stopgap too: typing "settings" lists one "<Project> ›
+Settings" row per project (the project pages the palette already offers), each
+opening that project's Settings page. Searching inside the settings blocks
+belongs to the settings card (C-395) and is not part of this one.
+
+**Board keyboard** (C-393, `components/board/use-board-shortcuts.ts`). j/k or
+↓/↑ move a cursor (an accent ring) over the cards in Board order, Enter opens
+the card, r runs it, a accepts it, n starts a new card and ? opens the cheat
+sheet, which lists every shortcut (`lib/board/shortcuts.ts`). The keys do
+nothing while a field, button or link has the focus, a dialog or menu is open,
+or a modifier is held; r, a and n are for operators.
+
 **Runner update notice** (C-328, `components/runners/runner-update-notice.tsx`).
 Below the top bar, on every page, a person whose own runner — one they are the
 local user of — last reported a version older than the latest

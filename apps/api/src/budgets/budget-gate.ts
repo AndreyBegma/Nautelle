@@ -24,7 +24,10 @@ export type BudgetGateResult =
  * rounds, plan and design turns and UI profile builds (D-10). Only enabled
  * `stop` budgets refuse, and only while their current period has reached
  * 100 % with no active override (D7, D8). Each budget is evaluated fresh, so the gate has no detection lag.
- * It never stops, kills or messages anything that is already running.
+ * The gate itself never stops, kills or messages anything that is already
+ * running; an evaluation that finds a stop budget reached hands it to
+ * `BudgetStops`, and the Board pauses its running card rounds (C-399,
+ * ADR-0101).
  */
 @Injectable()
 export class BudgetGate {

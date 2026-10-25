@@ -49,7 +49,7 @@ const describe = (
 };
 
 /**
- * `project.discover` (C-396, ADR-0101): the git main checkouts under the
+ * `project.discover` (C-396, ADR-0102): the git main checkouts under the
  * allowed roots, for the connect dialog's picker. A folder whose `.git` is a
  * directory is a main checkout and is not walked further; a `.git` file is a
  * linked worktree or a submodule and is skipped. Hidden folders, symlinks and

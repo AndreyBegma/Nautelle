@@ -31,7 +31,7 @@ const tail = (text: string): string =>
   ).slice(-TEXT_MESSAGE_MAX);
 
 /**
- * `project.push_check` (C-396, ADR-0101): whether this runner can push to the
+ * `project.push_check` (C-396, ADR-0102): whether this runner can push to the
  * repository's origin — `git push --dry-run` of `HEAD` to a branch no one
  * uses. git authenticates and asks the remote for its refs, then stops before
  * sending anything. The runner's git gets the same settings as every other
