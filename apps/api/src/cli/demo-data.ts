@@ -110,21 +110,30 @@ export const DEMO_FAILED_RUNS: ReadonlyArray<{
 export const DEMO_AWAY_SESSION_ID = 'demo-session-away';
 
 /**
- * C-401: tool calls the away session waits on. One comes with Claude Code's
- * rule suggestion, so it can be allowed for similar calls; the push to the
- * default branch always asks.
+ * C-401: tool calls the away session waits on, the soonest to expire first.
+ * The test run comes with Claude Code's rule suggestion, so it can be
+ * allowed for similar calls; reading the project's `.env` always asks.
  */
 export const DEMO_TOOL_CALLS: ReadonlyArray<{
   id: string;
-  command: string;
+  toolName: string;
+  input: Record<string, string>;
   suggestions?: ReadonlyArray<{ toolName: string; ruleContent: string }>;
+  expiresInMinutes: number;
 }> = [
   {
     id: 'demo-action-test',
-    command: 'bun run test --filter web',
+    toolName: 'Bash',
+    input: { command: 'bun run test --filter web' },
     suggestions: [{ toolName: 'Bash', ruleContent: 'bun run test:*' }],
+    expiresInMinutes: 235,
   },
-  { id: 'demo-action-push', command: 'git push origin main' },
+  {
+    id: 'demo-action-env',
+    toolName: 'Read',
+    input: { file_path: '/srv/demo/acme-shop/.env' },
+    expiresInMinutes: 240,
+  },
 ];
 
 /**
@@ -316,7 +325,7 @@ export const seedDemo = async (
     },
   });
   for (const call of DEMO_TOOL_CALLS) {
-    const input = JSON.stringify({ command: call.command });
+    const input = JSON.stringify(call.input);
     await prisma.actionRequest.upsert({
       where: { id: call.id },
       update: {},
@@ -327,15 +336,15 @@ export const seedDemo = async (
         sessionId: DEMO_AWAY_SESSION_ID,
         requestedById: admin.id,
         kind: 'tool_use',
-        summary: 'Allow Bash in an unattended Claude Code session',
+        summary: `Allow ${call.toolName} in an unattended Claude Code session`,
         args: {
-          toolName: 'Bash',
+          toolName: call.toolName,
           input,
           truncated: false,
           fullLength: input.length,
           ...(call.suggestions ? { suggestions: [...call.suggestions] } : {}),
         },
-        expiresAt: new Date(now.getTime() + 240 * 60_000),
+        expiresAt: new Date(now.getTime() + call.expiresInMinutes * 60_000),
       },
     });
   }

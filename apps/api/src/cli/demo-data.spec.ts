@@ -163,8 +163,8 @@ describe('seedDemo', () => {
       });
       expect(toolUseCallOf(request.args)).not.toBeNull();
     }
-    // The first offers its suggested rule; the push to main always asks.
-    const [suggested, push] = requests;
+    // The first offers its suggested rule; reading `.env` always asks.
+    const [suggested, secret] = requests;
     expect(
       rememberableToolRules(
         toolUseCallOf(suggested.args),
@@ -174,8 +174,8 @@ describe('seedDemo', () => {
       ok: true,
       rules: [{ toolName: 'Bash', ruleContent: 'bun run test:*' }],
     });
-    const pushCall = toolUseCallOf(push.args);
-    expect(pushCall && toolUseDanger(pushCall)?.kind).toBe('protected_push');
+    const secretCall = toolUseCallOf(secret.args);
+    expect(secretCall && toolUseDanger(secretCall)?.kind).toBe('secret_read');
     const [rule] = db.toolUseRule.upsert.mock.calls[0];
     expect(rule.create).toMatchObject({ scope: 'project', toolName: 'Bash' });
   });
