@@ -36,8 +36,14 @@
       "timeoutMs": 30000
     },
     {
+      "action": "click",
+      "target": { "role": "button", "name": "Details: Use Bash" }
+    },
+    {
       "action": "waitFor",
-      "target": { "text": "{\"command\":\"bun run test --filter web\"}" },
+      "target": {
+        "css": "div.surface-content:has(h3:text-is(\"Use Bash\")) pre"
+      },
       "caption": "The project lets such a request wait four hours, so the session waits instead of falling back.",
       "timeoutMs": 15000,
       "zoom": true
