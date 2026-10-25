@@ -27,7 +27,7 @@
     {
       "action": "waitFor",
       "target": { "text": "Import products from a CSV file" },
-      "caption": "C-6 was running when the project's hard budget was reached.",
+      "caption": "C-7 was running when the project's hard budget was reached.",
       "timeoutMs": 30000
     },
     {

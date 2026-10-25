@@ -11,7 +11,7 @@ import { PrismaService } from '../database/prisma.service';
 import { BoardWork } from './board-work';
 
 /**
- * C-399 (ADR-0100): a hard budget that is reached pauses the running card
+ * C-399 (ADR-0101): a hard budget that is reached pauses the running card
  * rounds in its scope — a project budget the project's, a user budget the
  * rounds that count toward that user (spec 28 D3: the run's
  * `triggeredById`). Each is paused by `BoardWork.pause`; Resume is the

@@ -140,7 +140,7 @@ export interface CardRoundBrief {
    */
   quotaWait?: { limit: QuotaLimit; resetsAt: string | null } | null;
   /**
-   * C-399 (ADR-0100): why Nautelle paused this `cancelled` round — the card
+   * C-399 (ADR-0101): why Nautelle paused this `cancelled` round — the card
    * shows "Paused: budget" and Run reads Resume; `null` for any other round.
    * Optional so older fixtures stay valid.
    */
@@ -1335,7 +1335,7 @@ export interface CardBackgroundStalledEventData {
 }
 
 /**
- * C-399 (ADR-0100): Nautelle paused a running round — it stopped the
+ * C-399 (ADR-0101): Nautelle paused a running round — it stopped the
  * session and kept the worktree and the Claude session, so Resume continues
  * it. With `reason: 'budget'`, the hard budget that was reached and when its
  * period resets (ISO-8601).

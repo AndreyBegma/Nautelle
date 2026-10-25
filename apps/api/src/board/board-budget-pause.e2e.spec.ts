@@ -5,7 +5,7 @@ import { ingest } from '../usage/testing/usage-e2e';
 import { BoardWorld, failed, ROOT_A } from './testing/board-e2e';
 
 /**
- * C-399 (ADR-0100): a hard budget that is reached pauses the running card
+ * C-399 (ADR-0101): a hard budget that is reached pauses the running card
  * rounds in its scope; Resume continues the same session once it allows.
  */
 describe('board budget pause (e2e)', () => {

@@ -2,7 +2,7 @@ import type { BudgetScope } from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 
 /**
- * C-399 (ADR-0100): a hard (`stop`) budget whose current period has reached
+ * C-399 (ADR-0101): a hard (`stop`) budget whose current period has reached
  * its limit, with no override lifting it — what the gate refuses new spend
  * for. Emitted after every evaluation that finds it so, not once: a listener
  * that could not act (a runner offline) acts on the next one.

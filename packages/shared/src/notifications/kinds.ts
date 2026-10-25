@@ -11,7 +11,7 @@ import type { Role } from '../auth';
  * `card.waiting` come from board card workers (issue #242 D15);
  * `card.background_stalled` from a card round waiting on its own background
  * task too long (#390); `card.paused` from Nautelle pausing a running round
- * because a hard budget in its scope was reached (C-399, ADR-0100).
+ * because a hard budget in its scope was reached (C-399, ADR-0101).
  * `cards.suggested` comes from card capture (issue #244 D11): suggestions are
  * content-derived, so it goes to operators and admins only, and never quotes
  * content.

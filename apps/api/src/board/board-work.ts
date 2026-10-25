@@ -184,6 +184,33 @@ export interface LivePr {
   mergedAt: Date | null;
 }
 
+/**
+ * C-389 (ADR-0100): the cards a merge completes — a card worker's card in
+ * In progress or Finished whose PR merged into the project base. The sweep's
+ * query; `completesOnMerge` also wants no round running.
+ */
+export const MERGED_TO_COMPLETE = {
+  column: { in: ['in_progress', 'finished'] },
+  source: { notIn: ['fleet', 'terminal'] },
+  prNumber: { not: null },
+  mergedAt: { not: null },
+  prBase: null,
+} satisfies Prisma.BoardCardWhereInput;
+
+export const completesOnMerge = (
+  card: Pick<
+    CardWithRounds,
+    'column' | 'source' | 'prNumber' | 'mergedAt' | 'prBase' | 'rounds'
+  >,
+): boolean =>
+  (card.column === 'in_progress' || card.column === 'finished') &&
+  card.source !== 'fleet' &&
+  card.source !== 'terminal' &&
+  card.prNumber !== null &&
+  card.mergedAt !== null &&
+  card.prBase === null &&
+  !isActiveRoundPhase(card.rounds[0]?.phase);
+
 /** #709: why a forward PR exists, leading its body. */
 const forwardSummary = (
   card: Pick<BoardCard, 'number' | 'prNumber'>,
@@ -503,12 +530,17 @@ export class BoardWork implements OnModuleInit {
       });
     }
     if (effects.includes('accept')) {
+      // C-389 (ADR-0100): a merge completes the card; no one accepted it.
+      const merged = request.source === 'merged';
       await this.audit.record({
         ...actor.ctx,
-        action: 'card.accepted',
+        action: merged ? 'card.completed_by_merge' : 'card.accepted',
         target,
         projectId: project.id,
-        after: { number: fresh.number },
+        after: {
+          number: fresh.number,
+          ...(merged ? { pr: fresh.prNumber } : {}),
+        },
         result: 'ok',
       });
     }
@@ -687,7 +719,8 @@ export class BoardWork implements OnModuleInit {
    * #273 D13, #359 D7: `card.merge` of the card's PR at `headSha`, audited
    * — Accept's, or the auto-merge's by the system actor. A refusal is 409
    * `merge_failed`. A merge records `prState merged`, `mergedAt` and the PR
-   * row's state (D8).
+   * row's state (D8), and completes the card (C-389) unless `complete` is
+   * false — Accept completes it itself.
    */
   async mergePr(
     project: BoardProject,
@@ -698,6 +731,7 @@ export class BoardWork implements OnModuleInit {
     headSha: string,
     deleteBranch: boolean,
     actor: BoardActor,
+    { complete = true }: { complete?: boolean } = {},
   ): Promise<CardMergeOutcome> {
     if (isActiveRoundPhase(card.rounds[0]?.phase)) {
       throw boardError(
@@ -772,7 +806,7 @@ export class BoardWork implements OnModuleInit {
       result: 'ok',
     });
     // #329 D6: the card's PR state from the merge result; #359 D8: Merged.
-    await this.markMerged(card.id, pr);
+    await this.markMerged(card.id, pr, null, { complete });
     return {
       merged: true,
       alreadyMerged: output.alreadyMerged,
@@ -899,12 +933,14 @@ export class BoardWork implements OnModuleInit {
    * branch it went into and when. A stacked PR that went into the project
    * base itself (GitHub moved it there) is no longer stacked; one that went
    * into its dependency's branch after that branch's own PR merged is
-   * carried forward (`retarget`).
+   * carried forward (`retarget`). C-389 (ADR-0100): a card whose work is in
+   * the base now is Completed (`completeMerged`), unless `complete` is false.
    */
   async markMerged(
     cardId: string,
     pr: number,
     facts: LivePr | null = null,
+    { complete = true }: { complete?: boolean } = {},
   ): Promise<void> {
     const card = await this.prisma.boardCard.findUnique({
       where: { id: cardId },
@@ -932,6 +968,43 @@ export class BoardWork implements OnModuleInit {
     }
     this.publish(project.id, cardId);
     await this.restack(cardId);
+    if (count > 0 && complete) await this.completeMerged(project, cardId);
+  }
+
+  /**
+   * C-389 (ADR-0100): a card whose PR merged into the project base moves to
+   * Completed — the merge was the person's decision, on GitHub, through
+   * Accept or by the auto-merge they turned on. Completed cleans up as
+   * Accept does. A card stays where it is while a round runs on it (the PR
+   * poll's sweep completes it later), while its PR went into a dependency's
+   * branch (it lands with the dependency), and when it is a fleet card (its
+   * slot moves it) or a terminal card (its branch is a person's session).
+   * Never throws for the board; answers whether the card moved.
+   */
+  async completeMerged(
+    project: BoardProject,
+    cardId: string,
+  ): Promise<boolean> {
+    const card = await this.prisma.boardCard.findUnique({
+      where: { id: cardId },
+      include: { rounds: { orderBy: { round: 'desc' } } },
+    });
+    if (!card || !completesOnMerge(card)) return false;
+    try {
+      await this.move(
+        project,
+        card,
+        { to: 'completed', index: 0, source: 'merged' },
+        BOARD_SYSTEM_ACTOR,
+      );
+      return true;
+    } catch (error) {
+      if (!(error instanceof BoardFailure)) throw error;
+      this.logger.warn(
+        `${cardLabel(card.number)} not completed after its merge: ${error.message}`,
+      );
+      return false;
+    }
   }
 
   /**
@@ -1675,7 +1748,7 @@ export class BoardWork implements OnModuleInit {
   }
 
   /**
-   * C-399 (ADR-0100): a hard budget in its scope was reached, so the card's
+   * C-399 (ADR-0101): a hard budget in its scope was reached, so the card's
    * active round is paused — the runner's `card.stop` ends the session and
    * keeps the worktree, and the round is `cancelled` with `pausedFor:
    * 'budget'`, so its Run resumes the same Claude session. Raises one

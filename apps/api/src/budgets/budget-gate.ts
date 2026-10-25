@@ -27,7 +27,7 @@ export type BudgetGateResult =
  * The gate itself never stops, kills or messages anything that is already
  * running; an evaluation that finds a stop budget reached hands it to
  * `BudgetStops`, and the Board pauses its running card rounds (C-399,
- * ADR-0100).
+ * ADR-0101).
  */
 @Injectable()
 export class BudgetGate {

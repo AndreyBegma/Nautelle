@@ -358,7 +358,7 @@ const EVENT_RULES: Record<string, EventRule> = {
         : null;
     },
   },
-  // C-399 (ADR-0100): a hard budget paused a running card round.
+  // C-399 (ADR-0101): a hard budget paused a running card round.
   [CARD_PAUSED_EVENT]: {
     category: 'fleet',
     severity: fixed('warn'),

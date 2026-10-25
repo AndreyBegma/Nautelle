@@ -8,7 +8,7 @@ import { useProjectBudgets } from '../../lib/budgets/use-budgets';
 /**
  * Fleet page notice (spec 28 UI): while a `stop` budget of the project is
  * exceeded, new starts and skill runs are refused until it resets. Running
- * card rounds are paused (ADR-0100); other running workers carry on (D7).
+ * card rounds are paused (ADR-0101); other running workers carry on (D7).
  * Draws nothing otherwise, or when the budgets cannot
  * be read — the fleet page must not depend on them.
  */

@@ -160,8 +160,36 @@ export class ApprovalsService {
     this.inspections.set(key, { at: Date.now(), value });
     if (value.state === 'open') {
       await this.voidIfMoved(project, pr, value.headSha);
+    } else {
+      await this.closeGone(project.id, pr, value.state);
     }
     return value;
+  }
+
+  /**
+   * C-389 (ADR-0100): re-reads every PR with a current approval, as the
+   * system, so one that merged or closed without an event reaching Nautelle
+   * — the runner was down, the event was lost — closes its row. Never
+   * throws: a runner that cannot answer leaves the row for the next sweep.
+   */
+  async sweep(): Promise<void> {
+    const current = await this.prisma.mergeApproval.findMany({
+      where: { status: { in: [...CURRENT_APPROVAL_STATUSES] } },
+      select: { projectId: true, prNumber: true },
+      distinct: ['projectId', 'prNumber'],
+      orderBy: [{ projectId: 'asc' }, { prNumber: 'asc' }],
+    });
+    for (const { projectId, prNumber } of current) {
+      try {
+        await this.inspect({ projectId, ...SYSTEM_CALLER }, prNumber, {
+          fresh: false,
+        });
+      } catch (error) {
+        this.logger.debug(
+          `sweep of PR #${prNumber} on project ${projectId} could not read it: ${String(error)}`,
+        );
+      }
+    }
   }
 
   approve(
@@ -394,6 +422,31 @@ export class ApprovalsService {
       return voidApprovedRow(tx, project.id, pr, headSha);
     });
     if (voided) await this.announceVoid(project, pr, voided, headSha);
+  }
+
+  /**
+   * C-389: GitHub says the PR merged or closed; its current row closes as
+   * `pr.merged` / `pr.closed` would have closed it, and the queue refetches.
+   */
+  private async closeGone(
+    projectId: string,
+    pr: number,
+    state: 'merged' | 'closed',
+  ): Promise<void> {
+    const closed = await this.prisma.$transaction(async (tx) => {
+      await lockApprovals(tx, projectId);
+      const row = await currentRow(tx, projectId, pr);
+      if (!row) return false;
+      await tx.mergeApproval.update({
+        where: { id: row.id },
+        data: { status: state },
+      });
+      return true;
+    });
+    if (!closed) return;
+    this.logger.debug(`PR #${pr} on project ${projectId}: ${state} (read)`);
+    const change: ApprovalsLiveChange = { kind: 'approvals', projectId };
+    this.live.publish(`project:${projectId}`, APPROVALS_LIVE_EVENT, change);
   }
 
   /**

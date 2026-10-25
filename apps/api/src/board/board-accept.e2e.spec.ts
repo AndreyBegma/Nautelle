@@ -160,6 +160,9 @@ describe('board accept with merge (e2e, #273)', () => {
         mergeCommit: 'b'.repeat(40),
         issueClosed: true,
       });
+      // C-389 (ADR-0100): the person accepted it — one move, one audit.
+      expect(await w.audit('card.accepted')).toHaveLength(1);
+      expect(await w.audit('card.completed_by_merge')).toHaveLength(0);
     });
 
     it('sends method null without a mergeMethod, and accepts an issue close that failed', async () => {

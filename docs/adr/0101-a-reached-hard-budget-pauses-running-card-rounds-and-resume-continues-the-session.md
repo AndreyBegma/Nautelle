@@ -1,4 +1,4 @@
-# ADR-0100: A reached hard budget pauses running card rounds, and Resume continues the session
+# ADR-0101: A reached hard budget pauses running card rounds, and Resume continues the session
 
 Status: accepted · Date: 2026-10-25 ·
 Card: C-399 ·

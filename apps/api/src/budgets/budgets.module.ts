@@ -24,7 +24,7 @@ import { BudgetsService } from './budgets.service';
  * `BudgetSweep` without importing this module; each takes it `@Optional()`,
  * so a build without it means "allowed" (D11). The local request router reads
  * `BudgetsService.remaining` (spec 201 D15). The Board subscribes to
- * `BudgetStops` to pause its running card rounds (C-399, ADR-0100).
+ * `BudgetStops` to pause its running card rounds (C-399, ADR-0101).
  */
 @Global()
 @Module({

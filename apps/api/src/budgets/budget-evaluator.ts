@@ -191,7 +191,7 @@ export class BudgetEvaluator {
   }
 
   /**
-   * C-399 (ADR-0100): a hard budget at its limit, with no override, pauses
+   * C-399 (ADR-0101): a hard budget at its limit, with no override, pauses
    * the running card rounds in its scope — on every evaluation that finds
    * it so, so a round a runner could not stop yet is stopped on the next.
    */

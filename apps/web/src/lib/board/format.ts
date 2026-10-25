@@ -107,7 +107,7 @@ const PHASE_PILL: Record<CardRoundPhase, RoundPill> = {
   cancelled: { status: 'idle', label: 'Stopped' },
 };
 
-/** C-399 (ADR-0100): a round a hard budget paused; Resume continues it. */
+/** C-399 (ADR-0101): a round a hard budget paused; Resume continues it. */
 const PAUSED_FOR_BUDGET_PILL: RoundPill = {
   status: 'blocked',
   label: 'Paused: budget',

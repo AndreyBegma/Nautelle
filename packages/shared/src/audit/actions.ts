@@ -174,8 +174,10 @@ export const AUDIT_ACTIONS = [
   // #750 D9: the worker's `escalate_card` (reason, model, relaunched).
   'card.escalated',
   'card.accepted',
+  /** C-389 (ADR-0100): the card's pull request merged, so it is Completed. */
+  'card.completed_by_merge',
   'card.stopped',
-  /** C-399 (ADR-0100): a hard budget paused the card's running round. */
+  /** C-399 (ADR-0101): a hard budget paused the card's running round. */
   'card.paused',
   /** #243 D10: the card's Continue after design switch. */
   'card.design_continue_toggled',

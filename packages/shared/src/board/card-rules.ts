@@ -66,7 +66,7 @@ export const canStop = (card: RuleCard): boolean =>
   ownsWorker(card) && isRoundActive(card.round);
 
 /**
- * C-399 (ADR-0100): a hard budget paused the card's latest round. The retry
+ * C-399 (ADR-0101): a hard budget paused the card's latest round. The retry
  * is its Resume: it continues the same session once the budget allows.
  */
 export const isPausedForBudget = (card: RuleCard): boolean =>
