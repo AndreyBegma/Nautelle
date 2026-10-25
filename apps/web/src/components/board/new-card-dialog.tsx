@@ -28,6 +28,7 @@ import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { FullScreenLayer } from '../design/full-screen-layer';
 import { DisabledReason } from '../prerequisites/disabled-reason';
 import { IntakeView } from './intake-view';
+import { useQuickCard } from './quick-card-context';
 
 /**
  * New work (#337 D2, #409): one field, **What to do**, in any language, with
@@ -77,6 +78,7 @@ export function NewCardDialog({
   /** **Open the card** once the intake wrote it. */
   onCreated: (number: number) => void;
 }) {
+  const quickCard = useQuickCard();
   const [busy, setBusy] = useState(false);
   const [startedId, setStartedId] = useState<string>();
   const planId = controlledId ?? startedId;
@@ -108,6 +110,10 @@ export function NewCardDialog({
       busy={busy}
       setBusy={setBusy}
       onCancel={wide === false ? undefined : () => onOpenChange(false)}
+      onQuickCard={(text) => {
+        onOpenChange(false);
+        quickCard(projectId, text);
+      }}
       onStarted={(id) => {
         setStartedId(id);
         onStarted?.(id);
@@ -239,6 +245,7 @@ function StartForm({
   busy,
   setBusy,
   onCancel,
+  onQuickCard,
   onStarted,
 }: {
   projectId: string;
@@ -250,6 +257,8 @@ function StartForm({
   setBusy: (busy: boolean) => void;
   /** Absent on a phone, where the bar's Close is the way out. */
   onCancel?: () => void;
+  /** C-391: the same text as a single card, without the interview. */
+  onQuickCard: (text: string) => void;
   onStarted: (planId: string) => void;
 }) {
   const settings = useUserSettings(open);
@@ -369,6 +378,13 @@ function StartForm({
             Cancel
           </Button>
         ) : null}
+        <Button
+          variant="glass"
+          disabled={busy}
+          onClick={() => onQuickCard(what)}
+        >
+          Quick card
+        </Button>
         <Button type="submit" disabled={!valid}>
           {busy ? 'Starting…' : 'Start'}
         </Button>

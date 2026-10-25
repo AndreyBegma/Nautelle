@@ -71,6 +71,23 @@ describe('capsuleAction', () => {
     expect(ids(result)).toEqual(['export']);
   });
 
+  test('Quick card follows the page’s own actions and turns the + into a sheet (C-391)', () => {
+    const quick = { ...action('quick-card', true), icon: Plus };
+    const withFallback = capsuleAction([], 'operator', newWork, [quick]);
+    expect(withFallback.kind).toBe('sheet');
+    expect(ids(withFallback)).toEqual(['new-work', 'quick-card']);
+    expect(
+      ids(capsuleAction([action('new-issue')], 'operator', newWork, [quick])),
+    ).toEqual(['new-issue', 'quick-card']);
+  });
+
+  test('a viewer does not get Quick card', () => {
+    const quick = action('quick-card', true);
+    expect(capsuleAction([], 'viewer', newWork, [quick])).toEqual({
+      kind: 'none',
+    });
+  });
+
   test('a viewer with nothing left gets no +', () => {
     expect(capsuleAction([], 'viewer', newWork)).toEqual({ kind: 'none' });
     expect(

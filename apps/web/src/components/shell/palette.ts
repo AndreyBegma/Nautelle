@@ -17,6 +17,7 @@ import {
   Sparkles,
   SquareTerminal,
   User,
+  Zap,
 } from 'lucide-react';
 import { runHref } from '../../lib/history/format';
 import { planHref } from '../../lib/planner/href';
@@ -41,7 +42,12 @@ export interface PaletteInput {
   plans: readonly PlanSummary[];
   /** The theme the "Switch theme" action reads as its hint. */
   themeLabel: string;
+  /** C-391: inside a project the person can create cards in (operator or up). */
+  canQuickCard?: boolean;
 }
+
+/** C-391: the palette row that opens Quick card for the current project. */
+export const QUICK_CARD_ACTION = 'action:quick-card';
 
 /** #660: the palette row that asks the Board the query, as a question. */
 export const ASK_PREFIX = 'ask:';
@@ -203,6 +209,9 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
     .slice(0, PLANS_MAX);
 
   const actions: Item[] = [
+    ...(input.canQuickCard
+      ? [{ id: QUICK_CARD_ACTION, label: 'Quick card', icon: Zap }]
+      : []),
     {
       id: 'action:theme',
       label: 'Switch theme',

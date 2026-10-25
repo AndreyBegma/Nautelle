@@ -3,6 +3,7 @@ import type {
   BoardSearchResponse,
   BoardTriageCounts,
   CardTriageView,
+  QuickCardDraft,
 } from '@nautelle/shared';
 import {
   applyDecorators,
@@ -28,8 +29,14 @@ import {
   type ResolvedProjectAccess,
 } from '../projects';
 import { BoardAskService } from './board-ask.service';
+import { BoardQuickDraft } from './board-quick-draft.service';
 import { BoardTriage } from './board-triage.service';
-import { BoardAskDto, BoardSearchDto, TriageHintDto } from './dto';
+import {
+  BoardAskDto,
+  BoardSearchDto,
+  QuickCardDraftDto,
+  TriageHintDto,
+} from './dto';
 
 /** Questions one person may ask per window: each is two model calls. */
 export const BOARD_ASK_LIMIT = 20;
@@ -81,7 +88,22 @@ export class BoardAskController {
 @Controller('projects/:projectId')
 @UseGuards(ProjectAccessGuard)
 export class BoardTriageController {
-  constructor(private readonly triage: BoardTriage) {}
+  constructor(
+    private readonly triage: BoardTriage,
+    private readonly quickDraft: BoardQuickDraft,
+  ) {}
+
+  /** C-391: the title and kind a cheap model suggests for a Quick card's text. */
+  @Post('board/cards/draft')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  @AskThrottle()
+  draft(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: QuickCardDraftDto,
+  ): Promise<QuickCardDraft> {
+    return this.quickDraft.draft(user.id, dto.text);
+  }
 
   @Get('board/triage')
   counts(
