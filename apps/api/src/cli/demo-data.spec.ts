@@ -87,6 +87,29 @@ describe('seedDemo', () => {
     });
   });
 
+  it('seeds a card a hard budget paused, keeping its branch and session (C-399)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    const number = DEMO_CARDS.findIndex((card) => card.round?.paused) + 1;
+    expect(number).toBeGreaterThan(0);
+    const [card] = db.boardCard.upsert.mock.calls[number - 1];
+    expect(card.create).toMatchObject({
+      column: 'in_progress',
+      branch: expect.any(String),
+      sessionId: expect.any(String),
+    });
+    const [run] = db.run.upsert.mock.calls.at(-1);
+    expect(run.create).toMatchObject({
+      status: 'abandoned',
+      outcome: 'Paused: a hard budget was reached',
+    });
+    const [round] = db.boardCardRound.upsert.mock.calls.at(-1);
+    expect(round.create).toMatchObject({
+      phase: 'cancelled',
+      pausedFor: 'budget',
+    });
+  });
+
   it('needs the admin to exist', async () => {
     const db = prisma();
     db.user.findUnique.mockResolvedValue(null);

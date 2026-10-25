@@ -39,8 +39,11 @@ export const DEMO_CARDS: ReadonlyArray<{
   title: string;
   column: BoardColumn;
   kind: 'feature' | 'bug';
-  /** C-359: a finished round 1 launched with this model and effort. */
-  round?: { model: string; effort: CardEffort };
+  /**
+   * C-359: a round 1 launched with this model and effort. It finished, or
+   * (C-399) a hard budget paused it.
+   */
+  round?: { model: string; effort: CardEffort; paused?: true };
 }> = [
   { title: 'Export the activity feed as CSV', column: 'todo', kind: 'feature' },
   { title: 'Dark mode for the settings page', column: 'todo', kind: 'feature' },
@@ -59,6 +62,12 @@ export const DEMO_CARDS: ReadonlyArray<{
     column: 'finished',
     kind: 'feature',
     round: { model: 'claude-opus-5-5', effort: 'high' },
+  },
+  {
+    title: 'Import products from a CSV file',
+    column: 'in_progress',
+    kind: 'feature',
+    round: { model: 'claude-sonnet-5-5', effort: 'medium', paused: true },
   },
 ];
 
@@ -129,9 +138,17 @@ export const seedDemo = async (
         createdById: admin.id,
         movedById: admin.id,
         movedAt: now,
+        // C-399: a paused card keeps its worktree branch and its session.
+        ...(card.round?.paused
+          ? {
+              branch: `card/c${number}-import-products-from-a-csv-file`,
+              sessionId: '0000c399-0000-4000-8000-000000000006',
+            }
+          : {}),
       },
     });
     if (card.round) {
+      const paused = card.round.paused === true;
       const runId = `demo-run-${number}`;
       const startedAt = new Date(now.getTime() - 20 * 60_000);
       await prisma.run.upsert({
@@ -145,7 +162,8 @@ export const seedDemo = async (
           runtime: 'claude',
           model: card.round.model,
           args: { card: number, round: 1, trigger: 'run' },
-          status: 'succeeded',
+          status: paused ? 'abandoned' : 'succeeded',
+          ...(paused ? { outcome: 'Paused: a hard budget was reached' } : {}),
           triggeredByType: 'user',
           triggeredById: admin.id,
           startedAt,
@@ -165,14 +183,18 @@ export const seedDemo = async (
           cardBody: '',
           cardKind: card.kind,
           authorId: admin.id,
-          phase: 'finished',
-          finishedBy: 'worker',
-          summary: 'Added a Retry collect button to the card.',
+          ...(paused
+            ? { phase: 'cancelled', pausedFor: 'budget' }
+            : {
+                phase: 'finished',
+                finishedBy: 'worker',
+                summary: 'Added a Retry collect button to the card.',
+                endedAt: now,
+              }),
           model: card.round.model,
           effort: card.round.effort,
           startedAt,
           finishedAt: now,
-          endedAt: now,
         },
       });
     }
