@@ -323,7 +323,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'card_run',
-    description: `Start a Board Run of a card: a dedicated worktree and card session. The Board’s refusals come back unchanged — dependency_open, design_not_approved, stack_design_not_approved, budget_exceeded, max_running — obey them, never work around them. ${MANUAL_ONLY}`,
+    description: `Start a Board Run of a card: a dedicated worktree and card session. When every slot is taken, a To Do card is queued instead (queued: true, round null) — it starts by itself when a slot frees; card_stop takes it out of the queue. The Board’s refusals come back unchanged — dependency_open, design_not_approved, stack_design_not_approved, budget_exceeded, max_running — obey them, never work around them. ${MANUAL_ONLY}`,
     method: 'card.run',
     input: {
       card: cardNumber,
@@ -373,7 +373,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'card_stop',
-    description: `Stop a card’s running round. ${MANUAL_ONLY}`,
+    description: `Stop a card’s running round, or take a queued card out of the run queue. ${MANUAL_ONLY}`,
     method: 'card.stop',
     input: { card: cardNumber },
   },

@@ -5,6 +5,7 @@ import {
 } from '@nautelle/shared';
 import type {
   BaseSource,
+  DiscoveredRepository,
   DocsRule,
   DocsSourceKind,
   ProjectInspection,
@@ -44,6 +45,7 @@ export const DOCS_RULE_LABEL: Record<DocsRule, string> = {
 
 export const BASE_SOURCE_LABEL: Record<BaseSource, string> = {
   config: 'orchestrator.base in the config',
+  develop: 'develop is in use',
   origin_head: 'origin/HEAD',
   gh: 'GitHub default branch',
   default: 'fallback default',
@@ -162,6 +164,26 @@ export const suggestedPathOf = (error: unknown): string | undefined =>
   (error.code as string | undefined) === PROJECT_ERROR.notMainCheckout
     ? error.suggestedPath
     : undefined;
+
+/**
+ * C-396: the repository picker's search. Every word of the query must appear
+ * in the repository's `owner/name` or its path, ignoring case; GitHub
+ * repositories first, since only those can be connected.
+ */
+export function filterRepositories(
+  repositories: readonly DiscoveredRepository[],
+  query: string,
+): DiscoveredRepository[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = repositories.filter((repository) => {
+    const text = `${repository.repo ?? ''} ${repository.path}`.toLowerCase();
+    return words.every((word) => text.includes(word));
+  });
+  return [
+    ...matches.filter((repository) => repository.repo !== null),
+    ...matches.filter((repository) => repository.repo === null),
+  ];
+}
 
 /**
  * Why the preview cannot be connected, or null when it can. The API refuses

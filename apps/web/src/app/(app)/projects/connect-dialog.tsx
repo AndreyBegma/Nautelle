@@ -12,6 +12,8 @@ import type {
   ProjectRuleAcceptRequest,
   ProjectRuleScanRequest,
   ProjectRuleScanResult,
+  PushCheckRequest,
+  PushCheckView,
 } from '@nautelle/shared';
 import type { ProjectInspection } from '@nautelle/shared/protocol';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
@@ -37,6 +39,7 @@ import {
   suggestedPathOf,
 } from '../../../lib/projects/format';
 import { DocsDetails } from './docs-details';
+import { RepositoryPicker } from './repository-picker';
 import { RuleCandidateList } from './rule-candidates';
 
 const yesNo = (value: boolean) => (value ? 'found' : 'not found');
@@ -52,6 +55,43 @@ type RuleScan =
   | { status: 'scanning' }
   | { status: 'done'; result: ProjectRuleScanResult }
   | { status: 'failed'; message: string };
+
+/** C-396: the `git push --dry-run` that follows a successful Inspect. */
+type PushCheck =
+  | { status: 'idle' }
+  | { status: 'checking' }
+  | { status: 'done'; result: PushCheckView }
+  | { status: 'failed'; message: string };
+
+/**
+ * The push check's row in the preview. It never blocks connecting: the
+ * checklist shows it again, and the admin may fix access afterwards.
+ */
+function PushCheckResult({ check }: { check: PushCheck }) {
+  switch (check.status) {
+    case 'idle':
+      return null;
+    case 'checking':
+      return (
+        <dd role="status" className="text-ink-2">
+          Running git push --dry-run…
+        </dd>
+      );
+    case 'failed':
+      return <dd className="text-ink-2">Not checked: {check.message}</dd>;
+    case 'done':
+      return (
+        <dd>
+          <span className={check.result.ok ? 'text-ok' : 'text-danger'}>
+            {check.result.ok ? 'can push' : 'cannot push'}
+          </span>
+          <span className="block text-xs break-words text-ink-3">
+            {check.result.message}
+          </span>
+        </dd>
+      );
+  }
+}
 
 /**
  * The scan's part of the preview. Nothing is stored here: the checked
@@ -133,7 +173,13 @@ function NoOnlineRunner({ fleet }: { fleet: RunnersFact }) {
   );
 }
 
-function Preview({ inspection }: { inspection: ProjectInspection }) {
+function Preview({
+  inspection,
+  pushCheck,
+}: {
+  inspection: ProjectInspection;
+  pushCheck: PushCheck;
+}) {
   const { remote, codeSentinelConfig } = inspection;
   return (
     <div className="flex flex-col gap-4" data-testid="inspection-preview">
@@ -150,6 +196,12 @@ function Preview({ inspection }: { inspection: ProjectInspection }) {
             · {BASE_SOURCE_LABEL[inspection.baseSource]}
           </span>
         </dd>
+        {pushCheck.status === 'idle' ? null : (
+          <>
+            <dt className="text-ink-2">Push access</dt>
+            <PushCheckResult check={pushCheck} />
+          </>
+        )}
         <dt className="text-ink-2">Code Sentinel config</dt>
         <dd>
           {codeSentinelConfig.error ? (
@@ -214,13 +266,16 @@ export function ConnectDialog({
   const [busy, setBusy] = useState(false);
   const [scan, setScan] = useState<RuleScan>({ status: 'idle' });
   const [checked, setChecked] = useState<Set<number>>(new Set());
+  const [pushCheck, setPushCheck] = useState<PushCheck>({ status: 'idle' });
   /** Only the newest scan may land: a path edit makes an older one stale. */
   const scanSeq = useRef(0);
 
+  /** Forgets the rule scan and the push check of the previous inspection. */
   const resetScan = () => {
     scanSeq.current += 1;
     setScan({ status: 'idle' });
     setChecked(new Set());
+    setPushCheck({ status: 'idle' });
   };
 
   useEffect(() => {
@@ -230,6 +285,7 @@ export function ConnectDialog({
     scanSeq.current += 1;
     setScan({ status: 'idle' });
     setChecked(new Set());
+    setPushCheck({ status: 'idle' });
     setError(undefined);
     setSuggested(undefined);
     let current = true;
@@ -283,7 +339,10 @@ export function ConnectDialog({
         body,
       });
       setInspection(found);
-      if (found.isMainCheckout) void scanRules(found.root);
+      if (found.isMainCheckout) {
+        void scanRules(found.root);
+        void checkPush(found.root);
+      }
     } catch (err) {
       setError(describeProjectError(err));
       setSuggested(suggestedPathOf(err));
@@ -308,6 +367,24 @@ export function ConnectDialog({
     } catch (err) {
       if (seq !== scanSeq.current) return;
       setScan({ status: 'failed', message: describeProjectError(err) });
+    }
+  };
+
+  /** C-396: stored by the API, so the checklist counts it once connected. */
+  const checkPush = async (root: string) => {
+    const seq = scanSeq.current;
+    setPushCheck({ status: 'checking' });
+    try {
+      const body: PushCheckRequest = { runnerId, path: root };
+      const result = await api<PushCheckView>('/admin/projects/push-check', {
+        method: 'POST',
+        body,
+      });
+      if (seq !== scanSeq.current) return;
+      setPushCheck({ status: 'done', result });
+    } catch (err) {
+      if (seq !== scanSeq.current) return;
+      setPushCheck({ status: 'failed', message: describeProjectError(err) });
     }
   };
 
@@ -355,7 +432,7 @@ export function ConnectDialog({
   const reason = busy
     ? null
     : !canInspect
-      ? 'Pick a runner and enter a path, then Inspect.'
+      ? 'Pick a repository, or enter a path and Inspect.'
       : !inspection
         ? 'Inspect the path first; Connect uses what it finds.'
         : scan.status === 'scanning'
@@ -371,7 +448,7 @@ export function ConnectDialog({
     >
       <DialogContent
         title="Connect project"
-        description="Pick a runner and the absolute path of the repository's main checkout on it. Nothing is stored until you connect."
+        description="Pick a runner and one of the repositories it found, or type the path of a main checkout on it. Nothing is stored until you connect."
         footer={
           <>
             <Button variant="ghost" onClick={onClose}>
@@ -406,11 +483,7 @@ export function ConnectDialog({
       >
         <div className="flex flex-col gap-4">
           {fleet ? <NoOnlineRunner fleet={fleet} /> : null}
-          <form
-            id="inspect-project"
-            className="flex flex-col gap-3"
-            onSubmit={inspect}
-          >
+          <div className="flex flex-col gap-3">
             <Field label="Runner" htmlFor="connect-runner" required>
               <Select
                 id="connect-runner"
@@ -432,17 +505,33 @@ export function ConnectDialog({
                 ))}
               </Select>
             </Field>
+          </div>
+          {runnerId ? (
+            <RepositoryPicker
+              key={runnerId}
+              runnerId={runnerId}
+              disabled={busy}
+              onUse={(chosen) => {
+                setPath(chosen);
+                void inspect(undefined, chosen);
+              }}
+            />
+          ) : null}
+          <form
+            id="inspect-project"
+            className="flex flex-col gap-3"
+            onSubmit={inspect}
+          >
             <Field
               label="Path"
               htmlFor="connect-path"
               required
-              hint={`Absolute path to an existing clone on ${selected?.hostname ?? selected?.name ?? "the runner's machine"}, e.g. /home/you/dev/my-repo. GitHub repositories only.`}
+              hint={`Or the absolute path to an existing clone on ${selected?.hostname ?? selected?.name ?? "the runner's machine"}, e.g. /home/you/dev/my-repo. GitHub repositories only.`}
             >
               <Input
                 id="connect-path"
                 value={path}
                 placeholder="/home/you/dev/my-repo"
-                autoFocus
                 onChange={(e) => {
                   setPath(e.target.value);
                   setInspection(undefined);
@@ -498,7 +587,7 @@ export function ConnectDialog({
                   )}
                 </div>
               ) : null}
-              <Preview inspection={inspection} />
+              <Preview inspection={inspection} pushCheck={pushCheck} />
               <RuleCandidates
                 scan={scan}
                 selected={checked}

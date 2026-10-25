@@ -19,6 +19,7 @@ import { githubCommands } from './commands/github';
 import { handoffCommands } from './commands/handoff';
 import { plannerCommands } from './commands/planner';
 import { prefixCommands } from './commands/prefix';
+import { projectConnectCommands } from './commands/project-connect';
 import { projectRuleCommands } from './commands/project-rules';
 import { queueCommands } from './commands/queue';
 import { repoCommands } from './commands/repo';
@@ -190,6 +191,7 @@ export const commands = {
   ...handoffCommands,
   ...sessionMessageCommands,
   ...projectRuleCommands,
+  ...projectConnectCommands,
   ...repoCommands,
   ...prefixCommands,
 } as const satisfies Record<string, CommandDefinition>;
