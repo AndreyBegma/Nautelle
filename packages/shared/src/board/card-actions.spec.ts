@@ -61,6 +61,7 @@ describe('cardReviewActions (#578)', () => {
       slot: 'slot-2',
       stage: null,
       slotGone: false,
+      detached: false,
     };
     expect(
       cardReviewActions(

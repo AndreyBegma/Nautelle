@@ -451,7 +451,7 @@ describe('terminal cards (e2e)', () => {
         },
       });
 
-    it('maps the slot, refuses a drag fleet_slot, and accepts without merging', async () => {
+    it('maps the slot, lets a drag detach it (C-397), and accepts without merging', async () => {
       await fleetCard('in_progress');
       expect(await boardCard(1)).toMatchObject({
         source: 'fleet',
@@ -460,6 +460,7 @@ describe('terminal cards (e2e)', () => {
           slot: 'i12-pairing',
           stage: 'plan_ready',
           slotGone: false,
+          detached: false,
         },
         tracking: null,
       });
@@ -468,10 +469,10 @@ describe('terminal cards (e2e)', () => {
         `${w.path()}/board/cards/1/move`,
         { column: 'todo', index: 0 },
       );
-      expect(drag.status).toBe(409);
-      expect(drag.body).toMatchObject({
-        error: 'move_refused',
-        reason: 'fleet_slot',
+      expect(drag.status).toBe(200);
+      expect(await boardCard(1)).toMatchObject({
+        column: 'todo',
+        fleet: { detached: true },
       });
 
       await w.ctx.prisma.boardCard.update({

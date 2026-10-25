@@ -300,6 +300,7 @@ const fleetOf = (card: BoardCard): CardFleetView | null =>
             ? card.fleetStage
             : null,
         slotGone: card.fleetSlotGone,
+        detached: card.fleetDetached,
       }
     : null;
 
