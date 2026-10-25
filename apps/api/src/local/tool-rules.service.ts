@@ -35,7 +35,7 @@ export const ruleNote = (rule: ToolUseRule): string =>
   `Allowed by the ${rule.scope} rule ${toolRuleLabel(asToolRule(rule))}`;
 
 /**
- * Tool-use rules (C-401, ADR-0102): "allow similar in this session" and
+ * Tool-use rules (C-401, ADR-0103): "allow similar in this session" and
  * "always allow in this project". The API keeps them and answers a later
  * `tool_use` request from them, so every call still reaches the API — the
  * shared danger check runs on it and every use is audited. A session rule

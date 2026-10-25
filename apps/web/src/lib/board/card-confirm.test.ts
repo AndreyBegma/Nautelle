@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import type { BoardCardView } from '@nautelle/shared';
 import { closedGate, probeGate } from '../../components/confirm/gate-probe';
-import { type CardConfirmation, cardConfirmCopy } from './card-confirm';
+import {
+  type CardConfirmation,
+  cardConfirmCopy,
+  stopLeavesQueue,
+} from './card-confirm';
 
 const card = { number: 7, label: 'C-7' } as BoardCardView;
 
@@ -40,5 +44,25 @@ describe('the other card confirmations keep their words', () => {
     );
     expect(cardConfirmCopy({ kind: 'stop', card }).verb).toBe('Stop worker');
     expect(cardConfirmCopy({ kind: 'delete', card }).title).toBe('Delete C-7?');
+  });
+});
+
+describe('Stop on a card waiting in the run queue (C-398)', () => {
+  const queued = {
+    ...card,
+    round: null,
+    queue: { state: 'queued', place: 1, stack: null },
+  } as BoardCardView;
+
+  test('takes it out of the queue instead of stopping a worker', () => {
+    expect(stopLeavesQueue(queued)).toBe(true);
+    const copy = cardConfirmCopy({ kind: 'stop', card: queued });
+    expect(copy.title).toBe('Take C-7 out of the run queue?');
+    expect(copy.verb).toBe('Remove from queue');
+  });
+
+  test('a card with a running worker keeps Stop worker', () => {
+    const running = { ...card, round: { phase: 'running' } } as BoardCardView;
+    expect(stopLeavesQueue(running)).toBe(false);
   });
 });

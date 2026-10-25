@@ -1,4 +1,4 @@
-import type { BoardCardView } from '@nautelle/shared';
+import { type BoardCardView, cardQueueText } from '@nautelle/shared';
 import {
   quotaLimitText,
   quotaWaitText,
@@ -27,7 +27,8 @@ export interface FaceState {
 
 /**
  * The most urgent state of the card, or null when it has none to show:
- * failed, needs you, a question, running, waiting for a slot; in that order.
+ * failed, needs you, a question, running, in the run queue, waiting for a
+ * slot; in that order.
  */
 export function faceState(card: BoardCardView): FaceState | null {
   const round = card.round;
@@ -104,6 +105,17 @@ export function faceState(card: BoardCardView): FaceState | null {
   }
   if (badge?.review) {
     return { status: 'running', label: 'In review', title: badge.label };
+  }
+  if (card.queue) {
+    // C-398 (ADR-0102): in the run queue; it starts when a slot frees.
+    return {
+      status: 'idle',
+      label: cardQueueText(card.queue),
+      title:
+        card.queue.stack !== null
+          ? `Queued by Run stack S-${card.queue.stack}; Stop takes it out of the queue`
+          : 'Starts when a slot frees; Stop takes it out of the queue',
+    };
   }
   if (pill?.status === 'blocked' || pill?.status === 'idle') {
     return { status: pill.status, label: pill.label, title: pill.label };

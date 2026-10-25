@@ -19,6 +19,7 @@ import {
   type CardHooksCause,
   type CardPrTarget,
   type CardPullRequestRef,
+  type CardQueueView,
   type CardRecommendationView,
   type CardReviewState,
   type CardReviewStepView,
@@ -269,6 +270,8 @@ export interface CardFacts {
   messagesRefused?: ReadonlyMap<string, string>;
   /** C-371: each card's newest demo recording, by card id; absent is none. */
   demos?: ReadonlyMap<string, CardDemoBrief>;
+  /** C-398: each queued card's place in the run queue, by card id; absent is none. */
+  queue?: ReadonlyMap<string, CardQueueView>;
   now: Date;
 }
 
@@ -664,6 +667,7 @@ export const toCardView = (
   autoRunWhenReady: card.autoRunWhenReady,
   readiness: cardReadiness(card.column, facts.dependencies.get(card.id) ?? []),
   stack: facts.stacks?.get(card.id) ?? null,
+  queue: facts.queue?.get(card.id) ?? null,
   tracking: trackingOf(card, facts),
   taken: takenOf(card, facts),
   queuedForSessionId: card.queuedForSessionId,
