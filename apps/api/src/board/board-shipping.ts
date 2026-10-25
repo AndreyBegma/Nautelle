@@ -522,6 +522,15 @@ export class BoardShipping
       if (!roundSinceMove(card)) return;
       const conflict = result.mergeable === 'CONFLICTING';
       if (conflict || state === 'red') {
+        // #946: a fix round replaces a conflicting head, so it is not
+        // recorded — and says so.
+        if (conflict && state === 'green') {
+          this.demos.deferred(
+            card,
+            result.headSha,
+            'the PR conflicts with its base; a fix round replaces the head',
+          );
+        }
         await this.fix(project, card, result, conflict);
         return;
       }
@@ -530,12 +539,17 @@ export class BoardShipping
         if (!(await this.shipsWithoutChecks(project, card, result, noneSince)))
           return;
       }
+      // #946 (ADR-0099): a green head is recorded before its review steps,
+      // so a card the review holds or hands to a person still gets its demo.
+      await this.recordDemo(project, card, result.headSha);
       // #884 (ADR-0084 §3): the review steps pass the head before Finished;
       // a card that needs a person goes there, and is never merged.
       const gate = await this.review.gate(project, card, result.headSha);
       if (gate === 'wait') return;
       if (!(await this.toFinished(project, card))) return;
       if (gate === 'needs_person') return;
+      await this.autoMerge(project, card.number, result);
+      return;
     } else if (state === 'red') {
       // #894: the checks of a card that finished while they ran went red.
       await this.fix(project, card, result, false);
@@ -946,7 +960,7 @@ export class BoardShipping
     }
     // C-370 (ADR-0095): the merge waits for a demo in flight — at most
     // `DEMO_MERGE_WAIT_MS`; the demo's end, or the poll, asks again.
-    if (await this.demos.holdsMerge(card.id)) return;
+    if (await this.demos.holds(card.id)) return;
     try {
       await this.work.mergePr(project, card, headSha, true, BOARD_SYSTEM_ACTOR);
     } catch (error) {

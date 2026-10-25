@@ -34,6 +34,7 @@ import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BudgetExceededError } from '../budgets/budget-error';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
+import { CardDemosService } from '../demos/card-demos.service';
 import { RuntimeProfileResolver } from '../readiness';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure, boardError } from './board-error';
@@ -168,6 +169,7 @@ export class BoardReview {
     private readonly commands: BoardCommands,
     private readonly audit: AuditService,
     private readonly profiles: RuntimeProfileResolver,
+    private readonly demos: CardDemosService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -263,6 +265,15 @@ export class BoardReview {
           body: f.body,
         })),
     );
+    // #946 (ADR-0099 §2): the demo records the card's worktree, so a fix
+    // round, which edits it, waits for a demo in flight — at most
+    // `DEMO_MERGE_WAIT_MS`; the demo's end, or the poll, asks again.
+    if (await this.demos.holds(card.id)) {
+      this.logger.debug(
+        `review_fix round of ${cardLabel(card.number)} waits for its demo`,
+      );
+      return 'wait';
+    }
     try {
       await this.rounds.reviewFix(project.id, card.number, {
         headSha,

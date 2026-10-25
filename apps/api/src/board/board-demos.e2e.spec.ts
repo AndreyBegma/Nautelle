@@ -1,4 +1,7 @@
 import { CARD_DEMO_EVENTS, DEMO_MERGE_WAIT_MS } from '@nautelle/shared';
+import type { LocalCardReviewReportArgs } from '@nautelle/shared/protocol';
+import { Logger } from '@nestjs/common';
+import { BoardReview } from './board-review';
 import { BoardShipping } from './board-shipping';
 import {
   BoardWorld,
@@ -19,6 +22,11 @@ const UI_FILES = [
 const API_FILES = [
   { path: 'apps/api/src/auth/auth.service.ts', additions: 4, deletions: 0 },
 ];
+const BLOCKER: LocalCardReviewReportArgs['findings'][number] = {
+  severity: 'blocking',
+  title: 'Password logged',
+  body: 'The password is written to the log.',
+};
 
 /**
  * C-370 (ADR-0095): a feature card whose PR turned green and changes the
@@ -29,10 +37,12 @@ const API_FILES = [
 describe('demo videos of green cards (e2e, C-370)', () => {
   const w = new BoardWorld();
   let shipping: BoardShipping;
+  let review: BoardReview;
 
   beforeAll(async () => {
     await w.init();
     shipping = w.ctx.app.get(BoardShipping);
+    review = w.ctx.app.get(BoardReview);
   });
   afterAll(() => w.close());
   beforeEach(async () => {
@@ -63,11 +73,8 @@ describe('demo videos of green cards (e2e, C-370)', () => {
     expect(response.status).toBe(200);
   };
 
-  /** C-1 ran and its worker ended while its checks were pending. */
-  const ended = async () => {
-    checksAnswer(PENDING);
-    await w.createCard();
-    expect((await w.runCard(1)).status).toBe(200);
+  /** C-1's latest round ran a minute and its worker ended. */
+  const roundEnded = async () => {
     const { rounds } = await w.card(1);
     await w.ctx.prisma.boardCardRound.update({
       where: { id: rounds[rounds.length - 1].id },
@@ -82,6 +89,45 @@ describe('demo videos of green cards (e2e, C-370)', () => {
       phase: 'ended',
       exitCode: 0,
     });
+    await w.work.settled();
+  };
+
+  /** C-1 ran and its worker ended while its checks were pending. */
+  const ended = async () => {
+    checksAnswer(PENDING);
+    await w.createCard();
+    expect((await w.runCard(1)).status).toBe(200);
+    await roundEnded();
+  };
+
+  /** #884: the project reviews each green head with one step. */
+  const reviewOn = async () => {
+    const data = { reviewEnabled: true, publishReviewComments: false };
+    await w.ctx.prisma.boardSettings.upsert({
+      where: { projectId: w.a },
+      create: { projectId: w.a, ...data },
+      update: data,
+    });
+    await w.ctx.prisma.projectReviewStep.create({
+      data: {
+        projectId: w.a,
+        position: 0,
+        name: 'Security',
+        type: 'peer_review',
+        enabled: true,
+        instructions: 'Review it as Security.',
+      },
+    });
+  };
+
+  /** The running review step blocks the head, and the card is checked. */
+  const blocked = async () => {
+    const session = w.reviews().at(-1)?.session;
+    expect(typeof session).toBe('string');
+    await review.report({ id: w.a, runnerId: w.runnerId }, session as string, {
+      findings: [BLOCKER],
+    });
+    await shipping.check((await w.card(1)).id);
     await w.work.settled();
   };
 
@@ -292,6 +338,165 @@ describe('demo videos of green cards (e2e, C-370)', () => {
       await demoStatus(demo.id, 'skipped', 'No UI change');
       await polled();
       expect(w.sent('card.merge')).toEqual([]);
+    });
+  });
+
+  /**
+   * #946 (ADR-0099): a green head is recorded as soon as it reads green —
+   * before its review steps decide, whatever the merge settings — and every
+   * head that gets no demo says why in the API's log, once.
+   */
+  describe('every green head (#946)', () => {
+    let log: jest.SpyInstance;
+    beforeEach(() => {
+      log = jest.spyOn(Logger.prototype, 'log');
+    });
+    afterEach(() => log.mockRestore());
+
+    const skips = () =>
+      log.mock.calls
+        .map(([message]) => String(message))
+        .filter((message) => message.includes(': no demo of '));
+
+    it('records a card moving from In progress with auto-merge off', async () => {
+      await setAutoMerge(false);
+      await enableDemos();
+      await ended();
+      await polled();
+      expect(await w.card(1)).toMatchObject({ column: 'finished' });
+      expect(await demos()).toEqual([
+        expect.objectContaining({ trigger: 'auto', headSha: HEAD_SHA }),
+      ]);
+      expect(w.demosSent()).toHaveLength(1);
+      expect(w.sent('card.merge')).toEqual([]);
+    });
+
+    it('records the head before its review steps, while the card stays In progress', async () => {
+      await enableDemos();
+      await reviewOn();
+      await ended();
+      await polled();
+      expect(w.reviews()).toHaveLength(1);
+      expect((await w.card(1)).column).toBe('in_progress');
+      expect(await demos()).toEqual([
+        expect.objectContaining({ status: 'queued', headSha: HEAD_SHA }),
+      ]);
+    });
+
+    it('a head the review blocks keeps its demo, and the fixed head records its own', async () => {
+      await enableDemos();
+      await reviewOn();
+      await ended();
+      await polled();
+      await blocked();
+      const [demo] = await demos();
+      await demoStatus(demo.id, 'failed', 'readyUrl never answered');
+      await polled();
+      const card = await w.card(1);
+      expect(card.rounds.map((r) => r.trigger)).toEqual(['run', 'review_fix']);
+      expect(await demos()).toHaveLength(1);
+
+      checksAnswer({ headSha: NEXT_HEAD });
+      await roundEnded();
+      const [old, next] = await demos();
+      expect(old).toMatchObject({ headSha: HEAD_SHA, status: 'failed' });
+      expect(next).toMatchObject({ headSha: NEXT_HEAD, status: 'queued' });
+    });
+
+    it('a review_fix round waits for the demo in flight, which records the worktree it edits', async () => {
+      await enableDemos();
+      await reviewOn();
+      await ended();
+      await polled();
+      await blocked();
+      await polled();
+      const rounds = async () => (await w.card(1)).rounds.map((r) => r.trigger);
+      expect(await rounds()).toEqual(['run']);
+      expect(await demos()).toEqual([
+        expect.objectContaining({ headSha: HEAD_SHA, status: 'queued' }),
+      ]);
+      expect(await w.card(1)).toMatchObject({
+        column: 'in_progress',
+        needsPerson: false,
+      });
+
+      // The demo ends: the next check starts the fix round.
+      const [demo] = await demos();
+      await demoStatus(demo.id, 'skipped', 'No UI change');
+      await polled();
+      expect(await rounds()).toEqual(['run', 'review_fix']);
+    });
+
+    it(`a review_fix round waits for the demo at most ${DEMO_MERGE_WAIT_MS / 60_000} minutes`, async () => {
+      await enableDemos();
+      await reviewOn();
+      await ended();
+      await polled();
+      await blocked();
+      expect((await w.card(1)).rounds).toHaveLength(1);
+
+      await w.ctx.prisma.cardDemo.updateMany({
+        data: { createdAt: new Date(Date.now() - DEMO_MERGE_WAIT_MS - 1_000) },
+      });
+      await polled();
+      const card = await w.card(1);
+      expect(card.rounds.map((r) => r.trigger)).toEqual(['run', 'review_fix']);
+    });
+
+    it('a card the review hands to a person still has its demo', async () => {
+      await enableDemos();
+      await reviewOn();
+      w.reviewServed = false;
+      await ended();
+      await polled();
+      expect(await w.card(1)).toMatchObject({
+        column: 'finished',
+        needsPerson: true,
+        needsPersonReason: 'review_failed',
+      });
+      expect(await demos()).toHaveLength(1);
+      expect(w.sent('card.merge')).toEqual([]);
+    });
+
+    it('a conflicting green head is not recorded and says so; the head its fix pushes is', async () => {
+      await enableDemos();
+      await ended();
+      await polled({ mergeable: 'CONFLICTING' });
+      expect(await demos()).toEqual([]);
+      expect(skips()).toEqual([
+        'C-1: no demo of aaaaaaaa: the PR conflicts with its base; a fix round replaces the head',
+      ]);
+
+      checksAnswer({ headSha: NEXT_HEAD });
+      await roundEnded();
+      expect(await demos()).toEqual([
+        expect.objectContaining({ headSha: NEXT_HEAD, status: 'queued' }),
+      ]);
+    });
+
+    it.each([
+      ['a bug card', 'only a feature card records one'],
+      ['demo videos off', 'demo videos are off for the project'],
+      [
+        'a PR that changes no UI path',
+        'the PR changes no UI path (apps/web/**, **/*.tsx, **/*.css)',
+      ],
+    ])('%s: the reason is logged once per head', async (what, reason) => {
+      // Nothing merges, so the poller reads the Finished card again.
+      await setAutoMerge(false);
+      if (what !== 'demo videos off') await enableDemos();
+      if (what === 'a PR that changes no UI path') {
+        w.handlers['pr.inspect'] = () => ok(prInspection({ files: API_FILES }));
+      }
+      await finishedPending();
+      if (what === 'a bug card') {
+        await w.ctx.prisma.boardCard.updateMany({ data: { kind: 'bug' } });
+      }
+      await polled();
+      await w.ctx.prisma.boardCard.updateMany({ data: { ciState: 'pending' } });
+      await polled();
+      expect(await demos()).toEqual([]);
+      expect(skips()).toEqual([`C-1: no demo of aaaaaaaa: ${reason}`]);
     });
   });
 });
