@@ -121,6 +121,13 @@ export const APPROVALS_RECENT_LIMIT = 50;
 /** D4: how long a `pr.inspect` result is reused. */
 export const PR_INSPECTION_CACHE_MS = 60_000;
 
+/**
+ * C-389 (ADR-0100): how often the API re-reads every PR that has a current
+ * approval, so one that merged or closed while no event reached Nautelle
+ * leaves the queue by itself.
+ */
+export const APPROVAL_SWEEP_MS = 5 * 60_000;
+
 /** Live event on topic `project:<id>` (D10). Clients refetch on it. */
 export const APPROVALS_LIVE_EVENT = 'approvals';
 
