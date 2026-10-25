@@ -7,6 +7,9 @@ node_modules/
 dist/
 .next/
 out/
+# Written by `next dev` / `next build` / `next typegen`, each with its own
+# distDir (#949): tracked, every dev server dirtied it.
+next-env.d.ts
 # Astro's generated types (apps/docs)
 .astro/
 
