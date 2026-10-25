@@ -11,7 +11,7 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { useBreakpoint } from '@andrewbehma/glass-ui/use-breakpoint';
 import { useCommandPaletteShortcut } from '@andrewbehma/glass-ui/use-command-palette-shortcut';
-import { LIVE_CLOSE_CODES, type PublicUser } from '@nautelle/shared';
+import { cardLabel, LIVE_CLOSE_CODES, type PublicUser } from '@nautelle/shared';
 import { ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -23,6 +23,8 @@ import {
   useState,
 } from 'react';
 import { api, describeError } from '../../lib/api';
+import { runCard } from '../../lib/board/actions';
+import { describeBoardError } from '../../lib/board/format';
 import { useLiveStatus } from '../../lib/live/use-live';
 import { Assistant } from '../assistant/assistant';
 import { AskBoardDialog } from '../board-ai/ask-board-dialog';
@@ -51,7 +53,7 @@ import {
   visibleNav,
 } from './nav';
 import { NotificationBell } from './notification-bell';
-import { ASK_PREFIX, paletteGroups } from './palette';
+import { ASK_PREFIX, CARD_RUN_PREFIX, paletteGroups } from './palette';
 import { Rail } from './rail';
 import { useRailCollapsed, useRailToggleShortcut } from './rail-collapse';
 import {
@@ -65,7 +67,12 @@ import {
 import { useCrumbNames } from './use-crumb-names';
 import { useDocumentTitle } from './use-document-title';
 import { PageActionsProvider } from './use-page-actions';
-import { usePlans, useProjects, useRecent } from './use-shell-data';
+import {
+  useCardLookup,
+  usePlans,
+  useProjects,
+  useRecent,
+} from './use-shell-data';
 import { useSlotsNeedingAttention } from './use-slots-needing-attention';
 import { useWaitingApprovals } from './use-waiting-approvals';
 import { UserProvider } from './user-context';
@@ -127,6 +134,9 @@ export function AppShell({
   const projects = useProjects();
   const recent = useRecent(paletteOpen, projectId);
   const plans = usePlans(paletteOpen, projectId);
+  // C-393: the palette's text, kept so the card lookup can follow it.
+  const [typed, setTyped] = useState('');
+  const lookup = useCardLookup(paletteOpen, typed);
   const names = useCrumbNames(pathname, projects);
 
   useCommandPaletteShortcut(() => setPaletteOpen(true));
@@ -201,8 +211,10 @@ export function AppShell({
         'system',
     );
 
-  const search = (query: string) =>
-    paletteGroups({
+  const search = (query: string) => {
+    // The palette calls this as the text changes; the lookup follows it.
+    setTyped(query);
+    return paletteGroups({
       query,
       role: user.role,
       sections,
@@ -211,12 +223,25 @@ export function AppShell({
       recent,
       plans,
       themeLabel: THEME_LABEL[theme],
+      cards: lookup.query === query.trim() ? lookup.cards : [],
     });
+  };
+
+  const runCardFromPalette = (projectId: string, number: number) =>
+    runCard(projectId, number).then(
+      () => toast.success(`Started a worker on ${cardLabel(number)}.`),
+      (error) => toast.error(describeBoardError(error)),
+    );
 
   const onSelect = (item: { id: string }) => {
     setPaletteOpen(false);
     if (item.id.startsWith('go:')) router.push(item.id.slice(3));
-    else if (item.id.startsWith(ASK_PREFIX)) {
+    else if (item.id.startsWith(CARD_RUN_PREFIX)) {
+      const [project, number] = item.id
+        .slice(CARD_RUN_PREFIX.length)
+        .split(':');
+      if (project && number) void runCardFromPalette(project, Number(number));
+    } else if (item.id.startsWith(ASK_PREFIX)) {
       setAsking(item.id.slice(ASK_PREFIX.length));
     } else if (item.id === 'action:theme') cycleTheme();
     else if (item.id === 'action:logout') void logout();
@@ -409,10 +434,13 @@ export function AppShell({
 
             <CommandPalette
               open={paletteOpen}
-              onOpenChange={setPaletteOpen}
+              onOpenChange={(open) => {
+                setPaletteOpen(open);
+                if (!open) setTyped('');
+              }}
               search={search}
               onSelect={onSelect}
-              placeholder="Go to a page, a project or a run — or ask the Board"
+              placeholder="Create, find a card (C-12, #41), go to a page — or ask the Board"
             />
             <AskBoardDialog
               question={asking}
