@@ -35,7 +35,12 @@ import {
   uploadDemoVideo,
 } from './api';
 import { demoflowCommand } from './pin';
-import { createDemoflowSpawn, type DemoflowSpawn, freePort } from './process';
+import {
+  createDemoflowSpawn,
+  type DemoflowExit,
+  type DemoflowSpawn,
+  freePort,
+} from './process';
 import { boundedReason, type DemoflowProvisioner } from './provision';
 import {
   failureReason,
@@ -43,6 +48,7 @@ import {
   parseSummary,
   renderedVideo,
 } from './report';
+import { changedTrackedFiles, restoreTrackedFiles } from './tracked';
 
 /** ADR-0090: a recording is killed, app and all, after this long. */
 export const DEMO_RUN_TIMEOUT_MS = 10 * 60_000;
@@ -355,6 +361,7 @@ export class DemoRecorder {
 
     mkdirSync(this.deps.workDir, { recursive: true, mode: 0o700 });
     const out = mkdtempSync(join(this.deps.workDir, 'demo-'));
+    const unchanged = await changedTrackedFiles(this.deps.exec, top);
     try {
       const run = demoflowCommand(
         'run',
@@ -367,15 +374,21 @@ export class DemoRecorder {
         ...plan.args,
       );
       const timeoutMs = this.deps.timeoutMs ?? DEMO_RUN_TIMEOUT_MS;
-      const exit = await this.spawn(run.binary, run.args, {
-        cwd: top,
-        env: {
-          ...definedOnly(this.deps.env),
-          PORT: String(plan.port),
-          ...secrets,
-        },
-        timeoutMs,
-      });
+      let exit: DemoflowExit;
+      try {
+        exit = await this.spawn(run.binary, run.args, {
+          cwd: top,
+          env: {
+            ...definedOnly(this.deps.env),
+            PORT: String(plan.port),
+            ...secrets,
+          },
+          timeoutMs,
+        });
+      } finally {
+        // Before the upload: a ready demo lets the card collect.
+        if (unchanged !== null) await this.restore(job, top, unchanged);
+      }
       if (exit.timedOut) {
         return failed(
           `the recording passed the ${Math.round(timeoutMs / 60_000)}-minute limit and was stopped`,
@@ -398,6 +411,29 @@ export class DemoRecorder {
       return await this.upload(job, video, realpathSync(out));
     } finally {
       rmSync(out, { recursive: true, force: true });
+    }
+  }
+
+  /** #949: the files the recording's app rewrote go back to `HEAD`. */
+  private async restore(
+    job: Job,
+    top: string,
+    before: ReadonlySet<string>,
+  ): Promise<void> {
+    const fields = { card: job.args.card, demoId: job.args.demoId };
+    try {
+      const restored = await restoreTrackedFiles(this.deps.exec, top, before);
+      if (restored.length > 0) {
+        this.deps.log.info('demo: restored tracked files the app rewrote', {
+          ...fields,
+          files: restored.join(', '),
+        });
+      }
+    } catch (error) {
+      this.deps.log.warn('demo: tracked files stay changed', {
+        ...fields,
+        reason: errorMessage(error),
+      });
     }
   }
 
