@@ -29,6 +29,16 @@ describe('CardSignals (C-392)', () => {
     expect(html).toContain('Slot gone');
   });
 
+  test('keeps the usage-limit wait line', () => {
+    expect(
+      render({
+        round: round('running', {
+          quotaWait: { limit: 'weekly', resetsAt: null },
+        }),
+      }),
+    ).toContain('Limit reached');
+  });
+
   test('keeps the terminal and taken badges', () => {
     const html = render({
       source: 'terminal',

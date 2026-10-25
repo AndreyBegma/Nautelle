@@ -14,6 +14,7 @@ import { shippingBadge } from '../../lib/board/shipping';
 import { SESSION_ENDED_TEXT, takenState } from '../../lib/board/taken';
 import { StewardChip } from '../steward/steward-chip';
 import { RestartChip } from './handoff/restart-chip';
+import { QuotaWaitLine } from './quota-wait-line';
 
 /** #282 D1: a card tracked from a terminal session: the badge and the state. */
 function TerminalBadges({ card }: { card: BoardCardView }) {
@@ -89,6 +90,9 @@ export function CardSignals({ card }: { card: BoardCardView }) {
             <Badge tone="warn" size="md" label={notPushed.label} />
           </span>
         </Tooltip>
+      ) : null}
+      {card.round?.quotaWait ? (
+        <QuotaWaitLine wait={card.round.quotaWait} />
       ) : null}
       {card.steward ? <StewardChip chip={card.steward} /> : null}
       <RestartChip card={card} />

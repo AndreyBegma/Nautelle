@@ -1,5 +1,9 @@
 import type { BoardCardView } from '@nautelle/shared';
 import {
+  quotaLimitText,
+  quotaWaitText,
+} from '../../components/board/quota-wait-line';
+import {
   autoRunFailureText,
   blockingDialogText,
   collectFailedBadge,
@@ -86,11 +90,13 @@ export function faceState(card: BoardCardView): FaceState | null {
     };
   }
   if (round?.quotaWait) {
-    return {
-      status: 'idle',
-      label: 'Waiting for a slot',
-      title: 'Waiting for the provider quota to free a slot',
-    };
+    const wait = round.quotaWait;
+    const title = `${quotaWaitText(wait)}. The session hit ${quotaLimitText(wait.limit)}.`;
+    // No reset time: the runner will not resume the session, a person has to.
+    if (wait.resetsAt === null) {
+      return { status: 'blocked', label: 'Needs you', title };
+    }
+    return { status: 'idle', label: 'Usage limit', title };
   }
   const pill = roundPill(round);
   if (pill?.status === 'running') {

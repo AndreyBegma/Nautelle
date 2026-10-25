@@ -61,7 +61,7 @@ describe('faceState (C-392)', () => {
     });
   });
 
-  test('a usage-limit wait is waiting for a slot', () => {
+  test('a usage-limit wait with a reset time is its own idle state', () => {
     expect(
       state({
         round: round('running', {
@@ -71,7 +71,25 @@ describe('faceState (C-392)', () => {
           },
         }),
       }),
-    ).toMatchObject({ label: 'Waiting for a slot' });
+    ).toMatchObject({
+      status: 'idle',
+      label: 'Usage limit',
+      title: expect.stringContaining('Waiting for the limit until'),
+    });
+  });
+
+  test('a usage-limit wait without a reset time needs you', () => {
+    expect(
+      state({
+        round: round('running', {
+          quotaWait: { limit: 'weekly', resetsAt: null },
+        }),
+      }),
+    ).toMatchObject({
+      status: 'blocked',
+      label: 'Needs you',
+      title: expect.stringContaining('Limit reached'),
+    });
   });
 
   test('failed beats needs you beats a question beats running', () => {
