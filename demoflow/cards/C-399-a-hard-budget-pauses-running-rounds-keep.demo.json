@@ -38,7 +38,10 @@
       "zoom": true
     },
     { "action": "screenshot", "name": "board-paused-budget" },
-    { "action": "marker", "title": "The card keeps its round and offers Resume" },
+    {
+      "action": "marker",
+      "title": "The card keeps its round and offers Resume"
+    },
     { "action": "navigate", "path": "/projects/demo-project/board/cards/6" },
     {
       "action": "waitFor",
