@@ -34,16 +34,29 @@ export const maintenanceUrl = (url: string): string => {
 export const DEMO_RUNNER_ID = 'demo-runner';
 export const DEMO_PROJECT_ID = 'demo-project';
 
+/**
+ * C-398 (ADR-0102): the demo Board runs one card worker at a time, so the
+ * running card fills it and the queued cards wait for a slot.
+ */
+export const DEMO_MAX_RUNNING = 1;
+
 /** The cards of the demo Board: a few in each working column. */
 export const DEMO_CARDS: ReadonlyArray<{
   title: string;
   column: BoardColumn;
   kind: 'feature' | 'bug';
   /**
-   * C-359: a round 1 launched with this model and effort. It finished, or
-   * (C-399) a hard budget paused it.
+   * C-359: round 1 launched with this model and effort. It finished, or
+   * (C-399) a hard budget paused it, or (C-398) a worker is still at it.
    */
-  round?: { model: string; effort: CardEffort; paused?: true };
+  round?: {
+    model: string;
+    effort: CardEffort;
+    paused?: true;
+    running?: true;
+  };
+  /** C-398: Run was pressed on a full Board; the card waits for a slot. */
+  queued?: true;
   /**
    * C-389: a PR recorded as merged into the project base while the card sat
    * in Finished — the API's sweep moves it to Completed by itself.
@@ -52,8 +65,18 @@ export const DEMO_CARDS: ReadonlyArray<{
   /** C-394: a design drawn and waiting for approval, with one frame. */
   design?: true;
 }> = [
-  { title: 'Export the activity feed as CSV', column: 'todo', kind: 'feature' },
-  { title: 'Dark mode for the settings page', column: 'todo', kind: 'feature' },
+  {
+    title: 'Export the activity feed as CSV',
+    column: 'todo',
+    kind: 'feature',
+    queued: true,
+  },
+  {
+    title: 'Dark mode for the settings page',
+    column: 'todo',
+    kind: 'feature',
+    queued: true,
+  },
   {
     title: 'Board search misses cards with emoji',
     column: 'todo',
@@ -63,6 +86,7 @@ export const DEMO_CARDS: ReadonlyArray<{
     title: 'Show the runner version in the header',
     column: 'in_progress',
     kind: 'feature',
+    round: { model: 'claude-sonnet-5-5', effort: 'medium', running: true },
   },
   {
     title: 'Retry a failed collect from the card',
@@ -131,9 +155,11 @@ export const seedDemo = async (
     | 'user'
     | 'runner'
     | 'project'
+    | 'boardSettings'
     | 'boardCard'
     | 'run'
     | 'boardCardRound'
+    | 'boardRunQueueCard'
     | 'taskDesign'
     | 'planTurn'
     | 'designRevision'
@@ -174,6 +200,11 @@ export const seedDemo = async (
       createdById: admin.id,
       members: { create: { userId: admin.id, addedById: admin.id } },
     },
+  });
+  await prisma.boardSettings.upsert({
+    where: { projectId: DEMO_PROJECT_ID },
+    update: {},
+    create: { projectId: DEMO_PROJECT_ID, maxRunning: DEMO_MAX_RUNNING },
   });
 
   for (const [index, card] of DEMO_CARDS.entries()) {
@@ -289,7 +320,20 @@ export const seedDemo = async (
         },
       });
     }
+    if (card.queued) {
+      await prisma.boardRunQueueCard.upsert({
+        where: { cardId: created.id },
+        update: {},
+        create: {
+          cardId: created.id,
+          status: 'queued',
+          queuedById: admin.id,
+          queuedByRole: 'admin',
+        },
+      });
+    }
     if (card.round) {
+      const running = card.round.running === true;
       const paused = card.round.paused === true;
       const runId = `demo-run-${number}`;
       const startedAt = new Date(now.getTime() - 20 * 60_000);
@@ -304,12 +348,12 @@ export const seedDemo = async (
           runtime: 'claude',
           model: card.round.model,
           args: { card: number, round: 1, trigger: 'run' },
-          status: paused ? 'abandoned' : 'succeeded',
+          status: running ? 'running' : paused ? 'abandoned' : 'succeeded',
           ...(paused ? { outcome: 'Paused: a hard budget was reached' } : {}),
           triggeredByType: 'user',
           triggeredById: admin.id,
           startedAt,
-          endedAt: now,
+          endedAt: running ? null : now,
           updatedAt: now,
         },
       });
@@ -325,18 +369,20 @@ export const seedDemo = async (
           cardBody: '',
           cardKind: card.kind,
           authorId: admin.id,
-          ...(paused
-            ? { phase: 'cancelled', pausedFor: 'budget' }
-            : {
-                phase: 'finished',
-                finishedBy: 'worker',
-                summary: 'Added a Retry collect button to the card.',
-                endedAt: now,
-              }),
+          ...(running
+            ? { phase: 'running' }
+            : paused
+              ? { phase: 'cancelled', pausedFor: 'budget' }
+              : {
+                  phase: 'finished',
+                  finishedBy: 'worker',
+                  summary: 'Added a Retry collect button to the card.',
+                  finishedAt: now,
+                  endedAt: now,
+                }),
           model: card.round.model,
           effort: card.round.effort,
           startedAt,
-          finishedAt: now,
         },
       });
     }

@@ -41,8 +41,8 @@ import { BoardDependencies } from './board-dependencies.service';
 import { boardError, cardNotFound } from './board-error';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardRoundsService } from './board-rounds.service';
+import { BoardRunQueue } from './board-run-queue';
 import { BoardSessionMessages } from './board-session-message.service';
-import { BoardStackRuns } from './board-stack-runs';
 import { BoardStacks } from './board-stacks';
 import type { BoardActor } from './board-work';
 import {
@@ -99,7 +99,7 @@ export class BoardController {
     private readonly bulk: BoardBulk,
     private readonly messages: BoardSessionMessages,
     private readonly stacks: BoardStacks,
-    private readonly stackRuns: BoardStackRuns,
+    private readonly stackRuns: BoardRunQueue,
   ) {}
 
   // ─── Stacks (#480, ADR-0044) ───────────────────────────────────────────────

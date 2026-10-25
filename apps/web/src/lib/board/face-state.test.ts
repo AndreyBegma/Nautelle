@@ -92,6 +92,29 @@ describe('faceState (C-392)', () => {
     });
   });
 
+  test('a card in the run queue waits for a slot, with its place (C-398)', () => {
+    expect(
+      faceState(
+        card(7, 'todo', { queue: { state: 'queued', place: 2, stack: null } }),
+      ),
+    ).toMatchObject({
+      status: 'idle',
+      label: 'Waiting for a slot · #2',
+      title: expect.stringContaining('Stop takes it out of the queue'),
+    });
+  });
+
+  test('a queued card whose dependency is open says so (C-398)', () => {
+    expect(
+      faceState(
+        card(7, 'todo', { queue: { state: 'waiting', place: null, stack: 4 } }),
+      ),
+    ).toMatchObject({
+      label: 'Queued · waiting for a dependency',
+      title: expect.stringContaining('Run stack S-4'),
+    });
+  });
+
   test('a round a hard budget paused reads Paused: budget (C-399)', () => {
     expect(
       state({ round: round('cancelled', { pausedFor: 'budget' }) }),
