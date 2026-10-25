@@ -57,7 +57,7 @@ export interface DeliveryClaim {
   digests: ClaimedDigest[];
 }
 
-const CONTENT_SELECT = {
+export const CONTENT_SELECT = {
   kind: true,
   title: true,
   body: true,
@@ -72,7 +72,7 @@ type ContentRow = Prisma.NotificationGetPayload<{
   select: typeof CONTENT_SELECT;
 }>;
 
-const toContent = (row: ContentRow): DeliveryContent => ({
+export const toContent = (row: ContentRow): DeliveryContent => ({
   kind: row.kind as NotificationKind,
   title: row.title,
   body: row.body,

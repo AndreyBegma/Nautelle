@@ -229,9 +229,26 @@ export class NotificationMatcher
         : everyone;
     return this.writer.write(
       tx,
-      this.input(draft, event, projectId),
+      {
+        ...this.input(draft, event, projectId),
+        ownerId: await this.cardOwner(tx, projectId, draft.card),
+      },
       recipients,
     );
+  }
+
+  /** C-404: who created the card a board kind is about; null: none or gone. */
+  private async cardOwner(
+    tx: Tx,
+    projectId: string,
+    card: number | undefined,
+  ): Promise<string | null> {
+    if (card === undefined) return null;
+    const found = await tx.boardCard.findUnique({
+      where: { projectId_number: { projectId, number: card } },
+      select: { createdById: true },
+    });
+    return found?.createdById ?? null;
   }
 
   private input(

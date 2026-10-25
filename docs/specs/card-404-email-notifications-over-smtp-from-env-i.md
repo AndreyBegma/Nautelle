@@ -13,8 +13,10 @@ Self-service password reset (C-402) needs email.
 
 ## What
 1. **Configuration.**
-   - `SMTP_URL` and `SMTP_FROM` in env, documented in `apps/api/.env.example`, `deploy/compose/.env.example`, the Helm
-     values and the docs site's configuration page.
+   - `SMTP_URL` and `SMTP_FROM` in env, documented in `apps/api/.env.example`, the Compose file, the Helm
+     values and the docs site's configuration page. Compose takes them from `api.env` beside
+     `docker-compose.yml`, as it does every other optional API variable: `deploy/compose/.env.example`
+     holds only the install settings.
    - Admin gets a **Send test email** button.
 2. **Per-user choice.** In Account › Notifications (`apps/web/src/app/account/notifications/`), email per event kind,
    either immediately or as a daily digest.
@@ -29,7 +31,7 @@ Self-service password reset (C-402) needs email.
 - `apps/api/src/notifications/notification-writer.ts`, `packages/shared/src/notifications/kinds.ts`
 - A new mail sender module in `apps/api/src/`
 - `apps/web/src/app/account/notifications/`
-- `apps/api/.env.example`, `deploy/compose/.env.example`, `deploy/helm/nautelle/values.yaml`, the docs site
+- `apps/api/.env.example`, `deploy/compose/docker-compose.yml`, `deploy/helm/nautelle/values.yaml`, the docs site
 
 ## ADRs to read
 - ADR-0046 (Telegram command router), ADR-0096 (demo to Telegram as a notification).

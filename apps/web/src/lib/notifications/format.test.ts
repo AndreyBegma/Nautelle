@@ -4,6 +4,9 @@ import {
   applyNew,
   applyRead,
   bellLabel,
+  emailChoice,
+  emailOptions,
+  emailRuleUpdate,
   fromDateInput,
   isFutureDay,
   KIND_LABEL,
@@ -206,6 +209,9 @@ describe('ruleRows', () => {
     telegram: true,
     channels: ['inApp', 'telegram'],
     isDefault: true,
+    email: null,
+    emailable: true,
+    ownerEmail: null,
     ...patch,
   });
 
@@ -236,6 +242,9 @@ describe('ruleSections', () => {
     telegram: false,
     channels: ['inApp'],
     isDefault: true,
+    email: null,
+    emailable: true,
+    ownerEmail: null,
   });
 
   test('groups rules by area in a fixed order and drops empty areas', () => {
@@ -274,6 +283,44 @@ describe('ruleUpdate', () => {
         false,
       ),
     ).toEqual({ rules: [{ kind: 'quota.hit', inApp: true, telegram: false }] });
+  });
+});
+
+describe('email choices (C-404)', () => {
+  const row = { kind: 'card.waiting' as const, inApp: true, telegram: false };
+
+  test('a kind with an owner default offers it first and shows it while unset', () => {
+    const owned = { email: null, ownerEmail: 'immediate' as const };
+    expect(emailChoice(owned)).toBe('default');
+    expect(emailOptions(owned).map((o) => o.value)).toEqual([
+      'default',
+      'off',
+      'immediate',
+      'digest',
+    ]);
+    expect(emailOptions(owned)[0]?.label).toBe('My cards: Immediately');
+    expect(emailChoice({ email: 'digest', ownerEmail: 'immediate' })).toBe(
+      'digest',
+    );
+  });
+
+  test('a kind without one is off until a mode is picked', () => {
+    const plain = { email: null, ownerEmail: null };
+    expect(emailChoice(plain)).toBe('off');
+    expect(emailOptions(plain).map((o) => o.label)).toEqual([
+      'Off',
+      'Immediately',
+      'Daily digest',
+    ]);
+  });
+
+  test('the default goes back to null, a mode is sent as is', () => {
+    expect(emailRuleUpdate(row, 'default').rules[0]?.email).toBeNull();
+    expect(emailRuleUpdate(row, 'digest')).toEqual({
+      rules: [
+        { kind: 'card.waiting', inApp: true, telegram: false, email: 'digest' },
+      ],
+    });
   });
 });
 

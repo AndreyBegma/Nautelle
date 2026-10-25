@@ -1,4 +1,5 @@
 import type {
+  EmailIntegrationStatus,
   GitHubAppView,
   InboundTriggerView,
   SlackWebhookStatus,
@@ -122,6 +123,30 @@ export function slackStatus(status: SlackWebhookStatus): IntegrationStatus {
     tone: 'ok',
     label: 'Connected',
     detail: `${plural(status.events.length, 'event')} posted for every project without its own webhook.`,
+  };
+}
+
+/** C-404: the SMTP server from `SMTP_URL`, which only the server's env sets. */
+export function emailStatus(status: EmailIntegrationStatus): IntegrationStatus {
+  if (!status.configured) {
+    return {
+      tone: 'neutral',
+      label: 'Not set up',
+      detail:
+        'Set SMTP_URL on the server so people can get notifications by email.',
+    };
+  }
+  if (status.lastError) {
+    return {
+      tone: 'warn',
+      label: 'Sending fails',
+      detail: `${status.server} refused an email. Open it to see why.`,
+    };
+  }
+  return {
+    tone: 'ok',
+    label: 'Sending',
+    detail: `${status.server} · ${plural(status.pending, 'email')} waiting.`,
   };
 }
 

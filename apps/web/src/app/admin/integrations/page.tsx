@@ -5,6 +5,7 @@ import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import type {
+  EmailIntegrationStatus,
   GitHubAppView,
   InboundTriggerView,
   SlackWebhookStatus,
@@ -15,6 +16,7 @@ import {
   GitBranch,
   Hash,
   type LucideIcon,
+  Mail,
   Send,
   Webhook,
   Zap,
@@ -23,6 +25,7 @@ import Link from 'next/link';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { api } from '../../../lib/api';
 import {
+  emailStatus,
   gitHubAppStatus,
   type IntegrationStatus,
   slackStatus,
@@ -101,6 +104,10 @@ export default function IntegrationsPage() {
     () => api<SlackWebhookStatus>('/admin/integrations/slack'),
     [],
   );
+  const email = useSection(
+    () => api<EmailIntegrationStatus>('/admin/integrations/email'),
+    [],
+  );
   const webhooks = useSection(() => api<WebhookView[]>('/admin/webhooks'), []);
   const triggers = useSection(
     () => api<InboundTriggerView[]>('/admin/triggers'),
@@ -134,6 +141,13 @@ export default function IntegrationsPage() {
           purpose="Finished cards, demos and failures posted to a channel through an incoming webhook."
           href="/admin/integrations/slack"
           status={statusOf(slack, slackStatus)}
+        />
+        <IntegrationCard
+          icon={Mail}
+          title="Email"
+          purpose="Notifications by email, at once or as a daily digest, over the SMTP server in SMTP_URL."
+          href="/admin/integrations/email"
+          status={statusOf(email, emailStatus)}
         />
         <IntegrationCard
           icon={Webhook}

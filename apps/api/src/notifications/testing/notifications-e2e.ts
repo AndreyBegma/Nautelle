@@ -9,6 +9,7 @@ import { AppModule } from '../../app.module';
 import { SecretCipher } from '../../common/crypto';
 import { configureApp } from '../../configure-app';
 import { PrismaService } from '../../database/prisma.service';
+import { MAIL_OPTIONS, type MailOptions } from '../../mail/mail-options';
 import { createUser, type E2eContext } from '../../test/e2e-app';
 import {
   defaultNotificationOptions,
@@ -28,10 +29,12 @@ export interface NotificationsE2e extends E2eContext {
 /**
  * The app with the notification timers off (tests call `tick()`), a short hole
  * wait, and `cipher` as the `SecretCipher` (default: `TEST_ENCRYPTION_KEY`).
+ * Email is off unless `mail` sets an `smtpUrl` (C-404).
  */
 export const createNotificationsApp = async (
   cipher = SecretCipher.fromKeyText(TEST_ENCRYPTION_KEY),
   overrides: Partial<NotificationOptions> = {},
+  mail: Partial<MailOptions> = {},
 ): Promise<NotificationsE2e> => {
   const options: NotificationOptions = {
     ...defaultNotificationOptions,
@@ -39,9 +42,19 @@ export const createNotificationsApp = async (
     holeWaitMs: 1_000,
     ...overrides,
   };
+  const mailOptions: MailOptions = {
+    smtpUrl: null,
+    from: 'Nautelle <nautelle@localhost>',
+    appUrl: null,
+    autoStart: false,
+    intervalMs: 10_000,
+    ...mail,
+  };
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(NOTIFICATION_OPTIONS)
     .useValue(options)
+    .overrideProvider(MAIL_OPTIONS)
+    .useValue(mailOptions)
     .overrideProvider(SecretCipher)
     .useValue(cipher)
     .compile();
