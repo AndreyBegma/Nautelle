@@ -10,6 +10,8 @@ import {
   ROLES,
   type Role,
   SESSION_CONTENT_RETENTION_DAYS,
+  TOOL_USE_TIMEOUT_MAX_MINUTES,
+  TOOL_USE_TIMEOUT_MIN_MINUTES,
   type UpdateProjectMemberRequest,
   type UpdateProjectRequest,
 } from '@nautelle/shared';
@@ -140,6 +142,13 @@ export class UpdateProjectDto implements UpdateProjectRequest {
   @Min(SESSION_CONTENT_RETENTION_DAYS.min)
   @Max(SESSION_CONTENT_RETENTION_DAYS.max)
   sessionContentRetentionDays?: number;
+
+  /** C-401: minutes a tool-use request waits; null: the requester's own. */
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsInt()
+  @Min(TOOL_USE_TIMEOUT_MIN_MINUTES)
+  @Max(TOOL_USE_TIMEOUT_MAX_MINUTES)
+  toolUseTimeoutMinutes?: number | null;
 }
 
 /** Which fields a kind takes is checked by the service (`invalid_docs_source`). */

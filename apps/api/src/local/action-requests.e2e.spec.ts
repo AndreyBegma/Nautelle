@@ -713,4 +713,310 @@ describe('action requests (e2e)', () => {
       expect(await audits('issue.queue')).toEqual([]);
     });
   });
+
+  /**
+   * C-401: "allow similar in this session" and "always allow in this
+   * project", the calls that always ask, and the tool-use timeout.
+   */
+  describe('tool-use rules and the timeout (C-401)', () => {
+    const NPM_TEST = { toolName: 'Bash', ruleContent: 'npm test:*' };
+
+    const sessionOf = async (externalId: string) =>
+      (
+        await ctx.prisma.agentSession.create({
+          data: {
+            runnerId,
+            runtime: 'claude',
+            externalId,
+            projectId,
+            cwd: ROOT,
+            origin: 'manual',
+            ownerId: requesterId,
+            startedAt: new Date(),
+            lastEventAt: new Date(),
+          },
+        })
+      ).id;
+
+    const call = (
+      sessionId: string | null,
+      input: Record<string, unknown>,
+      extra: Record<string, unknown> = {},
+      toolName = 'Bash',
+    ) =>
+      requests.create(
+        {
+          projectId,
+          runnerId,
+          sessionId,
+          requestedById: requesterId,
+          requesterRole: 'operator',
+          kind: 'tool_use',
+          args: { toolName, input: JSON.stringify(input), ...extra },
+          summary: `Claude wants to use ${toolName}`,
+        },
+        { ctx: RUNNER_ACTOR(runnerId), meta: { onBehalfOf: requesterId } },
+      );
+
+    const rowOf = (id: string) =>
+      ctx.prisma.actionRequest.findUniqueOrThrow({ where: { id } });
+
+    const notified = (id: string) =>
+      ctx.prisma.notification.count({
+        where: { link: { contains: id } },
+      });
+
+    let sessionA: string;
+    let sessionB: string;
+    beforeEach(async () => {
+      sessionA = await sessionOf('sess-a');
+      sessionB = await sessionOf('sess-b');
+    });
+
+    it('waits five minutes by default, else the requester’s setting, else the project’s', async () => {
+      const minutesOf = async () => {
+        const request = await call(sessionA, { command: 'ls' });
+        const row = await rowOf(request.id);
+        return (row.expiresAt.getTime() - row.createdAt.getTime()) / 60_000;
+      };
+      expect(await minutesOf()).toBe(5);
+      await ctx.prisma.userSettings.create({
+        data: { userId: requesterId, toolUseTimeoutMinutes: 240 },
+      });
+      expect(await minutesOf()).toBe(240);
+      const patch = await admin.send('patch', `/projects/${projectId}`, {
+        toolUseTimeoutMinutes: 720,
+      });
+      expect(patch.status).toBe(200);
+      expect(patch.body.toolUseTimeoutMinutes).toBe(720);
+      expect(await minutesOf()).toBe(720);
+      for (const toolUseTimeoutMinutes of [0, 721, 1.5]) {
+        const refused = await admin.send('patch', `/projects/${projectId}`, {
+          toolUseTimeoutMinutes,
+        });
+        expect(refused.status).toBe(400);
+      }
+      await admin.send('patch', `/projects/${projectId}`, {
+        toolUseTimeoutMinutes: null,
+      });
+      expect(await minutesOf()).toBe(240);
+    });
+
+    it('asks once in a session that allowed similar calls, and again in another session', async () => {
+      const first = await call(
+        sessionA,
+        { command: 'npm test' },
+        { suggestions: [NPM_TEST] },
+      );
+      expect(first.remember).toEqual({ ok: true, rules: ['Bash(npm test:*)'] });
+      const approved = await decide(approver, first.id, 'approve', {
+        remember: 'session',
+      });
+      expect(approved.status).toBe(200);
+      expect(approved.body.status).toBe('approved');
+      const [rule] = await ctx.prisma.toolUseRule.findMany();
+      expect(rule).toMatchObject({
+        scope: 'session',
+        sessionId: sessionA,
+        toolName: 'Bash',
+        ruleContent: 'npm test:*',
+        createdById: approverId,
+        sourceRequestId: first.id,
+      });
+
+      const again = await call(sessionA, { command: 'npm test -- --watch' });
+      expect(again).toMatchObject({ status: 'approved', ruleId: rule.id });
+      expect((await rowOf(again.id)).note).toBe(
+        'Allowed by the session rule Bash(npm test:*)',
+      );
+      expect(await notified(again.id)).toBe(0);
+      expect(
+        await ctx.prisma.toolUseRule.findUniqueOrThrow({
+          where: { id: rule.id },
+        }),
+      ).toMatchObject({ useCount: 1 });
+      const [used] = await audits('tool_rule.used');
+      expect(used).toMatchObject({
+        result: 'ok',
+        meta: { ruleId: rule.id, actionRequestId: again.id },
+      });
+      expect(await audits('tool_rule.created')).toHaveLength(1);
+
+      const elsewhere = await call(sessionB, { command: 'npm test' });
+      expect(elsewhere.status).toBe('pending');
+      expect(await notified(elsewhere.id)).toBeGreaterThan(0);
+      // A different command in the same session still asks.
+      expect((await call(sessionA, { command: 'npm publish' })).status).toBe(
+        'pending',
+      );
+    });
+
+    it('lets a project rule answer every session, and the parallel calls already waiting', async () => {
+      const first = await call(sessionA, { command: 'npm test' });
+      const parallel = await call(sessionB, { command: 'npm test' });
+      const unrelated = await call(sessionB, { command: 'npm publish' });
+      expect(first.remember).toEqual({ ok: true, rules: ['Bash(npm test)'] });
+      const approved = await decide(approver, first.id, 'approve', {
+        remember: 'project',
+      });
+      expect(approved.status).toBe(200);
+      const [rule] = await ctx.prisma.toolUseRule.findMany();
+      expect(rule).toMatchObject({ scope: 'project', sessionId: null });
+      expect(await rowOf(parallel.id)).toMatchObject({
+        status: 'approved',
+        ruleId: rule.id,
+      });
+      expect((await rowOf(unrelated.id)).status).toBe('pending');
+      expect((await call(null, { command: 'npm test' })).status).toBe(
+        'approved',
+      );
+    });
+
+    it('always asks for a dangerous call, even under a rule that covers it, and never remembers it', async () => {
+      await ctx.prisma.toolUseRule.createMany({
+        data: [
+          {
+            projectId,
+            scope: 'project',
+            toolName: 'Bash',
+            ruleContent: 'git push:*',
+          },
+          {
+            projectId,
+            scope: 'project',
+            toolName: 'Bash',
+            ruleContent: 'rm:*',
+          },
+          { projectId, scope: 'project', toolName: 'Read' },
+        ],
+      });
+      const push = await call(sessionA, {
+        command: 'git push origin main',
+      });
+      const rm = await call(sessionA, { command: 'rm -rf build' });
+      const secret = await call(
+        sessionA,
+        { file_path: `${ROOT}/.env` },
+        {},
+        'Read',
+      );
+      for (const request of [push, rm, secret]) {
+        expect(request.status).toBe('pending');
+        expect(request.remember?.ok).toBe(false);
+        const refused = await decide(approver, request.id, 'approve', {
+          remember: 'session',
+        });
+        expect(refused.status).toBe(409);
+        expect(refused.body.error).toBe('not_rememberable');
+        expect((await rowOf(request.id)).status).toBe('pending');
+      }
+      // A plain approval of the dangerous call still works, once.
+      expect((await decide(approver, rm.id, 'approve')).status).toBe(200);
+      expect(await ctx.prisma.toolUseRule.count()).toBe(3);
+      // A feature branch is not protected: the rule answers it.
+      expect(
+        (await call(sessionA, { command: 'git push origin card/c401' })).status,
+      ).toBe('approved');
+    });
+
+    it('remembers only an approval of a call it can see whole', async () => {
+      const denied = await call(sessionA, { command: 'npm test' });
+      const deny = await decide(approver, denied.id, 'deny', {
+        remember: 'project',
+      });
+      expect(deny.status).toBe(409);
+      expect(deny.body.error).toBe('not_rememberable');
+
+      const truncated = await call(
+        sessionA,
+        { command: 'npm test' },
+        { truncated: true },
+      );
+      expect(truncated.remember).toEqual({
+        ok: false,
+        reason: 'Only part of the call is shown, so it is not remembered',
+      });
+      expect(
+        (
+          await decide(approver, truncated.id, 'approve', {
+            remember: 'project',
+          })
+        ).status,
+      ).toBe(409);
+
+      const sessionless = await call(null, { command: 'npm test' });
+      expect(
+        (
+          await decide(approver, sessionless.id, 'approve', {
+            remember: 'session',
+          })
+        ).status,
+      ).toBe(409);
+      expect(
+        (await decide(approver, sessionless.id, 'approve', { remember: 'x' }))
+          .status,
+      ).toBe(400);
+      expect(await ctx.prisma.toolUseRule.count()).toBe(0);
+      const [refusal] = await audits('action_request.decided');
+      expect(refusal).toMatchObject({
+        result: 'denied',
+        meta: { reason: 'not_rememberable' },
+      });
+    });
+
+    it('lists the rules to operators, and removing one makes the call ask again', async () => {
+      const first = await call(sessionA, { command: 'npm test' });
+      await decide(approver, first.id, 'approve', { remember: 'project' });
+      expect(
+        (await viewer.get(`/projects/${projectId}/tool-rules`)).status,
+      ).toBe(403);
+      expect(
+        (await outsider.get(`/projects/${projectId}/tool-rules`)).status,
+      ).toBe(404);
+      const list = await requester.get(`/projects/${projectId}/tool-rules`);
+      expect(list.status).toBe(200);
+      expect(list.body).toEqual([
+        expect.objectContaining({
+          scope: 'project',
+          label: 'Bash(npm test)',
+          createdByEmail: 'approver@example.com',
+          sourceRequestId: first.id,
+          useCount: 0,
+        }),
+      ]);
+      const ruleId = list.body[0].id as string;
+      expect(
+        (
+          await viewer.send(
+            'delete',
+            `/projects/${projectId}/tool-rules/${ruleId}`,
+          )
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await requester.send(
+            'delete',
+            `/projects/${projectId}/tool-rules/${ruleId}`,
+          )
+        ).status,
+      ).toBe(204);
+      expect(
+        (
+          await requester.send(
+            'delete',
+            `/projects/${projectId}/tool-rules/${ruleId}`,
+          )
+        ).status,
+      ).toBe(404);
+      const [deleted] = await audits('tool_rule.deleted');
+      expect(deleted).toMatchObject({
+        actorUserId: requesterId,
+        before: { rule: 'Bash(npm test)', scope: 'project' },
+      });
+      expect((await call(sessionA, { command: 'npm test' })).status).toBe(
+        'pending',
+      );
+    });
+  });
 });

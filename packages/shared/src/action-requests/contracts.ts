@@ -1,9 +1,14 @@
 import { z } from 'zod';
 import { headShaSchema } from '../protocol/commands/approvals';
 import {
+  rememberableToolRules,
   TOOL_USE_SUGGESTIONS_MAX,
+  type ToolRule,
+  type ToolUseCall,
+  toolRuleLabel,
   toolRuleSchema,
   toolRuleScopeSchema,
+  toolUseCallOf,
 } from './tool-rules';
 
 /**
@@ -194,6 +199,37 @@ export const issueQueueArgsOf = (request: {
   return parsed.success ? parsed.data : null;
 };
 
+/**
+ * C-401: what the rule checks read of a `tool_use` request — the call (null
+ * when it cannot be judged, `toolUseCallOf`) and Claude Code's suggested
+ * rules; null for another kind or bad args.
+ */
+export const toolUseRequestOf = (request: {
+  kind: ActionRequestKind;
+  args: unknown;
+}): { call: ToolUseCall | null; suggestions: ToolRule[] } | null => {
+  if (request.kind !== 'tool_use') return null;
+  const parsed = actionRequestArgsSchemas.tool_use.safeParse(request.args);
+  if (!parsed.success) return null;
+  return {
+    call: toolUseCallOf(parsed.data),
+    suggestions: parsed.data.suggestions ?? [],
+  };
+};
+
+/** C-401: a `tool_use` request's `remember` (see the summary); null otherwise. */
+export const toolUseRememberOf = (request: {
+  kind: ActionRequestKind;
+  args: unknown;
+}): ActionRequestRemember | null => {
+  const toolUse = toolUseRequestOf(request);
+  if (!toolUse) return null;
+  const offer = rememberableToolRules(toolUse.call, toolUse.suggestions);
+  return offer.ok
+    ? { ok: true, rules: offer.rules.map(toolRuleLabel) }
+    : { ok: false, reason: offer.reason };
+};
+
 /** The card title kept on a `card_accept` request (`BOARD_CARD_TITLE_MAX`). */
 export const ACTION_REQUEST_CARD_TITLE_MAX = 200;
 
@@ -229,6 +265,12 @@ export const shortHeadSha = (sha: string): string => sha.slice(0, 7);
 export const prDiffUrl = (args: Pick<PrApproveBoundArgs, 'url' | 'headSha'>) =>
   `${args.url.replace(/\/+$/, '')}/files/${args.headSha}`;
 
+const actionRequestRememberSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), rules: z.array(z.string()) }),
+  z.object({ ok: z.literal(false), reason: z.string() }),
+]);
+export type ActionRequestRemember = z.infer<typeof actionRequestRememberSchema>;
+
 /** A request as the API lists it to the web and answers `action.status` with. */
 export const actionRequestSummarySchema = z.object({
   id: z.string().min(1),
@@ -245,6 +287,16 @@ export const actionRequestSummarySchema = z.object({
   note: z.string().max(ACTION_REQUEST_NOTE_MAX).nullable(),
   expiresAt: z.iso.datetime(),
   createdAt: z.iso.datetime(),
+  /**
+   * C-401: the stored rule that approved a `tool_use` request without a
+   * person (`note` names it); null for a person's decision.
+   */
+  ruleId: z.string().min(1).nullable().optional(),
+  /**
+   * C-401, a `tool_use` request: the rules "allow similar" and "always
+   * allow" would store (`toolRuleLabel`), or why nothing may be remembered.
+   */
+  remember: actionRequestRememberSchema.nullable().optional(),
 });
 export type ActionRequestSummary = z.infer<typeof actionRequestSummarySchema>;
 
