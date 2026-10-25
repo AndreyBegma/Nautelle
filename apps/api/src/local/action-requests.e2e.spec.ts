@@ -1043,9 +1043,8 @@ describe('action requests (e2e)', () => {
       );
       const notification = await notificationFor(first.id);
       // The buttons of an offer; a reply prompt has none.
-      const buttonsOf = (
-        markup: Awaited<ReturnType<typeof telegram.offer>>,
-      ) => (markup && 'inline_keyboard' in markup ? markup.inline_keyboard : []);
+      const buttonsOf = (markup: Awaited<ReturnType<typeof telegram.offer>>) =>
+        markup && 'inline_keyboard' in markup ? markup.inline_keyboard : [];
       const offer = await telegram.offer(notification.id);
       const target = `${notification.id}:${first.id}`;
       expect(buttonsOf(offer)).toEqual([
@@ -1097,9 +1096,9 @@ describe('action requests (e2e)', () => {
       // A dangerous call is never offered a rule, and a forged press is refused.
       const push = await call(sessionA, { command: 'git push origin main' });
       const pushNotification = await notificationFor(push.id);
-      expect(
-        buttonsOf(await telegram.offer(pushNotification.id)),
-      ).toHaveLength(1);
+      expect(buttonsOf(await telegram.offer(pushNotification.id))).toHaveLength(
+        1,
+      );
       const refused = await press(`xp:${pushNotification.id}:${push.id}`);
       expect(refused.text).toContain('cannot be remembered');
       expect((await rowOf(push.id)).status).toBe('pending');

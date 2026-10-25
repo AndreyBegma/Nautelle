@@ -96,7 +96,10 @@
       "action": "click",
       "target": { "role": "button", "name": "Cancel", "exact": true }
     },
-    { "action": "marker", "title": "Rules and the timeout in project settings" },
+    {
+      "action": "marker",
+      "title": "Rules and the timeout in project settings"
+    },
     {
       "action": "navigate",
       "path": "/projects/demo-project/settings?tab=away",
@@ -116,7 +119,10 @@
     },
     {
       "action": "waitFor",
-      "target": { "role": "button", "name": "Remove the rule Bash(bun run lint:*)" },
+      "target": {
+        "role": "button",
+        "name": "Remove the rule Bash(bun run lint:*)"
+      },
       "timeoutMs": 15000
     },
     { "action": "screenshot", "name": "settings-rules" },
