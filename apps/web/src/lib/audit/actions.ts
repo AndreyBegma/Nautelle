@@ -33,6 +33,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'project.connect': 'Connected a project',
   'project.delete': 'Removed a project',
   'project.update': 'Changed a project',
+  'project.move': 'Moved a project to another runner',
   'project.member_add': 'Added a project member',
   'project.member_update': 'Changed a project member',
   'project.member_remove': 'Removed a project member',

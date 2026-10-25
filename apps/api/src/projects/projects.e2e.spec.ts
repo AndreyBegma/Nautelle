@@ -5,7 +5,10 @@ import type {
   ProjectSummary,
   Role,
 } from '@nautelle/shared';
-import { WATCH_REFUSED_EVENT } from '@nautelle/shared/protocol';
+import {
+  type ProjectInspection,
+  WATCH_REFUSED_EVENT,
+} from '@nautelle/shared/protocol';
 import { allowedLiveOrigin } from '../live/live-options';
 import { TestLiveSocket } from '../live/testing/live-e2e';
 import {
@@ -468,6 +471,429 @@ describe('projects (e2e)', () => {
       expect(await live.subscribe(`project:${b.id}`)).toMatchObject({
         type: 'error',
       });
+    });
+  });
+
+  describe('move to another runner (C-400)', () => {
+    const NEW_ROOT = '/home/dev/code/widget';
+    const atNewRoot = (overrides: Partial<ProjectInspection> = {}) =>
+      inspection({
+        root: NEW_ROOT,
+        gitCommonDir: `${NEW_ROOT}/.git`,
+        docs: {
+          ...inspection().docs,
+          localPath: `${NEW_ROOT}/docs`,
+          evidence: [{ file: `${NEW_ROOT}/docs` }],
+          candidates: [],
+        },
+        ...overrides,
+      });
+
+    /** A second paired runner, connected and answering `answer`. */
+    const laptop = async (
+      answer: ProjectInspection = atNewRoot(),
+    ): Promise<{ runnerId: string; runner: FakeRunner }> => {
+      const paired = await pairedRunner(ctx, admin, 'laptop');
+      const socket = new TestRunnerSocket(ctx.origin, paired.token);
+      sockets.push(socket);
+      await socket.connect();
+      const runner = new FakeRunner(socket);
+      runner.answer = () => ({ ok: true, output: answer });
+      return { runnerId: paired.runnerId, runner };
+    };
+
+    /** The runner's `key` profile — reused when its capabilities already reported it. */
+    const profileOn = (id: string, key = 'claude-main') =>
+      ctx.prisma.runtimeProfile.upsert({
+        where: { runnerId_key: { runnerId: id, key } },
+        update: {},
+        create: {
+          runnerId: id,
+          key,
+          runtime: 'claude',
+          label: key,
+          env: {},
+          args: [],
+          authenticated: true,
+        },
+      });
+
+    const card = (projectId: string, number: number, extra = {}) =>
+      ctx.prisma.boardCard.create({
+        data: {
+          projectId,
+          number,
+          shortId: `card000${number}`,
+          title: `Card ${number}`,
+          position: number,
+          issueOnRun: false,
+          specOnRun: false,
+          movedAt: new Date(),
+          ...extra,
+        },
+      });
+
+    const move = (projectId: string, body: Record<string, unknown>) =>
+      admin.send('post', `/projects/${projectId}/move`, body);
+
+    it('moves the project, pushes both watch lists, starts sessions fresh and lists the old worktrees', async () => {
+      const desk = await connectRunner();
+      const project = await connectProject();
+      await desk.socket.next('config');
+      const target = await laptop();
+      const [oldProfile, newProfile] = await Promise.all([
+        profileOn(runnerId),
+        profileOn(target.runnerId),
+      ]);
+      await ctx.prisma.project.update({
+        where: { id: project.id },
+        data: { defaultProfileId: oldProfile.id },
+      });
+      await ctx.prisma.projectOrchestratorSettings.create({
+        data: { projectId: project.id, profileId: oldProfile.id },
+      });
+      const worktree = '/srv/dev/.wt-widget-card0001';
+      await card(project.id, 1, {
+        column: 'finished',
+        branch: 'card/c1-card-1',
+        worktree,
+        sessionId: '6f1c2b8e-4d3a-4b9e-9a51-0c2d1e3f4a5b',
+        designSessionId: '7a2d3c9f-5e4b-4c0f-8b62-1d3e2f4a5b6c',
+        sessionModel: 'opus',
+      });
+      // A completed card's worktree went with its acceptance.
+      await card(project.id, 2, {
+        column: 'completed',
+        worktree: '/srv/dev/.wt-widget-card0002',
+      });
+
+      const check = await admin.get(`/projects/${project.id}/move`);
+      expect(check.status).toBe(200);
+      expect(check.body).toEqual({
+        running: [],
+        worktrees: [
+          {
+            path: worktree,
+            source: 'card',
+            label: 'C-1 Card 1',
+            branch: 'card/c1-card-1',
+          },
+        ],
+      });
+
+      const askedBefore = desk.received.length;
+      const response = await move(project.id, {
+        runnerId: target.runnerId,
+        path: NEW_ROOT,
+        defaultProfileId: newProfile.id,
+      });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        project: {
+          id: project.id,
+          runnerId: target.runnerId,
+          runnerName: 'laptop',
+          runnerStatus: 'online',
+          rootPath: NEW_ROOT,
+          repo: 'acme/widget',
+          defaultProfileId: newProfile.id,
+          docsSource: { kind: 'in_repo', localPath: `${NEW_ROOT}/docs` },
+        },
+        from: { runnerId, rootPath: ROOT },
+        worktrees: [{ path: worktree, source: 'card' }],
+      });
+
+      // The target runner validated the path; the old one was not asked.
+      expect(target.runner.received).toEqual([
+        { name: 'project.inspect', args: { path: NEW_ROOT } },
+      ]);
+      expect(desk.received.slice(askedBefore)).toEqual([]);
+      expect((await desk.socket.next('config')).config.projects).toEqual([]);
+      expect(
+        (await target.runner.socket.next('config')).config.projects,
+      ).toEqual([
+        {
+          id: project.id,
+          root: NEW_ROOT,
+          steward: { enabled: true, silenceMinutes: 10, trailerGuard: true },
+        },
+      ]);
+
+      // Cards keep their history; their sessions live on the old machine.
+      const cards = await ctx.prisma.boardCard.findMany({
+        where: { projectId: project.id },
+        orderBy: { number: 'asc' },
+      });
+      expect(cards.map((c) => [c.number, c.column, c.branch])).toEqual([
+        [1, 'finished', 'card/c1-card-1'],
+        [2, 'completed', null],
+      ]);
+      expect(cards[0]).toMatchObject({
+        sessionId: null,
+        designSessionId: null,
+        sessionModel: null,
+        worktree: null,
+      });
+      expect(
+        await ctx.prisma.projectOrchestratorSettings.findUniqueOrThrow({
+          where: { projectId: project.id },
+        }),
+      ).toMatchObject({ profileId: null });
+
+      expect(await auditActions(project.id)).toEqual([
+        'project.connect:ok',
+        'project.move:ok',
+      ]);
+      const record = await ctx.prisma.auditRecord.findFirstOrThrow({
+        where: { projectId: project.id, action: 'project.move' },
+      });
+      expect(record.before).toMatchObject({ runnerId, rootPath: ROOT });
+      expect(record.after).toMatchObject({
+        runnerId: target.runnerId,
+        rootPath: NEW_ROOT,
+        defaultProfileId: newProfile.id,
+        worktrees: [worktree],
+      });
+    });
+
+    it('rebases a manual in-repo docs source onto the new root', async () => {
+      await connectRunner();
+      const project = await connectProject();
+      const target = await laptop();
+      await ctx.prisma.docsSource.update({
+        where: { projectId: project.id },
+        data: { manual: true, localPath: `${ROOT}/handbook` },
+      });
+      const response = await move(project.id, {
+        runnerId: target.runnerId,
+        path: NEW_ROOT,
+      });
+      expect(response.status).toBe(200);
+      expect(response.body.project).toMatchObject({
+        defaultProfileId: null,
+        docsSource: { manual: true, localPath: `${NEW_ROOT}/handbook` },
+      });
+    });
+
+    it('refuses while a card round, a run or a fleet slot is running', async () => {
+      await connectRunner();
+      const project = await connectProject();
+      const target = await laptop();
+      const body = { runnerId: target.runnerId, path: NEW_ROOT };
+      const at = new Date('2026-10-25T10:00:00Z');
+
+      const running = await card(project.id, 4, { title: 'Fix login' });
+      const run = await ctx.prisma.run.create({
+        data: {
+          kind: 'card',
+          projectId: project.id,
+          status: 'running',
+          triggeredByType: 'user',
+          startedAt: at,
+          updatedAt: at,
+        },
+      });
+      const round = await ctx.prisma.boardCardRound.create({
+        data: {
+          cardId: running.id,
+          round: 1,
+          runId: run.id,
+          trigger: 'run',
+          cardTitle: running.title,
+          cardBody: '',
+          cardKind: 'feature',
+          phase: 'running',
+        },
+      });
+      await ctx.prisma.run.create({
+        data: {
+          kind: 'skill',
+          projectId: project.id,
+          title: 'review',
+          status: 'running',
+          triggeredByType: 'user',
+          startedAt: at,
+          updatedAt: at,
+        },
+      });
+      await ctx.prisma.slot.create({
+        data: {
+          projectId: project.id,
+          name: 'w1',
+          worktree: '/srv/dev/.wt-widget-w1',
+          owns: [],
+          never: [],
+          status: 'running',
+          lastSeq: 1n,
+          startedAt: at,
+          updatedAt: at,
+        },
+      });
+
+      const check = await admin.get(`/projects/${project.id}/move`);
+      expect(check.body).toEqual({
+        running: ['C-4 Fix login', 'skill: review', 'slot w1'],
+        worktrees: [
+          {
+            path: '/srv/dev/.wt-widget-w1',
+            source: 'slot',
+            label: 'w1',
+            branch: null,
+          },
+        ],
+      });
+      const refused = await move(project.id, body);
+      expect(refused.status).toBe(409);
+      expect(refused.body).toMatchObject({
+        error: 'work_running',
+        message: 'Stop what runs first: C-4 Fix login, skill: review, slot w1',
+      });
+      // Nothing reached the target runner, and nothing moved.
+      expect(target.runner.received).toEqual([]);
+      expect(
+        (
+          await ctx.prisma.project.findUniqueOrThrow({
+            where: { id: project.id },
+          })
+        ).runnerId,
+      ).toBe(runnerId);
+
+      // Once the work ends, the move goes through.
+      await ctx.prisma.boardCardRound.update({
+        where: { id: round.id },
+        data: { phase: 'finished' },
+      });
+      await ctx.prisma.run.updateMany({ data: { status: 'succeeded' } });
+      await ctx.prisma.slot.updateMany({ data: { status: 'ended' } });
+      expect((await move(project.id, body)).status).toBe(200);
+    });
+
+    it('refuses the same runner, another repository, a linked worktree and a foreign profile', async () => {
+      await connectRunner();
+      const project = await connectProject();
+
+      const same = await move(project.id, { runnerId, path: ROOT });
+      expect(same.status).toBe(422);
+      expect(same.body.error).toBe('same_runner');
+
+      const target = await laptop();
+      const body = { runnerId: target.runnerId, path: NEW_ROOT };
+
+      target.runner.answer = () => ({
+        ok: true,
+        output: atNewRoot({
+          remote: {
+            url: 'git@github.com:acme/gadget.git',
+            forge: 'github',
+            repo: 'acme/gadget',
+          },
+        }),
+      });
+      const other = await move(project.id, body);
+      expect(other.status).toBe(422);
+      expect(other.body).toMatchObject({
+        error: 'different_repository',
+        message: `${NEW_ROOT} is a checkout of acme/gadget, not acme/widget`,
+      });
+
+      target.runner.answer = () => ({
+        ok: true,
+        output: atNewRoot({ isMainCheckout: false }),
+      });
+      const linked = await move(project.id, {
+        ...body,
+        path: `${NEW_ROOT}/packages`,
+      });
+      expect(linked.status).toBe(409);
+      expect(linked.body).toMatchObject({
+        error: 'not_main_checkout',
+        suggestedPath: NEW_ROOT,
+      });
+
+      target.runner.answer = () => ({
+        ok: true,
+        output: atNewRoot({
+          remote: {
+            url: 'git@gitlab.com:acme/widget.git',
+            forge: 'unsupported',
+            repo: null,
+          },
+        }),
+      });
+      expect((await move(project.id, body)).body.error).toBe(
+        'unsupported_forge',
+      );
+
+      target.runner.answer = () => ({ ok: true, output: atNewRoot() });
+      const foreign = await profileOn(runnerId);
+      const profile = await move(project.id, {
+        ...body,
+        defaultProfileId: foreign.id,
+      });
+      expect(profile.status).toBe(422);
+      expect(profile.body.error).toBe('profile_not_on_runner');
+
+      const missing = await move(project.id, {
+        ...body,
+        runnerId: 'no-such-runner',
+      });
+      expect(missing.status).toBe(404);
+
+      expect(
+        await ctx.prisma.project.findUniqueOrThrow({
+          where: { id: project.id },
+        }),
+      ).toMatchObject({ runnerId, rootPath: ROOT });
+      expect(await auditActions(project.id)).toEqual(['project.connect:ok']);
+    });
+
+    it('refuses a root the target runner already has, and an offline target', async () => {
+      await connectRunner();
+      const project = await connectProject();
+      const offline = await pairedRunner(ctx, admin, 'offline');
+      const unreachable = await move(project.id, {
+        runnerId: offline.runnerId,
+        path: NEW_ROOT,
+      });
+      expect(unreachable.status).toBe(409);
+      expect(unreachable.body.error).toBe('runner_offline');
+
+      const target = await laptop();
+      await ctx.prisma.project.create({
+        data: {
+          runnerId: target.runnerId,
+          rootPath: NEW_ROOT,
+          repo: 'acme/widget',
+          displayName: 'widget copy',
+          baseBranch: 'main',
+          baseSource: 'default',
+          hasClaudeMd: false,
+          hasAgentsMd: false,
+          lastInspectedAt: new Date('2026-01-01T00:00:00Z'),
+        },
+      });
+      const taken = await move(project.id, {
+        runnerId: target.runnerId,
+        path: NEW_ROOT,
+      });
+      expect(taken.status).toBe(409);
+      expect(taken.body.error).toBe('already_connected');
+    });
+
+    it('is admin only', async () => {
+      const project = await seedProject('/srv/a');
+      const operator = await userSession('op@x.test', 'operator');
+      await addMember(project.id, operator.id);
+      const target = await pairedRunner(ctx, admin, 'laptop');
+      expect(
+        (await operator.session.get(`/projects/${project.id}/move`)).status,
+      ).toBe(403);
+      const refused = await operator.session.send(
+        'post',
+        `/projects/${project.id}/move`,
+        { runnerId: target.runnerId, path: NEW_ROOT },
+      );
+      expect(refused.status).toBe(403);
     });
   });
 

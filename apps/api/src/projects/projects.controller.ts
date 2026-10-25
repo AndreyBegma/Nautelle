@@ -1,6 +1,8 @@
 import type {
   ProjectDetail,
   ProjectMemberView,
+  ProjectMoveCheck,
+  ProjectMoveResult,
   ProjectRuntimeProfile,
   ProjectSummary,
   PushCheckView,
@@ -35,6 +37,7 @@ import {
   DiscoverProjectsDto,
   DocsSourceOverrideDto,
   InspectProjectDto,
+  MoveProjectDto,
   PushCheckDto,
   UpdateProjectDto,
   UpdateProjectMemberDto,
@@ -46,6 +49,7 @@ import {
 } from './project-access.guard';
 import type { ResolvedProjectAccess } from './project-access.service';
 import { ProjectMembersService } from './project-members.service';
+import { ProjectMoveService } from './project-move.service';
 import { ProjectsService } from './projects.service';
 
 /** D1, D15: connecting and deleting projects is admin only. */
@@ -118,6 +122,7 @@ export class ProjectsController {
   constructor(
     private readonly projects: ProjectsService,
     private readonly members: ProjectMembersService,
+    private readonly mover: ProjectMoveService,
   ) {}
 
   // C-403: `visibleWhere` narrows the list to a project-limited token's own.
@@ -165,6 +170,29 @@ export class ProjectsController {
     @AuditCtx() ctx: AuditContext,
   ): Promise<ProjectDetail> {
     return this.projects.refresh(access.projectId, access.role, ctx);
+  }
+
+  /** C-400: what a move would meet — running work and the old worktrees. */
+  @Get(':projectId/move')
+  @Roles('admin')
+  @UseGuards(ProjectAccessGuard)
+  moveCheck(
+    @ProjectAccess() access: ResolvedProjectAccess,
+  ): Promise<ProjectMoveCheck> {
+    return this.mover.check(access.projectId);
+  }
+
+  /** C-400 (ADR-0107): the project's new runner and its root there. */
+  @Post(':projectId/move')
+  @HttpCode(200)
+  @Roles('admin')
+  @UseGuards(ProjectAccessGuard)
+  move(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @Body() dto: MoveProjectDto,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<ProjectMoveResult> {
+    return this.mover.move(access.projectId, dto, ctx);
   }
 
   @Put(':projectId/docs-source')

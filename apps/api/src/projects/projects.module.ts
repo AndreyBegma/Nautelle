@@ -6,6 +6,7 @@ import { ProjectAccessGuard } from './project-access.guard';
 import { ProjectAccessService } from './project-access.service';
 import { ProjectInspector } from './project-inspector';
 import { ProjectMembersService } from './project-members.service';
+import { ProjectMoveService } from './project-move.service';
 import {
   AdminProjectsController,
   ProjectsController,
@@ -22,6 +23,7 @@ import { WatchRefusalSink } from './watch-refusal-sink';
     ProjectInspector,
     ProjectsService,
     ProjectMembersService,
+    ProjectMoveService,
     WatchRefusalSink,
   ],
   // #11–#13 import this module and put `@UseGuards(ProjectAccessGuard)` and

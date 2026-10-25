@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "name": "Move a project to another runner from Settings",
+  "description": "C-400: Settings › General shows which runner a project runs on and opens a dialog that moves it to another paired runner, validating the path there and choosing the runtime profile again.",
+  "steps": [
+    { "action": "marker", "title": "Sign in" },
+    {
+      "action": "navigate",
+      "path": "/login?next=%2Fprojects%2Fdemo-project%2Fsettings%3Ftab%3Dgeneral"
+    },
+    { "action": "wait", "ms": 3000 },
+    {
+      "action": "fill",
+      "target": { "label": "Email" },
+      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+    },
+    {
+      "action": "fill",
+      "target": { "label": "Password" },
+      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
+    },
+    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
+    {
+      "action": "waitFor",
+      "target": { "role": "link", "name": "Board", "exact": true },
+      "timeoutMs": 30000
+    },
+    { "action": "marker", "title": "The Runner card in Settings › General" },
+    {
+      "action": "navigate",
+      "path": "/projects/demo-project/settings?tab=general"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "role": "heading", "name": "Runner", "exact": true },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "Settings › General says which runner the project runs on"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "text": "keeps its cards and their history" },
+      "timeoutMs": 10000,
+      "caption": "Moving keeps the cards and their history; the next rounds start fresh sessions"
+    },
+    { "action": "wait", "ms": 1500 },
+    { "action": "marker", "title": "The move dialog" },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Move to another runner…" }
+    },
+    {
+      "action": "assertVisible",
+      "target": { "role": "dialog", "name": "Move to another runner" },
+      "timeoutMs": 10000,
+      "caption": "The admin picks a paired runner and the path of the repository on it"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "role": "button", "name": "Inspect", "exact": true },
+      "timeoutMs": 10000,
+      "zoom": true,
+      "caption": "The target runner inspects the path before the move"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "text": "The orchestrator's profile is cleared" },
+      "timeoutMs": 10000,
+      "caption": "The runtime profile is chosen again from the target runner's profiles"
+    },
+    { "action": "screenshot", "name": "move-dialog" },
+    { "action": "wait", "ms": 2000 },
+    { "action": "click", "target": { "role": "button", "name": "Cancel" } },
+    { "action": "wait", "ms": 1000 }
+  ]
+}
