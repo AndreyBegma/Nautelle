@@ -242,8 +242,30 @@ model Runner {
   installedSkills      InstalledSkill[]
   skillInstallPreviews SkillInstallPreview[]
   actionRequests       ActionRequest[]
+  pushChecks           RepositoryPushCheck[]
 
   @@map("runners")
+}
+
+/// C-396 (ADR-0101): the latest `git push --dry-run` a runner ran for a
+/// checkout — from the connect dialog before the project exists, or from
+/// Getting started after. Keyed by runner and path, not by project, so the
+/// check made in the preview counts once the project is connected.
+model RepositoryPushCheck {
+  id        String   @id @default(cuid())
+  runnerId  String
+  /// The path the check ran on: the inspection's `root`, as a project stores it.
+  rootPath  String
+  ok        Boolean
+  /// origin's URL without credentials; null when the repository has none.
+  remote    String?
+  message   String
+  checkedAt DateTime
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@unique([runnerId, rootPath])
+  @@map("repository_push_checks")
 }
 
 model RunnerPairingCode {
