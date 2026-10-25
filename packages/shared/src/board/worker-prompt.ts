@@ -38,9 +38,11 @@ import type { BoardCardKind } from './types';
  * Version 22 (#747 D10): the terse register behind `terse-register`; its
  * control arm gets the #445 D7 two-register lines. Version 23 (#750 D8):
  * with `escalate`, when to call `escalate_card`. Version 24 (C-369): with
- * `demo`, the DemoFlow scenario to write.
+ * `demo`, the DemoFlow scenario to write. Version 25 (C-410): the demo
+ * signs in off camera in `setup`, uses locators that match one element, and
+ * is recorded on a merged base before the round finishes.
  */
-export const CARD_WORKER_PROMPT_VERSION = 24;
+export const CARD_WORKER_PROMPT_VERSION = 25;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'NAUTELLE_CARD';
@@ -526,7 +528,10 @@ const ESCALATE_LINES = [
 /**
  * C-369 (ADR-0090 §2): the project records a demo of finished UI features, so
  * the worker writes the scenario through DemoFlow's MCP server and commits it.
- * Only secret names are listed — a value never reaches the worker.
+ * Only secret names are listed — a value never reaches the worker. C-410: 7
+ * of 12 card demos failed their first recording — strict-mode locators and
+ * selectors a merged card had changed — so the worker records before it
+ * finishes, and signs in off camera (DemoFlow 0.7.0 `setup`).
  */
 const demoLines = (demo: CardWorkerDemo): string[] => [
   '## Demo video',
@@ -536,6 +541,10 @@ const demoLines = (demo: CardWorkerDemo): string[] => [
   demo.env.length > 0
     ? `- Read secrets only via \`valueFrom.env\`, using these names: ${demo.env.map((name) => `\`${name}\``).join(', ')}. Never write a secret's value into the scenario.`
     : '- The project has no demo secrets: a scenario that needs to sign in cannot be recorded, so show what works without them. Never write a credential into the scenario.',
+  '- Steps the video need not show, such as signing in, go in the scenario\'s `setup`: DemoFlow runs them off camera and the video opens on the page they end on. Include a fragment from `demoflow/fragments/` when the project has one — `{ "action": "include", "fragment": "sign-in", "with": { "next": "/path" } }` — instead of copying its steps, and start `steps` at the first step that matters.',
+  '- Use locators that match exactly one element; Playwright fails the run on two matches (a label on two fields, text in a list row and an `<option>`). Scope to a region, use role and name with `exact`, or add a unique label or test id.',
+  '- Before recording, merge the latest base branch (`origin/<base>`, named under Branch below): selectors break when another merged card changed the UI.',
+  `- Before finishing, record the scenario, not only validate it — a valid scenario still fails at run time. Run DemoFlow against the app from \`demoflow.config.json\` with \`--port $${CARD_ENV_PORT} --fresh-app\` and the env names above set locally (a throwaway demo account when the app seeds one), and fix the scenario until the run completes.`,
   '- If the card changes no UI, skip the scenario.',
 ];
 
