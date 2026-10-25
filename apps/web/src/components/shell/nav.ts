@@ -7,6 +7,7 @@ import {
   ChartColumn,
   FolderGit2,
   Gauge,
+  Inbox,
   KanbanSquare,
   LayoutDashboard,
   Lightbulb,
@@ -86,6 +87,17 @@ export const NAV: NavSection[] = [
     id: 'workspace',
     title: 'Workspace',
     entries: [
+      // C-390: what waits on the person, across projects. Its items all need
+      // an operator, so a viewer has none and no entry.
+      {
+        id: 'inbox',
+        primary: true,
+        href: '/inbox',
+        label: 'Inbox',
+        icon: Inbox,
+        minRole: 'operator',
+        enabled: true,
+      },
       {
         id: 'overview',
         primary: true,
@@ -502,14 +514,18 @@ export const iconRailSplit = (sections: readonly VisibleSection[]): NavSplit =>
 
 /**
  * The phone's capsule (#163, #521, C-282): three places, the rest behind More.
- * Outside a project the workspace's primary three; inside one the Board,
- * Queue and Activity — a subset of the project's primary five, which a phone's
- * width cannot hold beside More and the `+`.
+ * The Inbox leads both (C-390); then outside a project Overview and Projects,
+ * inside one the Board and Fleet — a subset of the project's primary five,
+ * which a phone's width cannot hold beside More and the `+`. The first three
+ * the role can see are taken, so a viewer, who has no Inbox, still gets three.
  */
 const TAB_IDS = {
-  workspace: ['overview', 'projects', 'work'],
-  project: ['board', 'queue', 'project-activity'],
+  workspace: ['inbox', 'overview', 'projects', 'work'],
+  project: ['inbox', 'board', 'fleet', 'queue'],
 } as const;
+
+/** The capsule's places beside More and the `+`. */
+const TAB_COUNT = 3;
 
 export interface TabBarSplit {
   /** In bar order; only entries the role can see. */
@@ -520,9 +536,12 @@ export interface TabBarSplit {
 
 export function tabBarSplit(sections: readonly VisibleSection[]): TabBarSplit {
   const inProject = sections.some((section) => section.id === 'project');
-  const ids: readonly string[] = TAB_IDS[inProject ? 'project' : 'workspace'];
+  const order: readonly string[] = TAB_IDS[inProject ? 'project' : 'workspace'];
   const entries = sections.flatMap((section) => section.entries);
-  const tabs = ids.flatMap((id) => entries.filter((entry) => entry.id === id));
+  const tabs = order
+    .flatMap((id) => entries.filter((entry) => entry.id === id))
+    .slice(0, TAB_COUNT);
+  const ids = tabs.map((entry) => entry.id);
   const { more } = splitBy(sections, (entry) => ids.includes(entry.id));
   return { tabs, more };
 }

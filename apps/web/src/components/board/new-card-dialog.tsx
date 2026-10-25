@@ -5,6 +5,7 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import {
+  type AttachmentView,
   type BoardSettingsView,
   type BoardView,
   type CreatePlanRequest,
@@ -28,6 +29,7 @@ import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { FullScreenLayer } from '../design/full-screen-layer';
 import { DisabledReason } from '../prerequisites/disabled-reason';
 import { IntakeView } from './intake-view';
+import { useQuickCard } from './quick-card-context';
 
 /**
  * New work (#337 D2, #409): one field, **What to do**, in any language, with
@@ -77,6 +79,7 @@ export function NewCardDialog({
   /** **Open the card** once the intake wrote it. */
   onCreated: (number: number) => void;
 }) {
+  const quickCard = useQuickCard();
   const [busy, setBusy] = useState(false);
   const [startedId, setStartedId] = useState<string>();
   const planId = controlledId ?? startedId;
@@ -108,6 +111,10 @@ export function NewCardDialog({
       busy={busy}
       setBusy={setBusy}
       onCancel={wide === false ? undefined : () => onOpenChange(false)}
+      onQuickCard={(text, attachments) => {
+        onOpenChange(false);
+        quickCard(projectId, text, attachments);
+      }}
       onStarted={(id) => {
         setStartedId(id);
         onStarted?.(id);
@@ -239,6 +246,7 @@ function StartForm({
   busy,
   setBusy,
   onCancel,
+  onQuickCard,
   onStarted,
 }: {
   projectId: string;
@@ -250,6 +258,8 @@ function StartForm({
   setBusy: (busy: boolean) => void;
   /** Absent on a phone, where the bar's Close is the way out. */
   onCancel?: () => void;
+  /** C-391: the same text and uploads as a single card, without the interview. */
+  onQuickCard: (text: string, attachments: AttachmentView[]) => void;
   onStarted: (planId: string) => void;
 }) {
   const settings = useUserSettings(open);
@@ -369,6 +379,18 @@ function StartForm({
             Cancel
           </Button>
         ) : null}
+        <Button
+          variant="glass"
+          disabled={busy || uploads.busy}
+          onClick={() => {
+            // The finished uploads move to Quick card, which claims them.
+            const attachments = uploads.done.map((d) => d.view);
+            uploads.forget(uploads.done.map((d) => d.item));
+            onQuickCard(what, attachments);
+          }}
+        >
+          Quick card
+        </Button>
         <Button type="submit" disabled={!valid}>
           {busy ? 'Starting…' : 'Start'}
         </Button>

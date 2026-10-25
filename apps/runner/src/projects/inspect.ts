@@ -5,6 +5,7 @@ import type {
   WatchedProject,
 } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
+import { DEMOFLOW_CONFIG_FILE } from '../demos/config-file';
 import type { Exec } from '../detect/exec';
 import { stripUrlCredentials } from '../redact-url';
 import { emptyClassified } from './classify';
@@ -19,6 +20,8 @@ export const DEFAULT_BASE_BRANCH = 'main';
 export interface InspectDeps {
   exec: Exec;
   fs?: ProjectFs;
+  /** Epoch ms; for `develop` in use (C-396). */
+  now?: () => number;
 }
 
 const git = async (
@@ -61,8 +64,36 @@ const readCodeSentinelConfig = (
   return { orchestrator: json.orchestrator };
 };
 
+/** C-396: the integration branch a team works on, when it has one. */
+export const DEVELOP_BRANCH = 'develop';
+/** C-396: `origin/develop` counts as used when its tip is younger than this. */
+export const DEVELOP_ACTIVE_DAYS = 90;
+
 /**
- * D4: the base is config → `origin/HEAD` → `gh` → `main`. C-148: the default
+ * C-396: `origin/develop` exists and had a commit in the last
+ * `DEVELOP_ACTIVE_DAYS` days. A stale one left over from an old flow does not
+ * become the base.
+ */
+const developInUse = async (
+  exec: Exec,
+  root: string,
+  now: number,
+): Promise<boolean> => {
+  const tip = await git(exec, root, [
+    'log',
+    '-1',
+    '--format=%ct',
+    `refs/remotes/origin/${DEVELOP_BRANCH}`,
+    '--',
+  ]);
+  const seconds = Number(tip);
+  if (!tip || !Number.isFinite(seconds)) return false;
+  return now - seconds * 1000 <= DEVELOP_ACTIVE_DAYS * 24 * 60 * 60 * 1000;
+};
+
+/**
+ * D4: the base is config → `develop` in use (C-396) → `origin/HEAD` → `gh` →
+ * `main`. C-148: the default
  * branch is `gh` → `origin/HEAD` → unknown (null), whatever the base is —
  * never the `main` guess, which would let auto-merge land on an unknown
  * default branch.
@@ -72,6 +103,7 @@ const resolveBase = async (
   root: string,
   repo: string | null,
   orchestrator: Record<string, unknown> | undefined,
+  now: number,
 ): Promise<{
   baseBranch: string;
   baseSource: BaseSource;
@@ -106,6 +138,9 @@ const resolveBase = async (
       baseSource: 'config',
       defaultBranch,
     };
+  }
+  if (await developInUse(exec, root, now)) {
+    return { baseBranch: DEVELOP_BRANCH, baseSource: 'develop', defaultBranch };
   }
   if (originHead) {
     return { baseBranch: originHead, baseSource: 'origin_head', defaultBranch };
@@ -177,7 +212,13 @@ export const inspectProject = async (
   if (codeSentinelConfig.error) warnings.push(codeSentinelConfig.error);
   const orchestrator = codeSentinelConfig.orchestrator;
 
-  const base = await resolveBase(exec, toplevel, remote.repo, orchestrator);
+  const base = await resolveBase(
+    exec,
+    toplevel,
+    remote.repo,
+    orchestrator,
+    (deps.now ?? Date.now)(),
+  );
 
   const specDir = orchestrator?.specDir;
   const detected = isMainCheckout
@@ -200,6 +241,7 @@ export const inspectProject = async (
     codeSentinelConfig,
     hasClaudeMd: isFile(fs, join(toplevel, 'CLAUDE.md')),
     hasAgentsMd: isFile(fs, join(toplevel, 'AGENTS.md')),
+    hasDemoflowConfig: isFile(fs, join(toplevel, DEMOFLOW_CONFIG_FILE)),
     docs: detected?.docs ?? {
       kind: 'none',
       localPath: null,

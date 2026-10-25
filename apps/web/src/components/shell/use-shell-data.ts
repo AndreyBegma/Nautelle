@@ -6,10 +6,13 @@ import type {
   ProjectSummary,
   RunPage,
   SessionListResponse,
+  WorkCardItem,
+  WorkPage,
 } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import type { RecentEntities } from './palette';
+import { EMPTY_WORK_FILTERS, workQuery } from '../../lib/work/format';
+import { lookupWanted, type RecentEntities } from './palette';
 
 /** Rows the palette's Recent group lists per kind. */
 const RECENT_LIMIT = 5;
@@ -92,4 +95,52 @@ export function usePlans(
     };
   }, [open, projectId]);
   return plans;
+}
+
+/** Wait for the typing to pause before the lookup asks the API. */
+const LOOKUP_DEBOUNCE_MS = 200;
+
+/**
+ * C-393: the cards matching what is typed in the palette — `C-12`, `#41` or a
+ * title — across the caller's projects (`GET /work?q=`). Plan tasks are left
+ * out. `query` says which text the cards answer, so a late answer is never
+ * shown under newer text.
+ */
+export function useCardLookup(
+  open: boolean,
+  query: string,
+): { query: string; cards: WorkCardItem[] } {
+  const [found, setFound] = useState<{ query: string; cards: WorkCardItem[] }>({
+    query: '',
+    cards: [],
+  });
+  const text = query.trim();
+  useEffect(() => {
+    if (!open || !lookupWanted(text)) {
+      setFound((current) =>
+        current.cards.length ? { query: '', cards: [] } : current,
+      );
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api<WorkPage>(`/work${workQuery({ ...EMPTY_WORK_FILTERS, q: text })}`)
+        .then((page) => {
+          if (cancelled) return;
+          const cards = page.items.filter(
+            (item): item is WorkCardItem => item.source !== 'plan',
+          );
+          setFound({ query: text, cards });
+        })
+        .catch(() => {
+          // No Cards group; the pages and actions still work.
+          if (!cancelled) setFound({ query: text, cards: [] });
+        });
+    }, LOOKUP_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [open, text]);
+  return found;
 }

@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "name": "Onboarding to the first card: checklist, setup link and repository picker",
+  "steps": [
+    { "action": "marker", "title": "Sign in" },
+    { "action": "navigate", "path": "/login?next=/" },
+    { "action": "wait", "ms": 3000 },
+    {
+      "action": "fill",
+      "target": { "label": "Email" },
+      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+    },
+    {
+      "action": "fill",
+      "target": { "label": "Password" },
+      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
+    },
+    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
+    { "action": "marker", "title": "Getting started counts seven steps" },
+    {
+      "action": "waitFor",
+      "target": { "role": "heading", "name": "Getting started" },
+      "caption": "The checklist runs through to a first card with a pull request.",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": { "text": "Check that the runner can push" }
+    },
+    {
+      "action": "assertVisible",
+      "target": { "text": "Run a first card to a pull request" }
+    },
+    { "action": "screenshot", "name": "getting-started" },
+    { "action": "marker", "title": "The rail's setup link" },
+    {
+      "action": "assertVisible",
+      "target": { "role": "link", "name": "Finish setup" }
+    },
+    {
+      "action": "click",
+      "target": { "role": "link", "name": "Finish setup" },
+      "caption": "Finish setup shows the progress and opens the checklist."
+    },
+    { "action": "wait", "ms": 2000 },
+    { "action": "marker", "title": "Connect: pick a repository" },
+    { "action": "navigate", "path": "/projects?connect=1" },
+    {
+      "action": "waitFor",
+      "target": { "role": "dialog", "name": "Connect project" },
+      "caption": "The dialog lists the runner's repositories, or says how to bring the runner online.",
+      "timeoutMs": 30000
+    },
+    { "action": "screenshot", "name": "connect-dialog" },
+    { "action": "wait", "ms": 3000 }
+  ]
+}

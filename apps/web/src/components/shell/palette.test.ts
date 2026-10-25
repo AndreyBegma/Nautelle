@@ -4,12 +4,19 @@ import type {
   ProjectSummary,
   RunSummary,
   SessionSummary,
+  WorkCardItem,
 } from '@nautelle/shared';
 import { visibleNav } from './nav';
-import { askItem, type PaletteInput, paletteGroups } from './palette';
+import {
+  askItem,
+  isCardReference,
+  lookupWanted,
+  type PaletteInput,
+  paletteGroups,
+} from './palette';
 
-const project = (id: string, displayName: string) =>
-  ({ id, displayName, repo: `acme/${id}` }) as ProjectSummary;
+const project = (id: string, displayName: string, role = 'operator') =>
+  ({ id, displayName, repo: `acme/${id}`, role }) as ProjectSummary;
 
 const PROJECTS = [project('p1', 'Nautelle'), project('p2', 'Glass')];
 
@@ -180,6 +187,58 @@ describe('paletteGroups', () => {
       if (hints.length > 1) expect(new Set(hints).size).toBeGreaterThan(1);
     }
   });
+
+  test('Quick card is an action only where the person can create cards (C-391)', () => {
+    const quick = (canQuickCard?: boolean) =>
+      labelsIn(
+        paletteGroups(input({ projectId: 'p1', canQuickCard })),
+        'actions',
+      );
+    expect(quick(true)).toContain('Quick card');
+    expect(quick(false)).not.toContain('Quick card');
+    expect(quick(undefined)).not.toContain('Quick card');
+  });
+
+  test('typing finds Quick card among the actions', () => {
+    const groups = paletteGroups(
+      input({ projectId: 'p1', canQuickCard: true, query: 'quick' }),
+    );
+    expect(labelsIn(groups, 'actions')).toEqual(['Quick card']);
+  });
+});
+
+describe('paletteGroups: Settings (C-395)', () => {
+  const settingsIn = (groups: ReturnType<typeof paletteGroups>) =>
+    groups.find((group) => group.id === 'settings')?.items ?? [];
+
+  test('"budget" opens the Budget block of the current project', () => {
+    const items = settingsIn(
+      paletteGroups(input({ query: 'budget', projectId: 'p1' })),
+    );
+    expect(items[0]).toMatchObject({
+      id: 'go:/projects/p1/settings?tab=budget',
+      label: 'Budgets',
+      hint: 'Cost › Budget',
+    });
+  });
+
+  test('"profile" finds each block with a profile once', () => {
+    const items = settingsIn(
+      paletteGroups(input({ query: 'profile', projectId: 'p1' })),
+    );
+    expect(items.map((item) => item.label)).toContain(
+      'Default runtime profile',
+    );
+    expect(items.map((item) => item.label)).toContain(
+      'Orchestrator runtime profile',
+    );
+    expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
+  });
+
+  test('nothing without a query or outside a project', () => {
+    expect(settingsIn(paletteGroups(input({ projectId: 'p1' })))).toEqual([]);
+    expect(settingsIn(paletteGroups(input({ query: 'budget' })))).toEqual([]);
+  });
 });
 
 describe('askItem (#660)', () => {
@@ -202,5 +261,139 @@ describe('askItem (#660)', () => {
   test('offers nothing for an empty or a one-letter query', () => {
     expect(askItem('')).toBeNull();
     expect(askItem(' a ')).toBeNull();
+  });
+});
+
+describe('paletteGroups: create, Inbox and card lookup (C-393)', () => {
+  const card = (overrides: Partial<WorkCardItem> = {}) =>
+    ({
+      source: 'card',
+      projectId: 'p1',
+      projectName: 'Nautelle',
+      number: 12,
+      label: 'C-12',
+      title: 'Fix the login loop',
+      column: 'finished',
+      href: '/projects/p1/board?card=12',
+      ...overrides,
+    }) as WorkCardItem;
+
+  test('inside a project, New card and New work come first', () => {
+    const groups = paletteGroups(input({ projectId: 'p1' }));
+    expect(groups[0]?.id).toBe('create');
+    expect(groups[0]?.items.map((item) => [item.id, item.label])).toEqual([
+      ['go:/projects/p1/board?quickCard=1', 'New card'],
+      ['go:/projects/p1/board?newWork=1', 'New work'],
+    ]);
+  });
+
+  test('outside a project each project you operate gets its own rows', () => {
+    const groups = paletteGroups(
+      input({
+        projects: [project('p1', 'Nautelle'), project('p2', 'Glass', 'viewer')],
+      }),
+    );
+    expect(labelsIn(groups, 'create')).toEqual(['New card', 'New work']);
+    const many = paletteGroups(input());
+    expect(labelsIn(many, 'create')).toEqual([
+      'New card · Nautelle',
+      'New work · Nautelle',
+      'New card · Glass',
+      'New work · Glass',
+    ]);
+  });
+
+  test('a viewer is offered no create rows', () => {
+    const groups = paletteGroups(
+      input({
+        projectId: 'p1',
+        projects: [project('p1', 'Nautelle', 'viewer')],
+      }),
+    );
+    expect(labelsIn(groups, 'create')).toEqual([]);
+  });
+
+  test('Inbox is a page to go to', () => {
+    expect(
+      labelsIn(paletteGroups(input({ query: 'inbox' })), 'pages'),
+    ).toContain('Inbox');
+  });
+
+  test('a card named by its label gets Run, Accept and Open before the lookup', () => {
+    const groups = paletteGroups(input({ query: 'C-12', cards: [card()] }));
+    expect(groups.map((group) => group.id).slice(0, 2)).toEqual([
+      'card-actions',
+      'cards',
+    ]);
+    expect(groups[0]?.items.map((item) => [item.id, item.label])).toEqual([
+      ['card:run:p1:12', 'Run C-12'],
+      ['go:/projects/p1/board?card=12&accept=1', 'Accept C-12'],
+      ['go:/projects/p1/board?card=12', 'Open C-12'],
+    ]);
+  });
+
+  test('a running card is offered Stop, not Run', () => {
+    const groups = paletteGroups(
+      input({ query: '#41', cards: [card({ column: 'in_progress' })] }),
+    );
+    expect(labelsIn(groups, 'card-actions')).toEqual([
+      'Stop C-12',
+      'Open C-12',
+    ]);
+  });
+
+  test('a viewer, a fleet card and an Inbox card can only open', () => {
+    const viewer = [project('p1', 'Nautelle', 'viewer')];
+    expect(
+      labelsIn(
+        paletteGroups(
+          input({ query: 'C-12', projects: viewer, cards: [card()] }),
+        ),
+        'card-actions',
+      ),
+    ).toEqual(['Open C-12']);
+    expect(
+      labelsIn(
+        paletteGroups(
+          input({ query: 'C-12', cards: [card({ source: 'fleet' })] }),
+        ),
+        'card-actions',
+      ),
+    ).toEqual(['Open C-12']);
+    expect(
+      labelsIn(
+        paletteGroups(
+          input({
+            query: 'C-12',
+            cards: [card({ source: 'inbox', column: 'inbox' })],
+          }),
+        ),
+        'card-actions',
+      ),
+    ).toEqual(['Open C-12']);
+  });
+
+  test('a title search lists the cards and offers actions only for a single hit', () => {
+    const two = paletteGroups(
+      input({
+        query: 'login',
+        cards: [card(), card({ number: 13, label: 'C-13' })],
+      }),
+    );
+    expect(labelsIn(two, 'cards')).toEqual([
+      'C-12 · Fix the login loop',
+      'C-13 · Fix the login loop',
+    ]);
+    expect(labelsIn(two, 'card-actions')).toEqual([]);
+    const one = paletteGroups(input({ query: 'login', cards: [card()] }));
+    expect(labelsIn(one, 'card-actions')).toContain('Run C-12');
+  });
+
+  test('isCardReference reads C-12 and #41 but not words', () => {
+    expect(isCardReference('c-12')).toBe(true);
+    expect(isCardReference('#41')).toBe(true);
+    expect(isCardReference('login')).toBe(false);
+    expect(lookupWanted('a')).toBe(false);
+    expect(lookupWanted('lo')).toBe(true);
   });
 });

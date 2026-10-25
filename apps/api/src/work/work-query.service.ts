@@ -149,7 +149,11 @@ export class WorkQueryService {
       ];
       if (search.cardNumber !== null) or.push({ number: search.cardNumber });
       if (search.issueNumber !== null) {
-        or.push({ issueNumber: search.issueNumber });
+        // C-393: `#41` is the card's issue or its pull request.
+        or.push(
+          { issueNumber: search.issueNumber },
+          { prNumber: search.issueNumber },
+        );
       }
       and.push({ OR: or });
     }

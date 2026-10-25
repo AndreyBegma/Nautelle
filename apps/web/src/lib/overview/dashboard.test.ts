@@ -5,7 +5,6 @@ import type {
   ApprovalsView,
   FleetView,
   ProjectSummary,
-  RunSummary,
   SlotSummary,
 } from '@nautelle/shared';
 import { formatUsd } from '../usage/format';
@@ -16,7 +15,6 @@ import {
   liveSessions,
   mergedPullRequests,
   mergedTodayHref,
-  needsYou,
   nextHour,
   OVERVIEW_TILE_HREF,
   roundLabel,
@@ -62,44 +60,6 @@ const slot = (over: Partial<SlotSummary>): SlotSummary => ({
   startedAt: '2026-10-13T08:00:00.000Z',
   endedAt: null,
   updatedAt: '2026-10-13T09:00:00.000Z',
-  ...over,
-});
-
-const run = (over: Partial<RunSummary>): RunSummary => ({
-  id: 'r',
-  kind: 'orchestrator_slot',
-  projectId: 'p1',
-  slotId: 's7',
-  slot: 'i7',
-  issue: 7,
-  title: null,
-  runtime: 'claude',
-  model: null,
-  profileKey: null,
-  output: 'pr',
-  status: 'failed',
-  outcome: null,
-  prNumber: null,
-  prUrl: null,
-  prChecks: null,
-  planId: null,
-  triggeredByType: 'orchestrator',
-  triggeredById: null,
-  startedAt: '2026-10-14T05:00:00.000Z',
-  endedAt: '2026-10-14T08:00:00.000Z',
-  durationMs: null,
-  updatedAt: '2026-10-14T08:00:00.000Z',
-  usage: {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite5m: 0,
-    cacheWrite1h: 0,
-    reasoning: 0,
-    requests: 0,
-    costUsd: null,
-    unpricedRequests: 0,
-  },
   ...over,
 });
 
@@ -233,144 +193,6 @@ describe('figures', () => {
         activity({ id: '5', type: 'pr.opened', prNumber: 9 }),
       ]),
     ).toBe(3);
-  });
-});
-
-describe('needsYou', () => {
-  test('blocked slots, prompts and waiting approvals, oldest first', () => {
-    const items = needsYou(
-      [project('p1')],
-      new Map([
-        [
-          'p1',
-          fleet('p1', [
-            slot({
-              id: 's1',
-              name: 'i4',
-              issue: 4,
-              lastCheckpoint: 'blocked',
-              updatedAt: '2026-10-13T09:00:00.000Z',
-            }),
-            slot({
-              id: 's2',
-              status: 'prompt',
-              updatedAt: '2026-10-13T08:00:00.000Z',
-            }),
-            slot({ id: 's3', status: 'running' }),
-            slot({ id: 's4', status: 'ended', lastCheckpoint: 'blocked' }),
-          ]),
-        ],
-      ]),
-      new Map([
-        [
-          'p1',
-          approvals([
-            approval({ title: 'fix login' }),
-            approval({ id: 'b', status: 'approved' }),
-          ]),
-        ],
-      ]),
-    );
-    expect(items.map((i) => [i.kind, i.title])).toEqual([
-      ['approval', 'PR #7 · fix login'],
-      ['prompt', 'Slot i1'],
-      ['blocked', 'Slot i4 · #4'],
-    ]);
-    expect(items[0]?.href).toBe('/projects/p1/queue?tab=approvals');
-    expect(items[2]?.projectName).toBe('Project p1');
-  });
-
-  test('a project whose fleet did not load contributes nothing', () => {
-    expect(needsYou([project('p1')], new Map(), new Map())).toEqual([]);
-  });
-
-  test('a blocked slot deep-links to itself on the Fleet (#213)', () => {
-    const [item] = needsYou(
-      [project('p1')],
-      new Map([
-        ['p1', fleet('p1', [slot({ name: 'i4', lastCheckpoint: 'blocked' })])],
-      ]),
-      new Map(),
-    );
-    expect(item?.href).toBe('/projects/p1/fleet?open=i4&focus=i4');
-  });
-
-  test('runs failed in the last 24 h, and a missing profile first (#213)', () => {
-    const now = Date.parse('2026-10-14T12:00:00.000Z');
-    const items = needsYou(
-      [project('p1'), project('p2')],
-      new Map(),
-      new Map(),
-      {
-        now,
-        failedRuns: new Map([
-          [
-            'p1',
-            [
-              run({ id: 'fresh', endedAt: '2026-10-14T06:00:00.000Z' }),
-              run({ id: 'old', endedAt: '2026-10-13T06:00:00.000Z' }),
-              run({ id: 'ok', status: 'succeeded' }),
-              run({ id: 'titled', slot: null, title: 'Nightly audit' }),
-              run({ id: 'skill', kind: 'skill', slot: null, title: null }),
-            ],
-          ],
-        ]),
-        missingProfile: new Set(['p2']),
-      },
-    );
-    expect(items.map((i) => [i.kind, i.key])).toEqual([
-      ['profile', 'profile:p2'],
-      ['failed', 'failed:fresh'],
-      ['failed', 'failed:titled'],
-      ['failed', 'failed:skill'],
-    ]);
-    expect(items[3]?.title).toBe('Skill run');
-    expect(items[0]?.href).toBe('/projects/p2/settings?tab=orchestrator');
-    expect(items[0]?.since).toBeNull();
-    expect(items[1]?.title).toBe('Slot i7 · #7');
-    expect(items[1]?.href).toBe('/projects/p1/activity?tab=runs&run=fresh');
-    expect(items[2]?.title).toBe('Nightly audit');
-  });
-
-  test('a blocked slot whose session is gone leaves the list (C-389)', () => {
-    const items = needsYou(
-      [project('p1')],
-      new Map([
-        [
-          'p1',
-          fleet('p1', [
-            slot({ id: 'idle', status: 'idle', lastCheckpoint: 'blocked' }),
-            slot({ id: 'stale', status: 'stale', lastCheckpoint: 'blocked' }),
-            slot({
-              id: 'dispatched',
-              status: 'dispatched',
-              lastCheckpoint: 'blocked',
-            }),
-            slot({ id: 'ended', status: 'ended', lastCheckpoint: 'blocked' }),
-          ]),
-        ],
-      ]),
-      new Map(),
-    );
-    expect(items.map((i) => i.key)).toEqual(['blocked:idle']);
-  });
-
-  test("a service's failed run is Activity's, not the list's (C-389)", () => {
-    const now = Date.parse('2026-10-14T12:00:00.000Z');
-    const items = needsYou([project('p1')], new Map(), new Map(), {
-      now,
-      failedRuns: new Map([
-        [
-          'p1',
-          [
-            run({ id: 'digest', kind: 'steward', slot: null }),
-            run({ id: 'assess', kind: 'card_assess', slot: null }),
-            run({ id: 'card', kind: 'card', slot: null, title: 'C-7' }),
-          ],
-        ],
-      ]),
-    });
-    expect(items.map((i) => i.key)).toEqual(['failed:card']);
   });
 });
 

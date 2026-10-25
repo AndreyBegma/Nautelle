@@ -19,6 +19,7 @@ import {
   type CardHooksCause,
   type CardPrTarget,
   type CardPullRequestRef,
+  type CardQueueView,
   type CardRecommendationView,
   type CardReviewState,
   type CardReviewStepView,
@@ -143,6 +144,21 @@ export const cardFaceRoundSelect = {
 export type CardFaceRound = Prisma.BoardCardRoundGetPayload<{
   select: typeof cardFaceRoundSelect;
 }>;
+
+/**
+ * C-364: the `findMany` arguments that read a card face — the Board's and
+ * the Inbox's (C-390) read.
+ */
+export const cardFaceArgs = {
+  omit: cardFaceOmit,
+  include: {
+    rounds: {
+      orderBy: { round: 'desc' as const },
+      select: cardFaceRoundSelect,
+    },
+    design: cardDesignSelect,
+  },
+} satisfies Prisma.BoardCardFindManyArgs;
 
 /** C-364: a card as its face reads it; every `CardWithRounds` is one. */
 export type CardFace = Omit<BoardCard, keyof typeof cardFaceOmit> & {
@@ -269,6 +285,8 @@ export interface CardFacts {
   messagesRefused?: ReadonlyMap<string, string>;
   /** C-371: each card's newest demo recording, by card id; absent is none. */
   demos?: ReadonlyMap<string, CardDemoBrief>;
+  /** C-398: each queued card's place in the run queue, by card id; absent is none. */
+  queue?: ReadonlyMap<string, CardQueueView>;
   now: Date;
 }
 
@@ -664,6 +682,7 @@ export const toCardView = (
   autoRunWhenReady: card.autoRunWhenReady,
   readiness: cardReadiness(card.column, facts.dependencies.get(card.id) ?? []),
   stack: facts.stacks?.get(card.id) ?? null,
+  queue: facts.queue?.get(card.id) ?? null,
   tracking: trackingOf(card, facts),
   taken: takenOf(card, facts),
   queuedForSessionId: card.queuedForSessionId,

@@ -3,8 +3,12 @@ import type {
   ProjectMemberView,
   ProjectRuntimeProfile,
   ProjectSummary,
+  PushCheckView,
 } from '@nautelle/shared';
-import type { ProjectInspection } from '@nautelle/shared/protocol';
+import type {
+  ProjectDiscoverResult,
+  ProjectInspection,
+} from '@nautelle/shared/protocol';
 import {
   Body,
   Controller,
@@ -20,12 +24,18 @@ import {
 import type { AuditContext } from '../audit/audit.types';
 import { AuditCtx } from '../audit/audit-context';
 import type { AuthUser } from '../auth/auth-request';
-import { CurrentUser, Roles } from '../auth/decorators';
+import {
+  CurrentUser,
+  ProjectScopedTokenAllowed,
+  Roles,
+} from '../auth/decorators';
 import {
   AddProjectMemberDto,
   ConnectProjectDto,
+  DiscoverProjectsDto,
   DocsSourceOverrideDto,
   InspectProjectDto,
+  PushCheckDto,
   UpdateProjectDto,
   UpdateProjectMemberDto,
 } from './dto';
@@ -51,6 +61,26 @@ export class AdminProjectsController {
     @AuditCtx() ctx: AuditContext,
   ): Promise<ProjectInspection> {
     return this.projects.inspect(dto.runnerId, dto.path, ctx);
+  }
+
+  /** C-396: the repository picker of the connect dialog. */
+  @Post('discover')
+  @HttpCode(200)
+  discover(
+    @Body() dto: DiscoverProjectsDto,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<ProjectDiscoverResult> {
+    return this.projects.discover(dto.runnerId, ctx);
+  }
+
+  /** C-396: does origin accept pushes from this checkout? */
+  @Post('push-check')
+  @HttpCode(200)
+  pushCheck(
+    @Body() dto: PushCheckDto,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<PushCheckView> {
+    return this.projects.pushCheck(dto.runnerId, dto.path, ctx);
   }
 
   @Post()
@@ -90,7 +120,9 @@ export class ProjectsController {
     private readonly members: ProjectMembersService,
   ) {}
 
+  // C-403: `visibleWhere` narrows the list to a project-limited token's own.
   @Get()
+  @ProjectScopedTokenAllowed()
   list(@CurrentUser() user: AuthUser): Promise<ProjectSummary[]> {
     return this.projects.list(user);
   }

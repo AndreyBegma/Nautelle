@@ -592,6 +592,50 @@ describe('projects (e2e)', () => {
       ]);
     });
 
+    it('stores the DemoFlow config the runner reports, unknown from an older runner (C-395)', async () => {
+      const runner = await connectRunner();
+      const project = await connectProject();
+      expect(project).toMatchObject({ hasDemoflowConfig: null });
+
+      runner.answer = () => ({
+        ok: true,
+        output: inspection({ hasDemoflowConfig: true }),
+      });
+      const refreshed = await admin.send(
+        'post',
+        `/projects/${project.id}/refresh`,
+      );
+      expect(refreshed.status).toBe(200);
+      expect(refreshed.body).toMatchObject({ hasDemoflowConfig: true });
+      expect((await admin.get(`/projects/${project.id}`)).body).toMatchObject({
+        hasDemoflowConfig: true,
+      });
+    });
+
+    it('shows the newest push check of its checkout, null before one ran (C-395)', async () => {
+      const runner = await connectRunner();
+      const project = await connectProject();
+      expect(project.pushCheck).toBeNull();
+
+      runner.answer = () => ({
+        ok: true,
+        output: { ok: false, remote: null, message: 'Permission denied' },
+      });
+      const check = await admin.send('post', '/admin/projects/push-check', {
+        runnerId,
+        path: ROOT,
+      });
+      expect(check.status).toBe(200);
+      expect((await admin.get(`/projects/${project.id}`)).body).toMatchObject({
+        pushCheck: {
+          ok: false,
+          remote: null,
+          message: 'Permission denied',
+          checkedAt: check.body.checkedAt,
+        },
+      });
+    });
+
     it('keeps the GitHub repository id on the same repo and drops it on another (spec 27 D7)', async () => {
       const runner = await connectRunner();
       const project = await connectProject();

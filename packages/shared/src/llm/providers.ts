@@ -65,6 +65,7 @@ export const LLM_FEATURES = [
   'title',
   'assistant_summary',
   'review_instructions',
+  'quick_card',
 ] as const;
 export type LlmFeature = (typeof LLM_FEATURES)[number];
 

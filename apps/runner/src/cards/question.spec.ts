@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { answerSteps, matchQuestion, readQuestion } from './question';
+import {
+  answerRow,
+  answerSteps,
+  matchQuestion,
+  readQuestion,
+} from './question';
 
 // Captured from a Claude Code 2.1.301 pane (#473), each at a step of answering.
 const fixture = (name: string): string =>
@@ -76,7 +81,9 @@ describe('reading and answering the selector (#489 M4)', () => {
       },
       cursor: 1,
       otherIndex: 3,
-      numbers: [1, 2, 3, 4],
+      rows: [1, 2, 3, 4],
+      place: expect.any(String),
+      cursorLabel: 'Add it to glass-ui',
     });
     // The same screen with the cursor moved is the same question.
     const moved = readQuestion(fixture('ask-user-question-moved'));
@@ -138,7 +145,9 @@ describe('reading and answering the selector (#489 M4)', () => {
       },
       cursor: 1,
       otherIndex: 4,
-      numbers: [1, 2, 3, 4, 5],
+      rows: [1, 2, 3, 4, 5],
+      place: expect.any(String),
+      cursorLabel: 'Wait for C-368',
     });
     if (!screen) throw new Error('no question');
     expect(answerSteps(screen, { index: 3 })).toEqual([
@@ -203,5 +212,136 @@ describe('reading and answering the selector (#489 M4)', () => {
       expect(answerSteps(screen, { index })).toBeNull();
     }
     expect(answerSteps(review, { text: 'x' })).toBeNull();
+  });
+});
+
+// Captured from a Claude Code 2.1.310 pane (#967): a form of two questions at
+// 80x24, as a card session shows it, and a multi-select tab.
+describe('a form of several questions (#967)', () => {
+  it('still reads a tab when its key hints wrap at 80 columns', () => {
+    for (const name of [
+      'ask-user-questions-80x24-other',
+      'ask-user-questions-80x24-typed',
+      'ask-user-questions-multi-other-typed',
+    ]) {
+      expect(matchQuestion(fixture(name))).not.toBeNull();
+      expect(readQuestion(fixture(name))).not.toBeNull();
+    }
+    const typed = readQuestion(fixture('ask-user-questions-80x24-typed'));
+    // The wrapped line is no option's description.
+    expect(typed?.question.options.at(-1)).toEqual({
+      index: 3,
+      label: 'At noon, in #team',
+    });
+  });
+
+  it('names every tab of the form, whether answered, and the step', () => {
+    const first = readQuestion(fixture('ask-user-questions-80x24-tab1'));
+    expect(first?.question.text).toBe(
+      'When should the daily digest go out, and to which channel should it be posted\nfor the team?',
+    );
+    expect(first?.question.form).toEqual({
+      tabs: [
+        { label: 'Digest time', answered: false },
+        { label: 'Events', answered: false },
+      ],
+      step: 'question',
+    });
+    const second = readQuestion(fixture('ask-user-questions-80x24-tab2'));
+    expect(second?.question.text).toBe('Which events count?');
+    expect(second?.question.form?.tabs).toEqual([
+      { label: 'Digest time', answered: true },
+      { label: 'Events', answered: false },
+    ]);
+    expect(second?.question.key).not.toBe(first?.question.key);
+    const review = readQuestion(fixture('ask-user-questions-80x24-review'));
+    expect(review?.question.form?.step).toBe('submit');
+    expect(review?.question.options.map((o) => o.label)).toEqual([
+      'Submit answers',
+      'Cancel',
+    ]);
+    // One question has no form.
+    expect(readQuestion(fixture('ask-user-question'))?.question.form).toBe(
+      undefined,
+    );
+  });
+
+  it('keeps the place of a tab while the person moves and types, and changes it with the tab', () => {
+    const first = readQuestion(fixture('ask-user-questions-80x24-tab1'));
+    const other = readQuestion(fixture('ask-user-questions-80x24-other'));
+    const typed = readQuestion(fixture('ask-user-questions-80x24-typed'));
+    expect(other?.place).toBe(first?.place);
+    expect(typed?.place).toBe(first?.place);
+    expect(typed?.cursor).toBe(3);
+    expect(typed?.cursorLabel).toBe('At noon, in #team');
+    for (const name of [
+      'ask-user-questions-80x24-tab2',
+      'ask-user-questions-80x24-review',
+    ]) {
+      expect(readQuestion(fixture(name))?.place).not.toBe(first?.place);
+    }
+  });
+
+  it('reads a multi-select tab: its boxes, Other, and the Next row', () => {
+    const screen = readQuestion(fixture('ask-user-questions-multi-first'));
+    expect(screen?.question).toMatchObject({
+      text: 'Which events?',
+      multiSelect: true,
+      other: true,
+      options: [
+        {
+          index: 1,
+          label: 'Started',
+          description: 'The event that marks the beginning',
+          checked: false,
+        },
+        {
+          index: 2,
+          label: 'Finished',
+          description: 'The event that marks the completion',
+          checked: false,
+        },
+      ],
+    });
+    expect(screen?.otherIndex).toBe(3);
+    expect(screen?.rows).toEqual([1, 2, 3, 'next', 4]);
+    const next = readQuestion(fixture('ask-user-questions-multi-next-row'));
+    expect(next?.cursor).toBe('next');
+    expect(next?.place).toBe(screen?.place);
+    // The last tab's row reads Submit.
+    expect(
+      readQuestion(fixture('ask-user-questions-three-multi'))?.rows,
+    ).toEqual([1, 2, 3, 'next', 4]);
+  });
+
+  it('ticks a multi-select option, or types Other, then presses Enter on Next', () => {
+    const screen = readQuestion(fixture('ask-user-questions-multi-first'));
+    if (!screen) throw new Error('no question');
+    expect(answerSteps(screen, { index: 2 })).toEqual([
+      { key: 'Down' },
+      { key: 'Enter' },
+      { key: 'Down' },
+      { key: 'Down' },
+      { key: 'Enter' },
+    ]);
+    expect(answerSteps(screen, { text: 'Merged' })).toEqual([
+      { key: 'Down' },
+      { key: 'Down' },
+      { literal: 'Merged' },
+      { key: 'Down' },
+      { key: 'Enter' },
+    ]);
+    expect(answerRow(screen, { index: 2 })).toBe('next');
+    // A box already ticked is not ticked off.
+    const ticked = readQuestion(
+      fixture('ask-user-questions-three-multi-toggled'),
+    );
+    if (!ticked) throw new Error('no question');
+    expect(ticked.question.options[1]?.checked).toBe(true);
+    expect(answerSteps(ticked, { index: 2 })).toEqual([
+      { key: 'Down' },
+      { key: 'Down' },
+      { key: 'Enter' },
+    ]);
   });
 });

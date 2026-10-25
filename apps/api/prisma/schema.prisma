@@ -45,6 +45,8 @@ model User {
   recoveryCodes               UserRecoveryCode[]
   approvedUsers               User[]                        @relation("UserApprovals")
   sessions                    UserSession[]
+  apiTokens                   ApiToken[]                    @relation("ApiTokenOwner")
+  apiTokensRevoked            ApiToken[]                    @relation("ApiTokenRevokedBy")
   settingsUpdated             Setting[]
   runnersCreated              Runner[]                      @relation("RunnerCreatedBy")
   runnersLocal                Runner[]                      @relation("RunnerLocalUser")
@@ -91,6 +93,7 @@ model User {
   boardCardsCreated           BoardCard[]                   @relation("BoardCardCreatedBy")
   boardStacksCreated          BoardStack[]                  @relation("BoardStackCreatedBy")
   boardStackRunsStarted       BoardStackRun[]               @relation("BoardStackRunStartedBy")
+  boardRunQueueCards          BoardRunQueueCard[]           @relation("BoardRunQueueCardQueuedBy")
   boardCardsMoved             BoardCard[]                   @relation("BoardCardMovedBy")
   boardCardsCompleted         BoardCard[]                   @relation("BoardCardCompletedBy")
   boardCardsAutoRunArmed      BoardCard[]                   @relation("BoardCardAutoRunArmedBy")
@@ -181,6 +184,40 @@ model UserSession {
   @@map("user_sessions")
 }
 
+enum ApiTokenScope {
+  owner
+  read_only
+}
+
+/// C-403: a personal API token — `Authorization: Bearer` on the REST API. It
+/// acts as its owner with the owner's current role; `read_only` refuses every
+/// write. Only the SHA-256 of the token is stored.
+model ApiToken {
+  id          String        @id @default(cuid())
+  userId      String
+  name        String
+  tokenHash   String        @unique
+  /// The token's first characters, shown so two tokens can be told apart.
+  hint        String
+  scope       ApiTokenScope
+  /// Empty: every project the owner can see. Otherwise only these; a deleted
+  /// project's id stays and matches nothing.
+  projectIds  String[]
+  /// Null: never expires.
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  lastUsedIp  String?
+  revokedAt   DateTime?
+  revokedById String?
+  createdAt   DateTime      @default(now())
+
+  user      User  @relation("ApiTokenOwner", fields: [userId], references: [id], onDelete: Cascade)
+  revokedBy User? @relation("ApiTokenRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("api_tokens")
+}
+
 model Setting {
   key         String   @id
   value       Json
@@ -243,8 +280,30 @@ model Runner {
   installedSkills      InstalledSkill[]
   skillInstallPreviews SkillInstallPreview[]
   actionRequests       ActionRequest[]
+  pushChecks           RepositoryPushCheck[]
 
   @@map("runners")
+}
+
+/// C-396 (ADR-0101): the latest `git push --dry-run` a runner ran for a
+/// checkout — from the connect dialog before the project exists, or from
+/// Getting started after. Keyed by runner and path, not by project, so the
+/// check made in the preview counts once the project is connected.
+model RepositoryPushCheck {
+  id        String   @id @default(cuid())
+  runnerId  String
+  /// The path the check ran on: the inspection's `root`, as a project stores it.
+  rootPath  String
+  ok        Boolean
+  /// origin's URL without credentials; null when the repository has none.
+  remote    String?
+  message   String
+  checkedAt DateTime
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@unique([runnerId, rootPath])
+  @@map("repository_push_checks")
 }
 
 model RunnerPairingCode {
@@ -405,6 +464,8 @@ enum BaseSource {
   origin_head
   gh
   default
+  /// C-396: `origin/develop` exists and had a commit lately.
+  develop
 }
 
 enum DocsSourceKind {
@@ -457,6 +518,9 @@ model Project {
   codeSentinelConfig          Json?
   hasClaudeMd                 Boolean
   hasAgentsMd                 Boolean
+  /// C-395: the repository has a `demoflow.config.json` at its root; null
+  /// until a runner that reports it inspects the project.
+  hasDemoflowConfig           Boolean?
   lastInspectedAt             DateTime
   /// #691: why the runner's local policy refuses to watch this project, as the
   /// runner worded it in its latest `runner.watch_refused` (ADR-0047). Null
@@ -3487,8 +3551,8 @@ model BoardCard {
   candidate            PlanCandidate?
   /// #660: the triage hints written when the card was made.
   triage               BoardCardTriage?
-  /// #652: the card's place in its stack's run queue.
-  stackRunEntry        BoardStackRunCard?
+  /// #652, C-398: the card's place in the run queue.
+  queueEntry           BoardRunQueueCard?
   /// #652: the stack runs this card paused.
   stackRunsPaused      BoardStackRun[]        @relation("BoardStackRunPausedCard")
   /// #746: the card's A/B arm per technique, drawn at its first launch.
@@ -3634,36 +3698,51 @@ model BoardStackRun {
   stack      BoardStack          @relation(fields: [stackId], references: [id], onDelete: Cascade)
   startedBy  User?               @relation("BoardStackRunStartedBy", fields: [startedById], references: [id], onDelete: SetNull)
   pausedCard BoardCard?          @relation("BoardStackRunPausedCard", fields: [pausedCardId], references: [id], onDelete: SetNull)
-  cards      BoardStackRunCard[]
+  cards      BoardRunQueueCard[]
 
   @@index([pausedCardId])
   @@map("board_stack_runs")
 }
 
-/// #652: a card's place in a stack run — `queued` and ready to start,
-/// `waiting` for a dependency, or `started` by the run (`roundId`).
-enum BoardStackRunCardStatus {
+/// #652: a card's place in the run queue — `queued` and ready to start when
+/// a slot frees, `waiting` for a dependency, or `started` by a stack run
+/// (`roundId`). C-398: a card queued on its own is never `started`; its entry
+/// goes once its round starts.
+enum BoardRunQueueStatus {
   queued
   waiting
   started
 }
 
-/// #652: one card of a stack run's queue. A card is in one stack, so in one run.
-model BoardStackRunCard {
-  id        String                  @id @default(cuid())
-  runId     String
-  cardId    String                  @unique
-  status    BoardStackRunCardStatus @default(queued)
-  /// The round the run started; `null` until it starts one.
-  roundId   String?
-  createdAt DateTime                @default(now())
-  updatedAt DateTime                @updatedAt
+/// #652, C-398 (ADR-0102): one card of the Board's run queue — a card of a
+/// stack run (`runId`), or a To Do card a Run at `maxRunning` left waiting
+/// for a slot (`runId` null). Queued cards start in To Do order.
+model BoardRunQueueCard {
+  id           String              @id @default(cuid())
+  /// The stack run that queued it; `null` for a card queued on its own.
+  runId        String?
+  cardId       String              @unique
+  status       BoardRunQueueStatus @default(queued)
+  /// The round the stack run started; `null` until it starts one.
+  roundId      String?
+  /// C-398: who pressed Run — the card starts as them. `null` in a stack run (its `startedById`) or for AgentDock.
+  queuedById   String?
+  /// C-398: their project role then (`operator` or `admin`); `null` in a stack run.
+  queuedByRole String?
+  /// C-398: the Run's launch choices (`RunBoardCardRequest`); `null` in a stack run.
+  options      Json?
+  /// C-398: the dependency an Auto-run when ready Run started after.
+  autoRunAfter Int?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 
-  run  BoardStackRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  card BoardCard     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  run      BoardStackRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
+  card     BoardCard      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  queuedBy User?          @relation("BoardRunQueueCardQueuedBy", fields: [queuedById], references: [id], onDelete: SetNull)
 
   @@index([runId])
-  @@map("board_stack_run_cards")
+  @@index([queuedById])
+  @@map("board_run_queue")
 }
 
 /// #480: one stage of a stack. Its cards may run in parallel; they wait on
@@ -4736,6 +4815,7 @@ enum LlmFeature {
   title
   assistant_summary
   review_instructions
+  quick_card
 }
 
 enum LlmCallOutcome {

@@ -12,6 +12,9 @@ export const AUDIT_ACTIONS = [
   'auth.two_factor_enable',
   'auth.two_factor_disable',
   'auth.two_factor_recovery_codes',
+  /** C-403: a personal API token was created or revoked (by its owner or an admin). */
+  'auth.api_token_create',
+  'auth.api_token_revoke',
   'user.create',
   'user.approve',
   'user.reject',
@@ -173,6 +176,10 @@ export const AUDIT_ACTIONS = [
   'card.fleet_removed',
   'card.moved',
   'card.run_started',
+  /** C-398: a Run at `maxRunning` put the card in the run queue (`after: { number }`). */
+  'card.run_queued',
+  /** C-398: Stop took a queued card out of the run queue (`after: { number, stack }`). */
+  'card.run_dequeued',
   'card.feedback',
   'card.finished',
   // #750 D9: the worker's `escalate_card` (reason, model, relaunched).

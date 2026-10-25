@@ -253,16 +253,14 @@ describe('board rounds (e2e)', () => {
       expect(w.sent('card.run')).toHaveLength(1);
     });
 
-    it('a 4th concurrent run → 409 max_running', async () => {
+    it('a 4th concurrent run waits for a slot in the run queue (C-398)', async () => {
       for (let i = 0; i < 4; i += 1) await w.createCard();
       const responses = await Promise.all(
         [1, 2, 3, 4].map((n) => w.runCard(n)),
       );
-      const statuses = responses.map((r) => r.status).sort();
-      expect(statuses).toEqual([200, 200, 200, 409]);
-      expect(responses.find((r) => r.status === 409)?.body.error).toBe(
-        'max_running',
-      );
+      expect(responses.map((r) => r.status)).toEqual([200, 200, 200, 200]);
+      expect(responses.filter((r) => r.body.queue)).toHaveLength(1);
+      expect(await w.ctx.prisma.boardRunQueueCard.count()).toBe(1);
       expect(
         await w.ctx.prisma.boardCardRound.count({
           where: {

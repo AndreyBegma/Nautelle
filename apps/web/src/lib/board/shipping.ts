@@ -74,7 +74,7 @@ export const PROTECTED_PATHS_TEXT = 'Protected paths changed; a person merges';
  * Why automation stopped: the stored reason, else — a card marked before
  * #542 — no checks at all (#484), or red ones (#359 D6).
  */
-const needsPersonText = (
+export const needsPersonText = (
   card: Pick<BoardCardView, 'ciState' | 'needsPersonReason'>,
 ): string => {
   switch (card.needsPersonReason) {
