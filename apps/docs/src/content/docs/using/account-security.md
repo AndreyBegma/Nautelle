@@ -122,11 +122,14 @@ A token limited to projects reaches only those projects, the project list and
 ### Call the API
 
 ```bash
-curl -H 'Authorization: Bearer ntl_YOUR_TOKEN' https://nautelle.example.com/api/projects
+export NAUTELLE_TOKEN='paste the token you copied when you created it'
+curl -H "Authorization: Bearer $NAUTELLE_TOKEN" https://nautelle.example.com/api/projects
 ```
 
-Use your instance address; behind the web app the API is under `/api`. No cookie
-and no CSRF header are needed.
+`NAUTELLE_TOKEN` is a variable you set yourself: paste the token shown once at
+creation, or load it from your CI's secret store so it never lands in a script
+or a repository. Use your instance address; behind the web app the API is under
+`/api`. No cookie and no CSRF header are needed.
 
 ### What a token cannot do
 
