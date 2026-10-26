@@ -71,6 +71,13 @@ export const cardRecordSchema = z.object({
   finishGuard: z
     .object({ issueNumber: z.number().int().positive().nullable() })
     .optional(),
+  /**
+   * C-504 (ADR-0126): the round's `card.run` carried `readOnly` — its
+   * worktree is detached at `start`, the commit the daemon's guard compares
+   * HEAD with; nothing is pushed and `card.collect` is refused. Absent is a
+   * writing round.
+   */
+  readOnly: z.object({ start: z.string().min(1) }).optional(),
   startedAt: z.iso.datetime(),
   endedAt: z.iso.datetime().optional(),
   /**

@@ -32,6 +32,7 @@ interface SetupOptions
       | 'alive'
       | 'launchedSession'
       | 'readDescription'
+      | 'readOnlyWorktree'
     >
   > {
   reply?: LocalResult<unknown>;
@@ -84,6 +85,9 @@ const setup = (
       : {}),
     ...(options.launchedSession
       ? { launchedSession: options.launchedSession }
+      : {}),
+    ...(options.readOnlyWorktree
+      ? { readOnlyWorktree: options.readOnlyWorktree }
       : {}),
     now: () => '2026-10-14T10:00:00.000Z',
     log: memoryLogger().log,
@@ -500,6 +504,117 @@ describe('LocalService — card rounds after a restart (#482)', () => {
       as(SESSION, WORKTREE),
     );
     expect(relayed[0]?.args).toEqual({ report: 'Found it.', proposals: [] });
+  });
+
+  describe('the read-only guard on finish_analysis (C-504 D2.4)', () => {
+    const START = 'c'.repeat(40);
+    const readOnly: CardRecord = { ...round, readOnly: { start: START } };
+    const report = { report: 'Found it.', proposals: [] };
+    /** A worktree with `changes`; a reset clears them and is recorded. */
+    const worktree = (changes: string[]) => {
+      const state = {
+        changes,
+        read: [] as string[][],
+        resets: [] as string[][],
+      };
+      return {
+        state,
+        readOnlyWorktree: {
+          changes: async (wt: string, start: string) => {
+            state.read.push([wt, start]);
+            return state.changes;
+          },
+          reset: async (wt: string, start: string) => {
+            state.resets.push([wt, start]);
+            state.changes = [];
+          },
+        },
+      };
+    };
+    const call = (service: LocalService, args: Record<string, unknown>) =>
+      service.handle(
+        'request',
+        { ...finish, method: 'card.finishAnalysis', args },
+        as(SESSION, WORKTREE),
+      );
+
+    it('relays a finish from a clean worktree at once, unflagged', async () => {
+      const { state, readOnlyWorktree } = worktree([]);
+      const { service, relayed } = setup(false, true, {
+        liveRound: () => readOnly,
+        readOnlyWorktree,
+      });
+      expect((await call(service, report)).ok).toBe(true);
+      expect(relayed[0]?.args).toEqual(report);
+      // The round's worktree and start, never the caller's cwd.
+      expect(state.read).toEqual([[WORKTREE, START]]);
+    });
+
+    it('refuses a changed worktree twice with the paths, then resets it and relays the finish flagged', async () => {
+      const { state, readOnlyWorktree } = worktree(['src/app.ts', 'notes.md']);
+      const { service, relayed } = setup(false, true, {
+        liveRound: () => readOnly,
+        readOnlyWorktree,
+      });
+      for (let i = 0; i < 2; i++) {
+        const refused = await call(service, report);
+        expect(refused.ok).toBe(false);
+        expect(!refused.ok && refused.error.code).toBe('read_only_violation');
+        expect(!refused.ok && refused.error.message).toContain('src/app.ts');
+        expect(!refused.ok && refused.error.message).toContain('notes.md');
+      }
+      expect(relayed).toEqual([]);
+      expect(state.resets).toEqual([]);
+      expect((await call(service, report)).ok).toBe(true);
+      expect(state.resets).toEqual([[WORKTREE, START]]);
+      expect(relayed[0]?.args).toEqual({ ...report, readOnlyViolation: true });
+    });
+
+    it('a caller cannot claim the flag away', async () => {
+      const { readOnlyWorktree } = worktree(['src/app.ts']);
+      const { service, relayed } = setup(false, true, {
+        liveRound: () => readOnly,
+        readOnlyWorktree,
+      });
+      const claimed = { ...report, readOnlyViolation: false };
+      expect((await call(service, claimed)).ok).toBe(false);
+      expect((await call(service, claimed)).ok).toBe(false);
+      expect((await call(service, claimed)).ok).toBe(true);
+      expect(relayed[0]?.args).toEqual({ ...report, readOnlyViolation: true });
+    });
+
+    it('starts each round without refusals', async () => {
+      let current = readOnly;
+      const { readOnlyWorktree } = worktree(['src/app.ts']);
+      const { service } = setup(false, true, {
+        liveRound: () => current,
+        readOnlyWorktree,
+      });
+      expect((await call(service, report)).ok).toBe(false);
+      expect((await call(service, report)).ok).toBe(false);
+      current = { ...readOnly, runId: 'run_2' };
+      expect((await call(service, report)).ok).toBe(false);
+    });
+
+    it('leaves a round that is not read-only, and another session in the worktree, alone', async () => {
+      const { state, readOnlyWorktree } = worktree(['src/app.ts']);
+      const { service, relayed } = setup(false, true, {
+        liveRound: () => round,
+        readOnlyWorktree,
+      });
+      expect((await call(service, report)).ok).toBe(true);
+      const other = setup(false, true, {
+        liveRound: () => readOnly,
+        readOnlyWorktree,
+      });
+      await other.service.handle(
+        'request',
+        { ...finish, method: 'card.finishAnalysis', args: report },
+        as('s-own', WORKTREE),
+      );
+      expect(state.read).toEqual([]);
+      expect(relayed[0]?.args).toEqual(report);
+    });
   });
 
   describe('the artifact guard on the daemon’s side (#445 D8, DR-10)', () => {

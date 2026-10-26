@@ -21,6 +21,11 @@ import {
 import { z } from 'zod';
 import { correlateCwd } from '../adapters/correlate';
 import { ARTIFACT_INCOMPLETE, FinishGuard } from '../cards/finish-guard';
+import {
+  READ_ONLY_VIOLATION,
+  ReadOnlyGuard,
+  type ReadOnlyWorktree,
+} from '../cards/read-only';
 import type { CardRecord } from '../cards/record';
 import { errorMessage, type Logger } from '../log';
 import type { EnvelopeProject } from '../otlp/map';
@@ -94,6 +99,11 @@ export interface LocalServiceDeps {
   stopRoundSoon?: (round: EscalatedRound) => void;
   /** #445 D8: a worktree's pull request description; read from disk by default. */
   readDescription?: (worktree: string) => string | null;
+  /**
+   * C-504 D2.4: reads and resets a read-only round's worktree (git). Absent,
+   * a read-only round's `finish_analysis` is relayed unchecked.
+   */
+  readOnlyWorktree?: ReadOnlyWorktree;
   now: () => string;
   log: Logger;
 }
@@ -181,6 +191,11 @@ export class LocalService {
   private readonly finishGuards = new Map<
     string,
     { runId: string; guard: FinishGuard }
+  >();
+  /** C-504 D2.4: each card's read-only guard for its current round, by card id. */
+  private readonly readOnlyGuards = new Map<
+    string,
+    { runId: string; guard: ReadOnlyGuard }
   >();
 
   constructor(private readonly deps: LocalServiceDeps) {}
@@ -445,6 +460,9 @@ export class LocalService {
     if (input.method === 'card.finishAnalysis') {
       // C-503 (ADR-0126): only the daemon's read-only guard (C-504) sets it.
       relayed = withoutClaimed(relayed, 'readOnlyViolation');
+      const guarded = await this.guardReadOnly(binding, relayed);
+      if (!guarded.ok) return guarded;
+      relayed = guarded.data;
     }
     const result = await this.deps.relay({
       method: input.method,
@@ -511,6 +529,60 @@ export class LocalService {
       data: decision.artifactIncomplete
         ? { ...rest, artifactIncomplete: true }
         : rest,
+    };
+  }
+
+  /**
+   * C-504 D2.4: a read-only round's `finish_analysis` from a worktree that
+   * changed — dirty, or HEAD off the start commit — is refused
+   * `read_only_violation` with the changes, twice; the third resets the
+   * worktree and goes on with `readOnlyViolation: true`. A clean one goes on
+   * at once; a session that is no read-only round is the API's to answer.
+   */
+  private async guardReadOnly(
+    binding: SessionBinding,
+    args: unknown,
+  ): Promise<LocalResult<unknown>> {
+    const git = this.deps.readOnlyWorktree;
+    if (!git || typeof args !== 'object' || args === null) {
+      return { ok: true, data: args };
+    }
+    const round = this.deps.liveRound?.(binding.cwd) ?? null;
+    if (!round?.readOnly || round.sessionId !== binding.sessionId) {
+      return { ok: true, data: args };
+    }
+    let guard = this.readOnlyGuards.get(round.cardId);
+    if (guard?.runId !== round.runId) {
+      // A new round starts with no refusals.
+      guard = {
+        runId: round.runId,
+        guard: new ReadOnlyGuard({
+          worktree: round.worktree,
+          start: round.readOnly.start,
+          git,
+          warn: (message, error) =>
+            this.deps.log.warn(`local: read-only guard: ${message}`, {
+              cardId: round.cardId,
+              runId: round.runId,
+              error: errorMessage(error),
+            }),
+        }),
+      };
+      this.readOnlyGuards.set(round.cardId, guard);
+    }
+    const decision = await guard.guard.check();
+    if (decision.kind === 'reject') {
+      this.deps.log.warn('local: finish_analysis from a changed worktree', {
+        cardId: round.cardId,
+        runId: round.runId,
+      });
+      return localFail(READ_ONLY_VIOLATION, decision.message);
+    }
+    return {
+      ok: true,
+      data: decision.readOnlyViolation
+        ? { ...args, readOnlyViolation: true }
+        : args,
     };
   }
 

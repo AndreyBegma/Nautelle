@@ -7,6 +7,9 @@ import { z } from 'zod';
  * proposals into cards with Create selected (C-506).
  */
 
+/** C-504: the MCP tool an analysis session finishes with (`card.finishAnalysis`). */
+export const FINISH_ANALYSIS_TOOL = 'finish_analysis';
+
 /** The report, markdown; stored on the round as `report`. */
 export const ANALYSIS_REPORT_MAX = 20_000;
 /** Proposals one finish may carry. */

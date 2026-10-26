@@ -1,11 +1,19 @@
 import {
   ACTION_REQUEST_SUMMARY_MAX,
+  ANALYSIS_REPORT_MAX,
   CARD_EFFORTS,
   CARD_ESCALATION_NOTE_MAX,
   CARD_ESCALATION_REASONS,
+  CARD_PROPOSAL_BODY_MAX,
+  CARD_PROPOSAL_KINDS,
+  CARD_PROPOSAL_LABEL_MAX,
+  CARD_PROPOSAL_LABELS_MAX,
+  CARD_PROPOSAL_TITLE_MAX,
+  CARD_PROPOSALS_MAX,
   CARD_RECOMMENDABLE_MODELS,
   DESIGN_COMMENT_MAX,
   ESCALATE_CARD_TOOL,
+  FINISH_ANALYSIS_TOOL,
   REVIEW_FINDING_BODY_MAX,
   REVIEW_FINDING_SEVERITIES,
   REVIEW_FINDING_TITLE_MAX,
@@ -648,5 +656,68 @@ export const REPORT_REVIEW_MCP_TOOL = {
       .max(REVIEW_SUMMARY_MAX)
       .optional()
       .describe('A short overall verdict; markdown.'),
+  },
+} as const satisfies McpToolDefinition;
+
+/**
+ * C-504 D3 (ADR-0126): set to `1` in the env of a read-only round
+ * (`card.run` `readOnly`); the MCP server then offers `finish_analysis`
+ * instead of `finish_card` and `escalate_card`.
+ */
+export const CARD_ANALYSIS_ENV = 'NAUTELLE_CARD_ANALYSIS';
+
+const cardProposal = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1)
+    .max(CARD_PROPOSAL_TITLE_MAX)
+    .describe('A short title, like an issue title.'),
+  body: z
+    .string()
+    .trim()
+    .min(1)
+    .max(CARD_PROPOSAL_BODY_MAX)
+    .describe('What and why, with the finding it comes from; markdown.'),
+  kind: z.enum(CARD_PROPOSAL_KINDS),
+  labels: z
+    .array(z.string().trim().min(1).max(CARD_PROPOSAL_LABEL_MAX))
+    .max(CARD_PROPOSAL_LABELS_MAX)
+    .optional(),
+  dependsOn: z
+    .array(z.number().int().nonnegative())
+    .max(CARD_PROPOSALS_MAX)
+    .optional()
+    .describe(
+      'Positions (0-based) of earlier proposals in this list that must be done first.',
+    ),
+});
+
+/**
+ * C-504 D3: an analysis card's worker finishes with its report and the cards
+ * it proposes, the way a card worker calls `finish_card`. Not in `MCP_TOOLS`:
+ * it is listed only in an analysis session (`CARD_ANALYSIS_ENV`). The daemon
+ * checks the worktree is untouched before it relays the call (D2.4).
+ */
+export const FINISH_ANALYSIS_MCP_TOOL = {
+  name: FINISH_ANALYSIS_TOOL,
+  description:
+    'Only for the worker of a Nautelle analysis card: finish the card with the report and the cards you propose. Read-only: you must not edit files, commit, push or open a pull request — a worktree with changes is refused read_only_violation; undo them and call it again. Any other session is refused (not_a_card_session).',
+  method: 'card.finishAnalysis',
+  input: {
+    report: z
+      .string()
+      .trim()
+      .min(1)
+      .max(ANALYSIS_REPORT_MAX)
+      .describe(
+        'The analysis report: numbered findings with evidence; markdown.',
+      ),
+    proposals: z
+      .array(cardProposal)
+      .max(CARD_PROPOSALS_MAX)
+      .describe(
+        `The cards you propose, at most ${CARD_PROPOSALS_MAX}; an empty list when there are none.`,
+      ),
   },
 } as const satisfies McpToolDefinition;

@@ -1323,6 +1323,22 @@ Every command needs an operator.
   `takenBranch`, and the round's `card.run_started` audit records `branch`,
   `takenBranch` and any `startBranchSkipped` (the API's own reasons:
   `runner_outdated`, `not_a_card_branch`, `follow_up`).
+- **Read-only (C-504, ADR-0126).** A `card.run` with `readOnly: true` (sent
+  only to a runner that advertises `cardReadOnly`) is an analysis round. The
+  launch adds `--disallowedTools` for `Edit`, `Write`, `NotebookEdit` and the
+  `Bash(<command>:*)` rules of `git commit|push|merge|rebase|reset|checkout|switch|stash|tag|branch|worktree`
+  and `gh pr|issue|release|api`, under every wiring, keeping the permission
+  mode. The worktree is detached at the updated `origin/<base>` (a later
+  read-only round re-detaches and drops what the last one left); `files` are
+  committed on the detached HEAD, never pushed; no PR is opened and
+  `card.collect` is `invalid_args`. The session's env carries
+  `NAUTELLE_CARD_ANALYSIS=1`, so its MCP server lists `finish_analysis`
+  (`card.finishAnalysis`) instead of `finish_card` and `escalate_card`. The
+  daemon checks the worktree before relaying `finish_analysis`: changed paths
+  (`git status`, ignored files excluded) or a moved HEAD are refused with
+  `read_only_violation` naming them, twice; the third attempt resets the
+  worktree (`checkout --force --detach <start>`, `clean -fd`) and relays the
+  finish with `readOnlyViolation: true`.
 - **Collect.** Commits leftovers as `chore: card C-<number> work in progress`,
   pushes, and opens a PR into `base` when none is open for `branch` (else
   pushes only). `ahead: 0` is "No changes".

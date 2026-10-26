@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { CardCollectArgs } from '@nautelle/shared/protocol';
+import type { CardCollectArgs, CardRunArgs } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { memoryLogger } from '../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
@@ -177,6 +177,123 @@ describe('card.collect of a card whose worktree card.close removed (#344)', () =
       prState: 'open',
     });
     expect(await originHead()).toBe(head);
+  });
+});
+
+describe('a read-only round (C-504 D2.2, D2.3)', () => {
+  const readOnlyRound = async () => {
+    const { f, failure } = await setup();
+    const calls: { binary: string; args: string[] }[] = [];
+    const executor = new CardExecutor({
+      deps: f.deps((binary, args, options) => {
+        calls.push({ binary, args: [...args] });
+        if (binary !== 'tmux') return f.exec(binary, args, options);
+        // No tmux server: no sessions, and every new one starts.
+        const code = args[0] === 'new-session' ? 0 : 1;
+        return Promise.resolve({ code, stdout: '', stderr: '' });
+      }),
+      cardsDir: join(f.ws, 'state', 'cards'),
+      selfCommand: ['true'],
+      attachmentSource: { server: 'http://127.0.0.1:1', token: 'test' },
+      emit: () => {},
+      log: memoryLogger().log,
+    });
+    const run = (overrides: Partial<CardRunArgs> = {}) =>
+      executor.run({
+        cardId: 'card_1',
+        runId: 'run_1',
+        projectId: f.project.id,
+        root: f.root,
+        base: 'main',
+        shortId: 'ab12cd34',
+        branch: 'card/c12-why-is-it-slow',
+        session: { id: '3bb1739e-1a1c-4baa-b8b4-a4b1e6700361', resume: false },
+        prompt: 'Find out why it is slow.',
+        profileKey: 'claude-work',
+        model: 'opus',
+        permissionMode: 'bypassPermissions',
+        readOnly: true,
+        ...overrides,
+      });
+    const store = new CardStore(join(f.ws, 'state', 'cards'));
+    return { f, failure, executor, calls, run, store };
+  };
+
+  it('detaches the worktree at origin/<base>: no branch, no push, no PR', async () => {
+    const { f, calls, run, store } = await readOnlyRound();
+    // origin moved on since the root last fetched: the round starts there.
+    const clone = join(f.ws, 'other');
+    await f.run(f.ws, 'clone', '-q', f.origin, clone);
+    f.write(clone, { 'src/app.txt': 'v2\n' });
+    await f.commitAll(clone, 'feat: v2');
+    await f.run(clone, 'push', '-q', 'origin', 'main');
+    const originMain = await f.run(clone, 'rev-parse', 'HEAD');
+
+    await run();
+    const record = store.load('card_1');
+    const worktree = record?.worktree ?? '';
+    expect(record?.readOnly).toEqual({ start: originMain });
+    expect(record?.pullRequest).toBeUndefined();
+    expect(await f.run(worktree, 'rev-parse', 'HEAD')).toBe(originMain);
+    // Detached: no branch is checked out, and none was made.
+    expect(await f.run(worktree, 'branch', '--show-current')).toBe('');
+    expect(
+      await f.run(f.root, 'branch', '--list', 'card/c12-why-is-it-slow'),
+    ).toBe('');
+    const git = calls.filter((c) => c.binary === 'git').map((c) => c.args);
+    expect(git.some((a) => a.includes('push'))).toBe(false);
+    expect(
+      git.some((a) => a.includes('worktree') && a.includes('--detach')),
+    ).toBe(true);
+    expect(calls.some((c) => c.binary === 'gh' && c.args[0] === 'pr')).toBe(
+      false,
+    );
+    expect(f.gh.calls).toEqual([]);
+  });
+
+  it("commits the card's files on the detached HEAD and starts the guard after them", async () => {
+    const { f, run, store } = await readOnlyRound();
+    await run({
+      files: [{ path: 'docs/specs/card-12.md', content: '# Why it is slow\n' }],
+    });
+    const record = store.load('card_1');
+    const worktree = record?.worktree ?? '';
+    const head = await f.run(worktree, 'rev-parse', 'HEAD');
+    expect(record?.readOnly).toEqual({ start: head });
+    expect(await f.run(worktree, 'ls-files', 'docs/specs/card-12.md')).toBe(
+      'docs/specs/card-12.md',
+    );
+    expect(await f.run(worktree, 'branch', '--show-current')).toBe('');
+  });
+
+  it('a later read-only round re-detaches and drops what the last one left', async () => {
+    const { f, run, store } = await readOnlyRound();
+    await run();
+    const worktree = store.load('card_1')?.worktree ?? '';
+    f.write(worktree, { 'src/app.txt': 'edited\n', 'scratch.txt': 'x\n' });
+    await run({ runId: 'run_2' });
+    expect(await f.run(worktree, 'status', '--porcelain')).toBe('');
+    expect(store.load('card_1')?.runId).toBe('run_2');
+  });
+
+  it('D2.3: card.collect of the card is refused with invalid_args', async () => {
+    const { f, failure, executor, run } = await readOnlyRound();
+    await run();
+    expect(
+      await failure(
+        executor.collect({
+          cardId: 'card_1',
+          projectId: f.project.id,
+          root: f.root,
+          base: 'main',
+          branch: 'card/c12-why-is-it-slow',
+          number: 12,
+          title: 'C-12: Why is it slow',
+          body: 'Nautelle-Card: C-12',
+        }),
+      ),
+    ).toBe('invalid_args');
+    expect(f.gh.calls).toEqual([]);
   });
 });
 

@@ -70,6 +70,7 @@ import {
   collectBranch,
   collectCard,
   commitFiles,
+  commitOf,
   ensureWorktree,
   excludeFromGit,
   removeCardWorktree,
@@ -79,6 +80,7 @@ import {
 import { cardLaunchSpec, cardTokenSaver, cardWorktreePath } from './launch';
 import { type PushStep, pushCardHead } from './push';
 import { matchQuestion, readQuestion } from './question';
+import { placeReadOnlyWorktree } from './read-only';
 import { type CardRecord, CardStore } from './record';
 import {
   CardReviewStore,
@@ -334,7 +336,8 @@ export class CardExecutor {
         specFiles: args.files?.length
           ? args.files.map((f) => f.path)
           : previous?.specFiles,
-        ...pushStateOf(previous, args),
+        // C-504 D2.3: a read-only round pushes nothing and opens no PR.
+        ...(args.readOnly ? {} : pushStateOf(previous, args)),
       };
       this.setPhase(record, 'starting');
       let wiring: CardWiring;
@@ -366,9 +369,18 @@ export class CardExecutor {
             });
           }
         }
-        // #359 D8: the follow-up branch, from the updated base, first.
-        if (args.newBranch) await startFollowUpBranch(deps, record);
-        await ensureWorktree(deps, record);
+        if (args.readOnly) {
+          // C-504 D2.2: detached at `origin/<base>`, no branch, no upstream.
+          await placeReadOnlyWorktree(
+            deps,
+            record,
+            previous?.readOnly !== undefined,
+          );
+        } else {
+          // #359 D8: the follow-up branch, from the updated base, first.
+          if (args.newBranch) await startFollowUpBranch(deps, record);
+          await ensureWorktree(deps, record);
+        }
         this.trust(profile, record);
         // #359 D3: the worker's PR description goes under `.agentdock/`,
         // excluded whether or not the card has attachments.
@@ -386,6 +398,12 @@ export class CardExecutor {
           this.options.attachmentSource,
         );
         await commitFiles(deps, record.worktree, args.files ?? []);
+        if (args.readOnly) {
+          // D2.4: what the guard compares HEAD with — after the card's files.
+          const start = await commitOf(deps, record.worktree, 'HEAD');
+          if (!start) throw new Error(`${record.worktree} has no HEAD`);
+          record.readOnly = { start };
+        }
         const roundDir = this.store.createRound(record.cardId, record.runId);
         // #367 D1, D2: hooks and `finish_card` without per-profile setup.
         wiring = wireCardRound(
@@ -575,6 +593,13 @@ export class CardExecutor {
         throw new CommandFailure(
           'not_found',
           'the card belongs to another project on this runner',
+        );
+      }
+      // C-504 D2.3: a read-only round leaves nothing to collect.
+      if (record?.readOnly) {
+        throw new CommandFailure(
+          'invalid_args',
+          `card ${args.cardId}'s last round was read-only; it has nothing to collect`,
         );
       }
       // #344: Accept's `card.close` removed the worktree and the record; the
@@ -885,6 +910,8 @@ export class CardExecutor {
         prompt: STEWARD_RESUME_TEXT,
         // C-369: the session keeps DemoFlow's MCP server.
         ...(record.demo ? { demo: true as const } : {}),
+        // C-504: a read-only round resumes read-only.
+        ...(record.readOnly ? { readOnly: true as const } : {}),
       };
       this.trust(profile, record);
       try {
@@ -929,7 +956,9 @@ export class CardExecutor {
         }
         record.sessionId = args.sessionId;
         record.profileKey = args.profileKey;
-        if (args.pullRequest) record.pullRequest = args.pullRequest;
+        if (args.pullRequest && !record.readOnly) {
+          record.pullRequest = args.pullRequest;
+        }
         delete record.endedAt;
         this.setPhase(record, 'running', {
           wiring: wiring.wiring,
@@ -1361,7 +1390,8 @@ export class CardExecutor {
    * logged and tried again after the interval, never failing the round.
    */
   private queuePush(record: CardRecord): void {
-    if (!record.pullRequest) return;
+    // C-504 D2.3: never for a read-only round.
+    if (!record.pullRequest || record.readOnly) return;
     const { clock } = this.options.deps;
     const last = this.lastPushAt.get(record.cardId);
     const interval = this.options.pushIntervalMs ?? CARD_PUSH_MIN_INTERVAL_MS;
