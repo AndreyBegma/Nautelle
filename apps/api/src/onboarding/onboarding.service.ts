@@ -1,10 +1,13 @@
 import {
+  type MyOnboardingFacts,
   type OnboardingCardStage,
   type OnboardingFacts,
   profileAgentdockOf,
 } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
+import type { AuthUser } from '../auth/auth-request';
 import { PrismaService } from '../database/prisma.service';
+import { ProjectAccessService } from '../projects/project-access.service';
 
 /**
  * C-396: the facts behind Getting started. Read from rows other features
@@ -13,10 +16,37 @@ import { PrismaService } from '../database/prisma.service';
  */
 @Injectable()
 export class OnboardingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: ProjectAccessService,
+  ) {}
+
+  /** C-476: the caller's own steps — nothing about anyone else. */
+  async mine(
+    user: Pick<AuthUser, 'id' | 'role' | 'projectScope'>,
+  ): Promise<MyOnboardingFacts> {
+    const [project, telegram, emailRules, rounds] = await Promise.all([
+      // The order of `GET /projects`, so the step opens the first one listed.
+      this.prisma.project.findFirst({
+        where: this.access.visibleWhere(user),
+        orderBy: [{ displayName: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true, displayName: true },
+      }),
+      this.prisma.telegramLink.count({ where: { userId: user.id } }),
+      this.prisma.notificationRule.count({
+        where: { userId: user.id, email: { in: ['immediate', 'digest'] } },
+      }),
+      this.prisma.boardCardRound.count({ where: { authorId: user.id } }),
+    ]);
+    return {
+      project,
+      notifications: telegram > 0 || emailRules > 0,
+      ranCard: rounds > 0,
+    };
+  }
 
   async facts(): Promise<OnboardingFacts> {
-    const [projects, runners, firstCard, app, installations, users] =
+    const [projects, runners, firstCard, app, installations, users, keys] =
       await Promise.all([
         this.prisma.project.findMany({
           select: {
@@ -35,6 +65,9 @@ export class OnboardingService {
         this.prisma.gitHubApp.count(),
         this.prisma.gitHubInstallation.count({ where: { suspended: false } }),
         this.prisma.user.count(),
+        this.prisma.llmProviderSetting.count({
+          where: { keyCiphertext: { not: null } },
+        }),
       ]);
 
     return {
@@ -52,6 +85,7 @@ export class OnboardingService {
       firstCard,
       githubApp: app > 0 && installations > 0,
       teammates: users > 1,
+      aiProvider: keys > 0,
     };
   }
 

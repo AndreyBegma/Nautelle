@@ -24,4 +24,20 @@ export interface OnboardingFacts {
   githubApp: boolean;
   /** Someone other than the first administrator has an account. */
   teammates: boolean;
+  /** C-476: an AI provider has a key on Admin › AI providers. */
+  aiProvider: boolean;
+}
+
+/**
+ * C-476: `GET /onboarding/me` (admin, operator) — the facts about the caller
+ * alone behind Getting started: an operator's whole checklist, and an admin's
+ * notifications step.
+ */
+export interface MyOnboardingFacts {
+  /** The first project the caller can see, as `GET /projects` orders them; null when none. */
+  project: { id: string; displayName: string } | null;
+  /** The caller linked Telegram or turned on email for at least one kind. */
+  notifications: boolean;
+  /** The caller started a round of a card. */
+  ranCard: boolean;
 }
