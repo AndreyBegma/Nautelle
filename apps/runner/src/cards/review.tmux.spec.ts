@@ -262,6 +262,100 @@ describe.skipIf(!tmuxInstalled)('card review sessions (#884)', () => {
     expect(await t.executor.stopReview(stop)).toEqual({ stopped: false });
   });
 
+  describe('card.close with a review still open (#1049)', () => {
+    const openCard = async (t: Awaited<ReturnType<typeof setup>>) => {
+      const worktree = cardWorktreePath(t.f.root, SHORT);
+      await t.f.run(
+        t.f.root,
+        'worktree',
+        'add',
+        '-q',
+        worktree,
+        '-b',
+        BRANCH,
+        `origin/${BRANCH}`,
+      );
+      t.executor.store.save({
+        cardId: 'card_1',
+        projectId: t.f.project.id,
+        root: t.f.root,
+        repo: 'widget',
+        shortId: SHORT,
+        worktree,
+        branch: BRANCH,
+        base: 'main',
+        tmuxSession: 'nautelle-card-ab12cd34',
+        runId: 'run_1',
+        phase: 'ended',
+        startedAt: '2026-10-23T12:00:00.000Z',
+      });
+      await t.executor.review(t.args());
+      await t.argvOf('run_review_1');
+      return worktree;
+    };
+    const close = (
+      t: Awaited<ReturnType<typeof setup>>,
+      removeWorktree: boolean,
+      projectId = t.f.project.id,
+    ) => t.executor.close({ cardId: 'card_1', projectId, removeWorktree });
+
+    it('removes the review session, worktree and record', async () => {
+      const t = await setup();
+      const cardWorktree = await openCard(t);
+
+      await close(t, true);
+
+      expect(await t.alive('nautelle-review-ab12cd34')).toBe(false);
+      expect(existsSync(t.worktree)).toBe(false);
+      expect(
+        await t.f.run(t.f.root, 'worktree', 'list', '--porcelain'),
+      ).not.toContain('review-ab12cd34');
+      expect(existsSync(join(t.cardsDir, 'card_1', 'review'))).toBe(false);
+      expect(t.executor.reviewSession(SESSION)).toBe(false);
+      expect(existsSync(cardWorktree)).toBe(false);
+    });
+
+    it('removes the review of a card that has no record here', async () => {
+      const t = await setup();
+      await t.executor.review(t.args());
+      await t.argvOf('run_review_1');
+
+      expect(await close(t, true)).toEqual({
+        stopped: false,
+        worktreeRemoved: false,
+        branchDeleted: false,
+      });
+
+      expect(await t.alive('nautelle-review-ab12cd34')).toBe(false);
+      expect(existsSync(t.worktree)).toBe(false);
+      expect(t.executor.reviewSession(SESSION)).toBe(false);
+    });
+
+    it('leaves the review alone without removeWorktree', async () => {
+      const t = await setup();
+      await openCard(t);
+
+      await close(t, false);
+
+      expect(await t.alive('nautelle-review-ab12cd34')).toBe(true);
+      expect(existsSync(t.worktree)).toBe(true);
+      expect(existsSync(join(t.cardsDir, 'card_1', 'review'))).toBe(true);
+      expect(t.executor.reviewSession(SESSION)).toBe(true);
+    });
+
+    it('leaves a review of another project alone', async () => {
+      const t = await setup();
+      await t.executor.review(t.args());
+      await t.argvOf('run_review_1');
+
+      await close(t, true, 'prj_other');
+
+      expect(await t.alive('nautelle-review-ab12cd34')).toBe(true);
+      expect(existsSync(t.worktree)).toBe(true);
+      expect(t.executor.reviewSession(SESSION)).toBe(true);
+    });
+  });
+
   it('refuses a head origin does not have, and a profile that is not claude', async () => {
     const t = await setup();
     expect(
