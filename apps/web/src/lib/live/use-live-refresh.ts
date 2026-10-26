@@ -1,26 +1,22 @@
 'use client';
 
-import { BOARD_CHANGED_EVENT, MAX_LIVE_SUBSCRIPTIONS } from '@nautelle/shared';
+import { BOARD_CHANGED_EVENT } from '@nautelle/shared';
 import { useEffect, useRef } from 'react';
 import { useLivePaused } from '../../components/shell/live-status';
 import { getLiveClient } from './client';
+import { LIVE_PROJECT_BUDGET } from './plan';
 
 /** A burst of events folds into one reload this long after the first. */
 export const LIVE_REFRESH_DELAY_MS = 300;
 /** While the socket is down (or a topic is not followed), look this often. */
 export const LIVE_FALLBACK_POLL_MS = 30_000;
-/** Subscriptions left to the page's own topics (a `useLive` or two). */
-const SUBSCRIPTIONS_RESERVED = 10;
 
 /** The project topics one page follows, and whether that is all of them. */
 export function followedProjectTopics(projectIds: readonly string[]): {
   followed: string[];
   covered: boolean;
 } {
-  const followed = projectIds.slice(
-    0,
-    MAX_LIVE_SUBSCRIPTIONS - SUBSCRIPTIONS_RESERVED,
-  );
+  const followed = projectIds.slice(0, LIVE_PROJECT_BUDGET);
   return { followed, covered: followed.length === projectIds.length };
 }
 

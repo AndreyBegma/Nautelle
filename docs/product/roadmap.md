@@ -38,7 +38,7 @@ GitHub issue via `/code-sentinel:spec`; large rows split into waves there.
 | M3.4 | GitHub App: issue / PR / check events | ADR-0004 · [#27](https://github.com/AndreyBegma/Nautelle/issues/27) |
 | M3.5 | Budgets: per project / per user, alert or hard stop | · [#28](https://github.com/AndreyBegma/Nautelle/issues/28) |
 | M3.6 | Interactive terminal attach (admin only, audited) | · [#29](https://github.com/AndreyBegma/Nautelle/issues/29) |
-| M3.7 | Planner: brief → tasks grilled per task → reviewed → sent to the fleet, with a plan graph and a cross-project Tasks page | ADR-0019 · [#172](https://github.com/AndreyBegma/Nautelle/issues/172) |
+| M3.7 | Planner: brief → tasks grilled per task → reviewed → sent to the fleet, with a plan graph and a cross-project Tasks page, which became the Work list (`/tasks` redirects to `/work?source=plan`) | ADR-0019 · [#172](https://github.com/AndreyBegma/Nautelle/issues/172) |
 | M3.8 | Claude Code integration: plugin hooks + MCP through the runner, manual sessions first-class, opt-in content, away-mode remote approval | ADR-0020, ADR-0021 · [#201](https://github.com/AndreyBegma/Nautelle/issues/201) |
 | M3.9 | Design stage: a per-task HTML mockup from a cached UI profile, reviewed with pins and approved before the fleet builds it | ADR-0022 · [#223](https://github.com/AndreyBegma/Nautelle/issues/223) |
 | M3.10 | Project Board: AgentDock-owned cards, automatic and manual column moves, a review loop, Run a dedicated interactive worker per card | ADR-0024 · [#242](https://github.com/AndreyBegma/Nautelle/issues/242) |
@@ -67,9 +67,9 @@ became the one work surface; the fleet and the queue became views onto it.
 | M5.5 | Token saver and context handoff | ADR-0039, ADR-0042, ADR-0074 |
 | M5.6 | Open-source install: one command, signed multi-arch images, Helm chart, documentation site | ADR-0088, ADR-0091, ADR-0092, ADR-0093, ADR-0097 |
 
-## M6 — Core and UX plan (2026-10-25)
+## M6 — Core and UX plan (2026-10-25), shipped in v0.18.0
 
-Settled with the person in a grilling session. The four stages go in order:
+Shipped in [v0.18.0](../releases/v0.18.0.md). Settled with the person in a grilling session. The four stages go in order:
 speed → daily flow → fleet scale → team. Nothing is removed in this iteration:
 pages and routes stay; roles and entry points may change. Each stage is one
 stack on the Board; each item is one card with a spec in `docs/specs/`, which
@@ -84,3 +84,7 @@ names its stack.
 
 Housekeeping (C-406): the Steward digest is shown in Activity, shipped issues
 are closed, and this PRD and roadmap match the product.
+
+## M7 — Improvement plan (2026-10-26)
+
+The next plan is tracked as stacks on the Board, not listed here.

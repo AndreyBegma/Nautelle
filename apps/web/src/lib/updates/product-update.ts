@@ -1,4 +1,5 @@
 import type { ProductRelease, ProductUpdateView } from '@nautelle/shared';
+import { docsUrl } from '../docs-site';
 
 /**
  * C-374: the notice admins see when a newer Nautelle release is out. The API
@@ -10,8 +11,7 @@ import type { ProductRelease, ProductUpdateView } from '@nautelle/shared';
 export const DISMISSED_PRODUCT_RELEASE_KEY = 'nautelle.productUpdate.dismissed';
 
 /** How to upgrade an install (the docs site). */
-export const UPGRADE_GUIDE_URL =
-  'https://andreybegma.github.io/Nautelle/operations/upgrade/';
+export const UPGRADE_GUIDE_URL = docsUrl('/operations/upgrade/');
 
 /** `Nautelle 0.16.0 is available` — the banner's title. */
 export const productUpdateTitle = (latest: ProductRelease): string =>

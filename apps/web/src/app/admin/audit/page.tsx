@@ -44,6 +44,7 @@ import {
 import { useUrlFilters } from '../../../lib/filters/use-url-filters';
 import { Time } from '../../../lib/format/time';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
+import { fetchAllUsers } from '../../../lib/users/list';
 import { AuditFilters } from './audit-filters';
 import { AUDIT_FILTER_CODEC } from './filters';
 import { RecordSheet } from './record-sheet';
@@ -191,11 +192,7 @@ function AuditView() {
       .catch((err: unknown) => {
         if (!handleAccess(err)) showError(describeAuditError(err));
       });
-    Promise.all(
-      USER_STATUSES.map((status) =>
-        api<AdminUser[]>(`/admin/users?status=${status}`),
-      ),
-    )
+    Promise.all(USER_STATUSES.map((status) => fetchAllUsers(status)))
       .then((lists) => setUsers(lists.flat()))
       .catch(() => {
         // The actor filter just stays empty; the rest of the page works.

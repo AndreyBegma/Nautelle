@@ -18,6 +18,7 @@ import {
   localUserOptions,
 } from '../../../lib/runners/local-settings';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
+import { fetchAllUsers } from '../../../lib/users/list';
 
 /**
  * The runner sheet's "Claude Code sessions" section (spec 201 D8, D17): the
@@ -43,7 +44,7 @@ export function LocalSettings({
 
   useEffect(() => {
     let cancelled = false;
-    api<AdminUser[]>('/admin/users?status=active')
+    fetchAllUsers('active')
       .then((list) => {
         if (!cancelled) setUsers(list);
       })
