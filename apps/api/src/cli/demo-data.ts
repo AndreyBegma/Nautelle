@@ -3,6 +3,8 @@ import {
   captureFingerprint,
 } from '@nautelle/shared';
 import type { BoardColumn, CardEffort, PrismaClient } from '@prisma/client';
+import { hashPassword } from '../auth/password';
+import { generateToken } from '../auth/tokens';
 
 /**
  * The database a demo recording runs on (C-383, ADR-0090): `agentdock_demo`,
@@ -195,6 +197,17 @@ export const DEMO_TOOL_CALLS: ReadonlyArray<{
 ];
 
 /**
+ * C-402: an active operator besides the admin, so Admin › Users has someone
+ * to give a reset link. Their password is random and never shown: they can
+ * get in only through such a link.
+ */
+export const DEMO_TEAMMATE = {
+  id: 'demo-user-teammate',
+  email: 'sam@acme.example',
+  name: 'Sam Rivera',
+} as const;
+
+/**
  * Seeds the demo project and its cards for the admin `adminEmail`, who must
  * exist (`bun run admin:create`). Every row has a fixed key, so running it
  * again changes nothing.
@@ -226,6 +239,18 @@ export const seedDemo = async (
   if (!admin) throw new DemoDataError(`No user with email ${email}`);
 
   const now = new Date();
+  await prisma.user.upsert({
+    where: { id: DEMO_TEAMMATE.id },
+    update: {},
+    create: {
+      ...DEMO_TEAMMATE,
+      passwordHash: await hashPassword(generateToken()),
+      role: 'operator',
+      status: 'active',
+      approvedById: admin.id,
+      approvedAt: now,
+    },
+  });
   await prisma.runner.upsert({
     where: { id: DEMO_RUNNER_ID },
     update: {},
