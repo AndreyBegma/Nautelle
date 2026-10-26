@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "name": "Update banner: running → new version and how to update",
+  "description": "C-526: the update banner shows the running version in red and the new one in green, a How to update section with the backup warning and three copyable upgrade commands, and the Release notes and Upgrade guide links.",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Nautelle update available",
+        "exact": true
+      },
+      "caption": "A newer release is out: the running version in red, the new one in green.",
+      "timeoutMs": 30000,
+      "zoom": true
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "How to update"
+      },
+      "caption": "How to update opens in place."
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Take a backup first."
+      },
+      "caption": "A backup comes first, with a link to the backup page.",
+      "timeoutMs": 10000,
+      "zoom": true
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "li:nth-child(1) > div button[aria-label='Copy code']"
+      },
+      "caption": "Each way has its command in a code block with a copy button."
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "button",
+        "name": "Copied"
+      },
+      "caption": "Copied: paste it on the server.",
+      "timeoutMs": 5000,
+      "zoom": true
+    },
+    {
+      "action": "wait",
+      "ms": 1000
+    }
+  ]
+}

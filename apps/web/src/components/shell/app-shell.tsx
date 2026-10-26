@@ -408,9 +408,10 @@ function Shell({ user, children }: { user: PublicUser; children: ReactNode }) {
                     </Banner>
                   ) : null}
 
-                  {productUpdate.release ? (
+                  {productUpdate.release && productUpdate.current ? (
                     <ProductUpdateNotice
                       release={productUpdate.release}
+                      current={productUpdate.current}
                       onDismiss={productUpdate.dismiss}
                     />
                   ) : null}
