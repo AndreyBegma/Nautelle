@@ -1,12 +1,10 @@
 import {
-  type TaskPage,
   WORK_ERROR,
   WORK_PAGE_SIZE,
   type WorkItem,
   type WorkPage,
   workItemStatus,
 } from '@nautelle/shared';
-import { TASK_PAGE_SIZE } from '../planner/tasks-query.service';
 import type { Session } from '../test/e2e-app';
 import { at, WorkWorld } from './testing/work-e2e';
 
@@ -345,7 +343,6 @@ describe('work list (e2e)', () => {
     try {
       const first = await list();
       const second = await list({ cursor: first.nextCursor ?? '' });
-      const tasks = (await w.operator.get('/tasks')).body as TaskPage;
       // The newest minute holds a card and a task; pages run on from there.
       expect(ids(first.items).slice(0, 2).sort()).toEqual([
         `C-${count}`,
@@ -356,8 +353,6 @@ describe('work list (e2e)', () => {
       expect(Date.parse(second.items[0].updatedAt)).toBe(
         at(count - 1 - WORK_PAGE_SIZE / 2).getTime(),
       );
-      expect(tasks.items).toHaveLength(TASK_PAGE_SIZE);
-      expect(tasks.nextCursor).not.toBeNull();
       for (const read of reads) {
         expect(read).toHaveBeenCalled();
         for (const result of read.mock.results) {
@@ -368,6 +363,10 @@ describe('work list (e2e)', () => {
     } finally {
       for (const read of reads) read.mockRestore();
     }
+  });
+
+  it('has no GET /tasks route (C-472)', async () => {
+    expect((await w.operator.get('/tasks')).status).toBe(404);
   });
 
   it('answers 400 invalid_args to an unknown cursor', async () => {
