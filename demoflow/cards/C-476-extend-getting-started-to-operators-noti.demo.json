@@ -64,8 +64,7 @@
     {
       "action": "waitFor",
       "target": {
-        "role": "heading",
-        "name": "Notifications",
+        "text": "Things that need a person, where to get them, and which projects to silence.",
         "exact": true
       },
       "timeoutMs": 30000
