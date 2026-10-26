@@ -91,5 +91,5 @@ decided on one **Work** surface.
 - Plan tasks have no per-project number; on the board a plan task is named
   `<key> · <plan title>`.
 - `GET /tasks` stays for one release, deprecated, and is removed in a
-  follow-up.
+  follow-up (removed in C-472).
 - Both new routes are reads: no audit action and no notification.

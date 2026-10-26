@@ -13,7 +13,8 @@ import { LiveService } from '../live/live.service';
 import { FIRING_EVENT } from './schedule-events';
 
 /**
- * D17: schedule changes on `project:<id>` through `LiveService`. The
+ * D17: schedule changes on `project:<id>` through `LiveService`, and the same
+ * events on `admin` for the cross-project Admin › Schedules page. The
  * `schedule.*` events are also recorded in `events` (ADR-0014,
  * `schedule-events.ts`), in the transaction that causes them.
  */
@@ -51,11 +52,13 @@ export class ScheduleLive {
   }
 
   private publish(projectId: string, type: string, data: unknown): void {
-    try {
-      this.live.publish(`project:${projectId}`, type, data);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`${type} not published: ${reason}`);
+    for (const topic of [`project:${projectId}`, 'admin']) {
+      try {
+        this.live.publish(topic, type, data);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`${type} not published on ${topic}: ${reason}`);
+      }
     }
   }
 }

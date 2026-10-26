@@ -2,7 +2,6 @@ import type {
   PlanDetail,
   PlanListView,
   PlanTaskVersionsView,
-  TaskPage,
 } from '@nautelle/shared';
 import type { Session } from '../test/e2e-app';
 import { decomposed, PlannerHarness, task } from './testing/planner-e2e';
@@ -34,7 +33,7 @@ const call = (
 ) => (method === 'get' ? session.get(path) : session.send(method, path, body));
 
 const items = async (session: Session, path: string) =>
-  ((await session.get(path)).body as TaskPage | PlanListView).items;
+  ((await session.get(path)).body as PlanListView).items;
 
 describe('planner authorization (e2e)', () => {
   const h = new PlannerHarness();
@@ -68,12 +67,9 @@ describe('planner authorization (e2e)', () => {
     }
     expect(h.sent.length).toBe(sentBefore);
     expect(await items(h.other, h.base())).toEqual([]);
-    expect(await items(h.other, '/tasks')).toEqual([]);
-    expect(await items(h.other, `/tasks?planId=${plan.id}`)).toEqual([]);
 
     // The author sees all of it.
     expect((await h.author.get(h.base(plan.id))).status).toBe(200);
-    expect(await items(h.author, '/tasks')).toHaveLength(2);
   });
 
   it('hides a private plan from a site admin too (spec open question, default)', async () => {
@@ -81,7 +77,6 @@ describe('planner authorization (e2e)', () => {
     const versions = `${h.base(plan.id)}/tasks/t1/versions`;
     expect((await h.admin.get(versions)).status).toBe(404);
     expect(await items(h.admin, h.base())).toEqual([]);
-    expect(await items(h.admin, '/tasks')).toEqual([]);
   });
 
   it('lets another operator read and act on the plan once it is shared', async () => {
@@ -94,7 +89,6 @@ describe('planner authorization (e2e)', () => {
     expect(versions.status).toBe(200);
     expect((versions.body as PlanTaskVersionsView).versions).toHaveLength(1);
     expect(await items(h.other, h.base())).toHaveLength(1);
-    expect(await items(h.other, '/tasks')).toHaveLength(2);
     const reviewed = await h.other.send(
       'post',
       `${h.base(plan.id)}/tasks/t1/review`,
@@ -122,7 +116,6 @@ describe('planner authorization (e2e)', () => {
       expect(await status(h.outsider, route)).toEqual([route[1], 404]);
     }
     expect((await h.outsider.get(h.base())).status).toBe(404);
-    expect(await items(h.outsider, '/tasks')).toEqual([]);
     const settings = `/projects/${h.projectId}/planner/settings`;
     expect((await h.outsider.get(settings)).status).toBe(404);
   });
@@ -142,7 +135,6 @@ describe('planner authorization (e2e)', () => {
     expect(first.resultText).toBeTruthy();
     const versions = `${h.base(plan.id)}/tasks/t1/versions`;
     expect((await h.viewer.get(versions)).status).toBe(200);
-    expect(await items(h.viewer, '/tasks')).toHaveLength(2);
     const sentBefore = h.sent.length;
     for (const route of planRoutes(h.base(plan.id), turnId)) {
       if (route[0] === 'get') continue;

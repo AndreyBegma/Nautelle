@@ -27,10 +27,8 @@ export interface ActionRequestsLiveChange {
   status: ActionRequestSummary['status'];
 }
 
-/** A request as the web lists it: the shared summary plus its outcome. */
+/** A request as the web lists it: the shared summary plus its PR. */
 export interface ActionRequestView extends ActionRequestSummary {
-  /** What executing it returned or why it failed; null until then. */
-  result: unknown;
   /**
    * A `pr_approve` request's PR as `pr.inspect` read it at creation — the
    * head an approval binds to — with its diff; null for any other kind.
@@ -38,10 +36,11 @@ export interface ActionRequestView extends ActionRequestSummary {
   pr: (PrApproveBoundArgs & { diffUrl: string }) | null;
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 const asArgs = (value: unknown): Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+  isRecord(value) ? value : {};
 
 export const toActionRequestSummary = (
   row: ActionRequest,
@@ -62,13 +61,14 @@ export const toActionRequestSummary = (
   createdAt: row.createdAt.toISOString(),
   ruleId: row.ruleId,
   remember: toolUseRememberOf(row),
+  // C-416: the session reads why an approval failed (`head_moved` and the new head).
+  result: isRecord(row.result) ? row.result : null,
 });
 
 export const toActionRequestView = (row: ActionRequest): ActionRequestView => {
   const pr = boundPrOf(row);
   return {
     ...toActionRequestSummary(row),
-    result: row.result ?? null,
     pr: pr ? { ...pr, diffUrl: prDiffUrl(pr) } : null,
   };
 };
@@ -110,14 +110,25 @@ export const actionRequestTitle = (
 
 /**
  * #845: a `card_accept` request's pull request link, and "and merge #<pr>"
- * when the approval also merges it.
+ * when the approval also merges it — "at <sha7>" when the head is bound
+ * (C-416), with the diff the approver reviews instead of the bare link.
  */
-export const cardAcceptLines = (card: CardAcceptBoundArgs): string[] => [
-  ...(card.prUrl ? [card.prUrl] : []),
-  ...(card.merge === true && card.prNumber !== null
-    ? [`and merge #${card.prNumber}`]
-    : []),
-];
+export const cardAcceptLines = (card: CardAcceptBoundArgs): string[] => {
+  const merges = card.merge === true && card.prNumber !== null;
+  const head = merges && card.headSha ? card.headSha : null;
+  const link =
+    card.prUrl && head
+      ? prDiffUrl({ url: card.prUrl, headSha: head })
+      : card.prUrl;
+  return [
+    ...(link ? [link] : []),
+    ...(merges
+      ? [
+          `and merge #${card.prNumber}${head ? ` at ${shortHeadSha(head)}` : ''}`,
+        ]
+      : []),
+  ];
+};
 
 /**
  * The notification's body: a `pr_approve` request's PR title and diff come

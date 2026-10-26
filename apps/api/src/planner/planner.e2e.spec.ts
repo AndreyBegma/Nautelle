@@ -5,7 +5,6 @@ import type {
   PlannerSettingsView,
   PlanTaskVersionsView,
   RunPage,
-  TaskPage,
 } from '@nautelle/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { capabilities } from '../runners/testing/runner-e2e';
@@ -268,15 +267,6 @@ describe('planner (e2e)', () => {
       const again = await h.author.send('post', `${h.base(created.id)}/send`);
       expect(again.status).toBe(200);
       expect(h.sentOf('issue.create')).toHaveLength(2);
-
-      const tasks = (await h.author.get('/tasks')).body as TaskPage;
-      expect(tasks.items.map((t) => [t.key, t.status])).toEqual(
-        expect.arrayContaining([
-          ['t1', 'queued'],
-          ['t2', 'queued'],
-          ['t3', 'rejected'],
-        ]),
-      );
     });
 
     it('publishes features as one docs pull request and queues them when it merges (docs_pr)', async () => {
