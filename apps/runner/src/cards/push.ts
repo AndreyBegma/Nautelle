@@ -176,6 +176,7 @@ export const pushCardHead = async (
         github,
         record.worktree,
         record.branch,
+        record.base,
         record.pushedHead,
       )
     : pending.headSha;
