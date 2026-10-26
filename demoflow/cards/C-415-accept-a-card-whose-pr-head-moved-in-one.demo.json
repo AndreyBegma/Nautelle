@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "name": "Accept dialog after the pull request head moved",
+  "description": "C-415: when the merge is refused because the pull request moved, the Accept dialog shows a warning with the new short head, a link to its diff and an Accept <sha7> button that merges exactly that head. The demo stack has no runner, so the pull request is unreadable and the dialog shows its accept-only path; the moved-head banner needs a readable open pull request and is covered by the API, Telegram and web unit tests.",
+  "viewport": { "width": 1440, "height": 900 },
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "%2Fprojects%2Fdemo-project%2Fboard%3Fcard%3D7%26accept%3D1"
+      }
+    }
+  ],
+  "steps": [
+    { "action": "marker", "title": "Open Accept on a finished card" },
+    {
+      "action": "waitFor",
+      "target": { "role": "dialog" },
+      "caption": "Accept opens on the head the person is shown.",
+      "timeoutMs": 30000
+    },
+    { "action": "wait", "ms": 2000 },
+    {
+      "action": "assertVisible",
+      "target": { "role": "button", "name": "Cancel" }
+    },
+    { "action": "screenshot", "name": "accept-dialog" }
+  ]
+}

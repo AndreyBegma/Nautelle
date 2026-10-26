@@ -541,6 +541,11 @@ export const cardMergeFailureSchema = z.object({
   merged: z.literal(false),
   error: cardMergeFailReasonSchema,
   message: z.string().max(500),
+  /**
+   * C-415: with `head_changed`, the PR's head now. Absent — a runner older
+   * than the field, or a head that moved during `gh pr merge` — is unknown.
+   */
+  headSha: headShaSchema.optional(),
 });
 export type CardMergeFailure = z.infer<typeof cardMergeFailureSchema>;
 

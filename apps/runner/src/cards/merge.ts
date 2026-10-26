@@ -49,6 +49,7 @@ class Refused extends Error {
   constructor(
     readonly reason: CardMergeFailReason,
     message: string,
+    readonly headSha?: string,
   ) {
     super(message);
   }
@@ -142,6 +143,7 @@ export const mergeCard = async (
       throw new Refused(
         'head_changed',
         `pull request #${pr} is at ${view.headRefOid.slice(0, 12)}, not ${args.headSha.slice(0, 12)}`,
+        shaOf(view.headRefOid) ?? undefined,
       );
     }
     const method = await methodOf();
@@ -173,6 +175,7 @@ export const mergeCard = async (
         merged: false,
         error: error.reason,
         message: redactUrlUserinfo(error.message),
+        ...(error.headSha ? { headSha: error.headSha } : {}),
       };
     }
     const message = error instanceof Error ? error.message : String(error);

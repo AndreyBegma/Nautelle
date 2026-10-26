@@ -419,9 +419,24 @@ describe('Telegram: feedback, accept, finish and message cards (#578, e2e)', () 
         button(confirm.markup, 'Accept and merge'),
       ),
     );
-    expect(last(OPERATOR_CHAT).text).toContain('new commits');
+    const moved = last(OPERATOR_CHAT);
+    expect(moved.text).toContain('new commits');
+    // C-415: it names the new head and offers a fresh button bound to it.
+    expect(moved.text).toContain('bbbbbbb');
     expect(w.sent('card.merge')).toEqual([]);
     expect((await detail(1)).column).toBe('finished');
+
+    await poll(
+      callbackPress(
+        nextUpdate++,
+        OPERATOR_CHAT,
+        button(moved.markup, 'Accept and merge'),
+      ),
+    );
+    expect(w.sent('card.merge')).toEqual([
+      expect.objectContaining({ pr: 77, headSha: 'b'.repeat(40) }),
+    ]);
+    expect((await detail(1)).column).toBe('completed');
   });
 
   it('Finish asks first; Cancel changes nothing, the confirm tap moves the card to Finished', async () => {

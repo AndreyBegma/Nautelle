@@ -1136,6 +1136,12 @@ export interface BoardErrorBody {
   dependencies?: CardDependencyRef[];
   /** `stack_refused` of a grouping (#588): the cards that cannot join, by number. */
   cards?: number[];
+  /**
+   * `merge_failed` with reason `head_changed` (C-415): the PR's head now,
+   * and its diff at that head — what the person reviews before accepting it.
+   */
+  headSha?: string;
+  diffUrl?: string;
 }
 
 /**
