@@ -103,8 +103,13 @@
       "target": { "role": "switch", "name": "Refine from pull request files" }
     },
     {
+      "action": "assertVisible",
+      "target": { "label": "Name of design-system" },
+      "caption": "The new label, its colour, its path rule and both switches are saved."
+    },
+    {
       "action": "wait",
-      "ms": 2000
+      "ms": 3000
     }
   ]
 }
