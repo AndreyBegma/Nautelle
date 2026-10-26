@@ -9,6 +9,7 @@ import { techniqueFlagsSchema } from '../../token-economy/techniques';
 import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import {
   cardBranchSchema,
+  changedPathsSchema,
   hasCardBranchPrefix,
   protectedPathsSchema,
 } from '../branch-policy';
@@ -418,6 +419,12 @@ export const cardCollectResultSchema = z
      * nothing was pushed, or from a runner older than the field.
      */
     protectedPaths: protectedPathsSchema.optional(),
+    /**
+     * C-501: every path the pushed branch changes against `origin/<base>`,
+     * sorted, at most `CHANGED_PATHS_MAX`; the API labels the card from it.
+     * Absent when nothing was pushed, or from a runner older than the field.
+     */
+    changedPaths: changedPathsSchema.optional(),
     /**
      * #837: the commit this collect pushed, now the PR's head — the round it
      * follows records it. Absent when nothing was pushed, or from a runner
