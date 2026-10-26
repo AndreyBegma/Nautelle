@@ -13,10 +13,12 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
-import type {
-  AdminScheduleView,
-  ScheduleView,
-  SystemJobView,
+import {
+  type AdminScheduleView,
+  SCHEDULE_FIRING_UPDATED_LIVE_EVENT,
+  SCHEDULE_UPDATED_LIVE_EVENT,
+  type ScheduleView,
+  type SystemJobView,
 } from '@nautelle/shared';
 import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
@@ -32,13 +34,16 @@ import {
   useUrlFilters,
 } from '../../../lib/filters/use-url-filters';
 import { Time } from '../../../lib/format/time';
+import { useLiveRefresh } from '../../../lib/live/use-live-refresh';
 import { formatFireTime } from '../../../lib/schedules/format';
 import { useSection } from '../../../lib/section/use-section';
 import { ScheduleSheet } from '../../(app)/projects/[projectId]/schedules/schedule-sheet';
 import { ScheduleTable } from '../../(app)/projects/[projectId]/schedules/schedule-table';
 
-/** The page polls; the project page is the one that listens to live events. */
+/** System jobs push no events, so they are polled. */
 const POLL_MS = 15_000;
+/** The schedules follow `admin`; this poll only catches what an event missed. */
+const SAFETY_POLL_MS = 60_000;
 
 type EnabledFilter = 'all' | 'on' | 'off';
 
@@ -162,10 +167,12 @@ function AdminSchedules() {
   const [selected, setSelected] = useState<ScheduleView>();
   const reload = schedules.retry;
 
-  useEffect(() => {
-    const timer = setInterval(reload, POLL_MS);
-    return () => clearInterval(timer);
-  }, [reload]);
+  useLiveRefresh(
+    [],
+    [SCHEDULE_UPDATED_LIVE_EVENT, SCHEDULE_FIRING_UPDATED_LIVE_EVENT],
+    reload,
+    { extraTopics: ['admin'], safetyMs: SAFETY_POLL_MS },
+  );
 
   return (
     <div className="flex flex-col gap-6">

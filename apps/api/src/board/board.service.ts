@@ -21,7 +21,9 @@ import {
   cardChange,
   cardLabel,
   type FleetCardEdits,
+  type FleetWorkingView,
   isActiveRoundPhase,
+  isWorkingCard,
   profileAgentdockOf,
   type Role,
 } from '@nautelle/shared';
@@ -273,6 +275,38 @@ export class BoardService implements OnModuleInit {
         project.defaultBranch,
       ),
     };
+  }
+
+  /**
+   * C-473 (ADR-0122): Fleet's Working now — only the cards at work, read by
+   * each part of `isWorkingCard` in SQL, mapped as the Board maps them, then
+   * held to the predicate itself. Inbox cards are never among them, so a
+   * viewer gets no captured card either.
+   */
+  async working(projectId: string): Promise<FleetWorkingView> {
+    const candidates = await this.prisma.boardCard.findMany({
+      where: {
+        projectId,
+        column: { not: 'inbox' },
+        OR: [
+          { rounds: { some: { phase: { in: ACTIVE_PHASES } } } },
+          {
+            fleetSlot: { not: null },
+            fleetSlotGone: false,
+            column: { not: 'completed' },
+          },
+          { trackedSession: { is: { endedAt: null } } },
+          {
+            column: 'todo',
+            queueEntry: { is: { status: { in: ['queued', 'waiting'] } } },
+          },
+        ],
+      },
+      ...cardFaceArgs,
+      orderBy: [{ position: 'asc' }, { number: 'asc' }],
+    });
+    const cards = await this.cardViews(candidates);
+    return { projectId, cards: cards.filter(isWorkingCard) };
   }
 
   /** A viewer asking for an Inbox card finds none (#244 D8). */

@@ -15,19 +15,15 @@ import { PlanSendService } from './plan-send.service';
 import { PlanStore } from './plan-store';
 import { PlanTurnService } from './plan-turn.service';
 import { PlanTurnProjector } from './plan-turn-projector';
-import {
-  PlannerAdminController,
-  TasksController,
-} from './planner-admin.controller';
+import { PlannerAdminController } from './planner-admin.controller';
 import { PlannerCommands } from './planner-commands';
 import { PlannerInstructionsService } from './planner-instructions.service';
 import { PlansController } from './plans.controller';
 import { StackDesignTurnService } from './stack-design-turn.service';
-import { TasksQueryService } from './tasks-query.service';
 
 /**
  * The Planner (docs/specs/172-planner.md): plans, turns, review, revise,
- * send to fleet, `/tasks`, and the instructions and settings editors. Turn
+ * send to fleet, and the instructions and settings editors. Turn
  * results arrive as `plan_turn.*` events (`PlanTurnProjector`); a docs pull
  * request's merge queues the features (`PlanDocsSink`).
  */
@@ -43,7 +39,7 @@ import { TasksQueryService } from './tasks-query.service';
     RunnersModule,
     SettingsModule,
   ],
-  controllers: [PlansController, PlannerAdminController, TasksController],
+  controllers: [PlansController, PlannerAdminController],
   providers: [
     CardDesignTurnService,
     PlanDocsSink,
@@ -58,7 +54,6 @@ import { TasksQueryService } from './tasks-query.service';
     PlannerInstructionsService,
     // #480: a stack's design turns.
     StackDesignTurnService,
-    TasksQueryService,
   ],
   // The design stage (spec 223) runs its turns through the planner's — a
   // board card's as well (#243).

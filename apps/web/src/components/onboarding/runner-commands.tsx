@@ -7,7 +7,7 @@ import {
   INSTALL_PATH,
   KEEP_ONLINE_COMMANDS,
   RUN_COMMAND,
-  RUNNER_README_URL,
+  RUNNER_SOURCE_BUILD_URL,
 } from '../../lib/runners/install';
 
 /** The public page with every step and the troubleshooting (issue #145). */
@@ -42,7 +42,7 @@ export function InstallCommands() {
       <p>
         Neither available?{' '}
         <a
-          href={RUNNER_README_URL}
+          href={RUNNER_SOURCE_BUILD_URL}
           target="_blank"
           rel="noreferrer"
           className="text-accent-ink underline underline-offset-2"

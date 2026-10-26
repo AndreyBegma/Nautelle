@@ -312,11 +312,16 @@ export class BudgetEvaluator {
       e.budget.scope === 'project'
         ? `project:${e.budget.projectId}`
         : `user:${e.budget.userId}`;
-    try {
-      this.live.publish(topic, BUDGET_UPDATED_LIVE_EVENT, event);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`${BUDGET_UPDATED_LIVE_EVENT} not published: ${reason}`);
+    // Also on `admin`, for the cross-project Admin › Budgets page.
+    for (const to of [topic, 'admin']) {
+      try {
+        this.live.publish(to, BUDGET_UPDATED_LIVE_EVENT, event);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `${BUDGET_UPDATED_LIVE_EVENT} not published on ${to}: ${reason}`,
+        );
+      }
     }
   }
 }
