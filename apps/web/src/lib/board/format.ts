@@ -327,7 +327,7 @@ export const CAPTURE_STATUS_PILL: Record<CaptureStatus, RoundPill> = {
 export const CAPTURE_SKIP_TEXT: Record<CaptureSkipReason, string> = {
   too_little: 'Too little new content',
   rate_limited: 'Rate limit reached',
-  inbox_full: 'Inbox is full',
+  inbox_full: 'Suggestions is full',
   budget_exceeded: 'Budget hard stop',
   runner_offline: 'Runner was offline',
   capture_off: 'Capture was turned off',

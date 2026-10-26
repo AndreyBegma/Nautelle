@@ -342,6 +342,21 @@ describe('card labels (e2e, C-497)', () => {
     ]);
   });
 
+  it('counts the cards that show each label, not the ones that removed it', async () => {
+    const first = await w.createCard();
+    const second = await w.createCard();
+    const [frontend, backend] = [await idOf('frontend'), await idOf('backend')];
+    expect((await view()).cardCounts).toEqual({});
+
+    await setCard(first.number, [frontend, backend]);
+    await setCard(second.number, [backend]);
+    expect((await view()).cardCounts).toEqual({ [frontend]: 1, [backend]: 2 });
+
+    // A removal is a row that no card shows.
+    await setCard(first.number, [backend]);
+    expect((await view()).cardCounts).toEqual({ [backend]: 2 });
+  });
+
   it('refuses a sixth card label, a foreign label and a foreign card', async () => {
     const card = await w.createCard();
     const ids = (await view()).labels.map((l) => l.id);

@@ -76,7 +76,7 @@ export class CaptureRetention implements OnApplicationBootstrap {
       const total = swept.inboxCards + swept.results + swept.dismissals;
       if (total > 0) {
         this.logger.log(
-          `deleted ${swept.inboxCards} Inbox cards, ${swept.results} results, ${swept.dismissals} dismissals`,
+          `deleted ${swept.inboxCards} suggestions, ${swept.results} results, ${swept.dismissals} dismissals`,
         );
       }
     } catch (error) {

@@ -67,7 +67,7 @@ Delivery order is in [roadmap.md](roadmap.md).
 | **Agent fleet** | live slots: issue, branch, worktree, runtime, model, last checkpoint, PR + checks, idle/quota/prompt state |
 | **Orchestrator control** | start / stop / `next` / `status` per project through a runtime profile; stop a slot; message a worker; open a read-only live pane |
 | **Task queue** | incoming GitHub issues with the ready label and their computed state (READY / IN FLIGHT / BLOCKED — work / BLOCKED — person / NO SPEC); "Make a card" turns one into a card; issues are not created from the web (ADR-0098) |
-| **Board** | cards in columns (Inbox → To Do → In progress → Finished → Completed) that Nautelle owns; a dedicated interactive worker per card, with a review loop, designs, dependencies and stacks; terminal and fleet work appear as cards too (ADR-0024, ADR-0028, ADR-0030, ADR-0035, ADR-0054) |
+| **Board** | cards in columns (Suggestions → To Do → In progress → Finished → Completed) that Nautelle owns; a dedicated interactive worker per card, with a review loop, designs, dependencies and stacks; terminal and fleet work appear as cards too (ADR-0024, ADR-0028, ADR-0030, ADR-0035, ADR-0054) |
 | **Planner & designs** | a brief becomes cards through an interview; a per-card HTML design is reviewed with pins and approved before the card runs (ADR-0022, ADR-0034, ADR-0037) |
 | **Steward** | watches cards and runs for stuck work, fixes the safe cases itself, and sends one digest a day to Telegram and Activity (ADR-0040) |
 | **Merge approval** | per-project switch; green PRs wait in an approval queue (Approve / Request changes) when on |
