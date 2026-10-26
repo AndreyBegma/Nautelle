@@ -29,6 +29,12 @@ describe('proxy', () => {
     }
   });
 
+  test('the password reset pages are public', () => {
+    for (const path of ['/forgot-password', '/reset-password']) {
+      expect(redirectOf(visit(path))).toBeNull();
+    }
+  });
+
   test('the Telegram Mini App entry is public, and nothing under it', () => {
     expect(redirectOf(visit('/tg?start=p1_2'))).toBeNull();
     expect(redirectOf(visit('/tg/x'))).toStartWith(`${ORIGIN}/login`);

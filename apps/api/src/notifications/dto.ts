@@ -1,6 +1,10 @@
 import {
+  AI_DIGEST_TIME_PATTERN,
+  EMAIL_MODES,
+  type EmailMode,
   NOTIFICATION_KINDS,
   NOTIFICATION_PAGE_MAX,
+  type NotificationEmailSettings,
   type NotificationKind,
   type NotificationMuteUpdate,
   type NotificationRulesUpdate,
@@ -15,6 +19,8 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsTimeZone,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -55,6 +61,11 @@ export class NotificationRuleDto {
 
   @IsBoolean()
   telegram!: boolean;
+
+  /** C-404: absent keeps the stored mode; null goes back to the default. */
+  @IsOptional()
+  @IsIn(EMAIL_MODES)
+  email?: EmailMode | null;
 }
 
 /** `PUT /notifications/rules`. */
@@ -72,4 +83,16 @@ export class NotificationMuteDto implements NotificationMuteUpdate {
   @ValidateIf((_, value) => value !== null)
   @IsDateString({ strict: true })
   until?: string | null;
+}
+
+/** `PUT /notifications/email` — when the caller's daily digest goes out (C-404). */
+export class NotificationEmailSettingsDto implements NotificationEmailSettings {
+  @IsString()
+  @Matches(AI_DIGEST_TIME_PATTERN, { message: 'digestTime must be HH:MM' })
+  digestTime!: string;
+
+  @IsString()
+  @MaxLength(64)
+  @IsTimeZone()
+  timezone!: string;
 }

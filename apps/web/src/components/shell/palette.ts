@@ -19,10 +19,12 @@ import {
   MessagesSquare,
   Palette,
   Play,
+  SlidersHorizontal,
   Sparkles,
   Square,
   SquareTerminal,
   User,
+  Zap,
 } from 'lucide-react';
 import { COLUMN_TITLE } from '../../lib/board/format';
 import {
@@ -33,6 +35,8 @@ import {
 } from '../../lib/board/href';
 import { runHref } from '../../lib/history/format';
 import { planHref } from '../../lib/planner/href';
+import { searchSettings } from '../../lib/projects/settings-search';
+import { settingsItemHref } from '../../lib/projects/settings-sections';
 import { planLabel, runLabel, sessionLabel } from './crumbs';
 import { type VisibleSection, visibleNav } from './nav';
 
@@ -54,9 +58,14 @@ export interface PaletteInput {
   plans: readonly PlanSummary[];
   /** The theme the "Switch theme" action reads as its hint. */
   themeLabel: string;
+  /** C-391: inside a project the person can create cards in (operator or up). */
+  canQuickCard?: boolean;
   /** C-393: the cards the lookup found for the query, across projects. */
   cards?: readonly WorkCardItem[];
 }
+
+/** C-391: the palette row that opens Quick card for the current project. */
+export const QUICK_CARD_ACTION = 'action:quick-card';
 
 /** C-393: a palette row that runs a card from where the person is. */
 export const CARD_RUN_PREFIX = 'card:run:';
@@ -106,6 +115,27 @@ const PROJECT_PAGES_MAX = 12;
 
 /** Plans listed: the newest, or the newest that match the query. */
 const PLANS_MAX = 5;
+
+/** Settings listed: one row per block, the best match in it. */
+const SETTINGS_MAX = 6;
+
+/**
+ * C-395: the current project's settings the query names, each opening the
+ * block that edits it — the same jump as the search on the Settings page.
+ * A block lists once: its rows would all open the same place.
+ */
+function settingItems(projectId: string, query: string): Item[] {
+  const seen = new Set<string>();
+  return searchSettings(query)
+    .filter((entry) => !seen.has(entry.item) && seen.add(entry.item))
+    .slice(0, SETTINGS_MAX)
+    .map((entry) => ({
+      id: `go:${settingsItemHref(projectId, entry.item)}`,
+      label: entry.label,
+      hint: entry.where,
+      icon: SlidersHorizontal,
+    }));
+}
 
 /** Every word of the query appears in the text, in any order. */
 function matcher(query: string): (text: string) => boolean {
@@ -289,6 +319,9 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
     .filter((item) => matches(`plan ${item.label}`))
     .slice(0, PLANS_MAX);
 
+  const settings =
+    searching && current ? settingItems(current.id, input.query) : [];
+
   // C-393: New card and New work for the open project; with none open, one row
   // per project the caller can operate.
   const operable = (project: ProjectSummary) => project.role !== 'viewer';
@@ -334,6 +367,9 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
     : [];
 
   const actions: Item[] = [
+    ...(input.canQuickCard
+      ? [{ id: QUICK_CARD_ACTION, label: 'Quick card', icon: Zap }]
+      : []),
     {
       id: 'action:theme',
       label: 'Switch theme',
@@ -349,6 +385,7 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
     ...group('cards', 'Cards', cards),
     ...group('pages', 'Go to', pages),
     ...group('project-pages', 'Project pages', subPages),
+    ...group('settings', 'Settings', settings),
     ...group('projects', 'Projects', projects),
     ...group('plans', 'Plans', plans),
     ...group('recent', 'Recent', recent),

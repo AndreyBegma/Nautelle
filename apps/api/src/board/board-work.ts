@@ -13,12 +13,16 @@ import {
   CARD_COLLECT_AUTO_ATTEMPTS_MAX,
   CARD_COLLECT_ERROR_MAX,
   CARD_COLLECT_RETRY_DELAY_MS,
+  CARD_FAILED_EVENT,
   CARD_FINISHED_EVENT,
+  CARD_MERGED_EVENT,
   CARD_PAUSED_EVENT,
   type CardAutoRunFailure,
   type CardCollectOutcome,
+  type CardFailedEventData,
   type CardFinishedBy,
   type CardFinishedEventData,
+  type CardMergedEventData,
   type CardMergeOutcome,
   type CardNeedsPersonReason,
   type CardPausedEventData,
@@ -959,6 +963,7 @@ export class BoardWork implements OnModuleInit {
         data: { state: 'merged' },
       }),
     ]);
+    if (count > 0) await this.merged(project, cardId, pr);
     // #722: a stacked PR that went into the base is no longer stacked.
     if (count > 0 && intoBase) {
       await this.adoptLiveBase(project, cardId, pr, facts?.base ?? null);
@@ -1659,6 +1664,7 @@ export class BoardWork implements OnModuleInit {
         ...(extra.endedAt !== undefined ? { endedAt: extra.endedAt } : {}),
       },
     });
+    if (count > 0 && phase === 'failed') await this.roundFailed(tx, roundId);
     return count > 0;
   }
 
@@ -2190,6 +2196,68 @@ export class BoardWork implements OnModuleInit {
         ...data,
       }),
     );
+  }
+
+  /**
+   * C-405: `card.merged`, once per card and PR — `markMerged` runs again for
+   * a merge it already saw, and the key keeps that to one event.
+   */
+  private async merged(
+    project: BoardProject,
+    cardId: string,
+    pr: number,
+  ): Promise<void> {
+    const card = await this.prisma.boardCard.findUnique({
+      where: { id: cardId },
+      select: { number: true, title: true, prUrl: true },
+    });
+    if (!card) return;
+    const data: CardMergedEventData = {
+      cardId,
+      number: card.number,
+      title: card.title,
+      prNumber: pr,
+      prUrl: card.prUrl,
+    };
+    await this.prisma.$transaction((tx) =>
+      this.serverEvent(tx, project, CARD_MERGED_EVENT, `${cardId}:${pr}`, {
+        ...data,
+      }),
+    );
+  }
+
+  /**
+   * C-405: `card.failed` for a round that just failed, once per round. It
+   * names the card only: the round's error can quote the pane.
+   */
+  private async roundFailed(tx: Tx, roundId: string): Promise<void> {
+    const round = await tx.boardCardRound.findUnique({
+      where: { id: roundId },
+      select: {
+        round: true,
+        card: {
+          select: {
+            id: true,
+            number: true,
+            title: true,
+            project: {
+              select: { runnerId: true, rootPath: true, repo: true },
+            },
+          },
+        },
+      },
+    });
+    if (!round) return;
+    const { card } = round;
+    const data: CardFailedEventData = {
+      cardId: card.id,
+      number: card.number,
+      title: card.title,
+      round: round.round,
+    };
+    await this.serverEvent(tx, card.project, CARD_FAILED_EVENT, roundId, {
+      ...data,
+    });
   }
 
   /**

@@ -43,6 +43,8 @@ model User {
 
   approvedBy                  User?                         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
   recoveryCodes               UserRecoveryCode[]
+  passwordResetLinks          PasswordResetLink[]           @relation("PasswordResetLinkUser")
+  passwordResetLinksCreated   PasswordResetLink[]           @relation("PasswordResetLinkCreatedBy")
   approvedUsers               User[]                        @relation("UserApprovals")
   sessions                    UserSession[]
   apiTokens                   ApiToken[]                    @relation("ApiTokenOwner")
@@ -53,6 +55,7 @@ model User {
   sessionsOwned               AgentSession[]                @relation("SessionOwner")
   actionRequestsRequested     ActionRequest[]               @relation("ActionRequestRequestedBy")
   actionRequestsDecided       ActionRequest[]               @relation("ActionRequestDecidedBy")
+  toolUseRulesCreated         ToolUseRule[]
   projectsCreated             Project[]
   memberships                 ProjectMember[]               @relation("ProjectMembership")
   membersAdded                ProjectMember[]               @relation("ProjectMemberAddedBy")
@@ -67,6 +70,7 @@ model User {
   notifications               Notification[]
   notificationRules           NotificationRule[]
   notificationMutes           NotificationMute[]
+  notificationEmailSettings   NotificationEmailSettings?
   telegramLink                TelegramLink?
   telegramLinkCodes           TelegramLinkCode[]
   telegramPendingLink         TelegramPendingLink?
@@ -111,6 +115,7 @@ model User {
   tokenEconomyTechniquesSet   TokenEconomyTechnique[]
   stewardSettingsUpdated      StewardSettings[]
   aiDigestSettingsUpdated     AiDigestSettings[]
+  slackWebhooksUpdated        SlackWebhook[]
   settings                    UserSettings?
   planCandidatesDecided       PlanCandidate[]               @relation("PlanCandidateDecidedBy")
 
@@ -120,13 +125,16 @@ model User {
 /// #337 D9: a person's own settings. No row: the defaults (shared
 /// `USER_SETTINGS_DEFAULTS`).
 model UserSettings {
-  userId        String   @id
+  userId                String   @id
   /// The model New Card and New Plan preselect; null: `PLANNING_MODEL_DEFAULT`.
-  planningModel String?
+  planningModel         String?
   /// C-294: the last `APP_VERSION` this person opened What's new on; null:
   /// never. The shell shows an unread dot while it differs.
-  seenVersion   String?
-  updatedAt     DateTime @updatedAt
+  seenVersion           String?
+  /// C-401: minutes a tool-use request of this person's sessions waits for
+  /// a decision where the project sets none; null: 5 (1–720, by the API).
+  toolUseTimeoutMinutes Int?
+  updatedAt             DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -163,6 +171,40 @@ model UserRecoveryCode {
 
   @@unique([userId, codeHash])
   @@map("user_recovery_codes")
+}
+
+enum PasswordResetKind {
+  password
+  two_factor
+}
+
+enum PasswordResetVia {
+  admin
+  email
+}
+
+/// C-402 (ADR-0113): a one-time link that sets a new password — from an admin
+/// in Admin › Users, or emailed by Forgot password. Only the SHA-256 of its
+/// 256-bit token is stored. It works once and before `expiresAt`; a new link
+/// for the same person replaces their unused ones.
+model PasswordResetLink {
+  id          String            @id @default(cuid())
+  userId      String
+  tokenHash   String            @unique
+  kind        PasswordResetKind
+  via         PasswordResetVia
+  /// The admin who made it; null for an emailed link or a deleted admin.
+  createdById String?
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime          @default(now())
+
+  user      User  @relation("PasswordResetLinkUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("PasswordResetLinkCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_links")
 }
 
 /// A login session. Named `UserSession` because `Session` is reserved for agent
@@ -513,10 +555,16 @@ model Project {
   shipSessionContent          Boolean    @default(false)
   /// 1–365, validated by the DTO.
   sessionContentRetentionDays Int        @default(30)
+  /// C-401: minutes a tool-use request waits for a decision; null: the
+  /// requester's own setting, else 5. 1–720, validated by the DTO.
+  toolUseTimeoutMinutes       Int?
   /// The `orchestrator` block of `.code-analyzer-config.json` and/or its parse error.
   codeSentinelConfig          Json?
   hasClaudeMd                 Boolean
   hasAgentsMd                 Boolean
+  /// C-395: the repository has a `demoflow.config.json` at its root; null
+  /// until a runner that reports it inspects the project.
+  hasDemoflowConfig           Boolean?
   lastInspectedAt             DateTime
   /// #691: why the runner's local policy refuses to watch this project, as the
   /// runner worded it in its latest `runner.watch_refused` (ADR-0047). Null
@@ -558,6 +606,7 @@ model Project {
   plans                  Plan[]
   sessionContents        SessionContent[]
   actionRequests         ActionRequest[]
+  toolUseRules           ToolUseRule[]
   uiProfiles             UiProfile[]
   designSettings         DesignSettings?
   designTemplates        DesignTemplate[]
@@ -589,6 +638,8 @@ model Project {
   demoSecrets            ProjectDemoSecret[]
   telegramLinks          TelegramLink[]
   telegramIntakes        TelegramIntake[]
+  slackWebhook           SlackWebhook?
+  slackDeliveries        SlackDelivery[]
 
   @@unique([runnerId, rootPath])
   @@index([githubRepoId])
@@ -884,6 +935,7 @@ model AgentSession {
   spawnedBy            ToolCall[]            @relation("ToolCallChild")
   compactions          SessionCompaction[]
   errors               SessionError[]
+  toolUseRules         ToolUseRule[]
   workflow             SessionWorkflow?
   workflowMark         SessionWorkflowMark?
   contents             SessionContent[]
@@ -1165,6 +1217,9 @@ model ActionRequest {
   decidedAt     DateTime?
   note          String?
   result        Json?
+  /// C-401: the stored rule that approved this `tool_use` request without a
+  /// person. Null for a person's decision, or once the rule is removed.
+  ruleId        String?
   expiresAt     DateTime
   createdAt     DateTime            @default(now())
 
@@ -1173,10 +1228,49 @@ model ActionRequest {
   session     AgentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   requestedBy User?         @relation("ActionRequestRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
   decidedBy   User?         @relation("ActionRequestDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  rule        ToolUseRule?  @relation("ToolUseRuleAnswered", fields: [ruleId], references: [id], onDelete: SetNull)
+  rulesMade   ToolUseRule[] @relation("ToolUseRuleSource")
 
   @@index([projectId, status, createdAt])
   @@index([status, expiresAt])
   @@map("action_requests")
+}
+
+enum ToolUseRuleScope {
+  session
+  project
+}
+
+/// C-401: "allow similar in this session" or "always allow in this project"
+/// — a Claude Code permission rule (`Bash(npm test:*)`) the API answers later
+/// `tool_use` requests with. Never for a dangerous call (shared
+/// `toolUseDanger`); every use is audited (`tool_rule.used`).
+model ToolUseRule {
+  id              String           @id @default(cuid())
+  projectId       String
+  scope           ToolUseRuleScope
+  /// `session` rules only: the session they hold for.
+  sessionId       String?
+  toolName        String
+  /// The part in parentheses; null: the whole tool.
+  ruleContent     String?
+  /// Nullable so deleting the person keeps the rule.
+  createdById     String?
+  /// The request whose decision stored it.
+  sourceRequestId String?
+  useCount        Int              @default(0)
+  lastUsedAt      DateTime?
+  createdAt       DateTime         @default(now())
+
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session       AgentSession?   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdBy     User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  sourceRequest ActionRequest?  @relation("ToolUseRuleSource", fields: [sourceRequestId], references: [id], onDelete: SetNull)
+  answered      ActionRequest[] @relation("ToolUseRuleAnswered")
+
+  @@index([projectId, scope, createdAt])
+  @@index([sessionId])
+  @@map("tool_use_rules")
 }
 
 // ─── Tokens and API-equivalent cost (docs/specs/13) ─────────────────────────
@@ -1517,6 +1611,9 @@ model NotificationRule {
   kind      String
   inApp     Boolean
   telegram  Boolean
+  /// C-404: shared `EmailMode`; null: never chosen — the card's creator gets
+  /// the kind's `ownerEmail`, everyone else no email.
+  email     String?
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1541,6 +1638,22 @@ model NotificationMute {
 
 enum NotificationDeliveryChannel {
   telegram
+  email
+}
+
+/// C-404: when a user's daily email digest goes out. No row: 09:00 UTC.
+/// `lastDigestAt`: the digest time whose digest went out (or had nothing in
+/// it) — a digest is sent once per occurrence, however often the job runs.
+model NotificationEmailSettings {
+  userId       String    @id
+  digestTime   String    @default("09:00")
+  timezone     String    @default("UTC")
+  lastDigestAt DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_email_settings")
 }
 
 enum NotificationDeliveryStatus {
@@ -1553,8 +1666,10 @@ enum NotificationDeliveryStatus {
 
 /// One notification's delivery on an outside channel (D6). `digested`: over
 /// the rate limit, sent inside the digest `digestId` once its window ends
-/// (`nextAttemptAt`); `sentAt` is set when that digest went out. `skipped`:
-/// never sent — `lastError` says why (shared `DeliverySkipReason`).
+/// (`nextAttemptAt`); `sentAt` is set when that digest went out. An email in
+/// the daily digest (C-404) is `digested` from the start, `digestId` null
+/// until a digest claims it. `skipped`: never sent — `lastError` says why
+/// (shared `DeliverySkipReason`).
 model NotificationDelivery {
   id             String                      @id @default(cuid())
   notificationId BigInt
@@ -1882,8 +1997,8 @@ model Run {
   /// #751 B4: the card type of a card session's round; null elsewhere.
   cardType           String?
 
-  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  slot              Slot?              @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  project           Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot              Slot?               @relation(fields: [slotId], references: [id], onDelete: Cascade)
   skillRun          SkillRun?
   planTurn          PlanTurn?
   uiProfiles        UiProfile[]
@@ -2205,6 +2320,65 @@ model WebhookDelivery {
   @@index([webhookId, createdAt])
   @@index([createdAt])
   @@map("webhook_deliveries")
+}
+
+/// C-405 (ADR-0109): a Slack incoming webhook. `projectId` null is the one
+/// workspace-wide webhook (a partial unique index keeps it single); a
+/// project's own webhook replaces it for that project. The URL is the secret
+/// and is stored sealed with `APP_ENCRYPTION_KEY` only.
+model SlackWebhook {
+  id            String   @id @default(cuid())
+  projectId     String?  @unique
+  /// The webhook URL sealed with `SecretCipher` (v1 format).
+  urlCiphertext String
+  /// The last four characters of the URL, for the masked hint.
+  urlHint       String
+  /// Shared `SLACK_EVENTS` that are posted.
+  events        String[]
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project    Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy  User?           @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  deliveries SlackDelivery[]
+
+  @@map("slack_webhooks")
+}
+
+/// Mirrors `SLACK_DELIVERY_STATUSES` of the shared contract.
+enum SlackDeliveryStatus {
+  pending
+  sent
+  failed
+}
+
+/// One Slack message for one notification (C-405). `(webhookId, eventId,
+/// kind)` keeps a replayed event from posting twice; a budget notification
+/// has no event. `message` is the shared `SlackMessageParts`; links into the
+/// app are paths, made absolute with `APP_URL` when it is sent.
+model SlackDelivery {
+  id            String              @id @default(cuid())
+  webhookId     String
+  projectId     String
+  kind          String
+  eventId       BigInt?
+  message       Json
+  status        SlackDeliveryStatus @default(pending)
+  attempts      Int                 @default(0)
+  nextAttemptAt DateTime            @default(now())
+  lastAttemptAt DateTime?
+  responseCode  Int?
+  error         String?
+  createdAt     DateTime            @default(now())
+
+  webhook SlackWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([webhookId, eventId, kind])
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+  @@map("slack_deliveries")
 }
 
 /// Where the outbound dispatcher stopped (D11): one row, id `webhooks`.
@@ -4592,7 +4766,7 @@ model ProjectReviewStep {
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project  Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// #884: the runs of this step on cards; kept when the step is deleted.
   cardRuns BoardCardReviewRun[]
 
@@ -4750,6 +4924,7 @@ enum LlmFeature {
   title
   assistant_summary
   review_instructions
+  quick_card
 }
 
 enum LlmCallOutcome {

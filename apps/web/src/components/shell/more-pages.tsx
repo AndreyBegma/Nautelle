@@ -9,6 +9,7 @@ import type { ProjectSummary } from '@nautelle/shared';
 import Link from 'next/link';
 import { approvalsBadge } from '../../lib/approvals/format';
 import { attentionBadge } from '../../lib/fleet/format';
+import { inboxBadge } from '../../lib/inbox/format';
 import { approvalsHref } from '../../lib/queue/tabs';
 import type { VisibleSection } from './nav';
 import { ProjectSwitcher } from './project-switcher';
@@ -27,8 +28,8 @@ export const renderLink: NonNullable<ActionListProps['link']> = ({
 
 /**
  * What More holds (#521, C-282), on the phone's capsule and on the icon rail
- * alike: the project switcher, a "Needs you" group with the waiting approvals
- * and the slots that need a person (neither the capsule's tabs nor a folded
+ * alike: the project switcher, a "Needs you" group with the Inbox's count, the
+ * waiting approvals and the slots that need a person (neither the capsule's tabs nor a folded
  * rail spell the counts out), then every page that is not in view, by section.
  */
 export function MorePages({
@@ -39,6 +40,7 @@ export function MorePages({
   projectName,
   waitingApprovals,
   slotsNeedingAttention,
+  inboxWaiting,
   switcher = true,
 }: {
   /** Every section the role sees here, for the entries "Needs you" points at. */
@@ -50,16 +52,19 @@ export function MorePages({
   projectName: string | undefined;
   waitingApprovals: number;
   slotsNeedingAttention: number;
+  /** C-390: the Inbox's items, across projects. */
+  inboxWaiting: number;
   /** The rail draws its own switcher; the capsule has none but this one. */
   switcher?: boolean;
 }) {
   // Approvals is the Queue page's tab (C-284): its row opens that tab.
-  const counts: Record<'queue' | 'fleet', RailBadge | undefined> = {
+  const counts: Record<'inbox' | 'queue' | 'fleet', RailBadge | undefined> = {
+    inbox: inboxBadge(inboxWaiting),
     queue: approvalsBadge(waitingApprovals),
     fleet: attentionBadge(slotsNeedingAttention),
   };
   const entries = sections.flatMap((section) => section.entries);
-  const needsYou = (['queue', 'fleet'] as const).flatMap((id) => {
+  const needsYou = (['inbox', 'queue', 'fleet'] as const).flatMap((id) => {
     const entry = entries.find((each) => each.id === id);
     const badge = counts[id];
     if (!entry || !badge) return [];

@@ -1,0 +1,175 @@
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { SecretCipher } from '../common/crypto';
+import { PrismaService } from '../database/prisma.service';
+import { SlackClient, type SlackPostResult } from './slack-client';
+import { slackAfterAttempt } from './slack-delivery-policy';
+import { type SlackMessageParts, slackText } from './slack-message';
+import { SLACK_OPTIONS, type SlackOptions } from './slack-options';
+
+const JOB_NAME = 'slack-delivery-worker';
+/** Deliveries one pass attempts at most. */
+const PASS_LIMIT = 20;
+/** A claimed delivery waits this far past the request timeout before a retry. */
+const CLAIM_LEASE_EXTRA_MS = 60_000;
+/** The longest `error` kept. */
+const ERROR_MAX = 200;
+
+/** A delivery a pass holds, and until when. */
+interface Claim {
+  id: string;
+  lease: Date;
+}
+
+/**
+ * Sends the queued Slack messages (C-405, ADR-0109). A pass claims the oldest
+ * due `pending` delivery with `FOR UPDATE SKIP LOCKED`, pushes its
+ * `nextAttemptAt` past a lease longer than one request can take, posts it,
+ * and only then claims the next one. A delivery is leased only while it is
+ * being sent — so two API instances never send one twice and a worker that
+ * dies mid-send leaves it to be retried — and a channel reads in order.
+ */
+@Injectable()
+export class SlackDeliveryService
+  implements OnApplicationBootstrap, OnModuleDestroy
+{
+  private readonly logger = new Logger(SlackDeliveryService.name);
+  private timer: NodeJS.Timeout | undefined;
+  private running = false;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cipher: SecretCipher,
+    private readonly client: SlackClient,
+    private readonly scheduler: SchedulerRegistry,
+    @Inject(SLACK_OPTIONS) private readonly options: SlackOptions,
+  ) {}
+
+  onApplicationBootstrap(): void {
+    if (!this.options.workerEnabled) return;
+    this.timer = setInterval(() => {
+      void this.tick().catch((error: unknown) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        this.logger.error(`slack delivery tick failed: ${reason}`);
+      });
+    }, this.options.intervalMs);
+    this.timer.unref();
+    this.scheduler.addInterval(JOB_NAME, this.timer);
+  }
+
+  onModuleDestroy(): void {
+    clearInterval(this.timer);
+    if (this.scheduler.doesExist('interval', JOB_NAME)) {
+      this.scheduler.deleteInterval(JOB_NAME);
+    }
+  }
+
+  /**
+   * One pass: claims and attempts what is due, one delivery at a time. Returns
+   * how many it attempted; `null` while a pass is running. Tests call it
+   * directly; `now` is the pass's start, and the pass's clock runs on from it
+   * so every claim and attempt is timed when it happens.
+   */
+  async tick(now = new Date()): Promise<number | null> {
+    if (this.running) return null;
+    this.running = true;
+    const started = Date.now();
+    const clock = () => new Date(now.getTime() + Date.now() - started);
+    try {
+      let attempted = 0;
+      while (attempted < PASS_LIMIT) {
+        const claimed = await this.claim(clock());
+        if (!claimed) break;
+        attempted += 1;
+        await this.deliver(claimed, clock).catch((error: unknown) => {
+          const reason = error instanceof Error ? error.message : String(error);
+          this.logger.error(`slack delivery ${claimed.id} failed: ${reason}`);
+        });
+      }
+      return attempted;
+    } finally {
+      this.running = false;
+    }
+  }
+
+  /** Posts one message now, outside the queue — the settings' test send. */
+  async send(urlCiphertext: string, text: string): Promise<SlackPostResult> {
+    return this.client.post(this.cipher.decrypt(urlCiphertext), text);
+  }
+
+  /** The oldest due delivery, leased for one send; `null` when none is due. */
+  private claim(now: Date): Promise<Claim | null> {
+    const lease = new Date(
+      now.getTime() + this.options.timeoutMs + CLAIM_LEASE_EXTRA_MS,
+    );
+    return this.prisma.$transaction(async (tx) => {
+      const [row] = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM slack_deliveries
+         WHERE status = 'pending' AND "nextAttemptAt" <= ${now}
+         ORDER BY "createdAt", id
+         LIMIT 1
+           FOR UPDATE SKIP LOCKED`;
+      if (!row) return null;
+      await tx.slackDelivery.update({
+        where: { id: row.id },
+        data: { nextAttemptAt: lease },
+      });
+      return { id: row.id, lease };
+    });
+  }
+
+  private async deliver(
+    { id, lease }: Claim,
+    clock: () => Date,
+  ): Promise<void> {
+    const delivery = await this.prisma.slackDelivery.findUnique({
+      where: { id },
+      include: { webhook: { select: { urlCiphertext: true } } },
+    });
+    if (!delivery || delivery.status !== 'pending') return;
+    let result: SlackPostResult;
+    try {
+      const text = slackText(
+        delivery.message as unknown as SlackMessageParts,
+        this.options.appUrl,
+      );
+      result = await this.send(delivery.webhook.urlCiphertext, text);
+    } catch {
+      // The URL cannot be opened: no key, or another key. A person fixes
+      // that, not a retry — but the message is kept for the next attempts.
+      result = {
+        ok: false,
+        status: null,
+        error: 'url_unavailable',
+        retryAfterMs: null,
+      };
+    }
+    const now = clock();
+    const attempts = delivery.attempts + 1;
+    const next = slackAfterAttempt(result, attempts, now);
+    // Only while this pass still holds the lease: a delivery claimed again
+    // after it lapsed is the other claimant's to record.
+    await this.prisma.slackDelivery.updateMany({
+      where: { id, status: 'pending', nextAttemptAt: lease },
+      data: {
+        status: next.status,
+        nextAttemptAt: next.nextAttemptAt,
+        attempts,
+        lastAttemptAt: now,
+        responseCode: result.status,
+        error: result.error?.slice(0, ERROR_MAX) ?? null,
+      },
+    });
+    if (next.status === 'failed') {
+      this.logger.warn(
+        `slack delivery ${id} given up after ${attempts} attempts: ${result.error ?? result.status}`,
+      );
+    }
+  }
+}

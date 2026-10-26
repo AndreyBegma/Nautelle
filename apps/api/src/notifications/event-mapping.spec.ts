@@ -451,8 +451,51 @@ describe('draftFor (spec 22 D1)', () => {
       ).toBeNull();
     });
 
+    it('maps card.failed and card.merged (C-405)', () => {
+      expect(
+        draftFor(
+          card('card.failed', {
+            cardId: 'c1',
+            number: 12,
+            title: 'Add login',
+            round: 2,
+          }),
+        ),
+      ).toEqual({
+        kind: 'card.failed',
+        slot: null,
+        issue: null,
+        title: 'C-12 "Add login" failed',
+        body: 'Its round did not run to the end. Open the card to see why, then run it again.',
+        page: 'board',
+        card: 12,
+      });
+      expect(
+        draftFor(
+          card('card.merged', {
+            cardId: 'c1',
+            number: 12,
+            title: 'Add login',
+            prNumber: 77,
+            prUrl: 'https://github.com/acme/widget/pull/77',
+          }),
+        ),
+      ).toMatchObject({
+        kind: 'card.merged',
+        title: 'C-12 "Add login" is merged',
+        body: 'PR #77 merged.',
+        card: 12,
+      });
+    });
+
     it('does not let a runner forge a card event, and needs a number', () => {
-      for (const type of ['card.finished', 'card.waiting', 'card.demo']) {
+      for (const type of [
+        'card.finished',
+        'card.waiting',
+        'card.demo',
+        'card.failed',
+        'card.merged',
+      ]) {
         expect(draftFor(card(type, { number: 1 }, 'runner'))).toBeNull();
         expect(draftFor(card(type, { title: 'x' }))).toBeNull();
       }

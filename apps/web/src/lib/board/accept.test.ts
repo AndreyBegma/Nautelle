@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import type { CardMergeOutcome, CardPullRequestView } from '@nautelle/shared';
-import { acceptChoice, acceptedMessage, mergeMethodText } from './accept';
+import {
+  acceptChoice,
+  acceptDescription,
+  acceptedMessage,
+  acceptPrimaryLabel,
+  mergeMethodText,
+} from './accept';
 
 const SHA = 'a'.repeat(40);
 
@@ -81,5 +87,39 @@ describe('what the dialog says', () => {
     );
     expect(open.warn).toBe(true);
     expect(open.text).toContain('gh offline');
+  });
+});
+
+describe('the selected path (#969)', () => {
+  const merge = { kind: 'merge', headSha: 'a'.repeat(40) } as const;
+  const only = { kind: 'accept_only', reason: 'x' } as const;
+
+  test('one primary label follows the path and the options', () => {
+    expect(acceptPrimaryLabel(merge, 'merge', false, false)).toBe(
+      'Merge pull request',
+    );
+    expect(acceptPrimaryLabel(merge, 'merge', false, true)).toBe('Merging…');
+    expect(acceptPrimaryLabel(merge, 'no_merge', false, false)).toBe('Accept');
+    expect(acceptPrimaryLabel(merge, 'no_merge', true, false)).toBe(
+      'Close pull request and accept',
+    );
+    expect(acceptPrimaryLabel(merge, 'no_merge', true, true)).toBe('Closing…');
+    expect(acceptPrimaryLabel(only, 'no_merge', false, true)).toBe(
+      'Accepting…',
+    );
+    expect(
+      acceptPrimaryLabel(
+        { kind: 'already_merged', headSha: 'b'.repeat(40) },
+        'no_merge',
+        false,
+        false,
+      ),
+    ).toBe('Accept');
+  });
+
+  test('the description names only the selected path', () => {
+    expect(acceptDescription(merge, 'merge')).toContain('Merges');
+    expect(acceptDescription(merge, 'no_merge')).not.toContain('Merges');
+    expect(acceptDescription(only, 'no_merge')).not.toContain('Merges');
   });
 });

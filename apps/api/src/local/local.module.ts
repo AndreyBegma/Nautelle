@@ -17,6 +17,8 @@ import { LocalManualGate } from './local-manual-gate';
 import { LOCAL_OPTIONS, localOptionsFromEnv } from './local-options';
 import { LocalRequestRouter } from './local-request-router';
 import { LocalStackHandlers } from './local-stack-handlers';
+import { ToolRulesController } from './tool-rules.controller';
+import { ToolRulesService } from './tool-rules.service';
 
 /**
  * The Claude Code integration's server side (spec 201, ADR-0020): the
@@ -42,10 +44,12 @@ import { LocalStackHandlers } from './local-stack-handlers';
     // C-377: a session drives stack and card designs.
     DesignModule,
   ],
-  controllers: [ActionRequestsController],
+  controllers: [ActionRequestsController, ToolRulesController],
   providers: [
     { provide: LOCAL_OPTIONS, useFactory: () => localOptionsFromEnv() },
     ActionRequestsService,
+    // C-401: "allow similar" and "always allow" rules of tool-use requests.
+    ToolRulesService,
     ActionRequestExpiryJob,
     // #845: a person's session works the Board.
     LocalBoardHandlers,

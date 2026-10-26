@@ -5,6 +5,7 @@ import type {
   WatchedProject,
 } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
+import { DEMOFLOW_CONFIG_FILE } from '../demos/config-file';
 import type { Exec } from '../detect/exec';
 import { stripUrlCredentials } from '../redact-url';
 import { emptyClassified } from './classify';
@@ -240,6 +241,7 @@ export const inspectProject = async (
     codeSentinelConfig,
     hasClaudeMd: isFile(fs, join(toplevel, 'CLAUDE.md')),
     hasAgentsMd: isFile(fs, join(toplevel, 'AGENTS.md')),
+    hasDemoflowConfig: isFile(fs, join(toplevel, DEMOFLOW_CONFIG_FILE)),
     docs: detected?.docs ?? {
       kind: 'none',
       localPath: null,

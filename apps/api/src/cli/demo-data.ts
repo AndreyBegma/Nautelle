@@ -1,5 +1,10 @@
-import { captureFingerprint } from '@nautelle/shared';
+import {
+  type CardNeedsPersonReason,
+  captureFingerprint,
+} from '@nautelle/shared';
 import type { BoardColumn, CardEffort, PrismaClient } from '@prisma/client';
+import { hashPassword } from '../auth/password';
+import { generateToken } from '../auth/tokens';
 
 /**
  * The database a demo recording runs on (C-383, ADR-0090): `agentdock_demo`,
@@ -62,6 +67,10 @@ export const DEMO_CARDS: ReadonlyArray<{
    * in Finished — the API's sweep moves it to Completed by itself.
    */
   mergedPr?: number;
+  /** C-390: an open PR on `branch`, so the card waits in the Inbox to merge. */
+  openPr?: { number: number; branch: string };
+  /** C-390: the card needs a person, so the Inbox lists it with Retry. */
+  needsPerson?: CardNeedsPersonReason;
   /** C-394: a design drawn and waiting for approval, with one frame. */
   design?: true;
 }> = [
@@ -99,6 +108,19 @@ export const DEMO_CARDS: ReadonlyArray<{
     column: 'finished',
     kind: 'feature',
     mergedPr: 42,
+  },
+  {
+    title: 'Gift cards in the cart',
+    column: 'finished',
+    kind: 'feature',
+    openPr: { number: 43, branch: 'card/c7-gift-cards' },
+  },
+  {
+    title: 'Order history pages past 100 orders',
+    column: 'finished',
+    kind: 'bug',
+    openPr: { number: 44, branch: 'card/c8-order-history' },
+    needsPerson: 'ci_still_failing',
   },
   {
     title: 'Import products from a CSV file',
@@ -144,6 +166,47 @@ export const DEMO_FAILED_RUNS: ReadonlyArray<{
   },
 ];
 
+/** C-401: the away session that asks for the tool calls below. */
+export const DEMO_AWAY_SESSION_ID = 'demo-session-away';
+
+/**
+ * C-401: tool calls the away session waits on, the soonest to expire first.
+ * The test run comes with Claude Code's rule suggestion, so it can be
+ * allowed for similar calls; reading the project's `.env` always asks.
+ */
+export const DEMO_TOOL_CALLS: ReadonlyArray<{
+  id: string;
+  toolName: string;
+  input: Record<string, string>;
+  suggestions?: ReadonlyArray<{ toolName: string; ruleContent: string }>;
+  expiresInMinutes: number;
+}> = [
+  {
+    id: 'demo-action-test',
+    toolName: 'Bash',
+    input: { command: 'bun run test --filter web' },
+    suggestions: [{ toolName: 'Bash', ruleContent: 'bun run test:*' }],
+    expiresInMinutes: 235,
+  },
+  {
+    id: 'demo-action-env',
+    toolName: 'Read',
+    input: { file_path: '/srv/demo/acme-shop/.env' },
+    expiresInMinutes: 240,
+  },
+];
+
+/**
+ * C-402: an active operator besides the admin, so Admin › Users has someone
+ * to give a reset link. Their password is random and never shown: they can
+ * get in only through such a link.
+ */
+export const DEMO_TEAMMATE = {
+  id: 'demo-user-teammate',
+  email: 'sam@acme.example',
+  name: 'Sam Rivera',
+} as const;
+
 /**
  * Seeds the demo project and its cards for the admin `adminEmail`, who must
  * exist (`bun run admin:create`). Every row has a fixed key, so running it
@@ -156,9 +219,13 @@ export const seedDemo = async (
     | 'runner'
     | 'project'
     | 'boardSettings'
+    | 'repositoryPushCheck'
     | 'boardCard'
     | 'run'
     | 'boardCardRound'
+    | 'agentSession'
+    | 'actionRequest'
+    | 'toolUseRule'
     | 'boardRunQueueCard'
     | 'taskDesign'
     | 'planTurn'
@@ -172,6 +239,18 @@ export const seedDemo = async (
   if (!admin) throw new DemoDataError(`No user with email ${email}`);
 
   const now = new Date();
+  await prisma.user.upsert({
+    where: { id: DEMO_TEAMMATE.id },
+    update: {},
+    create: {
+      ...DEMO_TEAMMATE,
+      passwordHash: await hashPassword(generateToken()),
+      role: 'operator',
+      status: 'active',
+      approvedById: admin.id,
+      approvedAt: now,
+    },
+  });
   await prisma.runner.upsert({
     where: { id: DEMO_RUNNER_ID },
     update: {},
@@ -196,9 +275,31 @@ export const seedDemo = async (
       defaultBranch: 'main',
       hasClaudeMd: true,
       hasAgentsMd: false,
+      // C-395: what the Ready to run block reads; the runner stays offline.
+      hasDemoflowConfig: true,
       lastInspectedAt: now,
+      // C-401: away mode requests wait four hours for a person.
+      toolUseTimeoutMinutes: 240,
       createdById: admin.id,
       members: { create: { userId: admin.id, addedById: admin.id } },
+    },
+  });
+  // C-395: the push check Ready to run reads (C-396 keeps it per runner and path).
+  await prisma.repositoryPushCheck.upsert({
+    where: {
+      runnerId_rootPath: {
+        runnerId: DEMO_RUNNER_ID,
+        rootPath: '/srv/demo/acme-shop',
+      },
+    },
+    update: {},
+    create: {
+      runnerId: DEMO_RUNNER_ID,
+      rootPath: '/srv/demo/acme-shop',
+      ok: true,
+      remote: 'git@github.com:acme/shop.git',
+      message: 'origin accepts pushes from this checkout.',
+      checkedAt: now,
     },
   });
   await prisma.boardSettings.upsert({
@@ -243,6 +344,17 @@ export const seedDemo = async (
               prState: 'merged' as const,
               mergedAt: new Date(now.getTime() - 10 * 60_000),
             }),
+        ...(card.openPr === undefined
+          ? {}
+          : {
+              branch: card.openPr.branch,
+              prNumber: card.openPr.number,
+              prUrl: `https://github.com/acme/shop/pull/${card.openPr.number}`,
+              prState: 'open' as const,
+            }),
+        ...(card.needsPerson === undefined
+          ? {}
+          : { needsPerson: true, needsPersonReason: card.needsPerson }),
       },
     });
     if (card.design) {
@@ -407,5 +519,65 @@ export const seedDemo = async (
       },
     });
   }
+
+  // C-401: an unattended session waiting on two tool calls, and a project
+  // rule an earlier "Always allow" stored.
+  await prisma.agentSession.upsert({
+    where: { id: DEMO_AWAY_SESSION_ID },
+    update: {},
+    create: {
+      id: DEMO_AWAY_SESSION_ID,
+      runnerId: DEMO_RUNNER_ID,
+      runtime: 'claude',
+      externalId: '0000c401-0000-4000-8000-000000000001',
+      projectId: DEMO_PROJECT_ID,
+      cwd: '/srv/demo/acme-shop',
+      gitBranch: 'card/c4-show-the-runner-version-in-the-header',
+      title: 'Show the runner version in the header',
+      origin: 'manual',
+      ownerId: admin.id,
+      startedAt: new Date(now.getTime() - 30 * 60_000),
+      lastEventAt: now,
+    },
+  });
+  for (const call of DEMO_TOOL_CALLS) {
+    const input = JSON.stringify(call.input);
+    await prisma.actionRequest.upsert({
+      where: { id: call.id },
+      update: {},
+      create: {
+        id: call.id,
+        projectId: DEMO_PROJECT_ID,
+        runnerId: DEMO_RUNNER_ID,
+        sessionId: DEMO_AWAY_SESSION_ID,
+        requestedById: admin.id,
+        kind: 'tool_use',
+        summary: `Allow ${call.toolName} in an unattended Claude Code session`,
+        args: {
+          toolName: call.toolName,
+          input,
+          truncated: false,
+          fullLength: input.length,
+          ...(call.suggestions ? { suggestions: [...call.suggestions] } : {}),
+        },
+        expiresAt: new Date(now.getTime() + call.expiresInMinutes * 60_000),
+      },
+    });
+  }
+  await prisma.toolUseRule.upsert({
+    where: { id: 'demo-rule-lint' },
+    update: {},
+    create: {
+      id: 'demo-rule-lint',
+      projectId: DEMO_PROJECT_ID,
+      scope: 'project',
+      toolName: 'Bash',
+      ruleContent: 'bun run lint:*',
+      createdById: admin.id,
+      useCount: 3,
+      lastUsedAt: new Date(now.getTime() - 15 * 60_000),
+      createdAt: new Date(now.getTime() - 2 * 24 * 60 * 60_000),
+    },
+  });
   return { projectId: DEMO_PROJECT_ID, cards: DEMO_CARDS.length };
 };

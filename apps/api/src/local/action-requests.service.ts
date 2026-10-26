@@ -13,6 +13,7 @@ import {
   mayDecideActionRequest,
   prApproveBoundArgsSchema,
   type Role,
+  type ToolRuleScope,
 } from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type { ActionRequest, Prisma } from '@prisma/client';
@@ -40,6 +41,7 @@ import {
   toActionRequestView,
 } from './action-request-mapper';
 import { httpErrorBody } from './local-error';
+import { ruleNote, ToolRulesService } from './tool-rules.service';
 
 /** The error codes of the action-request routes. */
 export const ACTION_REQUEST_ERROR = {
@@ -51,6 +53,12 @@ export const ACTION_REQUEST_ERROR = {
   prNotOpen: 'pr_not_open',
   /** The requester may not approve their own non-`tool_use` request (D18). */
   selfApproval: 'self_approval',
+  /**
+   * C-401: "allow similar" or "always allow" on a call that is never
+   * remembered — a dangerous one, one shown only in part, a rule broader
+   * than the call — or on a request that is not a `tool_use`.
+   */
+  notRememberable: 'not_rememberable',
 } as const;
 export type ActionRequestErrorCode =
   (typeof ACTION_REQUEST_ERROR)[keyof typeof ACTION_REQUEST_ERROR];
@@ -137,6 +145,7 @@ export class ActionRequestsService {
     private readonly approvals: ApprovalsService,
     private readonly queue: QueueService,
     private readonly board: BoardService,
+    private readonly rules: ToolRulesService,
   ) {}
 
   async create(
@@ -161,22 +170,45 @@ export class ActionRequestsService {
             )
           : (parsed.data as Record<string, unknown>);
     const now = new Date();
-    const { row, written } = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.actionRequest.create({
+    const ttlMs =
+      input.kind === 'tool_use'
+        ? (await this.rules.timeoutMinutes(
+            input.projectId,
+            input.requestedById,
+          )) * 60_000
+        : ACTION_REQUEST_TTL_MS[input.kind];
+    const data = {
+      projectId: input.projectId,
+      runnerId: input.runnerId,
+      sessionId: input.sessionId,
+      requestedById: input.requestedById,
+      kind: input.kind,
+      summary: input.summary,
+      args: args as Prisma.InputJsonObject,
+      expiresAt: new Date(now.getTime() + ttlMs),
+      createdAt: now,
+    };
+    // C-401: a call the person already allowed similar ones of is answered
+    // by the rule, without a notification; the hook reads the approval.
+    const rule =
+      input.kind === 'tool_use' ? await this.rules.ruleFor(input) : null;
+    if (rule) {
+      const row = await this.prisma.actionRequest.create({
         data: {
-          projectId: input.projectId,
-          runnerId: input.runnerId,
-          sessionId: input.sessionId,
-          requestedById: input.requestedById,
-          kind: input.kind,
-          summary: input.summary,
-          args: args as Prisma.InputJsonObject,
-          expiresAt: new Date(
-            now.getTime() + ACTION_REQUEST_TTL_MS[input.kind],
-          ),
-          createdAt: now,
+          ...data,
+          status: 'approved',
+          decidedAt: now,
+          note: ruleNote(rule),
+          ruleId: rule.id,
         },
       });
+      await this.recordCreated(row, args, auditor);
+      await this.rules.used(rule, row.id, auditor.ctx);
+      this.publish(row);
+      return toActionRequestSummary(row);
+    }
+    const { row, written } = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.actionRequest.create({ data });
       // Only those who can decide it: viewers would get a button that refuses.
       const recipients = (
         await this.writer.projectRecipients(tx, input.projectId)
@@ -202,7 +234,18 @@ export class ActionRequestsService {
       );
       return { row, written };
     });
-    await this.audit.record({
+    await this.recordCreated(row, args, auditor);
+    await this.notifications.publish(written);
+    this.publish(row);
+    return toActionRequestSummary(row);
+  }
+
+  private recordCreated(
+    row: ActionRequest,
+    args: Record<string, unknown>,
+    auditor: ActionRequestAuditor,
+  ): Promise<void> {
+    return this.audit.record({
       ...auditor.ctx,
       action: 'action_request.created',
       target: { type: 'action_request', id: row.id },
@@ -213,13 +256,11 @@ export class ActionRequestsService {
         summary: row.summary,
         sessionId: row.sessionId,
         expiresAt: row.expiresAt,
+        ...(row.ruleId ? { status: row.status, ruleId: row.ruleId } : {}),
       },
       result: 'ok',
       ...(auditor.meta ? { meta: auditor.meta } : {}),
     });
-    await this.notifications.publish(written);
-    this.publish(row);
-    return toActionRequestSummary(row);
   }
 
   /**
@@ -340,12 +381,18 @@ export class ActionRequestsService {
    * a requester approves their own non-`tool_use` request only as an admin.
    * An approval then executes as the approver; its outcome is the row's
    * `executed` or `failed` status and `result` — the decision stands either way.
+   *
+   * `remember` (C-401, approving a `tool_use`): also store the rules that
+   * answer similar calls — for the request's session, or the project — and
+   * answer the pending requests they already cover. A call that may not be
+   * remembered is refused before anything is decided.
    */
   async decide(
     decider: ActionRequestDecider,
     id: string,
     decision: ActionRequestDecision,
     note?: string,
+    remember?: ToolRuleScope,
   ): Promise<ActionRequestView> {
     const row = await this.prisma.actionRequest.findFirst({
       where: { id, projectId: decider.projectId },
@@ -361,6 +408,7 @@ export class ActionRequestsService {
           kind: row.kind,
           decision: DECIDED_STATUS[decision],
           ...(note ? { note } : {}),
+          ...(remember ? { remember } : {}),
         },
         result,
         meta: { ...meta, via: decider.via },
@@ -395,6 +443,23 @@ export class ActionRequestsService {
         'Only another operator or an admin can approve your own request',
       );
     }
+    const offer = remember ? this.rules.offer(row, remember) : null;
+    const refusal =
+      offer === null
+        ? null
+        : decision !== 'approve'
+          ? 'Only an approval can be remembered'
+          : offer.ok
+            ? null
+            : offer.reason;
+    if (refusal !== null) {
+      await record('denied', { reason: ACTION_REQUEST_ERROR.notRememberable });
+      throw actionRequestError(
+        409,
+        ACTION_REQUEST_ERROR.notRememberable,
+        refusal,
+      );
+    }
 
     // Only one decision wins: the row moves only while it is still pending.
     const { count } = await this.prisma.actionRequest.updateMany({
@@ -419,12 +484,66 @@ export class ActionRequestsService {
       where: { id: row.id },
     });
     this.publish(decided);
+    if (remember && offer?.ok) {
+      await this.rules.remember(
+        row,
+        remember,
+        offer.rules,
+        decider.user.id,
+        decider.ctx,
+      );
+      await this.answerPending(row.projectId, decider.ctx);
+    }
 
     if (decision === 'approve' && decided.kind !== 'tool_use') {
       decided = await this.execute(decided, decider);
       this.publish(decided);
     }
     return toActionRequestView(decided);
+  }
+
+  /**
+   * C-401: the pending `tool_use` requests of a project a stored rule now
+   * answers — parallel calls of the session that were waiting — approved by
+   * that rule, as `ctx` (the person who stored it).
+   */
+  private async answerPending(
+    projectId: string,
+    ctx: AuditContext,
+  ): Promise<void> {
+    const now = new Date();
+    const pending = await this.prisma.actionRequest.findMany({
+      where: {
+        projectId,
+        kind: 'tool_use',
+        status: 'pending',
+        expiresAt: { gt: now },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    });
+    for (const request of pending) {
+      const rule = await this.rules.ruleFor(request);
+      if (!rule) continue;
+      const { count } = await this.prisma.actionRequest.updateMany({
+        where: { id: request.id, status: 'pending' },
+        data: {
+          status: 'approved',
+          decidedAt: now,
+          note: ruleNote(rule),
+          ruleId: rule.id,
+        },
+      });
+      if (count === 0) continue;
+      await this.rules.used(rule, request.id, ctx);
+      this.publish({
+        ...request,
+        status: 'approved',
+        decidedAt: now,
+        note: ruleNote(rule),
+        ruleId: rule.id,
+      });
+    }
   }
 
   /** The every-minute sweep (D18): pending requests past `expiresAt` expire. */

@@ -35,9 +35,11 @@ Teams live in Slack, and Telegram is the only chat channel (`apps/api/src/telegr
   next free number at implementation time.
 
 ## Acceptance criteria
-- [ ] A finished card posts to the configured channel with its PR and demo link.
-- [ ] The per-event toggles are respected.
-- [ ] A bad URL is reported by the test button and does not block other channels.
+- [x] A finished card posts to the configured channel with its PR and demo link.
+- [x] The per-event toggles are respected.
+- [x] A bad URL is reported by the test button and does not block other channels.
+
+Implemented with ADR-0109; every criterion is checked by `apps/api/src/slack/slack.e2e.spec.ts`.
 
 ## Tests
 - API: e2e with a fake webhook endpoint, for each event kind, the toggles and the error path.

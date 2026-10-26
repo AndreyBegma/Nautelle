@@ -1,4 +1,9 @@
-import { MINI_APP_PATH, SESSION_COOKIE } from '@nautelle/shared';
+import {
+  FORGOT_PASSWORD_PAGE,
+  MINI_APP_PATH,
+  PASSWORD_RESET_PAGE,
+  SESSION_COOKIE,
+} from '@nautelle/shared';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { HOME_PATH, safeNext } from './app/login/safe-next';
@@ -20,6 +25,9 @@ const PUBLIC_PATHS = [
   '/pending',
   // C-367: the first-run setup, before any account exists.
   '/setup',
+  // C-402: for people who cannot sign in.
+  FORGOT_PASSWORD_PAGE,
+  PASSWORD_RESET_PAGE,
   INSTALL_PATH,
   MINI_APP_PATH,
 ];

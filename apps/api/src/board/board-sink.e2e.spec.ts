@@ -128,6 +128,47 @@ describe('board sink (e2e)', () => {
       });
     });
 
+    it('a failed round records card.failed once, without its error (C-405)', async () => {
+      const { card, round } = await running();
+      await phase(card, round.runId, {
+        phase: 'failed',
+        error: 'worktree exists',
+      });
+      // A replay finds the round already over.
+      await phase(card, round.runId, { phase: 'failed', error: 'again' });
+      const events = await serverEvents('card.failed');
+      expect(events).toHaveLength(1);
+      expect(events[0]?.data).toEqual({
+        cardId: card.id,
+        number: 1,
+        title: card.title,
+        round: 1,
+      });
+      expect(JSON.stringify(events[0]?.data)).not.toContain('worktree');
+    });
+
+    it('a merged PR records card.merged once per card and PR (C-405)', async () => {
+      const { card, round } = await running();
+      await phase(card, round.runId, { phase: 'ended', exitCode: 0 });
+      await w.work.settled();
+      expect(await w.card(1)).toMatchObject({ prNumber: 77 });
+      expect(await serverEvents('card.merged')).toHaveLength(0);
+
+      await w.work.markMerged(card.id, 77, null, { complete: false });
+      // The PR poll sees the same merge again.
+      await w.work.markMerged(card.id, 77, null, { complete: false });
+      // A PR the card does not have merges nothing.
+      await w.work.markMerged(card.id, 78, null, { complete: false });
+      const events = await serverEvents('card.merged');
+      expect(events).toHaveLength(1);
+      expect(events[0]?.data).toMatchObject({
+        cardId: card.id,
+        number: 1,
+        title: card.title,
+        prNumber: 77,
+      });
+    });
+
     it('ignores a round of another runner or project', async () => {
       const { card, round } = await running();
       await w.deliver('card_run.phase_changed', {

@@ -205,6 +205,16 @@ describe('surviving an API restart (spec 353)', () => {
     expect((error as ApiError).status).toBe(500);
     expect(error).not.toBeInstanceOf(ApiUnreachableError);
   });
+
+  test('a 202 with no body settles to undefined (C-402)', async () => {
+    script(new Response(null, { status: 202 }));
+    expect(
+      await api('/auth/password-reset/request', {
+        method: 'POST',
+        body: { email: 'a@example.com' },
+      }),
+    ).toBeUndefined();
+  });
 });
 
 describe('refusing a path that leaves its route (C-165)', () => {

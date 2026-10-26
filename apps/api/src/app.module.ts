@@ -25,6 +25,7 @@ import { GitHubAppModule } from './github-app';
 import { HandoffModule } from './handoff';
 import { HealthController } from './health.controller';
 import { HistoryModule } from './history';
+import { InboxModule } from './inbox';
 import { LiveModule } from './live/live.module';
 import { LlmModule } from './llm/llm.module';
 import { LocalModule } from './local';
@@ -44,6 +45,7 @@ import { SchedulesModule } from './schedules';
 import { SessionsModule } from './sessions/sessions.module';
 import { SetupModule } from './setup/setup.module';
 import { SkillsModule } from './skills';
+import { SlackModule } from './slack/slack.module';
 import { StewardModule } from './steward';
 import { StewardDigestModule } from './steward-digest';
 import { SummariesModule } from './summaries';
@@ -91,6 +93,7 @@ import { WorkflowsModule } from './workflows';
     // Spec 201: the `local.request` router and action requests.
     LocalModule,
     TelegramModule,
+    SlackModule,
     TerminalModule,
     // Issue #281: the Terminal → Board setup checklist.
     TerminalSetupModule,
@@ -110,6 +113,8 @@ import { WorkflowsModule } from './workflows';
     CaptureModule,
     // Issue #270: one Work surface — the List and the Board's plan tasks.
     WorkModule,
+    // C-390: the Inbox — what waits on the caller across their projects.
+    InboxModule,
     // Issue #271: saved text normalized to English on the runner.
     TextModule,
     // Issue #445: Token saver. Global: every launch sender asks it what to send.

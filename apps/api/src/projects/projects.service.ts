@@ -36,14 +36,14 @@ import {
   toProjectSummary,
 } from './project-mapper';
 
-const withRelations = {
+export const withRelations = {
   runner: {
     select: { id: true, name: true, revokedAt: true, capabilities: true },
   },
   docsSource: true,
 } as const;
 
-const isUniqueViolation = (error: unknown): boolean =>
+export const isUniqueViolation = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError &&
   error.code === 'P2002';
 
@@ -80,13 +80,15 @@ export const inspectedDefaultBranch = (
       : null;
 
 /** The columns an inspection sets on a project, at connect and on refresh. */
-const inspectionData = (inspection: ProjectInspection) => ({
+export const inspectionData = (inspection: ProjectInspection) => ({
   baseBranch: inspection.baseBranch,
   baseSource: inspection.baseSource,
   defaultBranch: inspectedDefaultBranch(inspection),
   codeSentinelConfig: inspection.codeSentinelConfig as Prisma.InputJsonValue,
   hasClaudeMd: inspection.hasClaudeMd,
   hasAgentsMd: inspection.hasAgentsMd,
+  // C-395: a runner older than the field leaves it unknown.
+  hasDemoflowConfig: inspection.hasDemoflowConfig ?? null,
   lastInspectedAt: new Date(),
 });
 
@@ -338,6 +340,7 @@ export class ProjectsService {
       'mergeApproval',
       'shipSessionContent',
       'sessionContentRetentionDays',
+      'toolUseTimeoutMinutes',
     ] as const;
     const before: Record<string, unknown> = {};
     const after: Record<string, unknown> = {};
@@ -486,8 +489,26 @@ export class ProjectsService {
     return project;
   }
 
-  private toDetail(project: ProjectWithRelations, role: Role): ProjectDetail {
-    return toProjectDetail(project, this.presence.status(project.runner), role);
+  private async toDetail(
+    project: ProjectWithRelations,
+    role: Role,
+  ): Promise<ProjectDetail> {
+    // C-395: Ready to run reads the push check C-396 keeps per runner and
+    // path — git's own answer, not a second signal stored on the project.
+    const pushCheck = await this.prisma.repositoryPushCheck.findUnique({
+      where: {
+        runnerId_rootPath: {
+          runnerId: project.runnerId,
+          rootPath: project.rootPath,
+        },
+      },
+    });
+    return toProjectDetail(
+      project,
+      this.presence.status(project.runner),
+      role,
+      pushCheck,
+    );
   }
 
   private async usableRunner(runnerId: string): Promise<void> {
@@ -502,7 +523,7 @@ export class ProjectsService {
   }
 }
 
-const docsSummary = (docs: {
+export const docsSummary = (docs: {
   kind: string;
   localPath: string | null;
   repo: string | null;

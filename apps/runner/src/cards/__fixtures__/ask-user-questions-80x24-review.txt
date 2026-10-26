@@ -1,0 +1,24 @@
+
+✻ Worked for 3s · done 6:24 PM
+
+❯ Call AskUserQuestion once with two questions: "When should the daily digest
+  go out, and to which channel should it be posted for the team?" (header
+  "Digest time", options "Morning" (description "Before the stand-up at nine"),
+  "Evening" (description "After the last merge of the day")) and "Which events
+  count?" (header "Events", options Started, Finished). Do nothing else.
+
+────────────────────────────────────────────────────────────────────────────────
+←  ☒ Digest time  ☒ Events  ✔ Submit  →
+
+Review your answers
+
+ │ ● When should the daily digest go out, and to which channel should it be
+ │   posted for the team?
+   → At noon, in #team
+ ● Which events count?
+   → Finished
+
+Ready to submit your answers?
+
+❯ 1. Submit answers
+  2. Cancel

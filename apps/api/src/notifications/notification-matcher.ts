@@ -51,6 +51,17 @@ const EVENT_SELECT = {
 } as const;
 
 /**
+ * C-405 (ADR-0109): `card.demo` carries `telegram: false` when only Slack
+ * wants it. Events recorded before C-405 have no flag: Telegram's.
+ */
+const telegramOff = (draft: NotificationDraft, event: MatchableEvent) =>
+  draft.kind === 'card.demo' &&
+  typeof event.data === 'object' &&
+  event.data !== null &&
+  !Array.isArray(event.data) &&
+  (event.data as Record<string, unknown>).telegram === false;
+
+/**
  * Turns stored runner events into notifications (spec 22 D4). A cursor over
  * `events.id` in `notification_matcher_state`, advanced in the same
  * transaction as the rows it caused, so every event is matched once.
@@ -203,7 +214,11 @@ export class NotificationMatcher
     ) {
       return [];
     }
-    const everyone = await this.writer.projectRecipients(tx, projectId);
+    // C-405: a demo recorded for Slack only, while `demoTelegram` is off,
+    // goes to no person; the writer still hands it to Slack.
+    const everyone = telegramOff(draft, event)
+      ? []
+      : await this.writer.projectRecipients(tx, projectId);
     const spec = NOTIFICATION_KIND_SPECS[draft.kind];
     // A content-derived kind never reaches a viewer, whatever their rules say
     // (ADR-0021 §5, #244 D11).
@@ -214,9 +229,26 @@ export class NotificationMatcher
         : everyone;
     return this.writer.write(
       tx,
-      this.input(draft, event, projectId),
+      {
+        ...this.input(draft, event, projectId),
+        ownerId: await this.cardOwner(tx, projectId, draft.card),
+      },
       recipients,
     );
+  }
+
+  /** C-404: who created the card a board kind is about; null: none or gone. */
+  private async cardOwner(
+    tx: Tx,
+    projectId: string,
+    card: number | undefined,
+  ): Promise<string | null> {
+    if (card === undefined) return null;
+    const found = await tx.boardCard.findUnique({
+      where: { projectId_number: { projectId, number: card } },
+      select: { createdById: true },
+    });
+    return found?.createdById ?? null;
   }
 
   private input(
@@ -246,6 +278,8 @@ export class NotificationMatcher
         draft.kind !== 'card.waiting' &&
         draft.kind !== 'card.background_stalled' &&
         draft.kind !== 'card.demo' &&
+        draft.kind !== 'card.failed' &&
+        draft.kind !== 'card.merged' &&
         draft.kind !== 'steward.incident',
     };
   }

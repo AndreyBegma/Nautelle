@@ -1,10 +1,19 @@
-import type {
-  UpdateUserSettingsRequest,
-  UserSettingsView,
-  WhatsNewView,
+import {
+  TOOL_USE_TIMEOUT_MAX_MINUTES,
+  TOOL_USE_TIMEOUT_MIN_MINUTES,
+  type UpdateUserSettingsRequest,
+  type UserSettingsView,
+  type WhatsNewView,
 } from '@nautelle/shared';
 import { Body, Controller, Get, HttpCode, Post, Put } from '@nestjs/common';
-import { IsDefined, IsString, MaxLength, ValidateIf } from 'class-validator';
+import {
+  IsInt,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 import type { AuditContext } from '../audit/audit.types';
 // From their own files: the barrels load `AuditModule` and `AuthModule`,
 // and `AuthModule` imports this module.
@@ -13,13 +22,23 @@ import type { AuthUser } from '../auth/auth-request';
 import { CurrentUser } from '../auth/decorators';
 import { UserSettingsService } from './user-settings.service';
 
-/** `PUT /me/settings`: a catalog alias, or `null` for the default. */
+/**
+ * `PUT /me/settings`: at least one field (the service checks), each `null`
+ * for its default.
+ */
 export class UpdateUserSettingsDto implements UpdateUserSettingsRequest {
-  @IsDefined()
-  @ValidateIf((_, value) => value !== null)
+  /** A catalog alias. */
+  @ValidateIf((_, value) => value !== null && value !== undefined)
   @IsString()
   @MaxLength(64)
-  planningModel!: string | null;
+  planningModel?: string | null;
+
+  /** C-401: minutes a tool-use request of the caller's sessions waits. */
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsInt()
+  @Min(TOOL_USE_TIMEOUT_MIN_MINUTES)
+  @Max(TOOL_USE_TIMEOUT_MAX_MINUTES)
+  toolUseTimeoutMinutes?: number | null;
 }
 
 /**
@@ -41,7 +60,7 @@ export class MeSettingsController {
     @AuditCtx() ctx: AuditContext,
     @Body() dto: UpdateUserSettingsDto,
   ): Promise<UserSettingsView> {
-    return this.settings.update(user.id, dto.planningModel, ctx);
+    return this.settings.update(user.id, dto, ctx);
   }
 
   /** C-294: the version and the unread dot of What's new. */

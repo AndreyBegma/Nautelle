@@ -795,7 +795,9 @@ export const localCardRunResultSchema = z.object({
 /**
  * `card.run`: C-398 (ADR-0102) — at the project's `maxRunning` a To Do card
  * is put in the run queue instead of refused; `queued` says so, and `round`
- * is `null` until a slot frees and the card starts.
+ * is `null` until a slot frees and the card starts. C-412: `place` is the
+ * card's 1-based place in the queue (the card that starts next is 1), `null`
+ * while it waits for a dependency or from an API that does not send it.
  */
 export const localCardRunQueuedResultSchema = z.union([
   localCardRunResultSchema,
@@ -803,6 +805,7 @@ export const localCardRunQueuedResultSchema = z.union([
     number: cardNumberSchema,
     round: z.null(),
     queued: z.literal(true),
+    place: z.number().int().positive().nullable().default(null),
   }),
 ]);
 

@@ -4,7 +4,9 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
 import {
   AUTH_ERROR,
+  FORGOT_PASSWORD_PAGE,
   type LoginRequest,
+  type PasswordResetOptions,
   type PublicUser,
   type RegistrationState,
 } from '@nautelle/shared';
@@ -25,11 +27,16 @@ export function LoginForm() {
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  // C-402: Forgot password by email, when this server can send one.
+  const [selfService, setSelfService] = useState<boolean>();
 
   useEffect(() => {
     api<RegistrationState>('/auth/registration')
       .then((state) => setRegistrationOpen(state.open))
       .catch(() => setRegistrationOpen(false));
+    api<PasswordResetOptions>('/auth/password-reset')
+      .then((options) => setSelfService(options.selfService))
+      .catch(() => setSelfService(false));
   }, []);
 
   const submit = async (event: FormEvent) => {
@@ -113,6 +120,19 @@ export function LoginForm() {
         </Button>
       </form>
       <div className="flex flex-col gap-1 border-t border-line pt-4 text-sm text-ink-2">
+        {selfService === true ? (
+          <p>
+            <Link
+              href={FORGOT_PASSWORD_PAGE}
+              className="text-accent-ink underline"
+            >
+              Forgot password?
+            </Link>
+          </p>
+        ) : null}
+        {selfService === false ? (
+          <p>Forgot your password? Ask an administrator for a reset link.</p>
+        ) : null}
         {registrationOpen ? (
           <p>
             No account?{' '}

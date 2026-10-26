@@ -1,5 +1,6 @@
 import type {
   AdminUser,
+  PasswordResetLinkResponse,
   RegistrationState,
   TwoFactorPolicy,
 } from '@nautelle/shared';
@@ -18,8 +19,9 @@ import {
 import type { AuditContext } from '../audit/audit.types';
 import { AuditCtx } from '../audit/audit-context';
 import type { AuthUser } from '../auth/auth-request';
-import { CurrentUser, Roles } from '../auth/decorators';
-import { TwoFactorPolicyDto } from '../auth/dto';
+import { CurrentUser, Roles, SessionOnly } from '../auth/decorators';
+import { CreatePasswordResetLinkDto, TwoFactorPolicyDto } from '../auth/dto';
+import { PasswordResetService } from '../auth/password-reset.service';
 import { TwoFactorService } from '../auth/two-factor.service';
 import { SettingsService } from '../settings/settings.service';
 import { AdminUsersService } from './admin-users.service';
@@ -33,7 +35,10 @@ import {
 @Roles('admin')
 @Controller('admin/users')
 export class AdminUsersController {
-  constructor(private readonly users: AdminUsersService) {}
+  constructor(
+    private readonly users: AdminUsersService,
+    private readonly resets: PasswordResetService,
+  ) {}
 
   @Get()
   list(@Query() query: ListUsersQuery): Promise<AdminUser[]> {
@@ -76,6 +81,22 @@ export class AdminUsersController {
     @AuditCtx() ctx: AuditContext,
   ): Promise<AdminUser> {
     return this.users.resetTwoFactor(id, admin.id, ctx);
+  }
+
+  /**
+   * C-402: a one-time link that sets a new password (and, for `two_factor`,
+   * turns two-factor sign-in off), shown once. A browser session only: a
+   * leaked API token must not hand out the way into other accounts.
+   */
+  @SessionOnly()
+  @Post(':id/reset-link')
+  createResetLink(
+    @Param('id') id: string,
+    @Body() dto: CreatePasswordResetLinkDto,
+    @CurrentUser() admin: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<PasswordResetLinkResponse> {
+    return this.resets.issueByAdmin(id, dto.kind, admin.id, ctx);
   }
 
   @Delete(':id')

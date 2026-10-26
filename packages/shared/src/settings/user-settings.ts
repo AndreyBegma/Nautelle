@@ -13,14 +13,22 @@ export const PLANNING_MODEL_DEFAULT = 'sonnet';
 export interface UserSettingsView {
   /** The stored value, else `PLANNING_MODEL_DEFAULT`. */
   planningModel: string;
+  /**
+   * C-401: how long a tool-use request of this person's sessions waits for a
+   * decision, in minutes, where the project sets none; null is the default
+   * (`TOOL_USE_TIMEOUT_DEFAULT_MINUTES`).
+   */
+  toolUseTimeoutMinutes: number | null;
 }
 
 /**
- * `PUT /me/settings`. `planningModel` is an alias of the model catalog
- * (`CLAUDE_MODELS`, #322 D4); `null` clears it back to the default.
+ * `PUT /me/settings`: at least one field. `planningModel` is an alias of the
+ * model catalog (`CLAUDE_MODELS`, #322 D4); `toolUseTimeoutMinutes` is 1–720
+ * (C-401). `null` clears a field back to its default; an absent one is kept.
  */
 export interface UpdateUserSettingsRequest {
-  planningModel: string | null;
+  planningModel?: string | null;
+  toolUseTimeoutMinutes?: number | null;
 }
 
 /** The planning model of a stored `user_settings.planningModel` (null: no row or cleared). */

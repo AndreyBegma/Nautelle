@@ -211,6 +211,12 @@ export interface CardDemoEventData {
   reason: string | null;
   /** With `ready`: bytes of the video. */
   size: number | null;
+  /**
+   * C-405: `false` when the event was recorded for Slack only, while the
+   * project's `demoTelegram` is off — it then reaches no person. Absent on
+   * events recorded before C-405, which were Telegram's.
+   */
+  telegram?: boolean;
 }
 
 /**
