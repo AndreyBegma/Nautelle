@@ -17,41 +17,77 @@
     },
     {
       "action": "assertText",
-      "target": {
-        "role": "heading",
-        "name": "Triggers",
-        "exact": true
-      },
+      "target": { "role": "heading", "name": "Triggers", "exact": true },
       "text": "Triggers",
       "match": "exact",
       "timeoutMs": 30000
     },
     {
-      "action": "wait",
-      "ms": 2000
-    },
-    {
       "action": "marker",
-      "title": "Webhooks list reloads on a delivery event"
+      "title": "Create a webhook to receive deliveries"
     },
-    {
-      "action": "navigate",
-      "path": "/admin/integrations/webhooks"
-    },
+    { "action": "navigate", "path": "/admin/integrations/webhooks" },
     {
       "action": "assertText",
-      "target": {
-        "role": "heading",
-        "name": "Webhooks",
-        "exact": true
-      },
+      "target": { "role": "heading", "name": "Webhooks", "exact": true },
       "text": "Webhooks",
       "match": "exact",
       "timeoutMs": 30000
     },
     {
-      "action": "wait",
-      "ms": 2000
-    }
+      "action": "click",
+      "target": { "role": "button", "name": "New webhook", "exact": true }
+    },
+    {
+      "action": "fill",
+      "target": { "label": "Name", "exact": true },
+      "value": "Live demo hook"
+    },
+    {
+      "action": "fill",
+      "target": { "label": "URL", "exact": true },
+      "value": "https://example.com/hooks/live-demo"
+    },
+    {
+      "action": "click",
+      "target": { "role": "checkbox", "name": "pr.opened" }
+    },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Save", "exact": true }
+    },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Done", "exact": true },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertText",
+      "target": { "text": "Live demo hook", "exact": true },
+      "text": "Live demo hook",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "marker",
+      "title": "A delivery lands and its row appears without a reload"
+    },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Open", "exact": true }
+    },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Test", "exact": true },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertText",
+      "target": { "text": "webhook.test", "exact": true },
+      "text": "webhook.test",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    { "action": "wait", "ms": 3000 }
   ]
 }
