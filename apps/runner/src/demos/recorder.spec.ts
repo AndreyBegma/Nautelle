@@ -281,6 +281,7 @@ describe('DemoRecorder', () => {
     // Only the names the command lists, not every project secret.
     expect(call.env.OTHER).toBeUndefined();
     expect(call.env.PORT).toBe('41234');
+    expect(call.env.NAUTELLE_CARD).toBe(SHORT_ID);
     expect(call.env.PATH).toBe('/usr/bin');
     expect('UNSET' in call.env).toBe(false);
     expect(call.args.join(' ')).not.toContain(SECRET);
@@ -685,6 +686,8 @@ describe('DemoRecorder on a checkout of the PR head (C-456)', () => {
     expect(calls[0].cwd).toBe(demo);
     expect(calls[0].cwd.endsWith(`.wt-shop-demo-${SHORT_ID}`)).toBe(true);
     expect(seen).toEqual({ head: headSha, branch: 'HEAD' });
+    // The dev command's per-card demo database cannot come from the path.
+    expect(calls[0].env.NAUTELLE_CARD).toBe(SHORT_ID);
     expect(existsSync(demo)).toBe(false);
     expect(await worktrees(root)).toHaveLength(1);
   });

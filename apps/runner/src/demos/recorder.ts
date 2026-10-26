@@ -467,6 +467,10 @@ export class DemoRecorder {
           cwd: top,
           env: {
             ...definedOnly(this.deps.env),
+            // The project's dev command names its demo database after the
+            // card; a `-demo-` checkout carries no `card-<id>` suffix to
+            // derive it from, so parallel demos would share one database.
+            NAUTELLE_CARD: args.worktree.shortId,
             PORT: String(plan.port),
             ...secrets,
           },
