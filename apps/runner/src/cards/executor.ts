@@ -1434,6 +1434,7 @@ export class CardExecutor {
           }
         : {}),
       ...(step.protectedPaths ? { protectedPaths: step.protectedPaths } : {}),
+      ...(step.changedPaths ? { changedPaths: step.changedPaths } : {}),
       ...(step.ahead !== undefined ? { ahead: step.ahead } : {}),
     });
     this.options.emit({

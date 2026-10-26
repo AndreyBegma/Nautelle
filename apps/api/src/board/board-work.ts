@@ -64,6 +64,7 @@ import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure, boardError, cardNotFound } from './board-error';
 import type { CardWithRounds } from './board-mapper';
 import { CollectRetryTimer } from './collect-retry-timer';
+import { PathLabelsRef } from './path-labels-ref';
 
 type Tx = Prisma.TransactionClient;
 
@@ -317,6 +318,7 @@ export class BoardWork implements OnModuleInit {
     private readonly audit: AuditService,
     private readonly retryTimer: CollectRetryTimer,
     private readonly connectHooks: RunnerConnectHooks,
+    private readonly pathLabels: PathLabelsRef,
   ) {}
 
   /** #329 D4: a failed collect is retried when its runner connects. */
@@ -2095,6 +2097,14 @@ export class BoardWork implements OnModuleInit {
           ahead: output.ahead,
           pr: open ? { number: prNumber, url: prUrl } : null,
         });
+      }
+      // C-501: the files the PR changes label the card.
+      if (open) {
+        await this.pathLabels.refine(
+          card.projectId,
+          card.id,
+          output.changedPaths,
+        );
       }
       // A terminal card's earlier failure no longer holds once one succeeds.
       const cleared =

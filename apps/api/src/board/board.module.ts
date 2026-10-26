@@ -18,6 +18,7 @@ import { BoardFixWaits } from './board-fix-waits';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardLabelsController } from './board-labels.controller';
 import { BoardLabels, CardLabelSuggestRef } from './board-labels.service';
+import { BoardPathLabels } from './board-path-labels';
 import { BoardPlanCards } from './board-plan-cards';
 import { BoardPrincipals } from './board-principal';
 import { BoardReview } from './board-review';
@@ -32,6 +33,7 @@ import { BoardTerminalService } from './board-terminal.service';
 import { BoardWaitService } from './board-wait.service';
 import { BoardWork } from './board-work';
 import { CollectRetryTimer } from './collect-retry-timer';
+import { PathLabelsRef } from './path-labels-ref';
 
 /**
  * The project Board (issue #242, ADR-0024): cards Nautelle owns, each worked
@@ -95,8 +97,10 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardStacks,
     BoardTerminalService,
     BoardWork,
+    BoardPathLabels,
     CardLabelSuggestRef,
     CollectRetryTimer,
+    PathLabelsRef,
     FleetCardEditsRef,
   ],
   // `BoardRoundsService` too: approving a card's design may start round 1 (#243 D6).

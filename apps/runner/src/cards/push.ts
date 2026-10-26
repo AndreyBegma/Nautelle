@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CardDraftPullRequest } from '@nautelle/shared/protocol';
-import { protectedPathsOf } from '../git/protected-paths';
+import { diffPathsOf } from '../git/protected-paths';
 import { GH_TIMEOUT_MS, gitOk, parsePrUrl, stderrLine } from '../skills/deps';
 import { githubOf } from '../skills/run/collect';
 import {
@@ -30,6 +30,8 @@ export interface PushStep {
   held?: TrailerCommit[];
   /** C-148 (D-12): the protected paths the branch changes; with a push only. */
   protectedPaths?: string[];
+  /** C-501: every path the branch changes, sorted; with a push only. */
+  changedPaths?: string[];
   /** #837: commits on the branch ahead of `origin/<base>` before the push. */
   ahead?: number;
 }
@@ -166,8 +168,8 @@ export const pushCardHead = async (
     root: record.root,
   });
   // C-148: the pre-push guard's diff; the push goes ahead either way.
-  const protectedPaths = pending.push
-    ? await protectedPathsOf(deps.exec, record.worktree, record.base)
+  const diff = pending.push
+    ? await diffPathsOf(deps.exec, record.worktree, record.base)
     : undefined;
   // #630: a reconciled push adds a merge, so the head pushed is its own.
   const headSha = pending.push
@@ -181,7 +183,7 @@ export const pushCardHead = async (
       )
     : pending.headSha;
   const paths = {
-    ...(protectedPaths ? { protectedPaths } : {}),
+    ...(diff ?? {}),
     ahead: pending.ahead,
   };
   try {
