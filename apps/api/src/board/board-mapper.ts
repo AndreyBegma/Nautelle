@@ -970,6 +970,12 @@ export const toCardDetail = (
   sessionMessageRefusal: facts.messagesRefused?.get(card.projectId) ?? null,
   sessionModel: card.sessionModel,
   sessionEffort: card.sessionEffort,
+  trackedSessionFilters:
+    card.trackedSessionId === null
+      ? []
+      : (facts.tokenSaver.tokenSaverFiltersBySession.get(
+          card.trackedSessionId,
+        ) ?? []),
   createdBy: card.createdBy,
   movedBy: card.movedBy,
   completedBy: card.completedBy,

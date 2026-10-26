@@ -313,6 +313,24 @@ function roundItems(
   });
 }
 
+/**
+ * C-443: what the tracked session's saving is made of. A terminal card has no
+ * round to list its filters on, so the sheet shows them here.
+ */
+export function TrackedSessionFilters({
+  card,
+}: {
+  card: Pick<BoardCardDetail, 'trackedSessionFilters'>;
+}) {
+  if (!card.trackedSessionFilters?.length) return null;
+  return (
+    <section aria-label="Tracked session" className="flex flex-col gap-2">
+      <SectionHeader title="Tracked session" headingLevel={3} />
+      <FilterBreakdown filters={card.trackedSessionFilters} />
+    </section>
+  );
+}
+
 function Links({ card }: { card: BoardCardDetail }) {
   const pr = card.prUrl ? githubUrl(card.prUrl) : null;
   const issue = card.issueUrl ? githubUrl(card.issueUrl) : null;
@@ -1449,6 +1467,7 @@ export function CardDetailBody({
       {wide ? null : demoSection}
       {triageSection}
       {runSection}
+      <TrackedSessionFilters card={card} />
       {summarySection}
       {designSection}
       {dependenciesSection}

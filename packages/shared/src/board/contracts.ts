@@ -724,6 +724,13 @@ export interface BoardCardDetail extends BoardCardView {
    */
   sessionModel?: string | null;
   sessionEffort?: CardEffort | null;
+  /**
+   * C-443: the per-filter breakdown of the tracked session's saving — the
+   * figure `tokenSaved` counts for a terminal card, which has no round to
+   * list it on — most saved first. Empty when the card has no tracked
+   * session or nothing of it was filtered; absent reads as empty.
+   */
+  trackedSessionFilters?: TokenSaverFilterSavings[];
   createdBy: BoardUserRef | null;
   movedBy: BoardUserRef | null;
   completedBy: BoardUserRef | null;

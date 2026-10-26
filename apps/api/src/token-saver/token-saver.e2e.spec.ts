@@ -384,6 +384,60 @@ describe('token saver (e2e)', () => {
       expect(view.tokenSaved?.estimateUsd).toBeGreaterThan(0);
     });
 
+    it('lists the tracked session’s filters on the card, most saved first (C-443)', async () => {
+      await price();
+      const id = await session('sess-a');
+      await terminalCard(id);
+      await eco(
+        [
+          manual({ filter: 'ops/git', rawBytes: 2_000, keptBytes: 1_000 }),
+          manual({ filter: 'js/jest', rawBytes: 4_000, keptBytes: 400 }),
+          manual({ filter: 'js/jest', rawBytes: 4_000, keptBytes: 400 }),
+        ],
+        'sess-a',
+      );
+      const view = await detail();
+      expect(view.trackedSessionFilters?.map((f) => f.filter)).toEqual([
+        'js/jest',
+        'ops/git',
+      ]);
+      expect(view.trackedSessionFilters?.[0]).toMatchObject({
+        commands: 2,
+        estimateTokens: 1_800,
+      });
+      const listed = view.trackedSessionFilters?.reduce(
+        (total, f) => total + f.estimateTokens,
+        0,
+      );
+      expect(listed).toBe(view.tokenSaved?.estimateTokens);
+    });
+
+    it('is empty for a card without a tracked session or with nothing filtered (C-443)', async () => {
+      await price();
+      await w.createCard();
+      expect((await detail()).trackedSessionFilters).toEqual([]);
+      await w.ctx.prisma.boardCard.deleteMany();
+      await terminalCard(await session('sess-a'));
+      expect((await detail()).trackedSessionFilters).toEqual([]);
+    });
+
+    it('shows another project’s card neither its session nor its filters (C-443)', async () => {
+      await price();
+      const id = await session('sess-a');
+      await terminalCard(id);
+      await eco([manual({ filter: 'js/jest' })], 'sess-a');
+      // B's operator has no access to A's card ...
+      const denied = await w.operatorOfB.get(`${w.path()}/board/cards/1`);
+      expect(denied.status).toBe(404);
+      expect(JSON.stringify(denied.body)).not.toContain('js/jest');
+      // ... and B's own card 1 carries none of A's session's filters.
+      await w.createCard({}, w.operatorOfB, w.b);
+      const read = await w.operatorOfB.get(`${w.path(w.b)}/board/cards/1`);
+      expect(read.status).toBe(200);
+      expect((read.body as BoardCardDetail).trackedSessionFilters).toEqual([]);
+      expect(JSON.stringify(read.body)).not.toContain('js/jest');
+    });
+
     it('counts a row stored before its session was known, once the session is', async () => {
       await price();
       await eco([manual()], 'sess-late');

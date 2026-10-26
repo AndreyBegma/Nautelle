@@ -10,6 +10,7 @@ import {
   focusSheetTitle,
   PrTargetBanner,
   RunMoney,
+  TrackedSessionFilters,
 } from './card-sheet';
 
 interface Fake {
@@ -244,6 +245,34 @@ describe('Card sheet Run row saving (#778)', () => {
       }),
     ).toBe('');
     expect(money({ costUsd: null, tokenSaved: null })).toBe('');
+  });
+});
+
+describe('Card sheet tracked session filters (C-443)', () => {
+  const filter = (name: string, estimateTokens: number) => ({
+    filter: name,
+    estimateUsd: estimateTokens / 1000,
+    estimateTokens,
+    commands: 2,
+    bypassed: 0,
+    passedThrough: 0,
+  });
+  const block = (trackedSessionFilters?: ReturnType<typeof filter>[]) =>
+    renderToStaticMarkup(
+      <TrackedSessionFilters card={{ trackedSessionFilters }} />,
+    );
+
+  test('lists the session’s filters in a Tracked session block, in the given order', () => {
+    const html = block([filter('js/jest', 900), filter('ops/git', 250)]);
+    expect(html).toContain('aria-label="Tracked session"');
+    expect(html).toContain('Tracked session');
+    expect(html).toContain('aria-label="Token saver, by filter"');
+    expect(html.indexOf('js/jest')).toBeLessThan(html.indexOf('ops/git'));
+  });
+
+  test('draws nothing without filters, empty or absent', () => {
+    expect(block([])).toBe('');
+    expect(block(undefined)).toBe('');
   });
 });
 
