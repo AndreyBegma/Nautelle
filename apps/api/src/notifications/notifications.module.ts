@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuthModule } from '../auth';
 import { CryptoModule } from '../common/crypto';
 import { LiveModule } from '../live/live.module';
@@ -19,7 +20,9 @@ import { NotificationMatcher } from './notification-matcher';
 import {
   defaultNotificationOptions,
   NOTIFICATION_OPTIONS,
+  notificationRetentionDays,
 } from './notification-options';
+import { NotificationRetentionJob } from './notification-retention.job';
 import { NotificationRulesService } from './notification-rules.service';
 import { NotificationWriter } from './notification-writer';
 import { NotificationsController } from './notifications.controller';
@@ -55,9 +58,13 @@ import { TelegramDeliveryLedger } from './telegram-delivery-ledger';
     {
       provide: NOTIFICATION_OPTIONS,
       // The e2e suite drives `tick()` itself; timers would race its fixtures.
-      useFactory: () => ({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
         ...defaultNotificationOptions,
         autoStart: process.env.APP_ENV !== 'test',
+        retentionDays: notificationRetentionDays(
+          config.get<string>('NOTIFICATION_RETENTION_DAYS'),
+        ),
       }),
     },
     NotificationWriter,
@@ -67,6 +74,7 @@ import { TelegramDeliveryLedger } from './telegram-delivery-ledger';
     RunnerWatcher,
     RunnerReplacedNotifier,
     BlockedCheckpointSweep,
+    NotificationRetentionJob,
     AccountThrottleNotifier,
     TelegramDeliveryLedger,
     BotTokenStore,
