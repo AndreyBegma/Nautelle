@@ -1,7 +1,10 @@
 import {
+  type BoardView,
   FLEET_LIVE_EVENT,
   type FleetsView,
   type FleetView,
+  type FleetWorkingView,
+  isWorkingCard,
   type RoundView,
   type SlotDetail,
   type SlotPage,
@@ -41,6 +44,7 @@ describe('fleet routes (e2e)', () => {
     `/projects/${projectId}/slots`,
     `/projects/${projectId}/slots/i42`,
     `/projects/${projectId}/rounds`,
+    `/projects/${projectId}/fleet/working`,
   ];
 
   const viewerOf = async (email: string, projectId: string) => {
@@ -141,6 +145,177 @@ describe('fleet routes (e2e)', () => {
       await createUser(ctx.prisma, 'lonely@example.com', 'viewer');
       const lonely = await login(ctx, 'lonely@example.com');
       expect((await lonely.get('/fleet')).body).toEqual({ items: [] });
+    });
+  });
+
+  describe('GET /projects/:id/fleet/working (C-473)', () => {
+    let number = 0;
+
+    /** A card of project A; by default an idle To Do card. */
+    const seedCard = (data: Record<string, unknown> = {}) => {
+      number += 1;
+      return ctx.prisma.boardCard.create({
+        data: {
+          projectId: a,
+          number,
+          shortId: `card${String(number).padStart(4, '0')}`,
+          title: `Card ${number}`,
+          column: 'todo',
+          position: number,
+          issueOnRun: false,
+          specOnRun: false,
+          movedAt: new Date(),
+          ...data,
+        },
+      });
+    };
+
+    const seedRound = async (cardId: string, phase: 'running' | 'finished') => {
+      const run = await ctx.prisma.run.create({
+        data: {
+          kind: 'card',
+          projectId: a,
+          status: phase === 'running' ? 'running' : 'succeeded',
+          triggeredByType: 'user',
+          startedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+      await ctx.prisma.boardCardRound.create({
+        data: {
+          cardId,
+          round: 1,
+          runId: run.id,
+          trigger: 'run',
+          phase,
+          cardTitle: 'Card',
+          cardBody: '',
+          cardKind: 'feature',
+        },
+      });
+    };
+
+    const seedSession = (externalId: string, ended: boolean) =>
+      ctx.prisma.agentSession.create({
+        data: {
+          runnerId,
+          runtime: 'claude',
+          externalId,
+          projectId: a,
+          cwd: ROOT,
+          origin: 'manual',
+          models: [],
+          startedAt: new Date(),
+          lastEventAt: new Date(),
+          ...(ended ? { endedAt: new Date() } : {}),
+        },
+      });
+
+    const working = async (session: Session) => {
+      const response = await session.get(`/projects/${a}/fleet/working`);
+      expect(response.status).toBe(200);
+      return response.body as FleetWorkingView;
+    };
+
+    beforeEach(() => {
+      number = 0;
+    });
+
+    it('returns only the 3 cards at work out of 40, as the Board maps them', async () => {
+      // At work: a card worker, an orchestrator slot and a terminal session.
+      const worker = await seedCard({ column: 'in_progress' });
+      await seedRound(worker.id, 'running');
+      await seedCard({
+        column: 'in_progress',
+        source: 'fleet',
+        fleetIssue: 12,
+        fleetSlot: 'fd-1',
+      });
+      const live = await seedSession('live', false);
+      await seedCard({
+        column: 'in_progress',
+        source: 'terminal',
+        trackedSessionId: live.id,
+      });
+      // Near misses, one per kind, and a captured suggestion with a live session.
+      const done = await seedCard({ column: 'finished' });
+      await seedRound(done.id, 'finished');
+      await seedCard({
+        column: 'in_progress',
+        source: 'fleet',
+        fleetIssue: 13,
+        fleetSlot: 'fd-2',
+        fleetSlotGone: true,
+      });
+      await seedCard({
+        column: 'completed',
+        source: 'fleet',
+        fleetIssue: 14,
+        fleetSlot: 'fd-3',
+        completedAt: new Date(),
+      });
+      const ended = await seedSession('ended', true);
+      await seedCard({
+        column: 'in_progress',
+        source: 'terminal',
+        trackedSessionId: ended.id,
+      });
+      const captured = await seedSession('captured', false);
+      await seedCard({
+        column: 'inbox',
+        source: 'captured',
+        trackedSessionId: captured.id,
+      });
+      while (number < 40) await seedCard();
+
+      const view = await working(memberOfA);
+      expect(view.projectId).toBe(a);
+      expect(view.cards.map((c) => c.number)).toEqual([1, 2, 3]);
+
+      // The same faces the Board serves, and the Board agrees on who works.
+      const board = (await memberOfA.get(`/projects/${a}/board`))
+        .body as BoardView;
+      const atWork = board.columns
+        .flatMap((column) => column.cards)
+        .filter(isWorkingCard)
+        .sort((x, y) => x.number - y.number);
+      expect(view.cards).toEqual(atWork);
+    });
+
+    it('returns a To Do card in the run queue with its place', async () => {
+      const queued = await seedCard();
+      await ctx.prisma.boardRunQueueCard.create({
+        data: { cardId: queued.id, status: 'queued' },
+      });
+      const started = await seedCard();
+      await ctx.prisma.boardRunQueueCard.create({
+        data: { cardId: started.id, status: 'started' },
+      });
+      const view = await working(memberOfA);
+      expect(view.cards.map((c) => [c.number, c.queue])).toEqual([
+        [1, { state: 'queued', place: 1, stack: null }],
+      ]);
+    });
+
+    it('gives a viewer and an operator no captured card', async () => {
+      const captured = await seedSession('captured', false);
+      await seedCard({
+        column: 'inbox',
+        source: 'captured',
+        trackedSessionId: captured.id,
+      });
+      const operator = await createUser(
+        ctx.prisma,
+        'op@example.com',
+        'operator',
+      );
+      await ctx.prisma.projectMember.create({
+        data: { projectId: a, userId: operator.id },
+      });
+      expect((await working(memberOfA)).cards).toEqual([]);
+      expect((await working(await login(ctx, 'op@example.com'))).cards).toEqual(
+        [],
+      );
     });
   });
 
