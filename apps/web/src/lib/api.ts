@@ -157,7 +157,9 @@ async function settle<T>(response: Response): Promise<T> {
     );
   }
   if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  // A `void` route answers 200 or 202 with no body at all.
+  const text = await response.text();
+  return (text === '' ? undefined : JSON.parse(text)) as T;
 }
 
 /**
@@ -224,6 +226,10 @@ export function describeError(error: unknown): string {
       return 'It no longer exists. Refresh the list.';
     case AUTH_ERROR.forbidden:
       return 'You do not have access to this.';
+    case AUTH_ERROR.resetLinkInvalid:
+      return 'This reset link has expired or was already used. Ask for a new one.';
+    case AUTH_ERROR.passwordResetUnavailable:
+      return 'This server cannot send email. Ask an administrator for a reset link.';
     default:
       return error.status === 429
         ? 'Too many attempts. Wait a minute and try again.'
