@@ -103,6 +103,8 @@ describe('parseCaptureOutput', () => {
       { why: '' },
       { why: 'x'.repeat(301) },
       { kind: 'chore' },
+      // C-503 D5: the model never picks an analysis card.
+      { kind: 'analysis' },
       { confidence: 1.2 },
       { confidence: -0.1 },
       { evidence: [] },

@@ -25,6 +25,7 @@ import {
   type CardPrTarget,
   type CardRoundView,
   isActiveRoundPhase,
+  WORK_CARD_KINDS,
 } from '@nautelle/shared';
 import { ExternalLink, Move, Zap } from 'lucide-react';
 import NextLink from 'next/link';
@@ -153,6 +154,7 @@ import { useCardMove } from './use-card-move';
 const KIND_LABEL: Record<BoardCardKind, string> = {
   feature: 'Feature',
   bug: 'Bug',
+  analysis: 'Analysis',
 };
 
 /** The terminal button's state: offered, or disabled with the reason (D11). */
@@ -1333,7 +1335,8 @@ export function CardDetailBody({
             setKind(BOARD_CARD_KINDS.find((k) => k === e.target.value) ?? kind)
           }
         >
-          {BOARD_CARD_KINDS.map((k) => (
+          {/* C-503: an analysis card stays one; a work card never becomes one here. */}
+          {(kind === 'analysis' ? [kind] : WORK_CARD_KINDS).map((k) => (
             <option key={k} value={k}>
               {KIND_LABEL[k]}
             </option>

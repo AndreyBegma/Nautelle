@@ -152,7 +152,11 @@ describe('card.merge (#273 D11–D13)', () => {
       pr: { state: 'OPEN', headRefOid: 'b'.repeat(40) },
     });
     const result = await mergeCard(args, deps);
-    expect(result).toMatchObject({ merged: false, error: 'head_changed' });
+    expect(result).toMatchObject({
+      merged: false,
+      error: 'head_changed',
+      headSha: 'b'.repeat(40),
+    });
     expect(calls('pr', 'merge')).toEqual([]);
     expect(calls('issue', 'close')).toEqual([]);
   });

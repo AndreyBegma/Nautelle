@@ -5,6 +5,7 @@ import {
   ATTACHMENT_VIDEO_MAX_BYTES,
   attachmentContentPath,
   BOARD_CHANGED_EVENT,
+  type BoardCardKind,
   type BoardChangedData,
   CARD_DEMO_EVENT,
   CARD_DEMO_EVENTS,
@@ -122,7 +123,7 @@ export interface DemoCard {
   id: string;
   number: number;
   title: string;
-  kind: 'feature' | 'bug';
+  kind: BoardCardKind;
   shortId: string;
 }
 

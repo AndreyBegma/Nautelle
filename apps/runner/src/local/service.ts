@@ -157,6 +157,13 @@ const refused = (
   error: { code: 'forbidden', message },
 });
 
+/** A flag only the daemon sets, dropped from what the caller claims (DA-18). */
+const withoutClaimed = (args: unknown, field: string): unknown => {
+  if (typeof args !== 'object' || args === null) return args;
+  const { [field]: _claimed, ...rest } = args as Record<string, unknown>;
+  return rest;
+};
+
 /**
  * The daemon's side of the local socket (spec 201 D5, D6, D9, D10, D13).
  * Everything that leaves the machine passes the content gate here, before
@@ -434,6 +441,10 @@ export class LocalService {
       const guarded = this.guardFinish(binding, relayed);
       if (!guarded.ok) return guarded;
       relayed = guarded.data;
+    }
+    if (input.method === 'card.finishAnalysis') {
+      // C-503 (ADR-0126): only the daemon's read-only guard (C-504) sets it.
+      relayed = withoutClaimed(relayed, 'readOnlyViolation');
     }
     const result = await this.deps.relay({
       method: input.method,

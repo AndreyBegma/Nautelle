@@ -6,10 +6,10 @@ import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import {
   type AcceptSuggestionRequest,
   BOARD_CARD_BODY_MAX,
-  BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
   type BoardCardDetail,
   type BoardCardKind,
+  WORK_CARD_KINDS,
 } from '@nautelle/shared';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -21,6 +21,7 @@ import type { CardActions } from './use-card-actions';
 const KIND_LABEL: Record<BoardCardKind, string> = {
   feature: 'Feature',
   bug: 'Bug',
+  analysis: 'Analysis',
 };
 
 /**
@@ -156,12 +157,10 @@ export function SuggestionSheetBody({
             value={kind}
             disabled={!canOperate}
             onChange={(e) =>
-              setKind(
-                BOARD_CARD_KINDS.find((k) => k === e.target.value) ?? kind,
-              )
+              setKind(WORK_CARD_KINDS.find((k) => k === e.target.value) ?? kind)
             }
           >
-            {BOARD_CARD_KINDS.map((k) => (
+            {WORK_CARD_KINDS.map((k) => (
               <option key={k} value={k}>
                 {KIND_LABEL[k]}
               </option>

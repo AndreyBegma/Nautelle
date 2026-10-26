@@ -12,6 +12,7 @@ import { type ReactNode, useCallback, useState } from 'react';
 import {
   acceptedMessage,
   confirmUnlanded,
+  isHeadMoved,
   notLandedReason,
 } from '../../lib/board/accept';
 import {
@@ -88,6 +89,8 @@ export function useCardActions({
   const [pending, setPending] = useState<CardConfirmation>();
   const [accepting, setAccepting] = useState<BoardCardView>();
   const [acceptVersion, setAcceptVersion] = useState(0);
+  // C-415: the last Accept was refused because the PR's head moved.
+  const [headMoved, setHeadMoved] = useState(false);
   // #709: an Accept refused for work not in the base, waiting for the
   // person to confirm it.
   const [unlanded, setUnlanded] = useState<{
@@ -127,6 +130,7 @@ export function useCardActions({
       else toast.success(message.text);
       setAccepting(undefined);
       setUnlanded(undefined);
+      setHeadMoved(false);
     } catch (err) {
       const reason = notLandedReason(err);
       if (reason) {
@@ -134,6 +138,7 @@ export function useCardActions({
         return;
       }
       toast.error(describeBoardError(err, runnerName));
+      setHeadMoved(isHeadMoved(err));
       // A refused merge or close usually means the PR moved: show it again.
       setAcceptVersion((v) => v + 1);
     } finally {
@@ -217,6 +222,7 @@ export function useCardActions({
       ),
     accept: (card) => {
       setUnlanded(undefined);
+      setHeadMoved(false);
       setAccepting(card);
     },
     createPullRequest: async (card) => {
@@ -252,6 +258,7 @@ export function useCardActions({
           card={accepting}
           busy={busy}
           version={acceptVersion}
+          headMoved={headMoved}
           runnerCommands={runnerCommands}
           onAccept={(card, request) => void accept(card, request)}
           unlanded={unlanded?.reason ?? null}
@@ -261,6 +268,7 @@ export function useCardActions({
           onClose={() => {
             setAccepting(undefined);
             setUnlanded(undefined);
+            setHeadMoved(false);
           }}
         />
         <ConfirmGate

@@ -8,6 +8,7 @@ import { RunnersModule } from '../runners/runners.module';
 import { SessionMessageModule } from '../session-message/session-message.module';
 import { BoardController } from './board.controller';
 import { BoardService, FleetCardEditsRef } from './board.service';
+import { BoardAnalysis } from './board-analysis';
 import { BoardAutoRun } from './board-auto-run';
 import { BoardBackgroundStall } from './board-background-stall';
 import { BoardBudgetPause } from './board-budget-pause';
@@ -19,6 +20,7 @@ import { BoardHeadCarry } from './board-head-carry';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardLabelsController } from './board-labels.controller';
 import { BoardLabels, CardLabelSuggestRef } from './board-labels.service';
+import { BoardPathLabels } from './board-path-labels';
 import { BoardPlanCards } from './board-plan-cards';
 import { BoardPrincipals } from './board-principal';
 import { BoardReview } from './board-review';
@@ -33,6 +35,7 @@ import { BoardTerminalService } from './board-terminal.service';
 import { BoardWaitService } from './board-wait.service';
 import { BoardWork } from './board-work';
 import { CollectRetryTimer } from './collect-retry-timer';
+import { PathLabelsRef } from './path-labels-ref';
 
 /**
  * The project Board (issue #242, ADR-0024): cards Nautelle owns, each worked
@@ -60,6 +63,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardLabelsController,
   ],
   providers: [
+    // C-503: an analysis card's finish — a report and proposed cards.
+    BoardAnalysis,
     // #443: accepting a card may start the Run of a card that waited for it.
     BoardAutoRun,
     // #390: a round stuck on its own background task raises one warning.
@@ -98,8 +103,10 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardStacks,
     BoardTerminalService,
     BoardWork,
+    BoardPathLabels,
     CardLabelSuggestRef,
     CollectRetryTimer,
+    PathLabelsRef,
     FleetCardEditsRef,
   ],
   // `BoardRoundsService` too: approving a card's design may start round 1 (#243 D6).
@@ -110,6 +117,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
   // `BoardReview`: a review session's `report_review` (#884).
   // `BoardDependencies`, `BoardRunQueue`: a person's session sets them (C-377).
   exports: [
+    // C-503: the local `card.finishAnalysis` method.
+    BoardAnalysis,
     // #578: the Telegram bot accepts and dismisses suggestions.
     BoardDependencies,
     BoardInboxService,

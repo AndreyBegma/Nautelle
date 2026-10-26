@@ -9,6 +9,7 @@ import { techniqueFlagsSchema } from '../../token-economy/techniques';
 import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import {
   cardBranchSchema,
+  changedPathsSchema,
   hasCardBranchPrefix,
   protectedPathsSchema,
 } from '../branch-policy';
@@ -275,12 +276,33 @@ export const cardRunArgsSchema = z
      * only to a runner that advertises `cardDemo`.
      */
     demo: z.literal(true).optional(),
+    /**
+     * C-503 (ADR-0126): an analysis card's round — read-only. The runner
+     * launches it with deny rules for writes, on a detached worktree, without
+     * push or PR commands, and its daemon guard reports a write. Never with
+     * `pullRequest`, `newBranch`, `startBranch` or `demo`. Sent only to a
+     * runner that advertises `cardReadOnly`.
+     */
+    readOnly: z.literal(true).optional(),
   })
   .refine(
     (a) =>
       new Set((a.files ?? []).map((f) => f.path)).size ===
       (a.files ?? []).length,
     { message: 'file paths must be distinct', path: ['files'] },
+  )
+  .refine(
+    (a) =>
+      a.readOnly !== true ||
+      (a.pullRequest === undefined &&
+        a.newBranch === undefined &&
+        a.startBranch === undefined &&
+        a.demo === undefined),
+    {
+      message:
+        'a read-only round takes no pullRequest, newBranch, startBranch or demo',
+      path: ['readOnly'],
+    },
   )
   .refine((a) => a.startBranch === undefined || a.startBranch !== a.branch, {
     message: 'startBranch must differ from branch',
@@ -421,6 +443,12 @@ export const cardCollectResultSchema = z
      */
     protectedPaths: protectedPathsSchema.optional(),
     /**
+     * C-501: every path the pushed branch changes against `origin/<base>`,
+     * sorted, at most `CHANGED_PATHS_MAX`; the API labels the card from it.
+     * Absent when nothing was pushed, or from a runner older than the field.
+     */
+    changedPaths: changedPathsSchema.optional(),
+    /**
      * #837: the commit this collect pushed, now the PR's head — the round it
      * follows records it. Absent when nothing was pushed, or from a runner
      * older than the field.
@@ -543,6 +571,11 @@ export const cardMergeFailureSchema = z.object({
   merged: z.literal(false),
   error: cardMergeFailReasonSchema,
   message: z.string().max(500),
+  /**
+   * C-415: with `head_changed`, the PR's head now. Absent — a runner older
+   * than the field, or a head that moved during `gh pr merge` — is unknown.
+   */
+  headSha: headShaSchema.optional(),
 });
 export type CardMergeFailure = z.infer<typeof cardMergeFailureSchema>;
 

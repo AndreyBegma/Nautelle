@@ -30,7 +30,7 @@ import type {
 import { z } from 'zod';
 import { CommandFailure } from '../commands/failure';
 import { assertPushAllowed } from '../git/branch-guard';
-import { protectedPathsOf } from '../git/protected-paths';
+import { diffPathsOf } from '../git/protected-paths';
 import {
   GH_TIMEOUT_MS,
   gitOk,
@@ -825,7 +825,11 @@ export const collectCard = async (
     id: record.projectId,
     root: record.root,
   });
-  const protectedPaths = await protectedPathsOf(deps.exec, wt, args.base);
+  const { protectedPaths, changedPaths } = await diffPathsOf(
+    deps.exec,
+    wt,
+    args.base,
+  );
   // #630: a reconciled push adds a merge, so the head pushed is its own.
   const headSha = await pushCardBranch(
     deps,
@@ -882,6 +886,7 @@ export const collectCard = async (
     prUrl: pr.url,
     prState: pr.state,
     protectedPaths,
+    changedPaths,
     headSha,
     ...listed,
   };
