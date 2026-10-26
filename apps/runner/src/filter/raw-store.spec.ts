@@ -5,13 +5,15 @@ import {
   mkdtempSync,
   readdirSync,
   rmSync,
+  statSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CardStore } from '../cards/record';
 import { FILTER_RAW_DIR, FILTER_STATS_FILE } from './env';
-import { RawFile, removeRawDir } from './raw-store';
+import { RAW_TOTAL_CHECK_MS, RawFile, removeRawDir } from './raw-store';
 
 describe('raw store (#445 amendment 6, DR-07)', () => {
   let dir: string;
@@ -75,5 +77,122 @@ describe('raw store (#445 amendment 6, DR-07)', () => {
     // A second removal, or one of a dir that never had raw files, is fine.
     removeRawDir(dir);
     removeRawDir(join(dir, 'missing'));
+  });
+
+  describe('total cap across run dirs', () => {
+    const CAP = 1000;
+    const START = Date.parse('2026-10-26T10:00:00Z');
+    const runDirs = () =>
+      ['a', 'b', 'c', 'current'].map((n) =>
+        join(dir, 'cards', `card_${n}`, 'rounds', 'r1'),
+      );
+    const seed = (runDir: string, n: number, size: number, ageMs: number) => {
+      mkdirSync(join(runDir, FILTER_RAW_DIR), { recursive: true });
+      const path = join(runDir, FILTER_RAW_DIR, `${n}.log`);
+      writeFileSync(path, 'x'.repeat(size));
+      const at = new Date(START - ageMs);
+      utimesSync(path, at, at);
+    };
+    const left = (runDir: string) => {
+      try {
+        return readdirSync(join(runDir, FILTER_RAW_DIR)).sort();
+      } catch {
+        return [];
+      }
+    };
+    const total = { stateDir: undefined as string | undefined };
+    const options = (now = START) => ({
+      stateDir: total.stateDir,
+      capBytes: CAP,
+      now: () => now,
+    });
+
+    beforeEach(() => {
+      total.stateDir = dir;
+    });
+
+    it('prunes the oldest files across run dirs down to 80 %, sparing the current run', () => {
+      const [a, b, c, current] = runDirs() as [string, string, string, string];
+      // 1400 bytes in total, interleaved by age: oldest first b1, a1, c1, b2, a2.
+      seed(b, 1, 300, 5000);
+      seed(a, 1, 300, 4000);
+      seed(c, 1, 300, 3000);
+      seed(b, 2, 200, 2000);
+      seed(a, 2, 200, 1000);
+      // The current run's file is the oldest of all and must stay.
+      seed(current, 1, 100, 9000);
+      RawFile.create(current, 10, 10_000, options()).close();
+      // 1400 > 1000: go down to 800 → b1 and a1 are enough, c1 stays.
+      expect(left(b)).toEqual(['2.log']);
+      expect(left(a)).toEqual(['2.log']);
+      expect(left(c)).toEqual(['1.log']);
+      expect(left(current)).toEqual(['1.log', '2.log']);
+    });
+
+    it('stops at the 80 % line, not at the cap', () => {
+      const [a, b, , current] = runDirs() as [string, string, string, string];
+      seed(a, 1, 600, 3000);
+      seed(b, 1, 500, 2000);
+      RawFile.create(current, 10, 10_000, options()).close();
+      // 1100 > 1000 → 800 wanted: a1 goes (500 left), b1 stays.
+      expect(left(a)).toEqual([]);
+      expect(left(b)).toEqual(['1.log']);
+    });
+
+    it('leaves everything alone under the cap', () => {
+      const [a, , , current] = runDirs() as [string, string, string, string];
+      seed(a, 1, 500, 1000);
+      RawFile.create(current, 10, 10_000, options()).close();
+      expect(left(a)).toEqual(['1.log']);
+    });
+
+    it('never prunes the current run, even when it is the whole total', () => {
+      const [, , , current] = runDirs() as [string, string, string, string];
+      seed(current, 1, 900, 1000);
+      seed(current, 2, 900, 500);
+      RawFile.create(current, 10, 10_000, options()).close();
+      expect(left(current)).toEqual(['1.log', '2.log', '3.log']);
+    });
+
+    it('checks the total once a minute', () => {
+      const [a, b, , current] = runDirs() as [string, string, string, string];
+      seed(a, 1, 1200, 3000);
+      RawFile.create(current, 10, 10_000, options()).close();
+      expect(left(a)).toEqual([]);
+      // Over the cap again, but inside the minute: not looked at.
+      seed(b, 1, 1200, 2000);
+      RawFile.create(
+        current,
+        10,
+        10_000,
+        options(START + RAW_TOTAL_CHECK_MS - 1),
+      ).close();
+      expect(left(b)).toEqual(['1.log']);
+      // A minute after the last check it is.
+      RawFile.create(
+        current,
+        10,
+        10_000,
+        options(START + RAW_TOTAL_CHECK_MS),
+      ).close();
+      expect(left(b)).toEqual([]);
+      expect(
+        Math.round(statSync(join(dir, '.raw-total-checked')).mtimeMs),
+      ).toBe(START + RAW_TOTAL_CHECK_MS);
+    });
+
+    it('finds the state dir above the run dir by itself', () => {
+      const [a, , , current] = runDirs() as [string, string, string, string];
+      seed(a, 1, 10, 1000);
+      RawFile.create(current, 10, 10_000).close();
+      // Real clock, real cap: nothing is over it, but the check ran.
+      expect(left(a)).toEqual(['1.log']);
+      expect(existsSync(join(dir, '.raw-total-checked'))).toBe(true);
+    });
+
+    it('does nothing for a run dir outside the state dir layout', () => {
+      RawFile.create(dir).close();
+      expect(existsSync(join(dir, '.raw-total-checked'))).toBe(false);
+    });
   });
 });

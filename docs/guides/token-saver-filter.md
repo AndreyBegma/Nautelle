@@ -172,7 +172,12 @@ Otherwise, the rules come from the files Claude Code loads:
   stay under 200 MB together. Before a new file, the oldest `<n>.log` files are
   deleted until there is room for one more at its 10 MB cap. A card deletes its
   earlier rounds' `raw/` when a new round starts, and all of them with the card.
-  Stopping the orchestrator deletes its session's `raw/`.
+  Stopping the orchestrator deletes its session's `raw/`. All `raw/` directories
+  of the runner's state dir stay under 1 GiB together: before a new file, at most
+  once a minute (the mtime of `<state>/.raw-total-checked`), the oldest files by
+  mtime are deleted across directories down to 80 % of that. The run being
+  written is never pruned. A pruned file is simply missing: re-run the command
+  with `NAUTELLE_RAW=1`.
 - **What the agent reads is redacted.** The compressed output goes through the
   pane redactor (`pane/redact.ts`): GitHub, OpenAI, Slack and AWS token shapes,
   and private-key blocks. The raw file keeps every byte. The fuller hook-content
