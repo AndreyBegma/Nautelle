@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S-22 breakdown</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;
+--font-sans:"SF Pro Text","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);
+--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);
+--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);
+--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--focus-width:3px;--focus-offset:4px;
+--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;
+--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-ink:#a4c8ff;
+--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-ink:#7ee0c0;
+--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-ink:#ade58f;
+--color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0/.18);--color-hue-4-ink:#f5c25c;
+--color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250/.18);--color-hue-7-ink:#cbbcff;
+--color-hue-8:#cc79a7;--color-hue-8-soft:rgb(204 121 167/.18);--color-hue-8-ink:#efabd1;
+--glass-sheen:rgb(255 255 255/.06);--glass-scrim-strong:rgb(9 9 12/.64);--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);--glass-blur-strong:40px;--canvas-glow:18%;
+--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-row:32px;--size-control:28px;--size-field:28px;--dur-fast:100ms;}
+:root[data-theme="light"]{color-scheme:light;
+--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);
+--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);
+--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);
+--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;
+--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;
+--color-hue-1:#1f64d6;--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-ink:#2f6617;--color-hue-4:#b36b00;--color-hue-4-ink:#8a5200;--color-hue-7:#7244e0;--color-hue-7-ink:#5b30c4;--color-hue-8:#b0457f;--color-hue-8-ink:#933668;
+--color-hue-1-soft:color-mix(in oklab,var(--color-hue-1) 13%,transparent);--color-hue-2-soft:color-mix(in oklab,var(--color-hue-2) 13%,transparent);--color-hue-3-soft:color-mix(in oklab,var(--color-hue-3) 13%,transparent);--color-hue-4-soft:color-mix(in oklab,var(--color-hue-4) 13%,transparent);--color-hue-7-soft:color-mix(in oklab,var(--color-hue-7) 13%,transparent);--color-hue-8-soft:color-mix(in oklab,var(--color-hue-8) 13%,transparent);
+--glass-sheen:rgb(255 255 255/.4);--glass-scrim-strong:rgb(255 255 255/.82);--glass-edge:rgb(20 40 110/.12);--glass-spec:rgb(255 255 255/.7);--glass-shadow-strong:rgb(20 40 110/.18);--glass-shadow-clear:rgb(20 40 110/.06);}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink);font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+body{margin:0;min-height:100vh}
+h1,h2,h3,p{margin:0}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+code,pre,.mono{font-family:var(--font-mono)}
+.num{font-variant-numeric:tabular-nums}
+svg{flex-shrink:0}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(var(--glass-blur-strong)) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 24px 64px var(--glass-shadow-strong)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.page{max-width:80rem;margin:0 auto;padding:24px 16px 48px;display:flex;flex-direction:column;gap:24px}
+.page-header__eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.page-header__desc{font-size:14px;color:var(--color-ink-2);max-width:70ch;margin-top:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--size-control);padding:0 12px;border-radius:var(--radius-control);border:1px solid transparent;font:inherit;font-size:13px;font-weight:500;white-space:nowrap;cursor:pointer;color:var(--color-ink)}
+.btn--glass{background:var(--color-raised);border-color:var(--color-line-strong)}
+.btn--ghost{background:transparent;color:var(--color-ink-2)}
+.btn--sm{height:24px;padding:0 8px;font-size:12px;border-radius:4px}
+.btn--icon{padding:0;width:var(--size-control)}.btn--sm.btn--icon{width:24px}
+.input,.select{width:100%;height:var(--size-field);padding:0 10px;border-radius:var(--radius-control);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-size:13px}
+.input.mono{font-family:var(--font-mono);font-size:12px}
+.select{appearance:none;padding-right:28px;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 14px) 50%,calc(100% - 10px) 50%;background-size:4px 4px;background-repeat:no-repeat}
+.badge{display:inline-flex;align-items:center;justify-content:center;height:18px;min-width:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;background:var(--color-hover);color:var(--color-ink-2);font-variant-numeric:tabular-nums}
+.status-pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap;background:var(--color-hue-2-soft);color:var(--color-hue-2-ink)}
+.status-pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--color-hue-2)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 4px 0 10px;border-radius:999px;border:1px solid var(--color-line-strong);background:var(--color-raised);font-size:12px}
+.chip button{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:0;border-radius:999px;background:transparent;color:var(--color-ink-2)}
+.toggle{position:relative;flex-shrink:0;width:36px;height:20px;padding:0;border-radius:999px;border:1px solid var(--color-line-strong);background:var(--color-hover);cursor:pointer}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:999px;background:var(--color-ink)}
+.toggle[aria-checked='true']{background:var(--color-accent);border-color:transparent}
+.toggle[aria-checked='true']::after{transform:translateX(16px);background:var(--color-on-accent)}
+.menu{min-width:220px;padding:4px;border-radius:var(--radius-surface);display:flex;flex-direction:column}
+.menu__item{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:4px;font-size:13px}
+.menu__item:hover{background:var(--color-hover)}
+.checkbox{width:16px;height:16px;accent-color:var(--color-accent);margin:0}
+.table{width:100%;border-collapse:collapse;font-size:13px}
+.table th{height:32px;padding:0 12px;text-align:left;font-size:12px;font-weight:500;color:var(--color-ink-3);border-bottom:1px solid var(--color-line)}
+.table td{height:var(--size-row);padding:6px 12px;border-bottom:1px solid var(--color-line)}
+.table tbody tr:last-child td{border-bottom:0}
+.code-block{margin:0;padding:12px 14px;border-radius:var(--radius-surface);border:1px solid var(--color-line);background:color-mix(in oklab,var(--color-ground) 70%,#000);font-family:var(--font-mono);font-size:12px;line-height:18px;white-space:pre-wrap}
+:root[data-theme="light"] .code-block{background:var(--color-raised)}
+.section__title{font-size:16px;line-height:24px;font-weight:600}
+.section__desc{font-size:13px;color:var(--color-ink-2)}
+.board-card{position:relative;overflow:hidden;padding:10px 12px 10px 16px;border-radius:var(--radius-surface);display:flex;flex-direction:column;gap:8px}
+.board-card__id{font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3)}
+.board-card__title{font-size:13px;font-weight:500;line-height:18px}
+/* labels */
+.h1{--h:var(--color-hue-1);--h-soft:var(--color-hue-1-soft);--h-ink:var(--color-hue-1-ink)}
+.h2{--h:var(--color-hue-2);--h-soft:var(--color-hue-2-soft);--h-ink:var(--color-hue-2-ink)}
+.h3{--h:var(--color-hue-3);--h-soft:var(--color-hue-3-soft);--h-ink:var(--color-hue-3-ink)}
+.h4{--h:var(--color-hue-4);--h-soft:var(--color-hue-4-soft);--h-ink:var(--color-hue-4-ink)}
+.h7{--h:var(--color-hue-7);--h-soft:var(--color-hue-7-soft);--h-ink:var(--color-hue-7-ink)}
+.h8{--h:var(--color-hue-8);--h-soft:var(--color-hue-8-soft);--h-ink:var(--color-hue-8-ink)}
+.stripe{position:absolute;left:0;top:0;bottom:0;width:4px;display:flex;flex-direction:column;gap:1px}
+.stripe i{flex:1;background:var(--h)}
+.sq{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--h)}
+.lchip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 4px 0 8px;border-radius:999px;background:var(--h-soft);color:var(--h-ink);font-size:12px;font-weight:500;border:1px solid color-mix(in oklab,var(--h) 35%,transparent)}
+.lchip--sm{height:20px;padding:0 7px;font-size:11px;gap:5px}
+.lchip button{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:0;border-radius:999px;background:transparent;color:inherit}
+/* breakdown */
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:24px;align-items:start}
+.zones{display:flex;flex-direction:column;gap:16px}
+.zone{position:relative;padding:16px;border-radius:var(--radius-surface);border:1px dashed color-mix(in oklab,var(--color-accent) 50%,transparent);display:flex;flex-direction:column;gap:12px}
+.zone__cap{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.mk{position:absolute;top:-11px;left:-11px;width:22px;height:22px;border-radius:999px;background:var(--color-accent);color:var(--color-on-accent);font-size:12px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px var(--color-ground)}
+.legend{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;position:sticky;top:16px}
+.legend li{display:grid;grid-template-columns:22px 1fr;gap:12px;padding:12px;border-radius:var(--radius-surface)}
+.legend li+li{border-top:1px solid var(--color-line)}
+.legend .n{width:22px;height:22px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:12px;font-weight:600;display:inline-flex;align-items:center;justify-content:center}
+.legend h3{font-size:14px;font-weight:600;line-height:20px}
+.legend p{font-size:13px;color:var(--color-ink-2);margin-top:2px}
+.legend .tag{display:inline-flex;margin-top:6px;margin-right:4px;font-family:var(--font-mono);font-size:11px;padding:1px 6px;border-radius:4px;background:var(--color-hover);color:var(--color-ink-2)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:899px){.grid{grid-template-columns:1fr}.legend{position:static}}
+@media (max-width:639px){.row2{grid-template-columns:1fr}.hide-sm{display:none}}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<main class="page">
+ <header><span class="page-header__eyebrow">S-22 · Card labels in colour</span><h1>Breakdown</h1><p class="page-header__desc">What the stack adds to Work, the card sheet, Settings and the channels outside the web app.</p></header>
+ <div class="grid">
+  <div class="zones">
+   <section class="zone"><span class="mk">1</span><span class="zone__cap">Toolbar · Labels filter (open)</span>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
+     <div style="display:flex;flex-direction:column;gap:8px">
+      <button type="button" class="btn btn--glass" aria-expanded="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/></svg>Labels<span class="badge" style="background:var(--color-accent-soft);color:var(--color-accent-ink)">2</span></button>
+      <div class="menu glass-strong" role="menu">
+       <label class="menu__item h1"><input type="checkbox" class="checkbox" checked><span class="sq"></span>frontend<span class="badge" style="margin-left:auto">11</span></label>
+       <label class="menu__item h7"><input type="checkbox" class="checkbox"><span class="sq"></span>backend<span class="badge" style="margin-left:auto">8</span></label>
+       <label class="menu__item h2"><input type="checkbox" class="checkbox" checked><span class="sq"></span>fullstack<span class="badge" style="margin-left:auto">5</span></label>
+       <label class="menu__item h8"><input type="checkbox" class="checkbox"><span class="sq"></span>redesign<span class="badge" style="margin-left:auto">3</span></label>
+       <label class="menu__item h4"><input type="checkbox" class="checkbox"><span class="sq"></span>infra<span class="badge" style="margin-left:auto">4</span></label>
+       <label class="menu__item h3"><input type="checkbox" class="checkbox"><span class="sq"></span>docs<span class="badge" style="margin-left:auto">2</span></label>
+       <div style="height:1px;background:var(--color-line);margin:4px 0"></div>
+       <label class="menu__item"><input type="checkbox" class="checkbox"><span class="ink-2">No label</span><span class="badge" style="margin-left:auto">1</span></label>
+      </div>
+     </div>
+     <span class="chip">Label: frontend, fullstack<button type="button" aria-label="Remove label filter"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>
+    </div>
+   </section>
+
+   <section class="zone"><span class="mk">2</span><span class="zone__cap">Board tile · stripe</span>
+    <div class="row2">
+     <article class="board-card surface-content" title="fullstack, backend, infra"><span class="stripe" aria-hidden="true"><i class="h2"></i><i class="h7"></i><i class="h4"></i></span><span class="board-card__id">C-497</span><span class="board-card__title">Card labels: schema, API, starter set and ADR-0125</span><div><span class="status-pill">Running</span></div></article>
+     <article class="board-card surface-content" title="frontend"><span class="stripe" aria-hidden="true"><i class="h1"></i></span><span class="board-card__id">C-505</span><span class="board-card__title">Board filters survive a reload</span><div><span class="status-pill">Running</span></div></article>
+    </div>
+   </section>
+
+   <section class="zone"><span class="mk">3</span><span class="zone__cap">Card sheet · Labels</span>
+    <div class="surface-content" style="padding:14px;border-radius:var(--radius-surface);display:flex;flex-direction:column;gap:10px">
+     <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+      <span class="lchip h1"><span class="sq"></span>frontend<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-label="Set by a person"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg><button type="button" aria-label="Remove frontend"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>
+      <span class="lchip h8"><span class="sq"></span>redesign<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-label="Suggested"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/></svg><button type="button" aria-label="Remove redesign"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>
+      <span class="lchip h2"><span class="sq"></span>fullstack<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-label="From a path rule"><path d="M4 4h6l2 3h8v13H4z"/></svg><button type="button" aria-label="Remove fullstack"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>
+      <button type="button" class="btn btn--ghost btn--sm">+ Add label</button>
+     </div>
+    </div>
+   </section>
+
+   <section class="zone"><span class="mk">4</span><span class="zone__cap">Card sheet · where each label came from</span>
+    <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--color-ink-2)">
+     <li class="h1" style="display:flex;gap:8px;align-items:center"><span class="sq"></span><span><b style="color:var(--color-ink);font-weight:500">frontend</b> — set by Andrew, 2 h ago</span></li>
+     <li class="h8" style="display:flex;gap:8px;align-items:center"><span class="sq"></span><span><b style="color:var(--color-ink);font-weight:500">redesign</b> — suggested on create</span></li>
+     <li class="h2" style="display:flex;gap:8px;align-items:center"><span class="sq"></span><span><b style="color:var(--color-ink);font-weight:500">fullstack</b> — PR #612 touches <code class="mono" style="font-size:11px">apps/web/**</code> and <code class="mono" style="font-size:11px">apps/api/**</code></span></li>
+     <li class="h3" style="display:flex;gap:8px;align-items:center;opacity:.75"><span class="sq"></span><span><b style="color:var(--color-ink);font-weight:500">docs</b> — removed by Andrew; rules won't add it back</span></li>
+    </ul>
+   </section>
+
+   <section class="zone"><span class="mk">5</span><span class="zone__cap">Settings → Labels</span>
+    <div style="display:flex;flex-direction:column;gap:12px">
+     <div><h2 class="section__title">Labels</h2><p class="section__desc">Group cards by area. Colours come from the identity palette.</p></div>
+     <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+      <table class="table"><thead><tr><th>Label</th><th class="hide-sm">Colour</th><th class="num">Cards</th><th></th></tr></thead><tbody>
+       <tr><td class="h1"><span style="display:inline-flex;gap:8px;align-items:center"><span class="sq" style="width:10px;height:10px;border-radius:3px"></span>frontend</span></td><td class="hide-sm"><select class="select" aria-label="Colour" style="width:120px"><option>Blue</option></select></td><td class="num">11</td><td style="text-align:right"><button type="button" class="btn btn--ghost btn--sm btn--icon" aria-label="Delete frontend"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></td></tr>
+       <tr><td class="h7"><span style="display:inline-flex;gap:8px;align-items:center"><span class="sq" style="width:10px;height:10px;border-radius:3px"></span>backend</span></td><td class="hide-sm"><select class="select" aria-label="Colour" style="width:120px"><option>Violet</option></select></td><td class="num">8</td><td style="text-align:right"><button type="button" class="btn btn--ghost btn--sm btn--icon" aria-label="Delete backend"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></td></tr>
+       <tr><td class="h4"><span style="display:inline-flex;gap:8px;align-items:center"><span class="sq" style="width:10px;height:10px;border-radius:3px"></span>infra</span></td><td class="hide-sm"><select class="select" aria-label="Colour" style="width:120px"><option>Amber</option></select></td><td class="num">4</td><td style="text-align:right"><button type="button" class="btn btn--ghost btn--sm btn--icon" aria-label="Delete infra"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></td></tr>
+      </tbody></table>
+     </div>
+     <div style="font-size:12px;font-weight:500;color:var(--color-ink-2)">Path rules</div>
+     <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+      <ul style="list-style:none;margin:0;padding:0">
+       <li style="display:flex;align-items:center;gap:8px;min-height:40px;padding:4px 8px 4px 16px;font-family:var(--font-mono);font-size:13px"><span style="flex:1;min-width:0">apps/web/**</span><span class="lchip lchip--sm h1"><span class="sq"></span>frontend</span><button type="button" class="btn btn--ghost btn--sm btn--icon" aria-label="Remove rule"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></li>
+       <li style="display:flex;align-items:center;gap:8px;min-height:40px;padding:4px 8px 4px 16px;font-family:var(--font-mono);font-size:13px;border-top:1px solid var(--color-line)"><span style="flex:1;min-width:0">infra/**, *.yml</span><span class="lchip lchip--sm h4"><span class="sq"></span>infra</span><button type="button" class="btn btn--ghost btn--sm btn--icon" aria-label="Remove rule"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></li>
+      </ul>
+      <div style="display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--color-line);background:var(--color-hover);flex-wrap:wrap"><input class="input mono" style="flex:1;min-width:140px" placeholder="docs/**" aria-label="New path glob"><select class="select" aria-label="Label" style="width:120px"><option>docs</option></select><button type="button" class="btn btn--glass">Add</button></div>
+     </div>
+     <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+      <div style="display:flex;justify-content:space-between;gap:16px;padding:14px 16px"><div><div style="font-size:14px;font-weight:500">Suggest labels on create</div><div class="ink-2" style="font-size:13px">The cheapest model reads the title and summary.</div></div><button type="button" class="toggle" role="switch" aria-checked="true" aria-label="Suggest labels on create"></button></div>
+      <div style="display:flex;justify-content:space-between;gap:16px;padding:14px 16px;border-top:1px solid var(--color-line)"><div><div style="font-size:14px;font-weight:500">Refine from pull request files</div><div class="ink-2" style="font-size:13px">Path rules run on the changed files. Labels a person set or removed stay as they are.</div></div><button type="button" class="toggle" role="switch" aria-checked="true" aria-label="Refine from pull request files"></button></div>
+     </div>
+    </div>
+   </section>
+
+   <section class="zone"><span class="mk">6</span><span class="zone__cap">Work list · MCP · Telegram</span>
+    <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden"><table class="table"><tbody><tr><td><span class="mono ink-3" style="font-size:12px">C-497</span> Card labels: schema, API…</td><td><span style="display:inline-flex;gap:4px;flex-wrap:wrap"><span class="lchip lchip--sm h2"><span class="sq"></span>fullstack</span><span class="lchip lchip--sm h7"><span class="sq"></span>backend</span><span class="lchip lchip--sm h4"><span class="sq"></span>infra</span></span></td></tr></tbody></table></div>
+    <pre class="code-block">C-497 · Card labels: schema, API, starter set
+[fullstack] [backend] [infra]
+Waiting for review · PR #612</pre>
+   </section>
+  </div>
+
+  <ol class="legend surface-content" style="border-radius:var(--radius-surface)">
+   <li><span class="n">1</span><div><h3>Labels filter</h3><p>A glass button with the active count opens a checkbox Menu: square swatch, name, card count and "No label". The choice becomes a removable chip and is stored in the URL with the other filters. Several labels match any of them.</p><span class="tag">toolbar</span><span class="tag">menu</span><span class="tag">chip</span><span class="tag">C-499</span></div></li>
+   <li><span class="n">2</span><div><h3>Colour stripe</h3><p>A 4 px stripe on the tile's left edge, split into equal segments, one per label in project order. It has no text, so the tile stays dense; a tooltip names the labels. Status keeps the pill.</p><span class="tag">board-card</span><span class="tag">C-499</span></div></li>
+   <li><span class="n">3</span><div><h3>Editable chips</h3><p>Chips are tinted in the label's identity hue and carry an origin icon: person, suggestion or path rule. Remove and add happen inline and save at once.</p><span class="tag">chip (hue)</span><span class="tag">C-499</span></div></li>
+   <li><span class="n">4</span><div><h3>Why this label</h3><p>One line per label tells where it came from. A label a person removed stays listed and dimmed, so it is clear why automation leaves it off.</p><span class="tag">C-500</span><span class="tag">C-501</span></div></li>
+   <li><span class="n">5</span><div><h3>Settings → Labels</h3><p>A table of labels with a colour Select and card counts, a list of path globs mapped to a label, and two switches for suggestion and refinement. Six starter labels come from C-497.</p><span class="tag">section</span><span class="tag">data-table</span><span class="tag">path-glob-list</span><span class="tag">toggle</span><span class="tag">C-498</span></div></li>
+   <li><span class="n">6</span><div><h3>Outside the Board</h3><p>The Work list shows small chips. MCP tools return the label names, and the Telegram card text adds a plain <code>[label]</code> line, because Telegram has no colour.</p><span class="tag">C-502</span></div></li>
+  </ol>
+ </div>
+</main>
+</body>
+</html>
