@@ -61,9 +61,20 @@ describe('card readiness and auto-run (e2e, #443)', () => {
         satisfied: 0,
         total: 2,
         open: [
-          { number: a.number, label: `C-${a.number}`, column: 'todo' },
-          { number: b.number, label: `C-${b.number}`, column: 'todo' },
+          {
+            number: a.number,
+            label: `C-${a.number}`,
+            column: 'todo',
+            landed: false,
+          },
+          {
+            number: b.number,
+            label: `C-${b.number}`,
+            column: 'todo',
+            landed: false,
+          },
         ],
+        unmerged: [],
       });
 
       await accept(a.number);
@@ -79,6 +90,7 @@ describe('card readiness and auto-run (e2e, #443)', () => {
         satisfied: 2,
         total: 2,
         open: [],
+        unmerged: [],
       });
     });
 
