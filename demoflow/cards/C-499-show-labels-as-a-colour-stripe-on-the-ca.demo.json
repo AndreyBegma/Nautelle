@@ -35,6 +35,14 @@
     {
       "action": "click",
       "target": {
+        "role": "tab",
+        "name": "Edit",
+        "exact": true
+      }
+    },
+    {
+      "action": "click",
+      "target": {
         "role": "button",
         "name": "Edit labels",
         "exact": true
