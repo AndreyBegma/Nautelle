@@ -121,13 +121,56 @@ const inReflog = async (
 };
 
 /**
+ * C-419: whether `remote` is what GitHub's "Update branch" makes — a merge
+ * commit whose first parent is in HEAD and whose other parent is in
+ * `origin/<base>`. Fetches the base first; false when it cannot be read.
+ */
+const isUpdateBranchMerge = async (
+  deps: GitDeps,
+  wt: string,
+  remote: string,
+  base: string,
+): Promise<boolean> => {
+  const parents = await deps.exec('git', [
+    '-C',
+    wt,
+    'rev-list',
+    '--parents',
+    '-n',
+    '1',
+    remote,
+  ]);
+  const [, first, second, ...rest] = (parents?.stdout ?? '').trim().split(' ');
+  if (parents?.code !== 0 || !first || !second || rest.length > 0) return false;
+  await fetchRef(deps, wt, base);
+  const inHead = gitSucceeds(deps.exec, [
+    '-C',
+    wt,
+    'merge-base',
+    '--is-ancestor',
+    first,
+    'HEAD',
+  ]);
+  const inBase = gitSucceeds(deps.exec, [
+    '-C',
+    wt,
+    'merge-base',
+    '--is-ancestor',
+    second,
+    `refs/remotes/origin/${base}`,
+  ]);
+  return (await inHead) && (await inBase);
+};
+
+/**
  * #359 D1, #630: pushes the worktree's HEAD to `origin/<branch>`, never
  * forced. A push refused as a non-fast-forward fetches the remote branch:
  * when it is already in HEAD (a race), the push is tried again; when its tip
  * is one the card's branch itself had — the runner pushed it (`pushedHead`),
  * or it is in the branch's reflog — the worker rewrote it locally, so it is
  * superseded: `git merge -s ours` records it, keeping HEAD's tree, and the
- * merge is pushed. Anything else on the remote is somebody else's work: it
+ * merge is pushed. C-419: when it is GitHub's "Update branch" merge of the
+ * base, it is merged (a conflict aborts and throws) and pushed. Anything else on the remote is somebody else's work: it
  * throws `divergedBranchMessage`, and nothing is pushed. Returns the head
  * pushed — the merge, when there was one. C-148: never to the default or a
  * protected branch of `github` (`assertPushAllowed`, `branch_refused`).
@@ -137,6 +180,7 @@ export const pushCardBranch = async (
   github: string,
   wt: string,
   branch: string,
+  base: string,
   pushedHead?: string,
 ): Promise<string> => {
   await assertPushAllowed(ghOf(deps.exec), github, branch);
@@ -168,7 +212,22 @@ export const pushCardBranch = async (
     remote,
     'HEAD',
   ]);
-  if (!contained) {
+  if (!contained && (await isUpdateBranchMerge(deps, wt, remote, base))) {
+    // C-419: GitHub's "Update branch" added a base merge on top of the push.
+    const merged = await deps.exec('git', [
+      '-C',
+      wt,
+      'merge',
+      '--quiet',
+      '--no-verify',
+      '--no-edit',
+      remote,
+    ]);
+    if (merged?.code !== 0) {
+      await deps.exec('git', ['-C', wt, 'merge', '--abort']);
+      throw new Error(divergedBranchMessage(branch, remote.slice(0, 8)));
+    }
+  } else if (!contained) {
     const superseded =
       remote === pushedHead || (await inReflog(deps, wt, branch, remote));
     if (!superseded) {
@@ -773,6 +832,7 @@ export const collectCard = async (
     github,
     wt,
     record.branch,
+    args.base,
     record.pushedHead,
   );
   // #359 D3: the worker's description is the body — of a new PR, and of an
