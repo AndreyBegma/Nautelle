@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { STEWARD_PANE_TAIL_MAX_BYTES } from '@nautelle/shared';
-import { paneTail, readPane } from './pane-rules';
+import { inputText, paneTail, readPane } from './pane-rules';
 
 const fixture = (name: string): string =>
   readFileSync(
@@ -164,6 +164,23 @@ describe('readPane (#447 D6, D9, D11)', () => {
       pane(['  ⎿  API Error: 500 secret-token-sk-abcdefghijklmnopqrstuvwx']),
     );
     expect(reading.signal?.reason).toBe('API error: the response was cut off');
+  });
+});
+
+describe('inputText (C-433)', () => {
+  it('reads the text in a boxed input', () => {
+    expect(inputText('● Done.\n╭──╮\n│ > fix the build   │\n╰──╯\n')).toBe(
+      'fix the build',
+    );
+  });
+
+  it('reads the text after the newer marker', () => {
+    expect(inputText('● Done.\n❯ fix the build\n')).toBe('fix the build');
+  });
+
+  it('is empty for an empty box, and the last input line wins over history', () => {
+    expect(inputText('> old message\n● Done.\n│ >        │\n')).toBe('');
+    expect(inputText('no input here')).toBe('');
   });
 });
 
