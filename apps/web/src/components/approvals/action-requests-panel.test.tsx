@@ -6,6 +6,7 @@ import {
   stepFor,
   toolUseConfirmable,
 } from '../../lib/approvals/tool-use-review';
+import { RequestCell } from './action-requests';
 import { ToolUseDialogBody } from './tool-use-review';
 
 const tool = (args: Record<string, unknown>): ActionRequestSummary =>
@@ -85,5 +86,43 @@ describe('the approve dialog of a tool_use request', () => {
     expect(html).toContain('tool-use-confirm-name');
     expect(toolUseConfirmable(review, 'bash')).toBe(false);
     expect(toolUseConfirmable(review, 'Bash')).toBe(true);
+  });
+});
+
+describe('the row of a card_accept request (C-416)', () => {
+  const HEAD = '0b6445a1'.padEnd(40, 'c');
+  const accept = (args: Record<string, unknown>) =>
+    renderToStaticMarkup(
+      <RequestCell
+        request={
+          {
+            kind: 'card_accept',
+            summary: '',
+            args: {
+              card: 12,
+              title: 'Add the thing',
+              merge: true,
+              prNumber: 34,
+              prUrl: 'https://github.com/o/r/pull/34',
+              ...args,
+            },
+          } as unknown as ActionRequestSummary
+        }
+      />,
+    );
+
+  test('shows the head the approval merges and links its diff', () => {
+    const html = accept({ headSha: HEAD });
+    expect(html).toContain('and merge #34');
+    expect(html).toContain('<code class="font-mono">0b6445a</code>');
+    expect(html).toContain(
+      `href="https://github.com/o/r/pull/34/files/${HEAD}"`,
+    );
+  });
+
+  test('a row stored without a head shows none, as before', () => {
+    const html = accept({});
+    expect(html).toContain('and merge #34');
+    expect(html).not.toContain('/files/');
   });
 });
