@@ -18,6 +18,7 @@ import {
 import type { PairRunnerDto } from './dto';
 import { RunnerConnections } from './runner-connections';
 import { runnerError } from './runner-error';
+import { RunnerLive } from './runner-live';
 
 const ATTEMPTS = 3;
 
@@ -45,6 +46,7 @@ export class PairingService {
     private readonly prisma: PrismaService,
     private readonly connections: RunnerConnections,
     private readonly audit: AuditService,
+    private readonly runnerLive: RunnerLive,
   ) {}
 
   async pair(
@@ -80,6 +82,8 @@ export class PairingService {
           're-paired',
         );
         this.logger.log(`runner ${runnerId} paired`);
+        // Its old socket, if any, closed above without a disconnect event.
+        this.runnerLive.updated(runnerId, 'offline');
         await this.audit.record({
           actor: { type: 'runner', runnerId },
           origin,

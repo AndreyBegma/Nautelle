@@ -782,6 +782,10 @@ export class PlanTurnService {
    * D3. Plan-level: `--session-id` until the session exists, then `--resume`.
    * A task's first turn forks the plan session with an id the API chooses;
    * later ones resume the fork.
+   *
+   * C-477 (ADR-0107): after a move only turns since `sessionSince` ran in
+   * the current session; until one did, there is nothing to resume or fork
+   * on the new runner.
    */
   private async session(
     plan: Plan,
@@ -793,20 +797,31 @@ export class PlanTurnService {
     if (task && design?.mode === 'revise') {
       return { id: randomUUID(), resume: false };
     }
+    const since: Prisma.PlanTurnWhereInput = plan.sessionSince
+      ? { createdAt: { gt: plan.sessionSince } }
+      : {};
+    const planStarted = async () =>
+      (await this.prisma.planTurn.count({
+        where: { planId: plan.id, taskId: null, ...sessionStarted, ...since },
+      })) > 0;
     if (!task) {
-      const started = await this.prisma.planTurn.count({
-        where: { planId: plan.id, taskId: null, ...sessionStarted },
-      });
-      return { id: plan.sessionId, resume: started > 0 };
+      return { id: plan.sessionId, resume: await planStarted() };
     }
     const id = task.sessionId ?? randomUUID();
     const forked =
       task.sessionId !== null &&
       (await this.prisma.planTurn.count({
-        where: { planId: plan.id, task: { key: task.key }, ...sessionStarted },
+        where: {
+          planId: plan.id,
+          task: { key: task.key },
+          ...sessionStarted,
+          ...since,
+        },
       })) > 0;
-    return forked
-      ? { id, resume: true }
-      : { id, resume: true, forkFrom: plan.sessionId };
+    if (forked) return { id, resume: true };
+    if (plan.sessionSince && !(await planStarted())) {
+      return { id, resume: false };
+    }
+    return { id, resume: true, forkFrom: plan.sessionId };
   }
 }
