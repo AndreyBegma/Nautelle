@@ -640,6 +640,9 @@ model Project {
   telegramIntakes        TelegramIntake[]
   slackWebhook           SlackWebhook?
   slackDeliveries        SlackDelivery[]
+  /// C-497 (ADR-0125): the project's card labels and their path rules.
+  labels                 ProjectLabel[]
+  labelPathRules         ProjectLabelPathRule[]
 
   @@unique([runnerId, rootPath])
   @@index([githubRepoId])
@@ -3671,6 +3674,8 @@ model BoardCard {
   /// #884: every review step run on the card's PRs.
   reviewRuns           BoardCardReviewRun[]
   demos                CardDemo[]
+  /// C-497 (ADR-0125): the card's labels, a person's and automation's.
+  labels               BoardCardLabel[]
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -3740,6 +3745,76 @@ model BoardCardDependency {
   @@id([cardId, dependsOnId])
   @@index([dependsOnId])
   @@map("board_card_dependencies")
+}
+
+/// C-497 (ADR-0125): who set a card's label.
+enum CardLabelSource {
+  person
+  model
+  paths
+}
+
+/// C-497 (ADR-0125): a label of the project — every project starts with the
+/// shared `STARTER_LABELS`. A project admin edits them.
+model ProjectLabel {
+  id        String   @id @default(cuid())
+  projectId String
+  /// Lower-case kebab (`LABEL_NAME_PATTERN`), unique per project.
+  name      String
+  /// 1–8: glass-ui's `--color-hue-N`; never a hex value.
+  hue       Int
+  /// 0-based and dense: the order in Settings, on the stripe and in chips.
+  position  Int
+  /// The label ids this one combines: when path rules yield all of them, this
+  /// label replaces them. Cleaned when a label is deleted.
+  combines  String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cards   BoardCardLabel[]
+  rules   ProjectLabelPathRule[]
+
+  @@unique([projectId, name])
+  @@map("project_labels")
+}
+
+/// C-497: files of a card's change matching `pattern` (a repository-relative
+/// glob of `*`, `**` and `?`) suggest the label; ordered by `position`.
+model ProjectLabelPathRule {
+  id        String @id @default(cuid())
+  projectId String
+  labelId   String
+  pattern   String
+  position  Int
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label   ProjectLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([labelId])
+  @@map("project_label_path_rules")
+}
+
+/// C-497 (ADR-0125): one label on one card. Automation (`model`, `paths`)
+/// never writes or deletes a `person` row; `removed` is a person's removal,
+/// which automation leaves off.
+model BoardCardLabel {
+  cardId    String
+  labelId   String
+  source    CardLabelSource
+  /// `person` only: the person removed the label, so automation never adds it back.
+  removed   Boolean         @default(false)
+  /// The person who set the row; null for automation.
+  setById   String?
+  updatedAt DateTime        @updatedAt
+
+  card  BoardCard    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  label ProjectLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, labelId])
+  @@index([labelId])
+  @@map("board_card_labels")
 }
 
 /// #480 (ADR-0044): a group of cards that make one larger piece of work,
@@ -4096,6 +4171,10 @@ model BoardSettings {
   demoUiPaths            String[]        @default(["apps/web/**", "**/*.tsx", "**/*.css"])
   /// ADR-0090: send a ready demo to the project's Telegram chats too.
   demoTelegram           Boolean         @default(true)
+  /// C-497: the model suggests labels for a new card that has none.
+  labelSuggest           Boolean         @default(true)
+  /// C-497: path rules label a card from the files its change touches.
+  labelPaths             Boolean         @default(true)
   updatedById            String?
   updatedAt              DateTime        @updatedAt
 
@@ -4925,6 +5004,7 @@ enum LlmFeature {
   assistant_summary
   review_instructions
   quick_card
+  card_labels
 }
 
 enum LlmCallOutcome {

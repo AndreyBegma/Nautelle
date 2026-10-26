@@ -74,6 +74,14 @@ describe('seedDemo', () => {
     designRevision: { upsert: jest.fn().mockResolvedValue({ id: 'r1' }) },
     designFrame: { upsert: jest.fn() },
     boardRunQueueCard: { upsert: jest.fn() },
+    projectLabel: {
+      count: jest.fn().mockResolvedValue(0),
+      createManyAndReturn: jest.fn(({ data }: { data: { name: string }[] }) =>
+        data.map((label) => ({ id: `l-${label.name}`, name: label.name })),
+      ),
+      update: jest.fn(),
+    },
+    projectLabelPathRule: { createMany: jest.fn() },
   });
 
   it('upserts the runner, the project and every card by a fixed key', async () => {
@@ -91,6 +99,18 @@ describe('seedDemo', () => {
     for (const call of db.boardCard.upsert.mock.calls) {
       expect(call[0].update).toEqual({});
     }
+  });
+
+  it('writes the starter labels once, into a demo project without labels (C-497)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    expect(db.projectLabel.createManyAndReturn).toHaveBeenCalledTimes(1);
+    expect(db.projectLabelPathRule.createMany).toHaveBeenCalledTimes(1);
+
+    const again = prisma();
+    again.projectLabel.count.mockResolvedValue(6);
+    await seedDemo(again as never, 'demo@example.com');
+    expect(again.projectLabel.createManyAndReturn).not.toHaveBeenCalled();
   });
 
   it("seeds the finished card's round with its model and effort (C-359)", async () => {

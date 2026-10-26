@@ -5,6 +5,7 @@ import {
 import type { BoardColumn, CardEffort, PrismaClient } from '@prisma/client';
 import { hashPassword } from '../auth/password';
 import { generateToken } from '../auth/tokens';
+import { writeStarterLabels } from '../board/starter-labels';
 
 /**
  * The database a demo recording runs on (C-383, ADR-0090): `agentdock_demo`,
@@ -231,6 +232,8 @@ export const seedDemo = async (
     | 'planTurn'
     | 'designRevision'
     | 'designFrame'
+    | 'projectLabel'
+    | 'projectLabelPathRule'
   >,
   adminEmail: string,
 ): Promise<{ projectId: string; cards: number }> => {
@@ -284,6 +287,14 @@ export const seedDemo = async (
       members: { create: { userId: admin.id, addedById: admin.id } },
     },
   });
+  // C-497: the starter labels, as a connected project gets them.
+  if (
+    (await prisma.projectLabel.count({
+      where: { projectId: DEMO_PROJECT_ID },
+    })) === 0
+  ) {
+    await writeStarterLabels(prisma, DEMO_PROJECT_ID);
+  }
   // C-395: the push check Ready to run reads (C-396 keeps it per runner and path).
   await prisma.repositoryPushCheck.upsert({
     where: {

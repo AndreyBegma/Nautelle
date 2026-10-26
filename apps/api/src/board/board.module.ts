@@ -15,6 +15,8 @@ import { BoardBulk } from './board-bulk';
 import { BoardCommands } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
 import { BoardInboxService } from './board-inbox.service';
+import { BoardLabelsController } from './board-labels.controller';
+import { BoardLabels, CardLabelSuggestRef } from './board-labels.service';
 import { BoardPlanCards } from './board-plan-cards';
 import { BoardPrincipals } from './board-principal';
 import { BoardReview } from './board-review';
@@ -49,7 +51,12 @@ import { CollectRetryTimer } from './collect-retry-timer';
     SessionMessageModule,
   ],
   // #309: claiming attachments onto a card is a card route.
-  controllers: [BoardController, BoardAttachmentsController],
+  // C-497: card labels are their own routes.
+  controllers: [
+    BoardController,
+    BoardAttachmentsController,
+    BoardLabelsController,
+  ],
   providers: [
     // #443: accepting a card may start the Run of a card that waited for it.
     BoardAutoRun,
@@ -62,6 +69,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardCommands,
     BoardDependencies,
     BoardInboxService,
+    // C-497: a project's card labels and the one way automation writes them.
+    BoardLabels,
     BoardPlanCards,
     // C-181: whom an automatic round runs as.
     BoardPrincipals,
@@ -83,6 +92,7 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardStacks,
     BoardTerminalService,
     BoardWork,
+    CardLabelSuggestRef,
     CollectRetryTimer,
     FleetCardEditsRef,
   ],
@@ -97,6 +107,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     // #578: the Telegram bot accepts and dismisses suggestions.
     BoardDependencies,
     BoardInboxService,
+    // C-500, C-501: the model's suggestion and the path rules label cards.
+    BoardLabels,
     BoardPlanCards,
     BoardReview,
     BoardRoundsService,
@@ -108,6 +120,7 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardTerminalService,
     BoardWaitService,
     BoardWork,
+    CardLabelSuggestRef,
     FleetCardEditsRef,
   ],
 })
