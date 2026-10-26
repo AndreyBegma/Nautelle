@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "name": "A card accept asked from a session merges only the head the approver saw",
+  "description": "C-416: request_action card_accept with merge binds the pull request's head when it is asked. The Approvals row shows that head and its diff, the approval merges only it, and a pull request that moved in the meantime fails the request with head_moved and merges nothing.",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "link",
+        "name": "Board",
+        "exact": true
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "marker",
+      "title": "A session asks to accept a card and merge it"
+    },
+    {
+      "action": "navigate",
+      "path": "/projects/demo-project/queue?tab=approvals",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "css": "li:has(a[href=\"https://github.com/acme/shop/pull/43/files/4f2c9e1b7a3d5e8f0c6b2a9d1e4f7c3b5a8d0e2f\"])"
+      },
+      "caption": "A Claude Code session asks to accept C-7 and merge pull request #43.",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "css": "li code:text-is(\"4f2c9e1\")"
+      },
+      "caption": "The request is bound to the head the PR had when it was asked: the approval merges 4f2c9e1 and nothing newer.",
+      "timeoutMs": 15000,
+      "zoom": true
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "css": "a[href=\"https://github.com/acme/shop/pull/43/files/4f2c9e1b7a3d5e8f0c6b2a9d1e4f7c3b5a8d0e2f\"]"
+      },
+      "caption": "View the diff opens exactly that head, so the approver reads what will be merged.",
+      "timeoutMs": 15000,
+      "zoom": true
+    },
+    {
+      "action": "screenshot",
+      "name": "pending-accept-pinned"
+    },
+    {
+      "action": "marker",
+      "title": "A moved head merges nothing"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Recent action requests",
+        "exact": true
+      },
+      "timeoutMs": 15000
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "css": "tr:has(code:text-is(\"9a1b3c5\"))"
+      },
+      "caption": "An earlier request was bound to 9a1b3c5. When it was approved, the PR had moved on.",
+      "timeoutMs": 15000,
+      "zoom": true
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "The head of #43 moved to 4f2c9e1 after the request; nothing was merged — ask again"
+      },
+      "caption": "So it failed with head_moved and the new head; the session reads the same in action_status and asks again.",
+      "timeoutMs": 15000,
+      "zoom": true
+    },
+    {
+      "action": "screenshot",
+      "name": "failed-head-moved"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    }
+  ]
+}
