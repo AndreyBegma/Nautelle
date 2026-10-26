@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en" data-scale="desk" data-palette="navy" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Breakdown · Analysis card sheet</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;
+--font-sans:"SF Pro Text","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);
+--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);
+--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);
+--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--focus-width:3px;--focus-offset:4px;
+--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;
+--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-ink:#a4c8ff;
+--color-hue-7:#a68bfa;
+--glass-sheen:rgb(255 255 255/.06);--glass-scrim-strong:rgb(9 9 12/.64);--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);--glass-blur-strong:40px;
+--canvas-glow:18%;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--dur-fast:100ms;}
+:root[data-theme="light"]{color-scheme:light;
+--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);
+--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);
+--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);
+--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;
+--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;
+--color-hue-1:#1f64d6;--color-hue-1-ink:#1550b0;--color-hue-1-soft:color-mix(in oklab,var(--color-hue-1) 13%,transparent);--color-hue-7:#7244e0;
+--glass-sheen:rgb(255 255 255/.4);--glass-scrim-strong:rgb(255 255 255/.82);--glass-edge:rgb(20 40 110/.12);--glass-spec:rgb(255 255 255/.7);--glass-shadow-strong:rgb(20 40 110/.18);--glass-shadow-clear:rgb(20 40 110/.06);}
+:root{--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink);font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+body{margin:0;min-height:100vh}
+h1,h2,h3,p{margin:0}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+a{color:var(--color-accent-ink);text-decoration:underline;text-underline-offset:2px}
+code,.mono{font-family:var(--font-mono)}
+code{font-size:12px;padding:1px 5px;border-radius:4px;background:var(--color-hover)}
+:focus-visible{outline:var(--focus-width) solid var(--color-focus);outline-offset:var(--focus-offset)}
+svg{flex-shrink:0}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(var(--glass-blur-strong)) saturate(180%);-webkit-backdrop-filter:blur(var(--glass-blur-strong)) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 24px 64px var(--glass-shadow-strong)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.page{max-width:80rem;margin:0 auto;padding:24px 16px 48px;display:flex;flex-direction:column;gap:24px}
+.page-header__eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em;margin-top:6px}
+.page-header__desc{font-size:14px;color:var(--color-ink-2);max-width:70ch;margin-top:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--size-control);padding:0 12px;border-radius:var(--radius-control);border:1px solid transparent;font:inherit;font-size:13px;font-weight:500;white-space:nowrap;color:var(--color-ink);cursor:pointer}
+.btn--solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn--ghost{background:transparent;color:var(--color-ink-2)}
+.btn--sm{height:24px;padding:0 8px;font-size:12px;border-radius:4px}
+.btn--icon{padding:0;width:var(--size-control)}
+.checkbox{width:16px;height:16px;accent-color:var(--color-accent);margin:0}
+.segmented{display:inline-flex;gap:2px;padding:2px;border-radius:var(--radius-control);background:var(--color-hover);border:1px solid var(--color-line)}
+.segmented button{height:22px;padding:0 10px;border:0;border-radius:4px;background:transparent;color:var(--color-ink-2);font:inherit;font-size:12px;font-weight:500}
+.segmented button[aria-checked='true']{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.badge{display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;background:var(--color-hover);color:var(--color-ink-2)}
+.badge--md{height:22px;padding:0 8px;font-size:12px}
+.status-pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap;background:var(--s-soft);color:var(--s-ink)}
+.status-pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--s)}
+.status-pill--md{height:24px;padding:0 10px;font-size:12px}
+.status-pill--waiting{--s:var(--color-status-waiting);--s-soft:var(--color-status-waiting-soft);--s-ink:var(--color-status-waiting-ink)}
+.section{display:flex;flex-direction:column;gap:10px}
+.section__title{font-size:16px;line-height:24px;font-weight:600}
+.section__desc{font-size:13px;color:var(--color-ink-2)}
+.ic{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ic--sm{width:14px;height:14px}.ic--xs{width:12px;height:12px}
+.kind-tag{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px 0 5px;border-radius:999px;background:var(--color-hover);color:var(--color-ink-2);font-size:11px;font-weight:600}
+.tag{height:18px;padding:0 6px;border-radius:4px;border:1px solid var(--color-line-strong);font-size:11px;color:var(--color-ink-2);display:inline-flex;align-items:center}
+.grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:24px;align-items:start}
+.zone{position:relative;border:1px dashed color-mix(in oklab,var(--color-accent) 55%,transparent);border-radius:var(--radius-surface);padding:10px}
+.mk{position:absolute;top:-10px;left:-10px;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;background:var(--color-accent);color:var(--color-on-accent);font-size:11px;font-weight:700;box-shadow:0 0 0 3px var(--color-ground)}
+.mk--inline{position:static;box-shadow:none;flex-shrink:0}
+.sheet{border-radius:var(--radius-sheet);display:flex;flex-direction:column}
+.sheet__head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--color-line)}
+.sheet__body{padding:16px;display:flex;flex-direction:column;gap:18px}
+.sheet__foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--color-line)}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--color-line);border-radius:var(--radius-surface);overflow:hidden}
+.fact{background:var(--color-content);padding:8px 10px;display:flex;flex-direction:column}
+.fact span{font-size:12px;color:var(--color-ink-3)}.fact b{font-size:13px;font-weight:500}
+.md p{font-size:13px;color:var(--color-ink-2)}
+.prop{display:grid;grid-template-columns:16px minmax(0,1fr);gap:12px;padding:10px 14px}
+.prop+.prop{border-top:1px solid var(--color-line)}
+.prop__title{font-size:14px;font-weight:500}
+.prop__meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:6px}
+.legend{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.legend li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:12px;padding:14px 16px}
+.legend li+li{border-top:1px solid var(--color-line)}
+.legend h3{font-size:14px;font-weight:600;line-height:20px}
+.legend p{font-size:13px;color:var(--color-ink-2);margin-top:2px}
+.legend .uses{font-size:12px;color:var(--color-ink-3);margin-top:6px;font-family:var(--font-mono)}
+.new{display:inline-flex;height:16px;padding:0 5px;border-radius:4px;font-size:10px;font-weight:600;background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok);vertical-align:2px;margin-left:6px}
+.tile{padding:10px 12px;border-radius:var(--radius-surface);display:flex;flex-direction:column;gap:8px}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:639px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}.sheet__foot .btn--solid{flex:1 1 100%}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="i-bug" viewBox="0 0 24 24"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3 3 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6 13H2"/><path d="M22 13h-4"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+</svg>
+<div class="canvas" aria-hidden="true"></div>
+<main class="page">
+<header><span class="page-header__eyebrow">Stack S-23 · Analysis cards</span><h1>Card sheet for an analysis card</h1><p class="page-header__desc">The Screen frame again, with each new or changed zone numbered. The legend says what each zone is, which glass-ui parts it uses, how it behaves and why.</p></header>
+<div class="grid">
+<div style="display:flex;flex-direction:column;gap:20px">
+<div class="zone"><span class="mk">1</span>
+<article class="tile surface-content"><span class="mono ink-3" style="font-size:11px">C-512</span><span style="font-size:13px;font-weight:500">Why do queued rounds stall after a runner reconnect?</span><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="kind-tag"><svg class="ic ic--xs"><use href="#i-scan"/></svg>Analysis</span><span class="status-pill status-pill--waiting">Waiting on you</span><span class="badge">4 proposals</span></div></article>
+</div>
+<div class="sheet glass-strong">
+<div class="sheet__head"><div style="display:flex;gap:8px;align-items:center"><span class="mono ink-3" style="font-size:12px">C-512</span><span class="kind-tag"><svg class="ic ic--xs"><use href="#i-scan"/></svg>Analysis</span></div><button type="button" class="btn btn--ghost btn--icon" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button></div>
+<div class="sheet__body">
+<div class="zone"><span class="mk">2</span><h2 style="font-size:16px;line-height:22px;font-weight:600">Why do queued rounds stall after a runner reconnect?</h2><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span class="status-pill status-pill--md status-pill--waiting">Waiting on you</span><span class="badge badge--md"><svg class="ic ic--xs"><use href="#i-lock"/></svg>Read-only · enforced by runner</span></div></div>
+<div class="zone"><span class="mk">3</span><div class="facts"><div class="fact"><span>Read</span><b>46 files · 3 logs</b></div><div class="fact"><span>Rounds</span><b>2</b></div><div class="fact"><span>Duration</span><b>6m 12s</b></div><div class="fact"><span>Cost</span><b>$0.84</b></div></div></div>
+<div class="zone"><span class="mk">4</span><div class="section"><div style="display:flex;justify-content:space-between;align-items:flex-end"><h2 class="section__title">Report</h2><button type="button" class="btn btn--ghost btn--sm"><svg class="ic ic--sm"><use href="#i-copy"/></svg>Copy</button></div><div class="surface-content md" style="border-radius:var(--radius-surface);padding:14px"><p>On reconnect the runner registers with a new session id, but the dispatcher keeps rounds bound to the old one until its 90 s heartbeat expires…</p><div style="display:flex;justify-content:center;margin-top:6px"><button type="button" class="btn btn--ghost btn--sm">Show full report<svg class="ic ic--sm"><use href="#i-down"/></svg></button></div></div></div></div>
+<div class="zone"><span class="mk">5</span><div class="section"><h2 class="section__title">Proposed cards</h2><div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden"><div style="display:flex;gap:12px;align-items:center;padding:8px 14px;background:var(--color-hover);border-bottom:1px solid var(--color-line);font-size:12px;color:var(--color-ink-3)"><input type="checkbox" class="checkbox" aria-label="Select all">3 of 4 selected</div>
+<div class="prop"><input type="checkbox" class="checkbox" checked aria-label="Select proposal"><div><div class="prop__title">Rebind in-flight rounds to the new runner session</div>
+<div class="zone" style="margin-top:8px;padding:6px 8px"><span class="mk">6</span><div class="prop__meta" style="margin-top:0"><span class="kind-tag"><svg class="ic ic--xs"><use href="#i-bug"/></svg>Bug</span><span class="mono ink-3" style="font-size:11px">apps/api/src/runners/**</span><span class="tag">runner</span><a href="#" style="font-size:12px">From finding 1</a></div></div></div></div>
+<div class="prop"><input type="checkbox" class="checkbox" aria-label="Select proposal"><div><div class="prop__title ink-2">Show a Reconnecting state on the Fleet slot</div></div></div>
+</div></div></div>
+</div>
+<div style="padding:10px"><div class="zone"><span class="mk">7</span><div class="sheet__foot" style="border-top:0;padding:0"><span style="font-size:13px"><b>3</b> <span class="ink-2">selected</span></span><span style="flex:1"></span><span style="font-size:12px;font-weight:500;color:var(--color-ink-2)">Land in</span><div class="segmented" role="radiogroup" aria-label="Land in"><button type="button" role="radio" aria-checked="true">To Do</button><button type="button" role="radio" aria-checked="false">Inbox</button></div><button type="button" class="btn btn--solid">Create selected · 3</button></div></div></div>
+</div>
+</div>
+
+<section class="section">
+<div><h2 class="section__title">Legend</h2><p class="section__desc">Every zone reuses existing glass-ui components. None needs a new one.</p></div>
+<div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+<ol class="legend">
+<li><span class="mk mk--inline">1</span><div><h3>Board tile<span class="new">Changed</span></h3><p>An analysis card shows an "Analysis" kind tag with a scan icon and a count of its proposals. It has no demo chip or checks badge, because no pull request comes out of it. While the report waits for selection the pill reads "Waiting on you", so the card shows up in the same triage as approvals.</p><p class="uses">Badge · StatusPill · board-card</p></div></li>
+<li><span class="mk mk--inline">2</span><div><h3>Sheet header<span class="new">Changed</span></h3><p>The existing card sheet, widened to 720 px so the report reads well. The Read-only badge is a fact, not a status, so it is a neutral Badge with a lock. It says the runner enforces read-only (ADR-0126), not just the prompt. There is no solid action up here; the only one is in zone 7.</p><p class="uses">Sheet · Badge · StatusPill · Tabs</p></div></li>
+<li><span class="mk mk--inline">3</span><div><h3>Run facts<span class="new">New</span></h3><p>This replaces the branch and PR key/value pairs an analysis card does not have. It shows what was read, how many rounds ran, how long, and what it cost. On mobile it folds into two columns.</p><p class="uses">KeyValueList (grid variant) · .num</p></div></li>
+<li><span class="mk mk--inline">4</span><div><h3>Report<span class="new">New</span></h3><p>The markdown from <code>finish_analysis</code>, rendered with react-markdown and remark-gfm. It is collapsed to about 280 px with a fade and "Show full report". Copy puts the raw markdown on the clipboard. Findings are anchors, so proposals can point at them.</p><p class="uses">Section · surface-content · react-markdown · Button ghost sm</p></div></li>
+<li><span class="mk mk--inline">5</span><div><h3>Proposed cards<span class="new">New</span></h3><p>A flush row list with one Checkbox per proposal and a select-all header with a live count. Every proposal starts ticked, and the person unticks what is not worth doing. A created proposal turns into a link to its card and can't be ticked again.</p><p class="uses">Section flush · Checkbox · row list</p></div></li>
+<li><span class="mk mk--inline">6</span><div><h3>Proposal meta<span class="new">New</span></h3><p>The kind (Bug, Feature or Task) is a neutral tag with an icon, because kind tells cards apart and is not a status. Target paths are in mono and labels are small tags. "From finding N" scrolls the report to its evidence. The Task kind is created only once the task kind exists. Labels are applied only once S-21 card labels land; until then they show as tags but are not applied.</p><p class="uses">Badge · Chip (static) · link</p></div></li>
+<li><span class="mk mk--inline">7</span><div><h3>Create selected<span class="new">New</span></h3><p>A sticky footer holds the sheet's one solid action, with the count in its label; it is disabled at zero. "Land in" picks To Do or Inbox. Creating is reversible (the cards can be archived), so there is no ConfirmDialog. Each card is linked back to C-512, and C-512 then moves itself to Done. A failure goes to useErrorToast and keeps the selection.</p><p class="uses">SegmentedControl sm · Button solid · toast</p></div></li>
+</ol>
+</div>
+</section>
+</div>
+</main>
+</body>
+</html>
