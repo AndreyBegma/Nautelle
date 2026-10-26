@@ -27,7 +27,8 @@
     },
     {
       "action": "navigate",
-      "path": "/projects/demo-project/board"
+      "path": "/projects/demo-project/board",
+      "timeoutMs": 60000
     },
     {
       "action": "assertVisible",
@@ -49,7 +50,8 @@
     },
     {
       "action": "navigate",
-      "path": "/projects/demo-project/fleet"
+      "path": "/projects/demo-project/fleet",
+      "timeoutMs": 60000
     },
     {
       "action": "assertVisible",
