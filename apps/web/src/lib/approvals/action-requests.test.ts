@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { ActionRequestSummary } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
+  cardAcceptHead,
   cardAcceptMergeText,
   describeActionRequestError,
   formatCountdown,
@@ -146,6 +147,18 @@ describe('card_accept (#845 D5)', () => {
     expect(cardAcceptMergeText(accept({ merge: true, prNumber: null }))).toBe(
       'and merge',
     );
+  });
+
+  test('C-416: the bound head of a merging accept, shortened, with its diff', () => {
+    const head = '0b6445a1'.padEnd(40, 'c');
+    expect(cardAcceptHead(accept({ merge: true, headSha: head }))).toEqual({
+      shortHead: '0b6445a',
+      diffUrl: `https://github.com/o/r/pull/34/files/${head}`,
+    });
+    // Rows stored before C-416, and accepts that merge nothing.
+    expect(cardAcceptHead(accept({ merge: true }))).toBeNull();
+    expect(cardAcceptHead(accept({ merge: true, headSha: null }))).toBeNull();
+    expect(cardAcceptHead(accept({ headSha: head }))).toBeNull();
   });
 
   test('falls back to the kind label for unreadable args', () => {

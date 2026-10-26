@@ -25,18 +25,20 @@ hold a place: when a slot frees, a waiting fix goes before To Do.
   `CARD_FIX_WAIT_MAX_MS` (15 min), after which the poll behaves as today.
 
 ## API
-- New `apps/api/src/board/board-fix-waits.ts` (`BoardFixWaits`: `add(projectId, cardId)`, `take(projectId)`,
-  `has(projectId)`), provided in `board.module.ts`.
+- New `apps/api/src/board/board-fix-waits.ts` (`BoardFixWaits`: `add(projectId, cardId, since?)`, `take(projectId)`
+  — the live waits, oldest first, removed —, `has(projectId)`, `drop(projectId, cardId)`), provided in
+  `board.module.ts`. A card that waits again keeps its older `since`, so the 15 minutes run from the first refusal.
 - `BoardRoundsService`: when `assertRoom` refuses a `ci_fix` or `review_fix` start, record the wait before throwing.
   No change to shipping or review: their catch stays.
-- `BoardRunQueue.tick`: serve fix waits first, then queued cards only if room is left.
+- `BoardRunQueue.tick`: serve fix waits first, then queued cards only if room is left and no fix waits. A wait
+  taken without room or without the runner is put back with its `since`.
 
 ## Acceptance criteria
-- [ ] e2e (`apps/api/src/board/board-run-queue.e2e.spec.ts`): with `maxRunning` 1, a running card, a red card waiting
+- [x] e2e (`apps/api/src/board/board-run-queue.e2e.spec.ts`): with `maxRunning` 1, a running card, a red card waiting
       for a fix and a queued To Do card: when the running round ends, the `ci_fix` round starts and the To Do card
       stays queued. Fails today: the To Do card starts.
-- [ ] e2e: a wait older than 15 min no longer holds To Do.
-- [ ] e2e: a review fix waits the same way.
+- [x] e2e: a wait older than 15 min no longer holds To Do.
+- [x] e2e: a review fix waits the same way.
 
 ## Risks
 - A fix that keeps failing for another reason (budget stop) holds To Do for at most 15 minutes.
