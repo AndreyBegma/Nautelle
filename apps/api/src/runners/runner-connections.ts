@@ -208,11 +208,13 @@ export class RunnerConnections {
   /**
    * Removes `connection` if it is still the runner's current one. Its
    * waiters stay: the runner replays their results after it reconnects.
+   * Returns whether it was — the runner went offline (C-479); a socket
+   * replaced or already disconnected by revoke or re-pair was not.
    */
-  detach(connection: LiveConnection): void {
-    if (this.live.get(connection.runnerId) === connection) {
-      this.live.delete(connection.runnerId);
-    }
+  detach(connection: LiveConnection): boolean {
+    if (this.live.get(connection.runnerId) !== connection) return false;
+    this.live.delete(connection.runnerId);
+    return true;
   }
 
   /** The open connections right now, by runner id. */
