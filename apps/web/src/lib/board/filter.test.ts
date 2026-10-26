@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { BoardCardView } from '@nautelle/shared';
+import type { BoardCardView, BoardPlanTaskView } from '@nautelle/shared';
 import {
   boardFilterCodec,
   boardMeta,
@@ -10,6 +10,7 @@ import {
   unfilteredIndex,
 } from './filter';
 import { toItem } from './format';
+import { toPlanItem } from './plan-tasks';
 
 const card = (over: Partial<BoardCardView>): BoardCardView =>
   ({
@@ -58,6 +59,48 @@ describe('matchesFilter', () => {
   });
 });
 
+const labelled = (...names: string[]) =>
+  card({
+    labels: names.map((name, i) => ({
+      id: `l${i}`,
+      name,
+      hue: 1,
+      source: 'person' as const,
+    })),
+  });
+
+describe('label filter (C-499)', () => {
+  test('keeps only cards with that label', () => {
+    const filter = { ...NO_FILTER, label: 'frontend' };
+    expect(matchesFilter(toItem(labelled('frontend', 'docs')), filter)).toBe(
+      true,
+    );
+    expect(matchesFilter(toItem(labelled('backend')), filter)).toBe(false);
+    expect(matchesFilter(toItem(labelled()), filter)).toBe(false);
+    expect(isFiltering(filter)).toBe(true);
+  });
+
+  test('a plan task is hidden by a label filter', () => {
+    const task = toPlanItem({
+      taskId: 't1',
+      key: 'T1',
+      planTitle: 'Plan',
+      title: 'Task',
+    } as BoardPlanTaskView);
+    expect(matchesFilter(task, { ...NO_FILTER, label: 'frontend' })).toBe(
+      false,
+    );
+  });
+
+  test('travels in the URL as ?label=', () => {
+    const search = boardFilterCodec.search({ ...NO_FILTER, label: 'docs' });
+    expect(search).toBe('?label=docs');
+    expect(boardFilterCodec.parse(new URLSearchParams(search)).label).toBe(
+      'docs',
+    );
+  });
+});
+
 describe('boardMeta', () => {
   test('counts running and waiting cards', () => {
     const items = [
@@ -79,7 +122,12 @@ describe('countLabel', () => {
 
 describe('boardFilterCodec', () => {
   test('round-trips through the query string', () => {
-    const filters = { text: 'deploy', kind: 'bug', state: 'error' } as const;
+    const filters = {
+      text: 'deploy',
+      kind: 'bug',
+      label: 'frontend',
+      state: 'error',
+    } as const;
     const search = boardFilterCodec.search(filters);
     expect(boardFilterCodec.parse(new URLSearchParams(search))).toEqual(
       filters,

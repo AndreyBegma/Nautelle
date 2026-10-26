@@ -128,6 +128,7 @@ import { SavedBadge } from '../token-saver/saved-badge';
 import { CardDependenciesSection } from './card-dependencies';
 import { CardDescription } from './card-description';
 import { ApproveRunLink, CardDesignSection } from './card-design';
+import { CardLabels } from './card-labels';
 import {
   AutoCollectToggle,
   AutoRunSection,
@@ -1344,6 +1345,14 @@ export function CardDetailBody({
             <Badge tone="neutral" label="Auto" />
           </div>
         ) : null}
+      </Field>
+      <Field label="Labels">
+        <CardLabels
+          projectId={projectId}
+          card={card}
+          canOperate={canOperate}
+          onSaved={onSaved}
+        />
       </Field>
       {fleet ? null : (
         <CardOptionToggles
