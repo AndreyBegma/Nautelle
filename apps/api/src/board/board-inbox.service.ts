@@ -15,7 +15,7 @@ import { type BoardActor, BoardWork } from './board-work';
 import type { AcceptSuggestionDto } from './dto';
 
 const notInInbox = () =>
-  boardError(409, BOARD_ERROR.wrongColumn, 'The card is not in the Inbox');
+  boardError(409, BOARD_ERROR.wrongColumn, 'The card is not in Suggestions');
 
 /**
  * The Inbox (issue #244 D9): a person accepts a suggestion into To Do —

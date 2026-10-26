@@ -71,7 +71,7 @@ describe('captureOutcome', () => {
   test('says the skip reason, the error or the count', () => {
     expect(
       captureOutcome(capture({ status: 'skipped', skipReason: 'inbox_full' })),
-    ).toBe('Inbox is full');
+    ).toBe('Suggestions is full');
     expect(
       captureOutcome(
         capture({

@@ -43,6 +43,7 @@ import { DesignTab } from './design/design-tab';
 import { DocsTab } from './docs-tab';
 import { GeneralTab } from './general-tab';
 import { GitHubAppRow } from './github-app-row';
+import { LabelsTab } from './labels/labels-tab';
 import { MembersTab } from './members-tab';
 import { OrchestratorTab } from './orchestrator-tab';
 import { PlannerTab } from './planner-tab';
@@ -84,6 +85,9 @@ const BLOCKS: Readonly<
   ),
   rules: ({ project, isAdmin }) => (
     <RulesTab projectId={project.id} isAdmin={isAdmin} />
+  ),
+  labels: ({ project, isAdmin }) => (
+    <LabelsTab projectId={project.id} isAdmin={isAdmin} />
   ),
   orchestrator: ({ project, isAdmin, canOperate }) => (
     <OrchestratorTab

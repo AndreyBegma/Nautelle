@@ -123,6 +123,11 @@ export interface LabelPathRuleView {
 export interface ProjectLabelsResponse {
   labels: ProjectLabelView[];
   rules: LabelPathRuleView[];
+  /**
+   * C-498: label id → the cards that show it (a label a person removed from a
+   * card does not count); a label no card shows is absent.
+   */
+  cardCounts: Record<string, number>;
   /** `labelSuggest`: the model suggests labels for a new card. */
   suggest: boolean;
   /** `labelPaths`: path rules label a card from its changed files. */

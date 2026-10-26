@@ -87,6 +87,36 @@ export const SETTINGS_CATALOGUE: readonly SettingEntry[] = [
   { item: 'rules', label: 'Scan project for rules' },
   { item: 'rules', label: 'Import rules from Markdown' },
   { item: 'rules', label: 'Applies to card types' },
+  // Project › Labels
+  {
+    item: 'labels',
+    label: 'Labels',
+    help: 'A label colours the stripe of a card and its chips.',
+    keywords: 'tag category',
+  },
+  {
+    item: 'labels',
+    label: 'Label colours',
+    keywords: 'colour color hue swatch',
+  },
+  {
+    item: 'labels',
+    label: 'Path rules for labels',
+    help: 'A changed file matching a pattern gives the card the label.',
+    keywords: 'glob pattern files',
+  },
+  {
+    item: 'labels',
+    label: 'Suggest labels on create',
+    help: 'The cheapest model reads the title and summary.',
+    keywords: 'model automatic',
+  },
+  {
+    item: 'labels',
+    label: 'Refine from pull request files',
+    help: 'Path rules run on the changed files.',
+    keywords: 'automatic changed',
+  },
   // Project › Slack
   {
     item: 'slack',

@@ -58,7 +58,7 @@ export const WORK_KIND_LABEL: Record<BoardCardKind, string> = {
 };
 
 export const WORK_STATUS_LABEL: Record<WorkStatus, string> = {
-  inbox: 'Inbox',
+  inbox: 'Suggestions',
   todo: 'To Do',
   in_progress: 'In progress',
   finished: 'Finished',

@@ -34,9 +34,16 @@ describe('project settings sections (#704)', () => {
     const items: string[] = SETTINGS_SECTIONS.flatMap(({ items }) =>
       items.map(({ id }) => id),
     );
-    // Review (#890), Demo videos (C-371), Slack (C-405) and Away mode (C-401) were never tabs.
+    // Review (#890), Demo videos (C-371), Slack (C-405), Away mode (C-401) and Labels (C-498) were never tabs.
     expect([...items].sort()).toEqual(
-      [...FORMER_TABS, 'review', 'demo-videos', 'slack', 'away'].sort(),
+      [
+        ...FORMER_TABS,
+        'review',
+        'demo-videos',
+        'slack',
+        'away',
+        'labels',
+      ].sort(),
     );
   });
 
@@ -49,6 +56,8 @@ describe('project settings sections (#704)', () => {
     expect(SETTINGS_ITEM_SECTION.design).toBe('planning');
     expect(SETTINGS_ITEM_SECTION.docs).toBe('project');
     expect(SETTINGS_ITEM_SECTION.general).toBe('project');
+    expect(SETTINGS_ITEM_SECTION.labels).toBe('project');
+    expect(settingsItemOf('labels')).toBe('labels');
   });
 
   test('settingsItemOf knows only former tab ids', () => {

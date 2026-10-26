@@ -301,7 +301,7 @@ const refusalOf = (
           // C-509 (ADR-0127): a task skips Finished — Done completes it.
           card.kind === 'task'
             ? 'A task has no Finished: Done moves it to Completed'
-            : 'A suggestion leaves the Inbox only for To Do, and nothing else enters it',
+            : 'A suggestion leaves Suggestions only for To Do, and nothing else enters it',
         )
       : boardError(409, BOARD_ERROR.moveRefused, MOVE_REFUSED[decision.error], {
           reason: decision.error,
