@@ -15,6 +15,7 @@ import { AssessExecutor, createAssessHandlers } from './assess';
 import { Backoff } from './backoff';
 import { CaptureExecutor, createCaptureHandlers } from './capture';
 import { CardExecutor, createCardHandlers } from './cards';
+import { cardReviewWorktreePath } from './cards/review';
 import type { Clock } from './clock';
 import { CollectorRegistry, collectors } from './collectors';
 import { type CommandHandlers, createDispatcher } from './commands/dispatcher';
@@ -99,6 +100,7 @@ import {
 import { bunSpawnPty, type SpawnPty, TerminalManager } from './terminal';
 import { createUiProfileHandlers, UiProfileBuildExecutor } from './uiprofile';
 import { RUNNER_VERSION } from './version';
+import { sweepWatchedProjects } from './worktrees/sweep';
 
 /**
  * #750 D8: how long after `escalate_card` answers the runner stops the round,
@@ -387,6 +389,8 @@ export const runDaemon = async (
         token: config.token,
       },
       runNotes,
+      // #1045: also hourly; `sweepWorktrees` is defined below the card executor.
+      sweep: () => sweepWorktrees(),
     });
     const uiProfiles = new UiProfileBuildExecutor({
       deps: skillsDeps,
@@ -449,6 +453,22 @@ export const runDaemon = async (
       onSessionEnded: (record, exitCode) =>
         steward.sessionEnded(record, exitCode),
     });
+    // #1045 D2: plan and review worktrees no record names. A review's
+    // worktree is named by its card's record too, before its own is saved.
+    const sweepWorktrees = (): Promise<void> =>
+      sweepWatchedProjects(skillsDeps, watchList.current, {
+        inUse: () => [
+          ...plans.worktrees(),
+          ...cards.store
+            .all()
+            .flatMap((card) => [
+              card.worktree,
+              cardReviewWorktreePath(card.root, card.shortId),
+            ]),
+          ...cards.reviews.all().map((review) => review.worktree),
+        ],
+        log,
+      });
     // Steward (#447): the runner observes card rounds and skill runs and
     // executes the API's nudge / dismiss / resume. Running skill runs are
     // kept from the executor's phase changes.
@@ -880,6 +900,9 @@ export const runDaemon = async (
         error: errorMessage(error),
       });
     });
+    // #1045 D2: after every record is loaded; not awaited, as many leftovers
+    // must not delay connecting.
+    void sweepWorktrees();
     // Not awaited: a first scan of a large profile must not delay connecting.
     sessions?.start(watchList.current).catch((error) => {
       log.error('sessions: cannot start', { error: errorMessage(error) });

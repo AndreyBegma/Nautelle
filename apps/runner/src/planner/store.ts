@@ -39,7 +39,7 @@ export const planRecordSchema = z.object({
   repo: z.string().min(1),
   shortId: skillRunShortIdSchema,
   worktree: z.string().min(1),
-  /** The last time a turn of this plan was queued or finished (the 14-day idle rule). */
+  /** The last time a turn of this plan was queued or finished (the 3-day idle rule, #1045 D3). */
   lastActiveAt: z.iso.datetime(),
 });
 export type PlanRecord = z.infer<typeof planRecordSchema>;

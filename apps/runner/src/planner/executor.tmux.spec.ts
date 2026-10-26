@@ -18,6 +18,7 @@ import {
 } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
+import type { Exec } from '../detect/exec';
 import { HandoffWriter, RunNotes } from '../handoff';
 import { validNote } from '../handoff/testing';
 import { SkillRunExecutor } from '../skills/run/executor';
@@ -84,7 +85,9 @@ echo '{"type":"result","subtype":"success","is_error":false,"result":"Planned.\\
 const S1 = '11111111-1111-4111-8111-111111111111';
 const S2 = '22222222-2222-4222-8222-222222222222';
 
-const setup = async (options: { cap?: number } = {}) => {
+const setup = async (
+  options: { cap?: number; failWorktreeRemove?: boolean } = {},
+) => {
   const f = await skillsWorkspace();
   const server = `nautelle-plan-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const tmuxServer = ['-L', server];
@@ -124,10 +127,17 @@ const setup = async (options: { cap?: number } = {}) => {
   await Bun.write(join(recordDir, '.keep'), '');
 
   const gh = withFakeGh(f.git, f.root);
+  // #1045: a `git worktree remove` that fails, as it did on the person's machine.
+  const exec: Exec = options.failWorktreeRemove
+    ? async (binary, args, execOptions) =>
+        binary === 'git' && args.includes('worktree') && args.includes('remove')
+          ? { code: 128, stdout: '', stderr: 'fatal: cannot remove' }
+          : gh.exec(binary, args, execOptions)
+    : gh.exec;
   const clock = new FakeClock(Date.parse('2026-10-13T12:00:00.000Z'));
   const events: UnsequencedEvent[] = [];
   let next = 0;
-  const deps = f.deps(gh.exec, {
+  const deps = f.deps(exec, {
     clock,
     profiles: () => profiles,
     shortId: () => `pln${String(next++).padStart(5, '0')}`,
@@ -780,7 +790,7 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     expect(huge?.resultChunks).toBe(t.chunked('turn_1').length);
   });
 
-  it('plan.close removes the worktree and the plan state; the idle cleanup does so after 14 days', async () => {
+  it('plan.close removes the worktree and the plan state; the idle cleanup does so after 3 days', async () => {
     const t = await setup();
     await t.executor.run(t.args());
     expect(await t.until('turn_1', ['succeeded', 'failed'])).toBe('succeeded');
@@ -812,6 +822,8 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     );
     const idleWorktree = join(t.f.ws, '.wt-widget-plan-pln00002');
     expect(existsSync(idleWorktree)).toBe(true);
+    // #1045 D3: three days, not fourteen.
+    expect(PLAN_IDLE_MS).toBe(3 * 24 * 60 * 60_000);
     t.clock.advance(PLAN_IDLE_MS - 60_000);
     await t.executor.cleanup();
     expect(existsSync(idleWorktree)).toBe(true);
@@ -819,6 +831,22 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     await t.executor.cleanup();
     expect(existsSync(idleWorktree)).toBe(false);
     expect(existsSync(join(t.f.ws, 'state', 'plans', 'plan_2'))).toBe(false);
+  });
+
+  it('removes the plan worktree when git worktree remove fails (#1045 D1)', async () => {
+    const t = await setup({ failWorktreeRemove: true });
+    await t.executor.run(t.args());
+    expect(await t.until('turn_1', ['succeeded', 'failed'])).toBe('succeeded');
+    expect(existsSync(t.worktree)).toBe(true);
+    expect(
+      await t.executor.close({ planId: 'plan_1', projectId: 'prj_widget' }),
+    ).toEqual({ removed: true });
+    expect(existsSync(t.worktree)).toBe(false);
+    expect(existsSync(join(t.f.ws, 'state', 'plans', 'plan_1'))).toBe(false);
+    // `prune` made git forget the directory the fallback removed.
+    expect(
+      await t.f.run(t.f.root, 'worktree', 'list', '--porcelain'),
+    ).not.toContain('plan-');
   });
 
   it('shares the cap with skill runs: each waits for the other', async () => {

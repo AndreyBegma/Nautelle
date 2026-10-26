@@ -26,6 +26,7 @@ import {
   readJson,
   writeJsonAtomic,
 } from '../skills/run/record';
+import { removeRunnerWorktree } from '../worktrees/remove';
 import { commitOf, fetchRef, type GitDeps } from './git';
 import { cardArgv, cardEnv } from './launch';
 import type { CardWiringFiles } from './wiring';
@@ -196,32 +197,6 @@ const isWorktreeOf = async (
 };
 
 /**
- * #884: removes the review worktree — `git worktree remove --force`, then
- * `prune`, then whatever directory is left. Answers whether there was one.
- */
-export const removeReviewWorktree = async (
-  deps: GitDeps,
-  root: string,
-  worktree: string,
-): Promise<boolean> => {
-  if (!existsSync(worktree)) {
-    await deps.exec('git', ['-C', root, 'worktree', 'prune']);
-    return false;
-  }
-  await deps.exec('git', [
-    '-C',
-    root,
-    'worktree',
-    'remove',
-    '--force',
-    worktree,
-  ]);
-  await deps.exec('git', ['-C', root, 'worktree', 'prune']);
-  rmSync(worktree, { recursive: true, force: true });
-  return true;
-};
-
-/**
  * #884: puts the review worktree on `headSha`, detached — the PR's head as
  * GitHub has it, whatever the card's branch says locally. `branch` is fetched
  * first (best effort), then the commit itself when that did not bring it; a
@@ -260,7 +235,7 @@ export const placeReviewWorktree = async (
       // Made again below.
     }
   }
-  await removeReviewWorktree(deps, root, worktree);
+  await removeRunnerWorktree(deps, root, worktree);
   await gitOk(deps.exec, [
     '-C',
     root,
