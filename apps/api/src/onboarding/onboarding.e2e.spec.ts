@@ -81,6 +81,9 @@ describe('onboarding (e2e, C-396)', () => {
       },
     });
 
+  const adminUser = () =>
+    ctx.prisma.user.findFirstOrThrow({ where: { role: 'admin' } });
+
   const facts = async (): Promise<OnboardingFacts> => {
     const response = await admin.get('/admin/onboarding');
     expect(response.status).toBe(200);
@@ -186,6 +189,7 @@ describe('onboarding (e2e, C-396)', () => {
       githubApp: false,
       teammates: false,
       aiProvider: false,
+      notifications: false,
     });
 
     const project = await seedProject();
@@ -239,15 +243,24 @@ describe('onboarding (e2e, C-396)', () => {
       },
     });
 
+    // A key with a cap of 0 is a disabled provider.
     await ctx.prisma.llmProviderSetting.upsert({
       where: { provider: 'anthropic' },
       create: {
         provider: 'anthropic',
         keyCiphertext: 'sealed',
         keySuffix: 'abcd',
-        capUsd: 10,
+        capUsd: 0,
       },
-      update: { keyCiphertext: 'sealed', keySuffix: 'abcd' },
+      update: { keyCiphertext: 'sealed', keySuffix: 'abcd', capUsd: 0 },
+    });
+    expect((await facts()).aiProvider).toBe(false);
+    await ctx.prisma.llmProviderSetting.update({
+      where: { provider: 'anthropic' },
+      data: { capUsd: 10 },
+    });
+    await ctx.prisma.telegramLink.create({
+      data: { userId: (await adminUser()).id, chatId: 3003n },
     });
 
     expect(await facts()).toMatchObject({
@@ -257,10 +270,36 @@ describe('onboarding (e2e, C-396)', () => {
       githubApp: true,
       teammates: true,
       aiProvider: true,
+      notifications: true,
     });
 
     await seedCard(project.id, 2, { mergedAt: new Date() });
     expect((await facts()).firstCard).toBe('merged');
+  });
+
+  it('counts the calling admin’s notifications, or a Slack webhook, never another user’s', async () => {
+    const teammate = await createUser(ctx.prisma, 'op@example.com', 'operator');
+    await ctx.prisma.telegramLink.create({
+      data: { userId: teammate.id, chatId: 4004n },
+    });
+    expect((await facts()).notifications).toBe(false);
+
+    await ctx.prisma.notificationRule.create({
+      data: {
+        userId: (await adminUser()).id,
+        kind: 'card.waiting',
+        inApp: true,
+        telegram: false,
+        email: 'immediate',
+      },
+    });
+    expect((await facts()).notifications).toBe(true);
+
+    await ctx.prisma.notificationRule.deleteMany();
+    await ctx.prisma.slackWebhook.create({
+      data: { urlCiphertext: 'sealed', urlHint: 'abcd', events: [] },
+    });
+    expect((await facts()).notifications).toBe(true);
   });
 
   describe('GET /onboarding/me (C-476)', () => {
@@ -289,9 +328,9 @@ describe('onboarding (e2e, C-396)', () => {
       );
       const session = await login(ctx, 'op@example.com');
       expect(await mine(session)).toEqual({
-        project: null,
         notifications: false,
-        ranCard: false,
+        cardRun: false,
+        projectCount: 0,
       });
 
       // Another operator's project, Telegram, email and round are not theirs.
@@ -339,9 +378,9 @@ describe('onboarding (e2e, C-396)', () => {
       };
       await round(other.id, 1);
       expect(await mine(session)).toEqual({
-        project: null,
         notifications: false,
-        ranCard: false,
+        cardRun: false,
+        projectCount: 0,
       });
 
       await ctx.prisma.projectMember.create({
@@ -358,9 +397,9 @@ describe('onboarding (e2e, C-396)', () => {
         },
       });
       expect(await mine(session)).toEqual({
-        project: { id: project.id, displayName: 'widget' },
         notifications: false,
-        ranCard: false,
+        cardRun: false,
+        projectCount: 1,
       });
 
       await ctx.prisma.notificationRule.update({
@@ -371,24 +410,21 @@ describe('onboarding (e2e, C-396)', () => {
       });
       await round(operator.id, 2);
       expect(await mine(session)).toEqual({
-        project: { id: project.id, displayName: 'widget' },
         notifications: true,
-        ranCard: true,
+        cardRun: true,
+        projectCount: 1,
       });
     });
 
     it('counts a linked Telegram chat, and an admin sees every project', async () => {
-      const project = await seedProject();
-      const me = await ctx.prisma.user.findFirstOrThrow({
-        where: { role: 'admin' },
-      });
+      await seedProject();
       await ctx.prisma.telegramLink.create({
-        data: { userId: me.id, chatId: 2002n },
+        data: { userId: (await adminUser()).id, chatId: 2002n },
       });
       expect(await mine(admin)).toEqual({
-        project: { id: project.id, displayName: 'widget' },
         notifications: true,
-        ranCard: false,
+        cardRun: false,
+        projectCount: 1,
       });
     });
   });

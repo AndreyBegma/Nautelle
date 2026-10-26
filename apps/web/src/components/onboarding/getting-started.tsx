@@ -185,8 +185,8 @@ function StepBody({
     case 'open':
       return (
         <p>
-          No project is shared with you yet. Ask an administrator to add you to
-          one; it shows on this page once they do.
+          You are not a member of a project yet. Ask an administrator to add you
+          to one; it then shows on Projects and on this page.
         </p>
       );
     case 'notifications':

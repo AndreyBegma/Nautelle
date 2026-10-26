@@ -60,14 +60,12 @@ export const GETTING_STARTED_PATH = '/#getting-started';
 export const GETTING_STARTED_ID = 'getting-started';
 export const AI_PROVIDERS_PATH = '/admin/ai-providers';
 export const NOTIFICATIONS_PATH = '/account/notifications';
+export const PROJECTS_PATH = '/projects';
 
-const notificationsStep = (
-  me: MyOnboardingFacts | null,
-  optional: boolean,
-): Step => ({
+const notificationsStep = (done: boolean, optional: boolean): Step => ({
   id: 'notifications',
   title: 'Turn on notifications',
-  done: me?.notifications === true,
+  done,
   optional,
   href: NOTIFICATIONS_PATH,
   cta: 'Open notifications',
@@ -103,7 +101,6 @@ export function gettingStarted({
   runners,
   projects,
   facts,
-  me,
 }: {
   runners: RunnersFact;
   projects: readonly Pick<
@@ -111,8 +108,6 @@ export function gettingStarted({
     'id' | 'displayName' | 'runnerId' | 'rootPath'
   >[];
   facts: OnboardingFacts | null;
-  /** C-476: the admin's own facts, for the notifications step. */
-  me: MyOnboardingFacts | null;
 }): GettingStarted {
   const paired = runners.kind === 'offline' || runners.kind === 'online';
   const online = runners.kind === 'online';
@@ -194,33 +189,39 @@ export function gettingStarted({
       href: AI_PROVIDERS_PATH,
       cta: 'Open AI providers',
     },
-    notificationsStep(me, true),
+    notificationsStep(facts?.notifications === true, true),
   ];
   return summarize('admin', steps, project, facts?.pushCheck ?? null);
 }
 
 /**
  * C-476: an operator's Getting started — a project an admin shared with them,
- * notifications, and a card they run. Every step is the caller's own
- * (`GET /onboarding/me`); unloaded facts read as not done.
+ * notifications, and a card they run. Every tick is the caller's own
+ * (`GET /onboarding/me`); unloaded facts read as not done. `projects` (as
+ * `GET /projects` lists them) only gives the Board link.
  */
-export function operatorGettingStarted(
-  me: MyOnboardingFacts | null,
-): GettingStarted {
-  const project = me?.project ?? null;
+export function operatorGettingStarted({
+  projects,
+  me,
+}: {
+  projects: readonly Pick<ProjectSummary, 'id'>[];
+  me: MyOnboardingFacts | null;
+}): GettingStarted {
+  const project = projects[0];
   const steps: Step[] = [
-    // Done once an admin shares a project: the Overview below lists it.
     {
       id: 'open',
-      title: 'Open a project',
-      done: project !== null,
+      title: 'Open a project you are a member of',
+      done: (me?.projectCount ?? 0) > 0,
       optional: false,
+      href: PROJECTS_PATH,
+      cta: 'Open Projects',
     },
-    notificationsStep(me, false),
+    notificationsStep(me?.notifications === true, false),
     {
       id: 'card',
       title: 'Run a card',
-      done: me?.ranCard === true,
+      done: me?.cardRun === true,
       optional: false,
       href: project ? `/projects/${project.id}/board` : undefined,
       cta: 'Open Board',

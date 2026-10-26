@@ -56,8 +56,8 @@ export function GettingStartedProvider({ children }: { children: ReactNode }) {
   });
   const projects = useSection(
     () =>
-      isAdmin ? api<ProjectSummary[]>('/projects') : Promise.resolve(undefined),
-    [isAdmin],
+      guided ? api<ProjectSummary[]>('/projects') : Promise.resolve(undefined),
+    [guided],
   );
   const facts = useSection(
     () =>
@@ -68,10 +68,10 @@ export function GettingStartedProvider({ children }: { children: ReactNode }) {
   );
   const me = useSection(
     () =>
-      guided
+      guided && !isAdmin
         ? api<MyOnboardingFacts>('/onboarding/me')
         : Promise.resolve(undefined),
-    [guided],
+    [guided, isAdmin],
   );
 
   const setup = isAdmin
@@ -80,11 +80,10 @@ export function GettingStartedProvider({ children }: { children: ReactNode }) {
           runners: runners.value,
           projects: projects.data,
           facts: facts.data ?? null,
-          me: me.data ?? null,
         })
       : undefined
-    : guided && me.data !== undefined
-      ? operatorGettingStarted(me.data)
+    : guided && projects.data !== undefined && me.data !== undefined
+      ? operatorGettingStarted({ projects: projects.data, me: me.data })
       : undefined;
   const settingUp = guided && setup?.complete !== true;
 

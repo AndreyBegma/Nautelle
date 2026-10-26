@@ -20,12 +20,13 @@ const NOTHING: OnboardingFacts = {
   githubApp: false,
   teammates: false,
   aiProvider: false,
+  notifications: false,
 };
 
 const NEW_OPERATOR: MyOnboardingFacts = {
-  project: null,
   notifications: false,
-  ranCard: false,
+  cardRun: false,
+  projectCount: 0,
 };
 
 const me = (overrides: Partial<MyOnboardingFacts> = {}): MyOnboardingFacts => ({
@@ -52,7 +53,6 @@ describe('gettingStarted', () => {
       runners: { kind: 'none' },
       projects: [],
       facts: facts(),
-      me: null,
     });
     expect(state.done).toBe(0);
     expect(state.total).toBe(7);
@@ -68,7 +68,6 @@ describe('gettingStarted', () => {
       },
       projects: [],
       facts: facts(),
-      me: null,
     });
     expect(ids(state, true)).toEqual(['install']);
     expect(currentStep(state)?.id).toBe('pair');
@@ -79,7 +78,6 @@ describe('gettingStarted', () => {
       runners: { kind: 'online', online: 1 },
       projects: [],
       facts: facts(),
-      me: null,
     });
     expect(state.done).toBe(2);
     expect(currentStep(state)?.href).toBe('/projects?connect=1');
@@ -90,7 +88,6 @@ describe('gettingStarted', () => {
       runners: { kind: 'online', online: 1 },
       projects: [PROJECT],
       facts: facts(),
-      me: null,
     });
     expect(currentStep(state)?.id).toBe('profile');
     expect(state.project?.id).toBe('p1');
@@ -103,7 +100,6 @@ describe('gettingStarted', () => {
     const base = {
       runners: { kind: 'online', online: 1 } as const,
       projects: [PROJECT],
-      me: null,
     };
     expect(
       currentStep(gettingStarted({ ...base, facts: facts({ profile: true }) }))
@@ -150,8 +146,8 @@ describe('gettingStarted', () => {
         pushCheck: PASSED,
         firstCard: 'pr',
         githubApp: true,
+        notifications: true,
       }),
-      me: me({ notifications: true }),
     });
     expect(state.audience).toBe('admin');
     expect(state.complete).toBe(true);
@@ -171,7 +167,6 @@ describe('gettingStarted', () => {
       runners: { kind: 'online', online: 1 },
       projects: [PROJECT],
       facts: facts({ aiProvider: true }),
-      me: me(),
     });
     const step = (id: string) => state.steps.find((s) => s.id === id);
     expect(step('ai')).toMatchObject({
@@ -193,7 +188,6 @@ describe('gettingStarted', () => {
       runners: { kind: 'offline', runners: [] },
       projects: [PROJECT],
       facts: facts({ profile: true }),
-      me: null,
     });
     expect(state.complete).toBe(false);
     expect(currentStep(state)?.id).toBe('pair');
@@ -204,7 +198,6 @@ describe('gettingStarted', () => {
       runners: { kind: 'unknown' },
       projects: [],
       facts: null,
-      me: null,
     });
     expect(ids(state, true)).toEqual([]);
     expect(state.steps.every((s) => !s.done)).toBe(true);
@@ -212,8 +205,10 @@ describe('gettingStarted', () => {
 });
 
 describe('operatorGettingStarted', () => {
+  const SHARED = [{ id: 'p1' }];
+
   test('a new operator with no project: three steps, 0 of 3, opens on the project', () => {
-    const state = operatorGettingStarted(me());
+    const state = operatorGettingStarted({ projects: [], me: me() });
     expect(state.audience).toBe('operator');
     expect(state.steps.map((s) => [s.id, s.optional])).toEqual([
       ['open', false],
@@ -222,16 +217,20 @@ describe('operatorGettingStarted', () => {
     ]);
     expect(state.done).toBe(0);
     expect(state.total).toBe(3);
-    expect(currentStep(state)?.id).toBe('open');
+    expect(currentStep(state)).toMatchObject({
+      id: 'open',
+      href: '/projects',
+    });
     // No project to run a card in yet.
     expect(state.steps.find((s) => s.id === 'card')?.href).toBeUndefined();
     expect(state.project).toBeNull();
   });
 
   test('a shared project: the next step turns on notifications, the card step links to its Board', () => {
-    const state = operatorGettingStarted(
-      me({ project: { id: 'p1', displayName: 'widget' } }),
-    );
+    const state = operatorGettingStarted({
+      projects: SHARED,
+      me: me({ projectCount: 1 }),
+    });
     expect(ids(state, true)).toEqual(['open']);
     expect(currentStep(state)).toMatchObject({
       id: 'notifications',
@@ -243,20 +242,17 @@ describe('operatorGettingStarted', () => {
   });
 
   test('notifications on and a card run complete it', () => {
-    const state = operatorGettingStarted(
-      me({
-        project: { id: 'p1', displayName: 'widget' },
-        notifications: true,
-        ranCard: true,
-      }),
-    );
+    const state = operatorGettingStarted({
+      projects: SHARED,
+      me: me({ projectCount: 1, notifications: true, cardRun: true }),
+    });
     expect(state.done).toBe(3);
     expect(state.complete).toBe(true);
     expect(currentStep(state)).toBeUndefined();
   });
 
   test('facts not loaded are never read as done', () => {
-    const state = operatorGettingStarted(null);
+    const state = operatorGettingStarted({ projects: SHARED, me: null });
     expect(state.steps.every((s) => !s.done)).toBe(true);
     expect(state.complete).toBe(false);
   });

@@ -111,7 +111,7 @@ export function Rail({
   const projectName = projects.find(
     (project) => project.id === projectId,
   )?.displayName;
-  // C-396, C-476: admins and operators (the provider loads nothing for viewers).
+  // C-396: admins only — an operator's checklist (C-476) stays on the Overview.
   const { setup } = useGettingStarted();
 
   const badges: Record<string, RailBadge | undefined> = {
@@ -233,7 +233,7 @@ export function Rail({
         footer={
           // C-396: the way back to Getting started while it is unfinished;
           // the icon-only rail has no room for it.
-          setup && !setup.complete && !iconOnly ? (
+          setup?.audience === 'admin' && !setup.complete && !iconOnly ? (
             <Link
               href={GETTING_STARTED_PATH}
               className="block rounded-control px-3 py-2 hover:bg-hover"
@@ -242,11 +242,9 @@ export function Rail({
                 value={setup.done}
                 max={setup.total}
                 label={
-                  setup.audience === 'operator'
-                    ? 'Getting started'
-                    : setup.project
-                      ? `Finish setup · ${setup.project.displayName}`
-                      : 'Finish setup'
+                  setup.project
+                    ? `Finish setup · ${setup.project.displayName}`
+                    : 'Finish setup'
                 }
                 hint={`${setup.done} / ${setup.total}`}
               />

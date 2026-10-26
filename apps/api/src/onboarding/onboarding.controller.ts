@@ -11,14 +11,14 @@ export class OnboardingController {
   constructor(private readonly onboarding: OnboardingService) {}
 
   @Get()
-  facts(): Promise<OnboardingFacts> {
-    return this.onboarding.facts();
+  facts(@CurrentUser() admin: AuthUser): Promise<OnboardingFacts> {
+    return this.onboarding.facts(admin.id);
   }
 }
 
 /**
- * C-476: `GET /onboarding/me` — the caller's own steps. Viewers get no
- * Getting started, so they are refused.
+ * C-476: `GET /onboarding/me` — an operator's Getting started, about the
+ * caller alone. Viewers get no Getting started, so they are refused.
  */
 @Roles('admin', 'operator')
 @Controller('onboarding/me')
