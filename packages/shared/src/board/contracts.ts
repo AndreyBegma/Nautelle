@@ -1122,6 +1122,14 @@ export const BOARD_ERROR = {
   labelLimit: 'label_limit',
   /** 422 (C-497): a path rule's pattern is refused (`labelPatternProblem`). */
   patternInvalid: 'pattern_invalid',
+  /** 409 (C-506): Create selected or Complete without cards on a card that is no analysis card. */
+  notAnalysis: 'not_analysis',
+  /** 409 (C-506): the `roundId` is not the round whose proposals are open. */
+  proposalsStale: 'proposals_stale',
+  /** 409 (C-506): a position is no `pending` proposal of the round — already decided or unknown. */
+  proposalsDecided: 'proposals_decided',
+  /** 422 (C-506): a `task` proposal while the project has no `task` card kind. */
+  kindUnavailable: 'kind_unavailable',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 
