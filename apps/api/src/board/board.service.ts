@@ -53,6 +53,8 @@ import { BoardCommands, boardOutput } from './board-commands';
 import { demoFactsFor } from './board-demo-facts';
 import { BoardDependencies } from './board-dependencies.service';
 import { boardError, cardNotFound } from './board-error';
+import { labelFactsFor } from './board-label-facts';
+import { BoardLabels } from './board-labels.service';
 import {
   type CardFace,
   type CardFacts,
@@ -131,6 +133,7 @@ export class BoardService implements OnModuleInit {
     private readonly dependencies: BoardDependencies,
     private readonly stacks: BoardStacks,
     private readonly economy: TokenEconomyService,
+    private readonly labels: BoardLabels,
   ) {}
 
   /**
@@ -439,6 +442,7 @@ export class BoardService implements OnModuleInit {
       review,
       demos,
       queue,
+      labels,
     ] = await Promise.all([
       usageByRun(this.prisma, runIds),
       sessionIds.length === 0
@@ -488,6 +492,8 @@ export class BoardService implements OnModuleInit {
       demoFactsFor(this.prisma, cards),
       // C-398: the run queue chip of each card.
       queueFactsFor(this.prisma, cards),
+      // C-497: the labels of every card, in one query.
+      labelFactsFor(this.prisma, cards),
     ]);
     const runProfileKeys = new Map<string, string>();
     for (const run of runs) {
@@ -524,6 +530,7 @@ export class BoardService implements OnModuleInit {
       ...review,
       ...demos,
       ...queue,
+      ...labels,
       now: new Date(),
     };
   }
@@ -601,6 +608,9 @@ export class BoardService implements OnModuleInit {
       dto.issueNumber === undefined
         ? null
         : await this.linkedIssue(projectId, dto.issueNumber);
+    // C-497: the person's labels, refused before the card exists.
+    const labelIds = [...new Set(dto.labelIds ?? [])];
+    await this.labels.assertForCreate(projectId, labelIds);
     const card = await this.prisma.$transaction(async (tx) => {
       const next = await this.work.nextCard(tx, projectId);
       const position = await this.work.place(
@@ -638,6 +648,7 @@ export class BoardService implements OnModuleInit {
         attachmentIds,
         actor,
       );
+      await this.labels.writeOnCreate(tx, created.id, labelIds, actor.userId);
       return created;
     });
     await this.audit.record({
@@ -652,6 +663,7 @@ export class BoardService implements OnModuleInit {
         issueOnRun: card.issueOnRun,
         specOnRun: card.specOnRun,
         issueNumber: card.issueNumber,
+        ...(labelIds.length > 0 ? { labelIds } : {}),
       },
       result: 'ok',
     });
@@ -666,6 +678,11 @@ export class BoardService implements OnModuleInit {
       card,
       { title: card.title, body: card.body },
       actor,
+    );
+    // C-497: without the person's labels the model may suggest some.
+    await this.labels.afterCreate(
+      { cardId: card.id, projectId, title: card.title, body: card.body },
+      labelIds.length > 0,
     );
     return this.detail(projectId, card.number);
   }
@@ -1541,6 +1558,11 @@ export class BoardService implements OnModuleInit {
     actor: BoardActor,
   ): Promise<BoardSettingsView> {
     const before = await this.settings(projectId);
+    // C-497: the label flags live outside the settings view.
+    const labelsBefore = await this.prisma.boardSettings.findUnique({
+      where: { projectId },
+      select: { labelSuggest: true, labelPaths: true },
+    });
     if (dto.captureEnabled === true && !before.captureEnabled) {
       const project = await this.prisma.project.findUnique({
         where: { id: projectId },
@@ -1578,6 +1600,10 @@ export class BoardService implements OnModuleInit {
       ...(dto.cardMergePolicy !== undefined
         ? { cardMergePolicy: dto.cardMergePolicy }
         : {}),
+      ...(dto.labelSuggest !== undefined
+        ? { labelSuggest: dto.labelSuggest }
+        : {}),
+      ...(dto.labelPaths !== undefined ? { labelPaths: dto.labelPaths } : {}),
       updatedById: actor.userId,
     };
     const row = await this.prisma.boardSettings.upsert({
@@ -1600,6 +1626,8 @@ export class BoardService implements OnModuleInit {
         autoMergeCards: before.autoMergeCards,
         backgroundStallMinutes: before.backgroundStallMinutes,
         cardMergePolicy: before.cardMergePolicy,
+        labelSuggest: labelsBefore?.labelSuggest ?? true,
+        labelPaths: labelsBefore?.labelPaths ?? true,
       },
       after: {
         issueOnRun: row.issueOnRun,
@@ -1611,9 +1639,14 @@ export class BoardService implements OnModuleInit {
         autoMergeCards: row.autoMergeCards,
         backgroundStallMinutes: row.backgroundStallMinutes,
         cardMergePolicy: row.cardMergePolicy,
+        labelSuggest: row.labelSuggest,
+        labelPaths: row.labelPaths,
       },
       result: 'ok',
     });
+    if (dto.labelSuggest !== undefined || dto.labelPaths !== undefined) {
+      this.labels.announce(projectId);
+    }
     const project = await this.work.project(projectId);
     return toSettingsView(projectId, row, project.base, project.defaultBranch);
   }

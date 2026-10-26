@@ -17,6 +17,7 @@ import {
   type CardEvidenceView,
   type CardFleetView,
   type CardHooksCause,
+  type CardLabelView,
   type CardPrTarget,
   type CardPullRequestRef,
   type CardQueueView,
@@ -287,6 +288,8 @@ export interface CardFacts {
   demos?: ReadonlyMap<string, CardDemoBrief>;
   /** C-398: each queued card's place in the run queue, by card id; absent is none. */
   queue?: ReadonlyMap<string, CardQueueView>;
+  /** C-497: each card's labels in label position order, by card id; absent is none. */
+  labels?: ReadonlyMap<string, readonly CardLabelView[]>;
   now: Date;
 }
 
@@ -624,6 +627,7 @@ export const toCardView = (
   title: card.title,
   kind: card.kind,
   kindSource: card.kindSource,
+  labels: [...(facts.labels?.get(card.id) ?? [])],
   designTemplate: card.designTemplate,
   designTemplateSource: card.designTemplateSource,
   column: card.column,

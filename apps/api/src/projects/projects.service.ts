@@ -19,6 +19,7 @@ import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
 import type { AuthUser } from '../auth';
+import { writeStarterLabels } from '../board/starter-labels';
 import { PrismaService } from '../database/prisma.service';
 import { RunnerPresence } from '../runners/runner-presence';
 import { RunnerWatchList } from '../runners/runner-watch-list';
@@ -177,17 +178,22 @@ export class ProjectsService {
 
     let project: ProjectWithRelations;
     try {
-      project = await this.prisma.project.create({
-        data: {
-          runnerId,
-          rootPath: inspection.root,
-          repo,
-          displayName: displayName ?? repo.slice(repo.indexOf('/') + 1),
-          ...inspectionData(inspection),
-          createdById: adminId,
-          docsSource: { create: detectedDocsData(inspection.docs) },
-        },
-        include: withRelations,
+      project = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.project.create({
+          data: {
+            runnerId,
+            rootPath: inspection.root,
+            repo,
+            displayName: displayName ?? repo.slice(repo.indexOf('/') + 1),
+            ...inspectionData(inspection),
+            createdById: adminId,
+            docsSource: { create: detectedDocsData(inspection.docs) },
+          },
+          include: withRelations,
+        });
+        // C-497 (ADR-0125): every project starts with the starter labels.
+        await writeStarterLabels(tx, created.id);
+        return created;
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
