@@ -1,4 +1,5 @@
 import type {
+  PatchTokenSaverSettingsBody,
   ProjectRuntimeProfile,
   TokenEconomyReport,
   TokenEconomySettingsBody,
@@ -22,6 +23,12 @@ export const saveTokenSaver = (
   projectId: string,
   body: UpdateTokenSaverSettingsBody,
 ) => api<TokenSaverSettingsView>(base(projectId), { method: 'PUT', body });
+
+/** C-442 D4: switches filter families off, leaving the rest of the setting. */
+export const patchTokenSaver = (
+  projectId: string,
+  body: PatchTokenSaverSettingsBody,
+) => api<TokenSaverSettingsView>(base(projectId), { method: 'PATCH', body });
 
 export const fetchTokenSaverSummary = (
   projectId: string,

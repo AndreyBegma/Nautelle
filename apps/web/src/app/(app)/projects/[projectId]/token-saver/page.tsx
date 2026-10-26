@@ -19,6 +19,7 @@ import {
   CostPerRoundWeeksTable,
   UnmeasuredKindsNote,
 } from '../../../../../components/token-saver/cost-per-round';
+import { FilterFamiliesSection } from '../../../../../components/token-saver/filter-families-section';
 import { PrefixSection } from '../../../../../components/token-saver/prefix-section';
 import { SavingsChart } from '../../../../../components/token-saver/savings-chart';
 import {
@@ -55,6 +56,7 @@ const TOP = 10;
  * as usage measured it. #663 D5: led by cost per round by session kind —
  * the fact the token saver is judged by (ADR-0068); saved bytes follow.
  * #746: above it all, each saving technique's A/B report (ADR-0074).
+ * C-442: the filter families a project admin switches off.
  */
 export default function TokenSaverPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -117,6 +119,13 @@ export default function TokenSaverPage() {
         <PrefixSection
           projectId={projectId}
           range={range}
+          isAdmin={project?.role === 'admin'}
+        />
+      </div>
+      <div className="mb-6">
+        <FilterFamiliesSection
+          projectId={projectId}
+          summary={section.data}
           isAdmin={project?.role === 'admin'}
         />
       </div>

@@ -144,10 +144,23 @@ sheet say why:
 | Compound command (not filtered) | a redirect, a subshell, a heredoc, a substitution or a background `&` — something other than simple commands joined by `\|`, `&&`, `\|\|` or `;` |
 | No filter for this command | no filter family covers the first command of any of its pipelines |
 | Not filtered in this permission mode | the session's mode is not `bypassPermissions`, `auto` or `plan` |
+| Filter switched off for this launch | a filter family covers the command, but the project switched that family off |
 | No filter (uncovered command) | recorded before the reasons above existed |
 
 The exact rules are in
 [the filter guide](token-saver-filter.md#permissions-the-rewrite-never-changes-what-is-allowed).
+
+## Switching a filter family off
+
+A project admin can switch a whole filter family off under **Filter families**
+on the project's Token saver page. The families are JavaScript and TypeScript
+(`js`), other languages (`lang`), Git and operations (`ops`), and whole-file
+reads through Bash (`tool`, the refusal that points the agent to `Read`). Each
+switch shows what that family saved in the page's range. The switch applies
+from the next launch: the family's commands then run as written and count as
+"Filter switched off for this launch". To judge the effect, compare **Cost per
+round** for the weeks before and after the switch. A runner older than the
+switch ignores it until it is updated, and the section says so.
 
 ## Reading the raw output
 

@@ -8,6 +8,7 @@ import {
   costChange,
   costPerRoundTrends,
   emptySummary,
+  familySavings,
   mergeSummaries,
   mostPassedThrough,
   promptCacheTotals,
@@ -322,6 +323,45 @@ describe('topFilters', () => {
       2,
     );
     expect(top.map((f) => f.filter)).toEqual(['a', 'c']);
+  });
+});
+
+describe('familySavings (C-442)', () => {
+  test('sums each family in family order, a family without rows at zero', () => {
+    const rows = familySavings([
+      filter('ops/git-status', 2, 4),
+      filter('js/vitest', 1, 3),
+      filter('ops/docker-build', 3, 6),
+      filter('none:uncovered', 9, 9),
+    ]);
+    expect(rows.map((r) => r.family)).toEqual(['js', 'lang', 'ops', 'tool']);
+    expect(rows[0]).toEqual({
+      family: 'js',
+      estimateUsd: 1,
+      estimateTokens: 1000,
+      commands: 3,
+    });
+    expect(rows[1]?.commands).toBe(0);
+    expect(rows[2]).toEqual({
+      family: 'ops',
+      estimateUsd: 5,
+      estimateTokens: 5000,
+      commands: 10,
+    });
+  });
+
+  test('`tool` is the Bash read refusal alone, not the techniques under tool/', () => {
+    const [, , , tool] = familySavings([
+      filter('tool/read-refused', 1, 2),
+      filter('tool/mcp-cut', 5, 5),
+      filter('tool/read-guard', 5, 5),
+    ]);
+    expect(tool).toEqual({
+      family: 'tool',
+      estimateUsd: 1,
+      estimateTokens: 1000,
+      commands: 2,
+    });
   });
 });
 
