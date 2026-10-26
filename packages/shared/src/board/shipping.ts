@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import type {
-  CardCheck,
-  CardDraftPullRequest,
+import {
+  CARD_CI_RERUN_RUNS_MAX,
+  type CardCheck,
+  type CardDraftPullRequest,
 } from '../protocol/commands/cards';
 import { CARD_PR_MARKER, cardLabel } from './naming';
 import type { CardCiState } from './types';
@@ -88,6 +89,32 @@ export const failedCardChecks = (checks: readonly CardCheck[]): CardCiCheck[] =>
     .filter((c) => c.bucket === 'fail')
     .slice(0, CARD_CI_CHECKS_STORED_MAX)
     .map(({ name, link }) => ({ name, link }));
+
+/** A GitHub Actions run's page, optionally one of its jobs. */
+const ACTIONS_RUN_LINK =
+  /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/(\d+)(?:\/job\/\d+)?\/?(?:[?#].*)?$/;
+
+/**
+ * C-414 (ADR-0114): the GitHub Actions runs the failed checks belong to, in
+ * the order `gh` listed them, each once — or `null` when a failed check is
+ * not an Actions run's (another CI, or no link) or there are more than
+ * `CARD_CI_RERUN_RUNS_MAX`, so the head is re-run by sending the PR's event
+ * again instead.
+ */
+export const actionsRunIdsOf = (
+  checks: readonly CardCheck[],
+): number[] | null => {
+  const ids: number[] = [];
+  for (const check of checks) {
+    if (check.bucket !== 'fail') continue;
+    const id = check.link ? ACTIONS_RUN_LINK.exec(check.link)?.[1] : undefined;
+    if (id === undefined) return null;
+    const run = Number(id);
+    if (!Number.isSafeInteger(run) || run <= 0) return null;
+    if (!ids.includes(run)) ids.push(run);
+  }
+  return ids.length > 0 && ids.length <= CARD_CI_RERUN_RUNS_MAX ? ids : null;
+};
 
 /** #359 D5: a stored `board_cards.ciChecks`; anything malformed is dropped. */
 export const cardCiChecksOf = (json: unknown): CardCiCheck[] =>

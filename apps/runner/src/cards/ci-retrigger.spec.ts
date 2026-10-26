@@ -92,6 +92,17 @@ describe('card.ciRetrigger (#484)', () => {
     ]);
   });
 
+  it('says a red head is re-run once when the reason is red (C-414)', async () => {
+    const t = setup({});
+    expect(await t.run({ ...args, reason: 'red' })).toEqual({
+      retriggered: true,
+    });
+    const reopen = t.gh.find((a) => a[1] === 'reopen');
+    expect(reopen?.at(-1)).toBe(ciRetriggerComment(HEAD, 'red'));
+    expect(ciRetriggerComment(HEAD, 'red')).toContain('CI failed on');
+    expect(ciRetriggerComment(HEAD)).toContain('no CI check reported');
+  });
+
   it('leaves a merged or closed PR alone', async () => {
     for (const state of ['MERGED', 'CLOSED']) {
       const t = setup({ view: ok({ state, headRefOid: HEAD }) });

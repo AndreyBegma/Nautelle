@@ -20,10 +20,19 @@ const prViewSchema = z.looseObject({
   headRefOid: z.string(),
 });
 
-/** The comment the reopen leaves, so the closed/reopened pair explains itself. */
-export const ciRetriggerComment = (headSha: string): string =>
-  `Nautelle: no CI check reported on ${headSha.slice(0, 12)}, so the ` +
-  'pull request was closed and reopened to send its event again (#484).';
+/**
+ * The comment the reopen leaves, so the closed/reopened pair explains itself:
+ * a head without checks (#484), or a red head re-run once (C-414).
+ */
+export const ciRetriggerComment = (
+  headSha: string,
+  reason: CardCiRetriggerArgs['reason'] = 'missing',
+): string =>
+  reason === 'red'
+    ? `Nautelle: CI failed on ${headSha.slice(0, 12)}, so the pull request ` +
+      'was closed and reopened to run it once more before a fix round (C-414).'
+    : `Nautelle: no CI check reported on ${headSha.slice(0, 12)}, so the ` +
+      'pull request was closed and reopened to send its event again (#484).';
 
 /** `gh pr reopen`, once more when the first attempt fails. */
 const reopen = async (gh: Gh, args: string[]) => {
@@ -103,7 +112,7 @@ export const retriggerCardCi = async (
     '--repo',
     github,
     '--comment',
-    ciRetriggerComment(args.headSha),
+    ciRetriggerComment(args.headSha, args.reason),
   ]);
   if (reopened?.code !== 0) {
     return {
