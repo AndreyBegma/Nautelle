@@ -10,6 +10,7 @@ import {
 } from './board-ai.controller';
 import { BoardAiModel } from './board-ai-model';
 import { BoardAskService } from './board-ask.service';
+import { BoardLabelSuggest } from './board-label-suggest.service';
 import { BoardQuickDraft } from './board-quick-draft.service';
 import { BoardTriage } from './board-triage.service';
 
@@ -29,6 +30,7 @@ import { BoardTriage } from './board-triage.service';
     BoardTriage,
     AssistantModels,
     BoardQuickDraft,
+    BoardLabelSuggest,
   ],
   exports: [BoardTriage],
 })

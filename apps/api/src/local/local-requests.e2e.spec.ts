@@ -45,6 +45,12 @@ const STACK_METHODS = new Set<LocalMethodName>([
   'card.undepend',
 ] satisfies LocalStackMethod[]);
 
+/**
+ * C-503: `card.finishAnalysis` answers only an analysis card's session — its
+ * own sweep is `board-analysis.e2e.spec.ts`.
+ */
+const OWN_SUITE = new Set<LocalMethodName>(['card.finishAnalysis']);
+
 /** The args each method is called with in the all-methods sweep. */
 const ARGS: Record<Exclude<LocalMethodName, LocalStackMethod>, unknown> = {
   'context.sessionStart': { gitBranch: 'feat/12-pairing' },
@@ -74,6 +80,7 @@ const ARGS: Record<Exclude<LocalMethodName, LocalStackMethod>, unknown> = {
   },
   'away.set': { on: true },
   'card.finish': { summary: 'Done.' },
+  'card.finishAnalysis': { report: 'Found two gaps.', proposals: [] },
   'card.escalate': {
     reason: 'misclassified',
     note: 'The card needs a schema decision.',
@@ -425,7 +432,8 @@ describe('local requests over the runner socket (e2e)', () => {
             m !== 'action.request' &&
             m !== 'card.escalate' &&
             !BOARD_CONTROL_ORDER.includes(m) &&
-            !STACK_METHODS.has(m),
+            !STACK_METHODS.has(m) &&
+            !OWN_SUITE.has(m),
         )
         .flatMap((m) =>
           m === 'card.finish' ? (['card.escalate', m] as const) : [m],
@@ -458,7 +466,9 @@ describe('local requests over the runner socket (e2e)', () => {
         actionId = (response.data as { id: string }).id;
       }
     }
-    expect(responses.size).toBe(localMethodNames.length - STACK_METHODS.size);
+    expect(responses.size).toBe(
+      localMethodNames.length - STACK_METHODS.size - OWN_SUITE.size,
+    );
 
     const context = responses.get('context.sessionStart')?.data as {
       text: string;

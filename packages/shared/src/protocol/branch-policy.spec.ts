@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  CHANGED_PATHS_MAX,
   cardBranchSchema,
+  changedPathsSchema,
   isProtectedPath,
   PROTECTED_PATHS,
 } from './branch-policy';
@@ -45,5 +47,18 @@ describe('protected paths (C-148, D-12)', () => {
     ]) {
       expect((PROTECTED_PATHS as readonly string[]).includes(p)).toBe(true);
     }
+  });
+});
+
+describe('changed paths (C-501)', () => {
+  it('takes up to CHANGED_PATHS_MAX paths and no more', () => {
+    const paths = (n: number) => Array.from({ length: n }, (_, i) => `a/${i}`);
+    expect(changedPathsSchema.safeParse(paths(CHANGED_PATHS_MAX)).success).toBe(
+      true,
+    );
+    expect(
+      changedPathsSchema.safeParse(paths(CHANGED_PATHS_MAX + 1)).success,
+    ).toBe(false);
+    expect(changedPathsSchema.safeParse(['']).success).toBe(false);
   });
 });

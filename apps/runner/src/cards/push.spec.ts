@@ -6,7 +6,10 @@ import {
   cardDraftPullRequest,
   cardPullRequestBody,
 } from '@nautelle/shared';
-import type { CardCollectArgs } from '@nautelle/shared/protocol';
+import {
+  type CardCollectArgs,
+  CHANGED_PATHS_MAX,
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
 import {
@@ -203,6 +206,7 @@ describe('push and draft PR (#359 D1)', () => {
       headSha: await head(),
       pushed: true,
       protectedPaths: [],
+      changedPaths: ['docs/specs/card-12-export-csv.md'],
       ahead: 1,
       pr: {
         number: 7,
@@ -389,6 +393,35 @@ describe('branch policy and protected paths (C-148)', () => {
 
     const result = await collectCard(deps, record, collectArgs);
     expect(result.protectedPaths).toContain('.woodpecker/pipeline.yml');
+  });
+
+  it('caps the changed paths at CHANGED_PATHS_MAX, keeping the sorted first ones (C-501)', async () => {
+    const { f, record, deps } = await setup();
+    const files: Record<string, string> = {};
+    for (let i = 0; i < CHANGED_PATHS_MAX + 5; i += 1) {
+      files[`bulk/f${String(i).padStart(4, '0')}.txt`] = `${i}\n`;
+    }
+    f.write(record.worktree, files);
+    await f.commitAll(record.worktree, 'feat: bulk');
+    const step = await pushCardHead(deps, record);
+    expect(step?.changedPaths).toHaveLength(CHANGED_PATHS_MAX);
+    expect(step?.changedPaths?.[0]).toBe('bulk/f0000.txt');
+  });
+
+  it('reports every changed path, sorted, with the push and the collect (C-501)', async () => {
+    const { f, record, deps, collectArgs } = await setup();
+    f.write(record.worktree, {
+      'src/b.ts': 'export const b = 1;\n',
+      '.woodpecker/pipeline.yml': 'steps: []\n',
+      'src/a.ts': 'export const a = 1;\n',
+    });
+    await f.commitAll(record.worktree, 'feat: a');
+    const step = await pushCardHead(deps, record);
+    const all = ['.woodpecker/pipeline.yml', 'src/a.ts', 'src/b.ts'];
+    expect(step?.changedPaths).toEqual(all);
+
+    const result = await collectCard(deps, record, collectArgs);
+    expect(result.changedPaths).toEqual(all);
   });
 });
 

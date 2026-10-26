@@ -48,6 +48,7 @@ import {
   type RunnerEventSink,
   RunnerEventSinks,
 } from '../runners/runner-event-sinks';
+import { BoardPathLabels } from './board-path-labels';
 import { BoardTerminalService } from './board-terminal.service';
 import {
   ACTIVE_PHASES,
@@ -88,6 +89,7 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
     private readonly prisma: PrismaService,
     private readonly work: BoardWork,
     private readonly terminal: BoardTerminalService,
+    private readonly pathLabels: BoardPathLabels,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -282,6 +284,14 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
       ahead: data.ahead ?? null,
       pr,
     });
+    // C-501: the files the PR changes label the card.
+    if (pr !== null) {
+      await this.pathLabels.refine(
+        data.projectId,
+        round.cardId,
+        data.changedPaths,
+      );
+    }
     this.work.publish(data.projectId, round.cardId);
   }
 

@@ -32,7 +32,7 @@ export interface PrefixLaunchInput {
   projectId: string;
   card: {
     id: string;
-    kind: 'bug' | 'feature';
+    kind: 'bug' | 'feature' | 'analysis';
     sessionPrefix: unknown;
   };
   ciFix: boolean;

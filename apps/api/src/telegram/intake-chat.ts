@@ -1,4 +1,5 @@
 import {
+  type BoardCardKind,
   cardLabel,
   type PlanAnswer,
   type PlanCandidateView,
@@ -360,7 +361,7 @@ export const idleMessage = (planId: string) => ({
 
 /** The cards the intake made, each with its kind and a link to it. */
 export const cardsMessage = (
-  cards: { number: number; title: string; kind: PlanTaskKind }[],
+  cards: { number: number; title: string; kind: BoardCardKind }[],
   projectId: string,
   appUrl: string | null,
 ): string =>

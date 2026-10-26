@@ -64,6 +64,7 @@ import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure, boardError, cardNotFound } from './board-error';
 import type { CardWithRounds } from './board-mapper';
 import { CollectRetryTimer } from './collect-retry-timer';
+import { PathLabelsRef } from './path-labels-ref';
 
 type Tx = Prisma.TransactionClient;
 
@@ -263,6 +264,14 @@ export interface MoveRequest {
    * ran while the card stayed In progress.
    */
   collect?: false;
+  /**
+   * C-503: writes that go with the move — inside its transaction, after the
+   * card's lock and the decision, before the round ends — so they commit or
+   * roll back with it. Gets the locked card, its rounds newest first.
+   */
+  within?: (tx: Tx, fresh: CardWithRounds) => Promise<void>;
+  /** C-503: more fields for the `card.finished` audit record. */
+  finishedAudit?: Record<string, unknown>;
 }
 
 /** The message of each `move_refused` reason. */
@@ -317,6 +326,7 @@ export class BoardWork implements OnModuleInit {
     private readonly audit: AuditService,
     private readonly retryTimer: CollectRetryTimer,
     private readonly connectHooks: RunnerConnectHooks,
+    private readonly pathLabels: PathLabelsRef,
   ) {}
 
   /** #329 D4: a failed collect is retried when its runner connects. */
@@ -437,6 +447,7 @@ export class BoardWork implements OnModuleInit {
       const fresh = await this.lock(tx, card.id);
       const decision = this.decide(fresh, request);
       if (!decision.allowed) throw refusalOf(decision);
+      if (request.within) await request.within(tx, fresh);
       const round = fresh.rounds[0] ?? null;
       const ended: { runId: string; status: RunStatus }[] = [];
       if (round && decision.effects.includes('stop')) {
@@ -530,6 +541,7 @@ export class BoardWork implements OnModuleInit {
           number: fresh.number,
           round: round?.round,
           finishedBy: request.finishedBy ?? 'person',
+          ...(request.finishedAudit ?? {}),
         },
         result: 'ok',
       });
@@ -2095,6 +2107,14 @@ export class BoardWork implements OnModuleInit {
           ahead: output.ahead,
           pr: open ? { number: prNumber, url: prUrl } : null,
         });
+      }
+      // C-501: the files the PR changes label the card.
+      if (open) {
+        await this.pathLabels.refine(
+          card.projectId,
+          card.id,
+          output.changedPaths,
+        );
       }
       // A terminal card's earlier failure no longer holds once one succeeds.
       const cleared =
