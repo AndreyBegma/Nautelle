@@ -45,6 +45,24 @@ export interface AdminUser extends PublicUser {
   createdAt: string;
 }
 
+/** Rows a page of `GET /admin/users` carries. */
+export const ADMIN_USERS_PAGE_SIZE = 50;
+
+/** Longest search text `GET /admin/users?q=` accepts. */
+export const ADMIN_USERS_SEARCH_MAX = 200;
+
+/**
+ * `GET /admin/users?status=&q=&cursor=`: one page of accounts, oldest first.
+ * `counts` covers every status for the same `q`, so the tabs stay accurate
+ * while a search narrows the list.
+ */
+export interface AdminUsersPage {
+  items: AdminUser[];
+  /** Pass as `cursor` for the next page; null on the last page. */
+  nextCursor: string | null;
+  counts: Record<UserStatus, number>;
+}
+
 export interface RegisterRequest {
   email: string;
   password: string;

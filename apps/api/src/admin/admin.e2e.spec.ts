@@ -87,6 +87,105 @@ describe('admin and authorization (e2e)', () => {
     });
   });
 
+  describe('list', () => {
+    const seed = async (count: number, status: 'active' | 'pending') => {
+      const passwordHash = (
+        await createUser(ctx.prisma, 'seed@x.test', 'viewer')
+      ).passwordHash;
+      await ctx.prisma.user.delete({ where: { email: 'seed@x.test' } });
+      const base = Date.parse('2026-01-01T00:00:00Z');
+      await ctx.prisma.user.createMany({
+        data: Array.from({ length: count }, (_, i) => ({
+          email: `${status}-${String(i).padStart(3, '0')}@example.com`,
+          name: i === 0 ? 'Zoë Findme' : null,
+          status,
+          passwordHash,
+          createdAt: new Date(base + i * 1000),
+        })),
+      });
+    };
+
+    it('pages 50 at a time, oldest first, without gaps or repeats', async () => {
+      await createUser(ctx.prisma, 'admin@example.com', 'admin');
+      await seed(120, 'pending');
+      const admin = await login(ctx, 'admin@example.com');
+
+      const first = await admin.get('/admin/users?status=pending');
+      expect(first.status).toBe(200);
+      expect(first.body.items).toHaveLength(50);
+      expect(first.body.nextCursor).toEqual(expect.any(String));
+      const second = await admin.get(
+        `/admin/users?status=pending&cursor=${encodeURIComponent(first.body.nextCursor)}`,
+      );
+      expect(second.body.items).toHaveLength(50);
+      const third = await admin.get(
+        `/admin/users?status=pending&cursor=${encodeURIComponent(second.body.nextCursor)}`,
+      );
+      expect(third.body.items).toHaveLength(20);
+      expect(third.body.nextCursor).toBeNull();
+
+      const emails = [first, second, third].flatMap((page) =>
+        page.body.items.map((u: { email: string }) => u.email),
+      );
+      expect(emails).toEqual([...emails].sort());
+      expect(new Set(emails).size).toBe(120);
+    });
+
+    it('a page of exactly 50 has no next page', async () => {
+      await createUser(ctx.prisma, 'admin@example.com', 'admin');
+      await seed(50, 'pending');
+      const admin = await login(ctx, 'admin@example.com');
+      const page = await admin.get('/admin/users?status=pending');
+      expect(page.body.items).toHaveLength(50);
+      expect(page.body.nextCursor).toBeNull();
+    });
+
+    it('counts every status, and follows the search', async () => {
+      await createUser(ctx.prisma, 'admin@example.com', 'admin');
+      await seed(3, 'pending');
+      await seed(2, 'active');
+      const admin = await login(ctx, 'admin@example.com');
+
+      const all = await admin.get('/admin/users?status=pending');
+      expect(all.body.counts).toEqual({
+        pending: 3,
+        active: 3,
+        rejected: 0,
+        disabled: 0,
+      });
+
+      const found = await admin.get('/admin/users?status=active&q=ACTIVE-001');
+      expect(found.body.items.map((u: { email: string }) => u.email)).toEqual([
+        'active-001@example.com',
+      ]);
+      expect(found.body.counts).toEqual({
+        pending: 0,
+        active: 1,
+        rejected: 0,
+        disabled: 0,
+      });
+    });
+
+    it('searches the name too, ignoring case, and returns nothing for a miss', async () => {
+      await createUser(ctx.prisma, 'admin@example.com', 'admin');
+      await seed(3, 'pending');
+      const admin = await login(ctx, 'admin@example.com');
+
+      const byName = await admin.get('/admin/users?status=pending&q=zoë');
+      expect(byName.body.items).toHaveLength(1);
+      const miss = await admin.get('/admin/users?status=pending&q=nobody');
+      expect(miss.body.items).toEqual([]);
+      expect(miss.body.nextCursor).toBeNull();
+    });
+
+    it('rejects a malformed cursor and an unknown status', async () => {
+      await createUser(ctx.prisma, 'admin@example.com', 'admin');
+      const admin = await login(ctx, 'admin@example.com');
+      expect((await admin.get('/admin/users?cursor=nope')).status).toBe(400);
+      expect((await admin.get('/admin/users?status=bogus')).status).toBe(400);
+    });
+  });
+
   describe('approval flow', () => {
     it('register → pending → approve as operator → login, /auth/me says operator', async () => {
       const admin = await createUser(ctx.prisma, 'admin@example.com', 'admin');
@@ -110,8 +209,8 @@ describe('admin and authorization (e2e)', () => {
         .expect(201);
 
       const pending = await adminSession.get('/admin/users?status=pending');
-      expect(pending.body).toHaveLength(1);
-      const id = pending.body[0].id;
+      expect(pending.body.items).toHaveLength(1);
+      const id = pending.body.items[0].id;
 
       const approved = await adminSession.send(
         'post',
