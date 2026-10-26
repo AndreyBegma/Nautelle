@@ -58,7 +58,7 @@ export const taskFactsFor = async (
       ? Promise.resolve([])
       : prisma.boardCard.findMany({
           where: { id: { in: raisedForIds } },
-          select: { id: true, number: true, column: true, kind: true },
+          select: { id: true, number: true, column: true },
         }),
   ]);
   const userOf = new Map(users.map((u) => [u.id, u]));
@@ -84,8 +84,6 @@ export const taskFactsFor = async (
             number: origin.number,
             label: cardLabel(origin.number),
             column: origin.column,
-            kind: origin.kind,
-            assigneeName: null,
           }
         : null,
     });

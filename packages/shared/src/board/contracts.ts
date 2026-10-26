@@ -448,9 +448,9 @@ export interface CardDependencyRef {
   label: string;
   /** Open while not `finished` or `completed` (#638). */
   column: BoardColumn;
-  /** C-509: so a dependant can say "waits for Anna" for a task. Absent reads as `feature`. */
+  /** C-509: `task` for a task, so a dependant can say "waits for Anna"; absent for a code card. */
   kind?: BoardCardKind;
-  /** C-509: a task's assignee's name; `null` otherwise or while unassigned. */
+  /** C-509: a task's assignee's name, `null` while unassigned; absent for a code card. */
   assigneeName?: string | null;
 }
 

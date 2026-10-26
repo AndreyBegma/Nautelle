@@ -13,6 +13,7 @@ import type { BoardCardKind, BoardColumn, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { boardError, cardNotFound } from './board-error';
+import { personName } from './board-task-facts';
 import { type BoardActor, BoardWork } from './board-work';
 import { hiddenFrom } from './inbox-access';
 
@@ -30,7 +31,10 @@ const DEPENDS_ON = {
   },
 } as const;
 
-/** C-509: a task names its assignee, so a dependant reads "waits for Anna". */
+/**
+ * C-509: a task says it is one and names its assignee, so a dependant reads
+ * "waits for Anna"; a code card's ref stays as it was.
+ */
 const refOf = (card: {
   number: number;
   column: BoardColumn;
@@ -40,11 +44,12 @@ const refOf = (card: {
   number: card.number,
   label: cardLabel(card.number),
   column: card.column,
-  kind: card.kind,
-  assigneeName:
-    card.kind === 'task' && card.assignee !== null
-      ? (card.assignee.name ?? card.assignee.email)
-      : null,
+  ...(card.kind === 'task'
+    ? {
+        kind: card.kind,
+        assigneeName: card.assignee ? personName(card.assignee) : null,
+      }
+    : {}),
 });
 
 const byNumber = (a: { number: number }, b: { number: number }) =>
