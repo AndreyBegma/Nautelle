@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>2 · How to update open</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--font-sans:"SF Pro Text","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--focus-width:3px;--focus-offset:4px;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255/.06);--glass-scrim:rgb(9 9 12/.55);--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-shadow:rgb(0 0 0/.35);--glass-shadow-clear:rgb(0 0 0/.15);--glass-blur:26px;--canvas-glow:18%;--radius-control:6px;--radius-surface:8px;--size-control:28px;--size-nav:28px;--dur-fast:100ms}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--glass-sheen:rgb(255 255 255/.4);--glass-scrim:rgb(248 250 255/.62);--glass-edge:rgb(20 40 110/.12);--glass-spec:rgb(255 255 255/.7);--glass-shadow:rgb(20 40 110/.1);--glass-shadow-clear:rgb(20 40 110/.06)}
+*,*::before,*::after{box-sizing:border-box}html{background:var(--color-ground);color:var(--color-ink);font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}body{margin:0;min-height:100vh}h1,h2,p,ol{margin:0}
+a{color:var(--color-accent-ink);text-decoration:underline;text-underline-offset:2px}code,pre,.mono{font-family:var(--font-mono)}code{font-size:12px;padding:1px 5px;border-radius:4px;background:var(--color-hover)}:focus-visible{outline:var(--focus-width) solid var(--color-focus);outline-offset:var(--focus-offset)}svg{flex-shrink:0}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(var(--glass-blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.shell{display:flex;gap:12px;padding:12px;min-height:100vh}
+.rail{position:sticky;top:12px;height:calc(100vh - 24px);width:232px;flex-shrink:0;border-radius:var(--radius-surface);display:flex;flex-direction:column;gap:2px;padding:10px 8px}
+.rail__brand{display:flex;align-items:center;gap:8px;height:36px;padding:0 8px;margin-bottom:8px;font-weight:600;font-size:15px}
+.rail__group{font-size:12px;font-weight:500;color:var(--color-ink-3);padding:12px 10px 4px}
+.rail__item{display:flex;align-items:center;gap:10px;height:var(--size-nav);padding:0 10px;border-radius:var(--radius-control);color:var(--color-ink-2);text-decoration:none}
+.rail__item[aria-current='page']{background:var(--color-accent-soft);color:var(--color-ink);font-weight:500}
+.rail__item--primary{height:38px;border:1px solid color-mix(in oklab,var(--color-accent) 45%,transparent);color:var(--color-ink)}
+.rail__tile{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;background:var(--color-accent);color:var(--color-on-accent)}
+.swatch{display:inline-block;width:20px;height:20px;border-radius:5px;background:var(--color-accent)}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+.topbar{height:56px;border-radius:var(--radius-surface);display:flex;align-items:center;gap:12px;padding:0 12px 0 16px}
+.crumbs{display:flex;align-items:center;gap:6px;flex:1;min-width:0;color:var(--color-ink-2)}.crumbs [aria-current]{color:var(--color-ink);font-weight:600;font-size:15px}
+.live-dot{width:8px;height:8px;border-radius:999px;background:var(--color-ok)}
+.page{width:100%;max-width:80rem;margin:0 auto;padding:8px 4px 96px;display:flex;flex-direction:column;gap:24px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--size-control);padding:0 12px;border-radius:var(--radius-control);border:1px solid transparent;font:inherit;font-size:13px;font-weight:500;white-space:nowrap;cursor:pointer;color:var(--color-ink);background:none}
+.btn--solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn--glass{background:var(--color-raised);border-color:var(--color-line-strong)}
+.btn--ghost{color:var(--color-ink-2)}.btn--ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn--sm{height:24px;padding:0 8px;font-size:12px;border-radius:4px}.btn--icon{padding:0;width:var(--size-control)}.btn--sm.btn--icon{width:24px}
+.badge{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;background:var(--color-hover);color:var(--color-ink-2)}
+.badge--md{height:22px;padding:0 8px;font-size:12px}
+.badge--ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}.badge--danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.page-header__eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em}
+.page-header__desc{color:var(--color-ink-2);margin-top:6px}
+.code-block{margin:0;padding:10px 92px 10px 14px;border-radius:var(--radius-surface);border:1px solid var(--color-line);background:color-mix(in oklab,var(--color-ground) 70%,#000);font-size:12px;line-height:18px;color:var(--color-ink);overflow-x:auto;white-space:pre}
+:root[data-theme="light"] .code-block{background:var(--color-raised)}
+.code-block code{background:none;padding:0}
+.cmd{position:relative}
+.copy{position:absolute;top:5px;right:5px;background:var(--color-content)}
+.upd{border-radius:var(--radius-surface);border:1px solid color-mix(in oklab,var(--color-info) 30%,transparent);background:color-mix(in oklab,var(--color-info) 10%,transparent);font-size:13px}
+.upd__row{display:flex;align-items:center;gap:10px;padding:10px 8px 10px 12px;flex-wrap:wrap}
+.upd__icon{color:var(--color-info)}.upd__title{font-weight:600;white-space:nowrap}
+.ver{display:inline-flex;align-items:center;gap:6px}.ver__item{display:inline-flex;align-items:center;gap:4px}.ver__label{font-size:11px;font-weight:500;color:var(--color-ink-3)}.ver .badge{font-family:var(--font-mono)}.ver__arrow{color:var(--color-ink-3)}
+.upd__links{display:inline-flex;align-items:center;gap:12px;font-size:12px}.upd__links a{display:inline-flex;align-items:center;gap:3px}
+.upd__spacer{flex:1}
+.chev{transition:transform var(--dur-fast)}[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.upd__body{border-top:1px solid color-mix(in oklab,var(--color-info) 22%,transparent);padding:14px 16px 16px 38px;display:flex;flex-direction:column;gap:14px}
+.backup{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:var(--radius-control);border:1px solid color-mix(in oklab,var(--color-warn) 32%,transparent);background:color-mix(in oklab,var(--color-warn) 10%,transparent)}
+.backup svg{color:var(--color-warn);margin-top:2px}
+.ways{list-style:none;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.way{display:flex;flex-direction:column;gap:6px;min-width:0}
+.way__head{display:flex;align-items:center;gap:8px;font-weight:600}
+.way__n{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;background:var(--color-hover);color:var(--color-ink-2);font-size:11px;font-weight:600}
+.way p{font-size:12px;line-height:18px;color:var(--color-ink-2)}
+.note{display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:18px;color:var(--color-ink-2)}.note svg{color:var(--color-ink-3);margin-top:1px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.capsule{display:none}
+@media (max-width:1180px){.ways{grid-template-columns:1fr}}
+@media (max-width:1023px){.rail{width:64px}.rail__label,.rail__group{display:none}}
+@media (max-width:639px){.rail{display:none}.shell{padding:8px 12px}
+.upd__row{display:grid;grid-template-columns:auto 1fr auto;row-gap:8px}.upd__spacer{display:none}.upd__dismiss{grid-column:3;grid-row:1}.ver,.upd__links,.upd__toggle{grid-column:1/-1}.upd__toggle{width:100%}.upd__body{padding:12px}
+.capsule{display:flex;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);gap:4px;padding:4px;border-radius:999px}.capsule a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 14px;border-radius:999px;font-size:11px;color:var(--color-ink-2);text-decoration:none}.capsule a[aria-current]{background:var(--color-accent-soft);color:var(--color-ink)}}
+</style></head>
+<body><div class="canvas" aria-hidden="true"></div>
+<div class="shell">
+<nav class="rail glass" aria-label="Main"><div class="rail__brand"><span class="swatch"></span><span class="rail__label">Nautelle</span></div>
+<a class="rail__item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="rail__label">Workspace</span></a>
+<div class="rail__group">web-app</div>
+<a class="rail__item rail__item--primary" href="#" aria-current="page"><span class="rail__tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/></svg></span><span class="rail__label">Work</span></a>
+<a class="rail__item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg><span class="rail__label">Activity</span></a>
+<div class="rail__group">Admin</div>
+<a class="rail__item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg><span class="rail__label">Runners</span></a>
+</nav>
+<div class="main">
+<header class="topbar glass"><nav class="crumbs" aria-label="Breadcrumb"><span>web-app</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><span aria-current="page">Work</span></nav><span class="live-dot" title="Live"></span><span class="badge badge--md" style="width:28px;height:28px">AB</span></header>
+<main class="page">
+<div class="upd" role="region" aria-label="Nautelle update available">
+<div class="upd__row">
+<svg class="upd__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4"/><path d="M12 16V8"/></svg>
+<span class="upd__title">Nautelle update available</span>
+<span class="ver" role="img" aria-label="Running 0.17.1, latest 0.18.0"><span class="ver__item"><span class="ver__label">Running</span><span class="badge badge--md badge--danger">0.17.1</span></span><svg class="ver__arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span class="ver__item"><span class="ver__label">Latest</span><span class="badge badge--md badge--ok">0.18.0</span></span></span>
+<span class="upd__links"><a href="#" target="_blank" rel="noreferrer">Release notes<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a><a href="#" target="_blank" rel="noreferrer">Upgrade guide<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a></span>
+<span class="upd__spacer"></span>
+<button type="button" class="btn btn--glass btn--sm upd__toggle" aria-expanded="true" aria-controls="howto">How to update<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+<button type="button" class="btn btn--ghost btn--sm btn--icon upd__dismiss" aria-label="Dismiss until the next release"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+</div>
+<div class="upd__body" id="howto">
+<div class="backup"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg><div><b>Take a backup first.</b> <span style="color:var(--color-ink-2)">Downgrading is not supported. A backup is the way back.</span> <a href="#" target="_blank" rel="noreferrer">Back up an install</a></div></div>
+<ol class="ways">
+<li class="way"><div class="way__head"><span class="way__n">1</span>Docker Compose <span class="badge">Usual way</span></div><p>Run in the <code>nautelle</code> directory on the server. The API applies migrations when it starts.</p>
+<div class="cmd"><pre class="code-block"><code>docker compose pull
+docker compose up -d</code></pre><button type="button" class="btn btn--glass btn--sm copy" aria-label="Copy the Docker Compose commands"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>Copy</button></div></li>
+<li class="way"><div class="way__head"><span class="way__n">2</span>Re-run install.sh</div><p>Fetches the current compose file and keeps <code>.env</code> and its passwords.</p>
+<div class="cmd"><pre class="code-block"><code>curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/compose/install.sh | sh</code></pre><button type="button" class="btn btn--glass btn--sm copy" aria-label="Copy the install.sh command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>Copy</button></div></li>
+<li class="way"><div class="way__head"><span class="way__n">3</span>Pinned to a version</div><p>If <code>nautelle/.env</code> pins <code>NAUTELLE_VERSION</code>, change it to this line, then run <code>docker compose up -d</code>.</p>
+<div class="cmd"><pre class="code-block"><code>NAUTELLE_VERSION=0.18.0</code></pre><button type="button" class="btn btn--glass btn--sm copy" aria-label="Copy the NAUTELLE_VERSION line"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>Copy</button></div></li>
+</ol>
+<p class="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Run these on the server. Nautelle cannot restart its own stack from the web app. Runners are upgraded separately, on their own machines; <a href="#">Admin › Runners</a> lists them.</span></p>
+<div class="sr" aria-live="polite"></div>
+</div></div>
+<header class="page-header"><div><span class="page-header__eyebrow">web-app</span><h1>Work</h1><p class="page-header__desc">Cards the fleet is working on, and what waits on you.</p></div><button type="button" class="btn btn--solid"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New</button></header>
+</main></div></div>
+<nav class="capsule glass" aria-label="Main"><a href="#" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/></svg>Work</a><a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/></svg>Fleet</a><a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</a></nav>
+</body></html>
