@@ -54,6 +54,15 @@ export const switchedOffFamilies = (
   );
 
 /**
+ * C-442 D3: `NAUTELLE_FILTER_OFF` for a launch whose setting switches
+ * `families` off; with none it is left unset, as before the switch.
+ */
+export const filtersOffEnv = (
+  families: readonly string[] | undefined,
+): Record<string, string> =>
+  families?.length ? { [FILTER_OFF_ENV]: families.join(',') } : {};
+
+/**
  * #747 D4: the techniques on for this launch, comma-separated
  * (`mcp-cut,read-guard-400`). The launch sets it from `tokenSaver.techniques`;
  * `read-hook` and `tool-hook` read it. Unset is no technique on — the

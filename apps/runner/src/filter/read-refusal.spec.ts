@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CliDeps } from '../cli';
@@ -174,6 +174,67 @@ describe('filter family switch (#663 D9)', () => {
   it('leaves a command of a switched-off family alone', async () => {
     expect(await run('fixture')).toBe('');
     expect(await run('js, fixture')).toBe('');
+  });
+});
+
+describe('a switched-off family counts `none:off` (C-442)', () => {
+  /** Runs the hook over the real filters; its output and its stats row. */
+  const run = async (
+    command: string,
+    off: string | undefined,
+  ): Promise<{ out: string; row: StatsLine['row'] | undefined }> => {
+    const dir = mkdtempSync(join(tmpdir(), 'family-none-off-'));
+    try {
+      const out: string[] = [];
+      await runFilterCommand(['filter-hook'], {
+        env: {
+          ...filterEnv({
+            runDir: dir,
+            projectId: 'p1',
+            runId: 'r1',
+            runKind: 'card',
+          }),
+          ...(off === undefined ? {} : { [FILTER_OFF_ENV]: off }),
+        },
+        stdout: (bytes) => out.push(String(bytes)),
+        stderr: () => {},
+        stdin: async () => input(command, 'bypassPermissions'),
+        flush: async () => {},
+      });
+      const stats = join(dir, 'filter-stats.jsonl');
+      const rows = existsSync(stats)
+        ? readFileSync(stats, 'utf8')
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line) as StatsLine)
+        : [];
+      return { out: out.join(''), row: rows[0]?.row };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('wraps an ops command while the family is on', async () => {
+    expect((await run('docker build .', undefined)).out).toContain(
+      'filter -- docker build',
+    );
+  });
+
+  it('passes an ops command through as `none:off` under NAUTELLE_FILTER_OFF=ops', async () => {
+    const { out, row } = await run('docker build .', 'ops');
+    expect(out).toBe('');
+    expect(row).toMatchObject({ filter: 'none:off', passedThrough: true });
+  });
+
+  it('keeps `none:uncovered` for a command no family covers', async () => {
+    const { row } = await run('frobnicate --now', 'ops');
+    expect(row).toMatchObject({ filter: 'none:uncovered' });
+  });
+
+  it('counts a whole-file read `none:off` when `tool` is off', async () => {
+    const { out, row } = await run('cat file.ts', 'tool');
+    expect(out).toBe('');
+    expect(row).toMatchObject({ filter: 'none:off', passedThrough: true });
   });
 });
 

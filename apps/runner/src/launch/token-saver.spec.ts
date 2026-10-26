@@ -9,6 +9,7 @@ import {
 import { join } from 'node:path';
 import type { ConfigProfile } from '../config';
 import {
+  FILTER_OFF_ENV,
   FILTER_PROJECT_ENV,
   FILTER_RUN_ENV,
   FILTER_RUN_FILE,
@@ -301,6 +302,28 @@ describe('tokenSaverLaunch (#445)', () => {
       runKind: 'card',
     });
     expect(statSync(file).mode & 0o777).toBe(0o600);
+  });
+
+  it('switches the families of the setting off in the env (C-442 D3)', () => {
+    const launch = tokenSaverLaunch(
+      input({ config: { enabled: true, mcpAllow: [], filtersOff: ['ops'] } }),
+    );
+    expect(launch?.env[FILTER_OFF_ENV]).toBe('ops');
+    const two = tokenSaverLaunch(
+      input({
+        config: { enabled: true, mcpAllow: [], filtersOff: ['js', 'tool'] },
+      }),
+    );
+    expect(two?.env[FILTER_OFF_ENV]).toBe('js,tool');
+  });
+
+  it('leaves NAUTELLE_FILTER_OFF unset for an empty or absent list (C-442 D3)', () => {
+    for (const filtersOff of [[], undefined]) {
+      const launch = tokenSaverLaunch(
+        input({ config: { enabled: true, mcpAllow: [], filtersOff } }),
+      );
+      expect(launch?.env).not.toHaveProperty(FILTER_OFF_ENV);
+    }
   });
 
   it('sets no run id for the orchestrator session', () => {
