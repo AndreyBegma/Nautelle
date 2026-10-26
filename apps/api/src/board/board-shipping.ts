@@ -1,5 +1,6 @@
 import {
   ACTIVE_CARD_ROUND_PHASES,
+  actionsRunIdsOf,
   CARD_CI_FIX_ATTEMPTS_MAX,
   CARD_CI_MISSING_MS,
   CARD_CI_POLL_MS,
@@ -932,6 +933,8 @@ export class BoardShipping
     result: CardChecksResult,
     conflict: boolean,
   ): Promise<void> {
+    // C-414 (ADR-0114): a red head is re-run once first; a conflict never is.
+    if (!conflict && (await this.rerun(project, card, result))) return;
     if (card.ciFixAttempts >= CARD_CI_FIX_ATTEMPTS_MAX) {
       await this.prisma.boardCard.update({
         where: { id: card.id },
@@ -983,6 +986,95 @@ export class BoardShipping
         `ci_fix round of ${cardLabel(card.number)} not started: ${error.message}`,
       );
     }
+  }
+
+  /**
+   * C-414 (ADR-0114): whether the red head is re-run instead of a fix round
+   * now — once per head, so a flake costs no `ci_fix` attempt. Failed GitHub
+   * Actions runs get `card.ciRerun`; any other CI the PR's event again
+   * (`card.ciRetrigger`, close and reopen). The head counts as re-run
+   * whatever the runner answered, so a re-run that failed is audited and the
+   * next poll starts the round. A runner without `card.ciRerun` re-runs
+   * nothing; a head whose checks still run waits for them, as `gh run rerun`
+   * refuses a run in progress and a reopen would cancel it.
+   */
+  private async rerun(
+    project: BoardProject,
+    card: CardWithRounds,
+    result: CardChecksResult,
+  ): Promise<boolean> {
+    if (card.prNumber === null || card.ciRerunSha === result.headSha) {
+      return false;
+    }
+    if (!this.commands.servesCiRerun(project.runnerId)) return false;
+    if (result.checks.some((check) => check.bucket === 'pending')) return true;
+    const target = {
+      cardId: card.id,
+      projectId: project.id,
+      root: project.rootPath,
+      pr: card.prNumber,
+      headSha: result.headSha,
+    };
+    const options = {
+      role: 'operator',
+      ctx: { actor: SYSTEM_ACTOR },
+    } as const;
+    const runIds = actionsRunIdsOf(result.checks);
+    let failure: { error: string; message: string } | null = null;
+    try {
+      if (runIds) {
+        const rerun = boardOutput(
+          'card.ciRerun',
+          await this.commands.ciRerun(
+            project.runnerId,
+            { ...target, runIds },
+            options,
+          ),
+        );
+        if (!rerun.rerun) failure = rerun;
+      } else {
+        const retriggered = boardOutput(
+          'card.ciRetrigger',
+          await this.commands.ciRetrigger(
+            project.runnerId,
+            { ...target, reason: 'red' },
+            options,
+          ),
+        );
+        if (!retriggered.retriggered) failure = retriggered;
+      }
+    } catch (error) {
+      if (!(error instanceof BoardFailure)) throw error;
+      failure = { error: error.code, message: error.message };
+    }
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { ciRerunSha: result.headSha },
+    });
+    await this.audit.record({
+      actor: SYSTEM_ACTOR,
+      action: 'card.ci_rerun',
+      target: { type: 'board_card', id: card.id },
+      projectId: project.id,
+      after: {
+        number: card.number,
+        pr: card.prNumber,
+        headSha: result.headSha,
+        provider: runIds ? 'github_actions' : 'pr_event',
+        ...(runIds ? { runIds } : {}),
+        ...(failure
+          ? { error: failure.error, message: failure.message.slice(0, 500) }
+          : {}),
+      },
+      result: failure ? 'error' : 'ok',
+    });
+    this.work.publish(project.id, card.id);
+    if (failure) {
+      this.logger.warn(
+        `${cardLabel(card.number)}: red CI not re-run (${failure.error}) — ${failure.message}`,
+      );
+    }
+    return true;
   }
 
   /** D7: the card enters Finished; its round's collect already ran. */

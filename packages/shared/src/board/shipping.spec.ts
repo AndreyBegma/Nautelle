@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import type { CardCheck } from '../protocol/commands/cards';
-import { cardDraftPullRequestSchema } from '../protocol/commands/cards';
+import {
+  CARD_CI_RERUN_RUNS_MAX,
+  cardDraftPullRequestSchema,
+} from '../protocol/commands/cards';
 import { CARD_PR_MARKER } from './naming';
 import {
+  actionsRunIdsOf,
   CARD_CI_CHECKS_STORED_MAX,
   cardAutoMergeDefault,
   cardAutoMergeEnabled,
@@ -150,6 +154,49 @@ describe('failedCardChecks and cardCiChecksOf (#359 D5)', () => {
     ).toEqual([{ name: 'test', link: 'https://ci.example/1' }]);
     expect(cardCiChecksOf(null)).toEqual([]);
     expect(cardCiChecksOf({ name: 'test' })).toEqual([]);
+  });
+});
+
+describe('actionsRunIdsOf (C-414)', () => {
+  const run = (id: number, job?: number) =>
+    `https://github.com/acme/widget/actions/runs/${id}${job ? `/job/${job}` : ''}`;
+
+  it('lists the runs of the failed checks, each once, in order', () => {
+    expect(
+      actionsRunIdsOf([
+        check('lint', 'pass', run(1)),
+        check('test', 'fail', run(42, 7)),
+        check('e2e', 'fail', run(42, 8)),
+        check('build', 'fail', run(43)),
+        check('stale', 'cancel', 'https://ci.example/x'),
+      ]),
+    ).toEqual([42, 43]);
+  });
+
+  it('is null when a failed check is another CI’s or has no link', () => {
+    expect(
+      actionsRunIdsOf([
+        check('test', 'fail', run(42)),
+        check('ci/woodpecker/pr/test', 'fail', 'https://ci.example/repos/1'),
+      ]),
+    ).toBeNull();
+    expect(actionsRunIdsOf([check('test', 'fail', null)])).toBeNull();
+    expect(
+      actionsRunIdsOf([
+        check('test', 'fail', 'https://evil.example/a/b/actions/runs/1'),
+      ]),
+    ).toBeNull();
+  });
+
+  it('is null without a failed check, or with too many runs', () => {
+    expect(actionsRunIdsOf([check('test', 'pass', run(1))])).toBeNull();
+    expect(
+      actionsRunIdsOf(
+        Array.from({ length: CARD_CI_RERUN_RUNS_MAX + 1 }, (_, i) =>
+          check(`t${i}`, 'fail', run(i + 1)),
+        ),
+      ),
+    ).toBeNull();
   });
 });
 

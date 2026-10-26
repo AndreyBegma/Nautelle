@@ -253,6 +253,13 @@ export const AUDIT_ACTIONS = [
    */
   'card.ci_retriggered',
   /**
+   * C-414 (ADR-0114): a card PR's red head was re-run once before its first
+   * `ci_fix` round — `card.ciRerun` for GitHub Actions runs, else
+   * `card.ciRetrigger` (`after: { number, pr, headSha, provider, runIds?,
+   * error?, message? }`).
+   */
+  'card.ci_rerun',
+  /**
    * #884: a review step started on the head of a card's PR (`after: { number,
    * step, stepType, pr, headSha, pass, runId, tmuxSession, model }`).
    */

@@ -176,6 +176,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
     "A card's worker did not start on its own (design approval or Auto-run)",
   'card.ci_retriggered':
     "Reopened a card's pull request because CI reported no checks",
+  'card.ci_rerun': "Re-ran a card's red CI once before starting a fix round",
   'card.pr_retargeted':
     "Moved a stacked card's pull request onto the base after its dependency merged, or found it moved there on GitHub",
   'card.pr_forwarded':

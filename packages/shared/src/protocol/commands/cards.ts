@@ -56,6 +56,8 @@ export const CARD_TIMEOUTS_MS = {
   checks: 30_000,
   /** #484: `gh pr view`, `gh pr close`, then `gh pr reopen`. */
   ciRetrigger: 45_000,
+  /** C-414: `gh pr view`, then `gh run rerun` per run. */
+  ciRerun: 90_000,
   /** #636: `gh pr view`, then `gh pr edit --base`. */
   prRetarget: 45_000,
   /** #709: `gh pr list`, `gh pr create`, then `gh pr view`. */
@@ -801,8 +803,15 @@ export const cardCiRetriggerArgsSchema = z.strictObject({
   ...cardTarget,
   root: absolutePathSchema,
   pr: z.number().int().positive(),
-  /** The head the API saw without checks. */
+  /** The head the API saw without checks — or red (`reason: 'red'`). */
   headSha: headShaSchema,
+  /**
+   * C-414 (ADR-0114): why the event is sent again, which the reopen comment
+   * says — `missing` (#484, the default) or `red`, a head whose checks failed
+   * re-run once before its first fix round. Sent only to a runner that serves
+   * `card.ciRerun`: an older one refuses the unknown key.
+   */
+  reason: z.enum(['missing', 'red']).optional(),
 });
 export type CardCiRetriggerArgs = z.infer<typeof cardCiRetriggerArgsSchema>;
 
@@ -846,6 +855,73 @@ export const cardCiRetriggerCommands = {
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CardCiRetriggerCommandName = keyof typeof cardCiRetriggerCommands;
+
+// card.ciRerun
+
+/** C-414: GitHub Actions runs `card.ciRerun` re-runs at once, at most. */
+export const CARD_CI_RERUN_RUNS_MAX = 10;
+
+/**
+ * C-414 (ADR-0114, ADR-0010, advertised per ADR-0023): re-runs the failed
+ * jobs of a card PR's GitHub Actions runs once, before the API starts a
+ * `ci_fix` round on the red head — `gh pr view <pr> --json state,headRefOid`,
+ * then `gh run rerun <id> --failed` per run, argument arrays only, in the
+ * project root. It adds no commit.
+ *
+ * Only an open (or draft) PR whose head is still `headSha` is touched: a
+ * merged or closed PR, or one that moved on, is refused and left alone.
+ */
+export const cardCiRerunArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  pr: z.number().int().positive(),
+  /** The red head. */
+  headSha: headShaSchema,
+  /** The Actions run ids of the failed checks, from their links. */
+  runIds: z
+    .array(z.number().int().positive())
+    .min(1)
+    .max(CARD_CI_RERUN_RUNS_MAX),
+});
+export type CardCiRerunArgs = z.infer<typeof cardCiRerunArgsSchema>;
+
+/**
+ * Why not every run was re-run: `not_open` — merged or closed; `head_moved`
+ * — a newer head, with its own checks; `gh_failed` — `gh` could not view the
+ * PR or re-run a run (one still in progress, say).
+ */
+export const cardCiRerunFailReasonSchema = z.enum([
+  'not_open',
+  'head_moved',
+  'gh_failed',
+]);
+export type CardCiRerunFailReason = z.infer<typeof cardCiRerunFailReasonSchema>;
+
+/** A refusal is a result, not a command error. */
+export const cardCiRerunResultSchema = z.discriminatedUnion('rerun', [
+  z.object({ rerun: z.literal(true) }),
+  z.object({
+    rerun: z.literal(false),
+    error: cardCiRerunFailReasonSchema,
+    message: stepErrorSchema,
+  }),
+]);
+export type CardCiRerunResult = z.infer<typeof cardCiRerunResultSchema>;
+
+/**
+ * C-414: `card.ciRerun`, an operator command, in the `commands` allowlist
+ * beside `card.ciRetrigger`.
+ */
+export const cardCiRerunCommands = {
+  'card.ciRerun': {
+    args: cardCiRerunArgsSchema,
+    result: cardCiRerunResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.ciRerun,
+  },
+} as const satisfies Record<string, CommandDefinition>;
+
+export type CardCiRerunCommandName = keyof typeof cardCiRerunCommands;
 
 // card.prRetarget
 

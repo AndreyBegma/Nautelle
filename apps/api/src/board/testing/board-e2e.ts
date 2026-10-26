@@ -31,6 +31,7 @@ type WorldCommand =
   | CardCommandName
   | 'card.checks'
   | 'card.ciRetrigger'
+  | 'card.ciRerun'
   | 'card.demo'
   | 'card.prClose'
   | 'card.prRetarget'
@@ -130,6 +131,12 @@ export class BoardWorld {
   checksServed = false;
   /** #484: whether the runner advertises `card.ciRetrigger`. */
   ciRetriggerServed = true;
+  /**
+   * C-414: whether the runner advertises `card.ciRerun` — a red head is then
+   * re-run once before its fix round. Off by default: the suites before
+   * C-414 run as they did.
+   */
+  ciRerunServed = false;
   /** #636: whether the runner advertises `card.prRetarget`. */
   prRetargetServed = true;
   /** #709: whether the runner advertises `card.prOpen`. */
@@ -202,6 +209,15 @@ export class BoardWorld {
       .mockImplementation(async (runnerId, args) => {
         this.commands.assertReady(runnerId, 'card.ciRetrigger');
         return this.answer('card.ciRetrigger', { ...args });
+      });
+    jest
+      .spyOn(this.commands, 'servesCiRerun')
+      .mockImplementation(() => this.ciRerunServed);
+    jest
+      .spyOn(this.commands, 'ciRerun')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.ciRerun');
+        return this.answer('card.ciRerun', { ...args });
       });
     jest
       .spyOn(this.commands, 'servesPrRetarget')
@@ -291,6 +307,7 @@ export class BoardWorld {
       'pr.inspect': prInspection(),
       'card.checks': cardChecks(),
       'card.ciRetrigger': { retriggered: true },
+      'card.ciRerun': { rerun: true },
       'card.demo': { status: 'queued' },
       'card.prRetarget': { retargeted: true, alreadyThere: false },
       'card.prOpen': {
@@ -362,6 +379,7 @@ export class BoardWorld {
     jest.mocked(this.commands.publishDocsSpecs).mockClear();
     jest.mocked(this.commands.checks).mockClear();
     jest.mocked(this.commands.ciRetrigger).mockClear();
+    jest.mocked(this.commands.ciRerun).mockClear();
     jest.mocked(this.commands.retargetPr).mockClear();
     jest.mocked(this.commands.openPr).mockClear();
     jest.mocked(this.commands.review).mockClear();
@@ -375,6 +393,7 @@ export class BoardWorld {
     this.prCloseAdvertised = true;
     this.checksServed = false;
     this.ciRetriggerServed = true;
+    this.ciRerunServed = false;
     this.prRetargetServed = true;
     this.prOpenServed = true;
     this.retries = [];
@@ -479,6 +498,13 @@ export class BoardWorld {
     return jest
       .mocked(this.commands.ciRetrigger)
       .mock.calls.map(([, args]) => args as unknown as Record<string, unknown>);
+  }
+
+  /** C-414: the `card.ciRerun` commands sent, oldest first. */
+  ciReruns(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.ciRerun)
+      .mock.calls.map(([, args]) => ({ ...args }));
   }
 
   /** #636: the `card.prRetarget` commands sent, oldest first. */

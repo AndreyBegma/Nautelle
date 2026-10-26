@@ -7,6 +7,7 @@ import type {
 import type { CardExecutor } from './executor';
 
 export { type CardChecksDeps, cardChecks } from './checks';
+export { type CardCiRerunDeps, rerunCardCi } from './ci-rerun';
 export { type CardCiRetriggerDeps, retriggerCardCi } from './ci-retrigger';
 export { CardExecutor, type CardExecutorOptions } from './executor';
 export { type CardMergeDeps, mergeCard } from './merge';
@@ -24,7 +25,7 @@ export {
  * serves it with `mergeCard` beside these, for a runner that runs cards;
  * `card.prClose` (#329 D8) likewise with `closeCardPr`, and `card.checks`
  * (#359 D5) with `cardChecks`, `card.ciRetrigger` (#484) with
- * `retriggerCardCi`, `card.prRetarget` (#636) with `retargetCardPr`, and
+ * `retriggerCardCi`, `card.ciRerun` (C-414) with `rerunCardCi`, `card.prRetarget` (#636) with `retargetCardPr`, and
  * `card.prOpen` (#709) with `openCardPr`, and `card.reviewPublish` (#884)
  * with `publishCardReview`. `card.review` and `card.reviewStop` (#884) are
  * the executor's: they share its tmux and its card store.

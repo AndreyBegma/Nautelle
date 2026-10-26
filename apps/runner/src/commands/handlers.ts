@@ -14,6 +14,7 @@ import {
   mergeCard,
   openCardPr,
   publishCardReview,
+  rerunCardCi,
   retargetCardPr,
   retriggerCardCi,
 } from '../cards';
@@ -318,6 +319,13 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'card.ciRetrigger': (args) =>
       context.cards
         ? retriggerCardCi(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
+    'card.ciRerun': (args) =>
+      context.cards
+        ? rerunCardCi(args, {
             exec: context.exec,
             watchedProjects: context.watchedProjects,
           })
