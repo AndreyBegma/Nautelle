@@ -274,12 +274,33 @@ export const cardRunArgsSchema = z
      * only to a runner that advertises `cardDemo`.
      */
     demo: z.literal(true).optional(),
+    /**
+     * C-503 (ADR-0126): an analysis card's round — read-only. The runner
+     * launches it with deny rules for writes, on a detached worktree, without
+     * push or PR commands, and its daemon guard reports a write. Never with
+     * `pullRequest`, `newBranch`, `startBranch` or `demo`. Sent only to a
+     * runner that advertises `cardReadOnly`.
+     */
+    readOnly: z.literal(true).optional(),
   })
   .refine(
     (a) =>
       new Set((a.files ?? []).map((f) => f.path)).size ===
       (a.files ?? []).length,
     { message: 'file paths must be distinct', path: ['files'] },
+  )
+  .refine(
+    (a) =>
+      a.readOnly !== true ||
+      (a.pullRequest === undefined &&
+        a.newBranch === undefined &&
+        a.startBranch === undefined &&
+        a.demo === undefined),
+    {
+      message:
+        'a read-only round takes no pullRequest, newBranch, startBranch or demo',
+      path: ['readOnly'],
+    },
   )
   .refine((a) => a.startBranch === undefined || a.startBranch !== a.branch, {
     message: 'startBranch must differ from branch',

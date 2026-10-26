@@ -15,6 +15,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { BoardService } from '../board/board.service';
+import { BoardAnalysis, CardAnalysisExpected } from '../board/board-analysis';
 import { BoardReview } from '../board/board-review';
 import {
   BoardRoundsService,
@@ -128,6 +129,7 @@ export class LocalHandlers {
     private readonly rounds: BoardRoundsService,
     private readonly sessions: BoardSessionService,
     private readonly review: BoardReview,
+    private readonly analysis: BoardAnalysis,
     boardHandlers: LocalBoardHandlers,
     stackHandlers: LocalStackHandlers,
   ) {
@@ -161,6 +163,7 @@ export class LocalHandlers {
     'action.request': (args, call) => this.actionRequest(args, call),
     'away.set': (args, call) => this.awaySet(args.on, call),
     'card.finish': (args, call) => this.cardFinish(args, call),
+    'card.finishAnalysis': (args, call) => this.cardFinishAnalysis(args, call),
     'card.escalate': (args, call) => this.cardEscalate(args, call),
     'card.reviewReport': (args, call) => this.cardReviewReport(args, call),
     'card.track': (args, call) => this.cardTrack(args, call),
@@ -188,11 +191,19 @@ export class LocalHandlers {
     if (args.artifactIncomplete === true) {
       await this.tokenSaver.markArtifactIncomplete(target, session.id);
     }
-    const worker = await this.board.finishByWorker(
-      target,
-      session.id,
-      args.summary,
-    );
+    let worker: Awaited<ReturnType<BoardService['finishByWorker']>>;
+    try {
+      worker = await this.board.finishByWorker(
+        target,
+        session.id,
+        args.summary,
+      );
+    } catch (error) {
+      if (error instanceof CardAnalysisExpected) {
+        throw new LocalError('analysis_expected', error.message);
+      }
+      throw error;
+    }
     if (worker) return { number: worker.number, finished: true };
     const taken = await this.sessions.finishTaken(
       { ...target, repo: project.repo },
@@ -206,6 +217,38 @@ export class LocalHandlers {
       throw new LocalError('not_a_card_session', 'not a board card session');
     }
     return { number: tracked.number, finished: true };
+  }
+
+  /**
+   * C-503 (ADR-0126): an analysis card worker's `finish_analysis`. The card
+   * is the analysis card whose Claude session asks — never an argument; any
+   * other session, a feature card's too, is `not_a_card_session`.
+   */
+  private async cardFinishAnalysis(
+    args: LocalMethodArgs<'card.finishAnalysis'>,
+    call: LocalCall,
+  ): Promise<LocalMethodResult<'card.finishAnalysis'>> {
+    const project = projectOf(call);
+    const session = call.session;
+    const finished =
+      session && session.runtime === 'claude'
+        ? await this.analysis.finishByWorker(
+            { id: project.id, runnerId: call.runnerId },
+            session.id,
+            args,
+          )
+        : null;
+    if (!finished) {
+      throw new LocalError(
+        'not_a_card_session',
+        'not an analysis card session',
+      );
+    }
+    return {
+      number: finished.number,
+      finished: true,
+      proposals: finished.proposals,
+    };
   }
 
   /**

@@ -241,6 +241,35 @@ describe('card.run startBranch (#854)', () => {
   });
 });
 
+describe('card.run readOnly (C-503, ADR-0126)', () => {
+  it('accepts a read-only round with nothing that writes', () => {
+    expect(
+      cardRunArgsSchema.safeParse({ ...runArgs, readOnly: true }).success,
+    ).toBe(true);
+    expect(
+      cardRunArgsSchema.safeParse({ ...runArgs, readOnly: false }).success,
+    ).toBe(false);
+  });
+
+  it('refuses a pull request, a new branch, a start branch or a demo with it', () => {
+    for (const extra of [
+      { pullRequest: { title: 'Add login', body: 'Closes nothing.' } },
+      { newBranch: true },
+      { startBranch: 'feat/12-login' },
+      { demo: true },
+    ]) {
+      const parsed = cardRunArgsSchema.safeParse({
+        ...runArgs,
+        ...extra,
+        readOnly: true,
+      });
+      expect(parsed.error?.issues.map((i) => i.path)).toContainEqual([
+        'readOnly',
+      ]);
+    }
+  });
+});
+
 describe('card.run attachments (#309 D9)', () => {
   const ref = (id: string) => ({
     id,

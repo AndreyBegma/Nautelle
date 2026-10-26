@@ -10,6 +10,10 @@ import {
   CARD_ESCALATION_REASONS,
   CARD_RECOMMENDABLE_MODELS,
 } from '../assess/limits';
+import {
+  ANALYSIS_REPORT_MAX,
+  cardProposalsInputSchema,
+} from '../board/analysis';
 import { DESIGN_COMMENT_MAX } from '../design/limits';
 import { taskDesignStatusSchema } from '../design/types';
 import {
@@ -132,6 +136,16 @@ export const localErrorCodeSchema = z.enum([
    * request description or the summary is incomplete; `message` says what.
    */
   'artifact_incomplete',
+  /**
+   * C-503 (ADR-0126): `card.finish` from an analysis card's session — its
+   * worker finishes with `finish_analysis` (`card.finishAnalysis`).
+   */
+  'analysis_expected',
+  /**
+   * C-503 (ADR-0126): an analysis session's write the runner's read-only
+   * guard refused (C-504); `message` says what.
+   */
+  'read_only_violation',
   /** #845 D5: `card.move` to `completed` — only a person accepts (`card_accept`). */
   'completed_needs_person',
   /**
@@ -339,6 +353,32 @@ export const localCardFinishResultSchema = z.object({
 });
 
 /**
+ * `card.finishAnalysis` (C-503, ADR-0126): an analysis card worker's
+ * `finish_analysis` tool — the report and the proposed cards instead of a
+ * pull request. Like `card.finish`, the card is resolved from the request's
+ * `session.id`; a session that is not an analysis card's worker is answered
+ * `not_a_card_session`. A later finish (after a feedback round) replaces the
+ * card's `pending` proposals; created and dismissed ones stay.
+ */
+export const localCardFinishAnalysisArgsSchema = z.strictObject({
+  report: z.string().trim().min(1).max(ANALYSIS_REPORT_MAX),
+  proposals: cardProposalsInputSchema,
+  /**
+   * Set only by the runner daemon's read-only guard (C-504) when the session
+   * wrote; stored as `runs.readOnlyViolation`. The daemon drops it from every
+   * caller, as `artifactIncomplete`.
+   */
+  readOnlyViolation: z.boolean().optional(),
+});
+export const localCardFinishAnalysisResultSchema = z.object({
+  /** The card's per-project number (`C-<number>`). */
+  number: z.number().int().positive(),
+  finished: z.literal(true),
+  /** The proposals stored. */
+  proposals: z.number().int().nonnegative(),
+});
+
+/**
  * `card.escalate` (#750 D8, D9): the card worker's `escalate_card` tool. Like
  * `card.finish`, the card is resolved from the request's `session.id`, never
  * from an argument; any other session is answered `not_a_card_session`. It
@@ -403,12 +443,18 @@ export const localCardReviewReportResultSchema = z.object({
 
 /**
  * A card's title and body limits and its kinds; `BOARD_CARD_TITLE_MAX`,
- * `BOARD_CARD_BODY_MAX` and `BOARD_CARD_KINDS` in the board module. Defined
- * here because the board module imports this one.
+ * `BOARD_CARD_BODY_MAX`, `BOARD_CARD_KINDS` and `WORK_CARD_KINDS` in the
+ * board module. Defined here because the board module imports this one.
+ * C-503 (ADR-0126): `analysis` investigates and proposes cards; only a person
+ * picks it, so a kind a model chooses is one of `LOCAL_WORK_CARD_KINDS`.
  */
 export const LOCAL_CARD_TITLE_MAX = 200;
 export const LOCAL_CARD_BODY_MAX = 20_000;
-export const LOCAL_CARD_KINDS = ['feature', 'bug'] as const;
+export const LOCAL_CARD_KINDS = ['feature', 'bug', 'analysis'] as const;
+export const LOCAL_WORK_CARD_KINDS = [
+  'feature',
+  'bug',
+] as const satisfies readonly (typeof LOCAL_CARD_KINDS)[number][];
 
 /**
  * `card.track` (issue #282 D1, ADR-0030 §1): the `track_card` tool of a
@@ -427,8 +473,11 @@ export const localCardTrackArgsSchema = z.strictObject({
     .max(LOCAL_CARD_TITLE_MAX)
     .refine((title) => !/[\r\n]/.test(title), 'title must be one line'),
   body: z.string().max(LOCAL_CARD_BODY_MAX).optional(),
-  /** Only when it is obvious; absent leaves it to the normalization (#271 D9). */
-  kind: z.enum(LOCAL_CARD_KINDS).optional(),
+  /**
+   * Only when it is obvious; absent leaves it to the normalization (#271 D9).
+   * Never `analysis` (C-503 D5): a tracked session changes code.
+   */
+  kind: z.enum(LOCAL_WORK_CARD_KINDS).optional(),
 });
 export const localCardTrackResultSchema = z.object({
   /** The card's per-project number. */
@@ -1140,6 +1189,12 @@ export const localMethods = {
   'card.finish': {
     args: localCardFinishArgsSchema,
     result: localCardFinishResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.finishAnalysis': {
+    args: localCardFinishAnalysisArgsSchema,
+    result: localCardFinishAnalysisResultSchema,
     minRole: 'operator',
     needsProject: true,
   },

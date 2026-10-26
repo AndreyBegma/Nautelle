@@ -8,6 +8,7 @@ import { RunnersModule } from '../runners/runners.module';
 import { SessionMessageModule } from '../session-message/session-message.module';
 import { BoardController } from './board.controller';
 import { BoardService, FleetCardEditsRef } from './board.service';
+import { BoardAnalysis } from './board-analysis';
 import { BoardAutoRun } from './board-auto-run';
 import { BoardBackgroundStall } from './board-background-stall';
 import { BoardBudgetPause } from './board-budget-pause';
@@ -61,6 +62,8 @@ import { PathLabelsRef } from './path-labels-ref';
     BoardLabelsController,
   ],
   providers: [
+    // C-503: an analysis card's finish — a report and proposed cards.
+    BoardAnalysis,
     // #443: accepting a card may start the Run of a card that waited for it.
     BoardAutoRun,
     // #390: a round stuck on its own background task raises one warning.
@@ -111,6 +114,8 @@ import { PathLabelsRef } from './path-labels-ref';
   // `BoardReview`: a review session's `report_review` (#884).
   // `BoardDependencies`, `BoardRunQueue`: a person's session sets them (C-377).
   exports: [
+    // C-503: the local `card.finishAnalysis` method.
+    BoardAnalysis,
     // #578: the Telegram bot accepts and dismisses suggestions.
     BoardDependencies,
     BoardInboxService,

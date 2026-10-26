@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en" data-scale="desk" data-palette="navy" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>States · Analysis card sheet</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;
+--font-sans:"SF Pro Text","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+--color-ground:#0a1022;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);
+--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);
+--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);
+--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--focus-width:3px;--focus-offset:4px;
+--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;
+--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-ink:#a4c8ff;
+--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-ink:#7ee0c0;
+--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-ink:#ade58f;
+--color-hue-7:#a68bfa;
+--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%;
+--radius-control:6px;--radius-surface:8px;--size-control:28px;}
+:root[data-theme="light"]{color-scheme:light;
+--color-ground:#fff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);
+--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);
+--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);
+--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;
+--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;
+--color-hue-1:#1f64d6;--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-ink:#2f6617;--color-hue-7:#7244e0;
+--color-hue-1-soft:color-mix(in oklab,var(--color-hue-1) 13%,transparent);--color-hue-2-soft:color-mix(in oklab,var(--color-hue-2) 13%,transparent);--color-hue-3-soft:color-mix(in oklab,var(--color-hue-3) 13%,transparent);
+--glass-shadow-clear:rgb(20 40 110/.06);}
+:root{--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);
+--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);
+--color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink);font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+body{margin:0;min-height:100vh}
+h1,h2,h3,p{margin:0}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+a{color:var(--color-accent-ink);text-decoration:underline;text-underline-offset:2px}
+code,.mono{font-family:var(--font-mono)}
+code{font-size:12px;padding:1px 5px;border-radius:4px;background:var(--color-hover)}
+:focus-visible{outline:var(--focus-width) solid var(--color-focus);outline-offset:var(--focus-offset)}
+svg{flex-shrink:0}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.page{max-width:80rem;margin:0 auto;padding:24px 16px 48px;display:flex;flex-direction:column;gap:24px}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em;margin-top:6px}
+.desc{font-size:14px;color:var(--color-ink-2);margin-top:6px;max-width:70ch}
+.states{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.state{display:flex;flex-direction:column;gap:10px;min-width:0}
+.state__label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.section__title{font-size:16px;line-height:24px;font-weight:600}
+.section__desc{font-size:13px;color:var(--color-ink-2)}
+.body{border-radius:var(--radius-surface);padding:16px}
+.flush{padding:0;overflow:hidden}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--size-control);padding:0 12px;border-radius:var(--radius-control);border:1px solid transparent;font:inherit;font-size:13px;font-weight:500;white-space:nowrap;color:var(--color-ink);cursor:pointer}
+.btn--solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn--glass{background:var(--color-raised);border-color:var(--color-line-strong)}
+.btn--ghost{background:transparent;color:var(--color-ink-2)}
+.btn--sm{height:24px;padding:0 8px;font-size:12px;border-radius:4px}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.badge{display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;background:var(--color-hover);color:var(--color-ink-2)}
+.badge--md{height:22px;padding:0 8px;font-size:12px}
+.badge--ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.badge--danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.status-pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap;background:var(--s-soft);color:var(--s-ink)}
+.status-pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--s)}
+.status-pill--md{height:24px;padding:0 10px;font-size:12px}
+.status-pill--running{--s:var(--color-status-running);--s-soft:var(--color-status-running-soft);--s-ink:var(--color-status-running-ink)}
+.status-pill--running::before{box-shadow:0 0 0 3px var(--color-status-running-soft)}
+.status-pill--waiting{--s:var(--color-status-waiting);--s-soft:var(--color-status-waiting-soft);--s-ink:var(--color-status-waiting-ink)}
+.status-pill--done{--s:var(--color-status-done);--s-soft:var(--color-status-done-soft);--s-ink:var(--color-status-done-ink)}
+.skeleton{display:block;border-radius:4px;background:linear-gradient(90deg,var(--color-hover),color-mix(in oklab,var(--color-ink) 10%,transparent),var(--color-hover));background-size:200% 100%;height:12px}
+.banner{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--radius-surface);border:1px solid color-mix(in oklab,var(--b,var(--color-info)) 30%,transparent);background:color-mix(in oklab,var(--b,var(--color-info)) 10%,transparent);font-size:13px}
+.banner svg{color:var(--b,var(--color-info));margin-top:2px}
+.banner__title{font-weight:600}
+.banner--danger{--b:var(--color-danger)}.banner--ok{--b:var(--color-ok)}
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:32px 24px}
+.empty__icon{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;background:var(--color-hover);color:var(--color-ink-2)}
+.empty__title{font-size:15px;font-weight:600}
+.empty__desc{font-size:13px;color:var(--color-ink-2);max-width:44ch}
+.ic{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ic--sm{width:14px;height:14px}.ic--xs{width:12px;height:12px}
+.kind-tag{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px 0 5px;border-radius:999px;background:var(--color-hover);color:var(--color-ink-2);font-size:11px;font-weight:600}
+.prop{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:12px;padding:10px 14px;align-items:center}
+.prop+.prop{border-top:1px solid var(--color-line)}
+.prop__title{font-size:14px;font-weight:500}
+.checkbox{width:16px;height:16px;accent-color:var(--color-accent);margin:0}
+.progress{height:4px;border-radius:999px;background:var(--color-hover);overflow:hidden}
+.progress span{display:block;height:100%;width:55%;background:var(--color-status-running)}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-family:var(--font-mono);font-size:12px;color:var(--color-ink-2)}
+@media (max-width:900px){.states{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+<symbol id="i-bug" viewBox="0 0 24 24"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3 3 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6 13H2"/><path d="M22 13h-4"/></symbol>
+<symbol id="i-task" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></symbol>
+</svg>
+<div class="canvas" aria-hidden="true"></div>
+<main class="page">
+<header><span class="eyebrow">Stack S-23 · Analysis cards</span><h1>Card sheet states</h1><p class="desc">The Report and Proposed cards sections through their life: loading, still running, nothing proposed, unavailable, partly created and completed.</p></header>
+<div class="states">
+
+<section class="state" aria-label="Loading">
+<span class="state__label">Loading</span>
+<div><h2 class="section__title">Report</h2></div>
+<div class="body surface-content" style="display:flex;flex-direction:column;gap:10px"><span class="skeleton" style="width:30%"></span><span class="skeleton" style="width:92%"></span><span class="skeleton" style="width:84%"></span><span class="skeleton" style="width:60%"></span></div>
+<div class="body surface-content flush"><div class="prop"><span class="skeleton" style="width:16px;height:16px"></span><span class="skeleton" style="width:70%"></span><span></span></div><div class="prop"><span class="skeleton" style="width:16px;height:16px"></span><span class="skeleton" style="width:55%"></span><span></span></div></div>
+</section>
+
+<section class="state" aria-label="Running">
+<span class="state__label">Still running</span>
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px"><div><h2 class="section__title">Report</h2><p class="section__desc">Written when the analysis finishes.</p></div><span class="status-pill status-pill--md status-pill--running">Analysing</span></div>
+<div class="body surface-content" style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;justify-content:space-between;font-size:13px"><span>Round 2 · reading logs</span><span class="ink-3 mono" style="font-size:12px">4m 03s</span></div>
+<div class="progress" role="progressbar" aria-label="Analysis progress" aria-valuetext="Round 2"><span></span></div>
+<ul class="log"><li>read apps/api/src/runners/round-dispatcher.ts</li><li>read apps/runner/src/connection/backoff.ts</li><li>read logs/runner-mac-mini-2026-10-25.log</li></ul>
+<p class="ink-3" style="font-size:12px">Proposed cards appear here with the report.</p>
+</div>
+</section>
+
+<section class="state" aria-label="No proposals">
+<span class="state__label">Nothing proposed</span>
+<div><h2 class="section__title">Proposed cards</h2></div>
+<div class="surface-content" style="border-radius:var(--radius-surface)"><div class="empty"><span class="empty__icon"><svg class="ic" style="width:18px;height:18px"><use href="#i-inbox"/></svg></span><p class="empty__title">No cards proposed</p><p class="empty__desc">The analysis found nothing worth a card. Read the report, then complete the analysis.</p><button type="button" class="btn btn--glass" style="margin-top:4px">Complete analysis</button></div></div>
+</section>
+
+<section class="state" aria-label="Unavailable">
+<span class="state__label">Report unavailable</span>
+<div><h2 class="section__title">Report</h2></div>
+<div class="banner banner--danger" role="alert"><svg class="ic"><use href="#i-alert"/></svg><div style="flex:1"><div class="banner__title">The report could not be loaded</div><div class="ink-2">The API did not answer. The analysis and its proposals are saved.</div></div><button type="button" class="btn btn--glass btn--sm">Retry</button></div>
+<div class="body surface-content" style="display:flex;flex-direction:column;gap:10px;opacity:.6"><span class="skeleton" style="width:40%"></span><span class="skeleton" style="width:80%"></span></div>
+</section>
+
+<section class="state" aria-label="Partly created">
+<span class="state__label">Partly created</span>
+<div><h2 class="section__title">Proposed cards</h2></div>
+<div class="banner banner--danger" role="alert"><svg class="ic"><use href="#i-alert"/></svg><div style="flex:1"><div class="banner__title">2 of 3 cards created</div><div class="ink-2">“Add a reconnect scenario…” failed: GitHub rate limit, resets in 4 min. C-512 stays open until every selected card exists.</div></div><button type="button" class="btn btn--glass btn--sm">Retry failed</button></div>
+<div class="body surface-content flush">
+<div class="prop"><input type="checkbox" class="checkbox" checked disabled aria-label="Created"><span class="prop__title">Rebind in-flight rounds to the new runner session</span><a href="#" class="mono" style="font-size:12px">C-520</a></div>
+<div class="prop"><input type="checkbox" class="checkbox" checked disabled aria-label="Created"><span class="prop__title">Count a reconnect as successful only after the handshake</span><a href="#" class="mono" style="font-size:12px">C-521</a></div>
+<div class="prop"><input type="checkbox" class="checkbox" checked aria-label="Select: Add a reconnect scenario"><span class="prop__title">Add a reconnect scenario to the runner e2e suite</span><span class="badge badge--danger">Failed</span></div>
+</div>
+</section>
+
+<section class="state" aria-label="Completed">
+<span class="state__label">Completed</span>
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px"><div><h2 class="section__title">Proposed cards</h2><p class="section__desc">3 created in To Do · 1 dismissed</p></div><span class="status-pill status-pill--md status-pill--done">Done</span></div>
+<div class="body surface-content flush">
+<div class="prop"><svg class="ic" style="color:var(--color-ok)"><use href="#i-check"/></svg><span class="prop__title">Rebind in-flight rounds to the new runner session</span><a href="#" class="mono" style="font-size:12px">C-520</a></div>
+<div class="prop"><svg class="ic" style="color:var(--color-ok)"><use href="#i-check"/></svg><span class="prop__title">Count a reconnect as successful only after the handshake</span><a href="#" class="mono" style="font-size:12px">C-521</a></div>
+<div class="prop"><svg class="ic" style="color:var(--color-ok)"><use href="#i-check"/></svg><span class="prop__title">Add a reconnect scenario to the runner e2e suite</span><a href="#" class="mono" style="font-size:12px">C-522</a></div>
+<div class="prop"><span></span><span class="prop__title ink-3">Show a Reconnecting state on the Fleet slot</span><span class="badge">Not created</span></div>
+</div>
+</section>
+
+</div>
+</main>
+</body>
+</html>

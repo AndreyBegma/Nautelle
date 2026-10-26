@@ -8,6 +8,7 @@ import {
   LOCAL_CARD_ROUND_PHASES,
   LOCAL_CARD_SUMMARY_MAX,
   LOCAL_CARD_TITLE_MAX,
+  LOCAL_WORK_CARD_KINDS,
 } from '../protocol/local';
 
 /**
@@ -26,9 +27,23 @@ export type BoardColumn = (typeof BOARD_COLUMNS)[number];
 export const isBoardColumn = (value: string): value is BoardColumn =>
   (BOARD_COLUMNS as readonly string[]).includes(value);
 
-/** Decides the branch prefix (`feat` / `fix`) and the issue label. */
+/**
+ * Decides the branch prefix (`feat` / `fix` / `card`) and the issue label.
+ * C-503 (ADR-0126): an `analysis` card investigates read-only and ends with a
+ * report and proposed cards, never a pull request.
+ */
 export const BOARD_CARD_KINDS = LOCAL_CARD_KINDS;
 export type BoardCardKind = (typeof BOARD_CARD_KINDS)[number];
+
+/**
+ * C-503 D5: the kinds a model may pick — the normalizer, capture and every
+ * other classifier. `analysis` is only ever a person's choice.
+ */
+export const WORK_CARD_KINDS = LOCAL_WORK_CARD_KINDS;
+export type WorkCardKind = (typeof WORK_CARD_KINDS)[number];
+
+export const isWorkCardKind = (value: string): value is WorkCardKind =>
+  (WORK_CARD_KINDS as readonly string[]).includes(value);
 
 /**
  * Where a card came from (#282 D6):
