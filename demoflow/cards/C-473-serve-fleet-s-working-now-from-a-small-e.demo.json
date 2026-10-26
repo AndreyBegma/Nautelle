@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "name": "Fleet's Working now reads only the cards at work",
+  "description": "C-473 (ADR-0122): the Fleet page reads Working now from GET /fleet/working, which returns only the cards someone works on, instead of the whole Board; the rows stay the same.",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "link",
+        "name": "Board",
+        "exact": true
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "marker",
+      "title": "The Board holds every card"
+    },
+    {
+      "action": "navigate",
+      "path": "/projects/demo-project/board"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "Board search misses cards with emoji",
+        "exact": true
+      },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "Most cards on the Board wait in To Do or are done; nobody works on them"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "marker",
+      "title": "Fleet reads only the cards at work"
+    },
+    {
+      "action": "navigate",
+      "path": "/projects/demo-project/fleet"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "heading",
+        "name": "Working now"
+      },
+      "timeoutMs": 30000,
+      "caption": "Working now comes from its own small read, not the whole Board"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "li:has-text(\"Card worker\"):has-text(\"Show the runner version in the header\")"
+      },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "The card a worker runs right now"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "li:has-text(\"Run queue\"):has-text(\"Waiting for a slot · #1\")"
+      },
+      "zoom": true,
+      "caption": "Then the cards waiting in the run queue, in order"
+    },
+    {
+      "action": "waitFor",
+      "state": "hidden",
+      "target": {
+        "text": "Board search misses cards with emoji",
+        "exact": true
+      },
+      "caption": "A card nobody works on is not read at all"
+    },
+    {
+      "action": "screenshot",
+      "name": "fleet-working-now"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    }
+  ]
+}
