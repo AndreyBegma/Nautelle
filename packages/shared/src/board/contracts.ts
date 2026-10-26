@@ -38,6 +38,7 @@ import type {
   TokenSavedView,
   TokenSaverFilterSavings,
 } from '../token-saver/contracts';
+import type { CardAnalysisView } from './analysis';
 import type {
   CaptureModel,
   CaptureSkipReason,
@@ -741,6 +742,21 @@ export interface BoardCardDetail extends BoardCardView {
    * own carry its `roundId`.
    */
   attachments: AttachmentView[];
+  /**
+   * C-503 (ADR-0126): an analysis card's report and proposed cards; `null`
+   * for every other kind.
+   */
+  analysis: CardAnalysisView | null;
+  /** C-503: the analysis card this card was created from; else `null`. */
+  origin: { number: number; title: string } | null;
+}
+
+/** C-506: the cards Create selected made, and the links it left out. */
+export interface CreateCardProposalsResponse {
+  created: { number: number; title: string }[];
+  /** `[position, dependsOn]` pairs whose other end was not selected. */
+  droppedLinks: [number, number][];
+  card: BoardCardDetail;
 }
 
 /** #359 D8: one PR of a card, as the card sheet lists it. */

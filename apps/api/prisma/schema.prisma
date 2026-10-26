@@ -102,6 +102,7 @@ model User {
   boardCardsCompleted         BoardCard[]                   @relation("BoardCardCompletedBy")
   boardCardsAutoRunArmed      BoardCard[]                   @relation("BoardCardAutoRunArmedBy")
   boardCardRounds             BoardCardRound[]
+  boardCardProposalsDecided   BoardCardProposal[]           @relation("BoardCardProposalDecidedBy")
   boardSettingsUpdated        BoardSettings[]
   demoSecretsUpdated          ProjectDemoSecret[]
   cardDemosRequested          CardDemo[]
@@ -1985,6 +1986,9 @@ model Run {
   /// #445 D8: the finish was accepted after the artifact guard's 2 rejections —
   /// the card shows "Description incomplete".
   artifactIncomplete Boolean    @default(false)
+  /// C-503 (ADR-0126): an analysis round's finish was accepted after the
+  /// runner's read-only guard reset changes the session made.
+  readOnlyViolation  Boolean    @default(false)
   /// #445 D12: the launch carried `tokenSaver.enabled`. The before/after
   /// compares runs with `false` against runs with `true`, by kind.
   tokenSaver         Boolean    @default(false)
@@ -3294,6 +3298,25 @@ enum BoardColumn {
 enum BoardCardKind {
   feature
   bug
+  /// C-503 (ADR-0126): investigates read-only and ends with a report and
+  /// proposed cards, never a pull request. Only a person picks it.
+  analysis
+}
+
+/// Shared `CARD_PROPOSAL_KINDS` (C-503 D4): what a proposed card becomes —
+/// its own enum, so a `task` proposal does not need the `task` card kind.
+enum CardProposalKind {
+  feature
+  bug
+  task
+}
+
+/// Shared `CARD_PROPOSAL_STATUSES` (C-503): a proposal waits for the person,
+/// was made into a card, or was dismissed.
+enum CardProposalStatus {
+  pending
+  created
+  dismissed
 }
 
 /// Shared `CARD_KIND_SOURCES` (#271 D9).
@@ -3628,10 +3651,16 @@ model BoardCard {
   /// #636: the dependency `prBase` belongs to; both are cleared once that
   /// dependency merges and the card's PR is retargeted onto the base.
   prBaseCardId            String?
+  /// C-503 (ADR-0126): the analysis card this card was created from, via
+  /// Create selected; kept as its origin.
+  originCardId            String?
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
 
   project              Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  originCard           BoardCard?             @relation("BoardCardOrigin", fields: [originCardId], references: [id], onDelete: SetNull)
+  /// C-503: the cards created from this analysis card's proposals.
+  originOf             BoardCard[]            @relation("BoardCardOrigin")
   prBaseCard           BoardCard?             @relation("BoardCardPrBase", fields: [prBaseCardId], references: [id], onDelete: SetNull)
   /// #636: the cards stacked on this one's branch.
   stackedOn            BoardCard[]            @relation("BoardCardPrBase")
@@ -3676,6 +3705,10 @@ model BoardCard {
   demos                CardDemo[]
   /// C-497 (ADR-0125): the card's labels, a person's and automation's.
   labels               BoardCardLabel[]
+  /// C-503 (ADR-0126): an analysis card's proposed cards, every round's.
+  proposals            BoardCardProposal[]    @relation("BoardCardProposals")
+  /// C-503: the proposal this card was created from.
+  fromProposal         BoardCardProposal?     @relation("BoardCardProposalCreated")
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -3686,7 +3719,46 @@ model BoardCard {
   @@index([stageId])
   @@index([prBaseCardId])
   @@index([queuedForSessionId])
+  @@index([originCardId])
   @@map("board_cards")
+}
+
+/// C-503 (ADR-0126): a card an analysis round proposes, from its
+/// `finish_analysis`. A later finish replaces the card's `pending` ones;
+/// `created` and `dismissed` ones are the person's decisions and stay.
+model BoardCardProposal {
+  id            String             @id @default(cuid())
+  /// The analysis card.
+  cardId        String
+  roundId       String
+  /// 0-based, in the order the round proposed them.
+  position      Int
+  /// At most 200 characters.
+  title         String
+  /// Markdown, at most 8 000 characters.
+  body          String
+  kind          CardProposalKind
+  /// At most 5 names of at most 40 characters; applied as card labels by
+  /// Create selected where the project has them (C-506).
+  labels        String[]           @default([])
+  /// Positions of earlier proposals of the same round, so the graph has no cycle.
+  dependsOn     Int[]              @default([])
+  status        CardProposalStatus @default(pending)
+  /// The card Create selected made from it.
+  createdCardId String?            @unique
+  /// Who created or dismissed it; null for a deleted user.
+  decidedById   String?
+  decidedAt     DateTime?
+  createdAt     DateTime           @default(now())
+
+  card        BoardCard      @relation("BoardCardProposals", fields: [cardId], references: [id], onDelete: Cascade)
+  round       BoardCardRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  createdCard BoardCard?     @relation("BoardCardProposalCreated", fields: [createdCardId], references: [id], onDelete: SetNull)
+  decidedBy   User?          @relation("BoardCardProposalDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@unique([roundId, position])
+  @@index([cardId, status])
+  @@map("board_card_proposals")
 }
 
 /// #660: where a card's triage is. `hidden` is a triage the gateway refused
@@ -3996,8 +4068,12 @@ model BoardCardRound {
   /// #367 D3: with `wiring = none`, why (shared `cardRunWiringReasonSchema`).
   wiringReason        String?
   finishedBy          CardFinishedBy?
-  /// From `finish_card` (D6), at most 4 000 characters.
+  /// From `finish_card` (D6), at most 4 000 characters. C-503: an analysis
+  /// round's is the first paragraph of its report.
   summary             String?
+  /// C-503 (ADR-0126): an analysis round's report from `finish_analysis`,
+  /// markdown, at most 20 000 characters; null for any other round.
+  report              String?
   /// #750 D9: set on the round whose worker called `escalate_card`.
   escalation          CardEscalationReason?
   exitCode            Int?
@@ -4083,6 +4159,8 @@ model BoardCardRound {
   attachments        Attachment[]
   /// #884: the review step runs on the head this round left.
   reviewRuns         BoardCardReviewRun[]
+  /// C-503: the cards an analysis round proposed.
+  proposals          BoardCardProposal[]
 
   @@unique([cardId, round])
   @@index([phase])
