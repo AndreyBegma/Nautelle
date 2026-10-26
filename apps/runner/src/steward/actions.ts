@@ -57,6 +57,7 @@ export interface StewardActionsOptions {
 export type StewardHandlers = {
   [N in StewardCommandName]: (
     args: CommandArgs<N>,
+    signal?: AbortSignal,
   ) => Promise<CommandResult<N>>;
 };
 

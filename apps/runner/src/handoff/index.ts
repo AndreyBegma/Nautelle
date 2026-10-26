@@ -13,6 +13,7 @@ export { HandoffStateStore } from './state';
 export interface HandoffHandlers {
   'card.handoff.set': (
     args: CardHandoffSetArgs,
+    signal?: AbortSignal,
   ) => Promise<CardHandoffSetResult>;
 }
 

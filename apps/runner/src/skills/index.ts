@@ -17,6 +17,7 @@ export { RunLogStreamer } from './run/log';
 export type SkillHandlers = {
   [N in SkillCommandName]: (
     args: CommandArgs<N>,
+    signal?: AbortSignal,
   ) => Promise<CommandResult<N>> | CommandResult<N>;
 };
 

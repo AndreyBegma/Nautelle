@@ -7,6 +7,7 @@ import type {
   DocsPublishSpecsArgs,
   DocsPublishSpecsResult,
 } from '@nautelle/shared/protocol';
+import { withSignal } from '../detect/exec';
 import { openSpecsPr } from '../planner/publish-specs';
 import { GH_TIMEOUT_MS, type SkillsDeps, stderrLine } from '../skills/deps';
 import { docsBaseOf, docsRepoOf } from './repo';
@@ -15,6 +16,7 @@ import { docsBaseOf, docsRepoOf } from './repo';
 export type DocsHandlers = {
   [N in DocsCommandName]: (
     args: CommandArgs<N>,
+    signal?: AbortSignal,
   ) => Promise<CommandResult<N>> | CommandResult<N>;
 };
 
@@ -30,10 +32,11 @@ type DocsDeps = Pick<
  */
 export const publishDocsSpecs = async (
   args: DocsPublishSpecsArgs,
-  deps: DocsDeps,
+  deps: DocsDeps & { signal?: AbortSignal },
 ): Promise<DocsPublishSpecsResult> => {
-  const repo = await docsRepoOf(args, deps);
-  const base = await docsBaseOf(deps.exec, repo);
+  const exec = withSignal(deps.exec, deps.signal);
+  const repo = await docsRepoOf(args, { ...deps, exec });
+  const base = await docsBaseOf(exec, repo);
   const pr = await openSpecsPr(
     { root: repo.root, github: repo.github, base },
     args,
@@ -45,10 +48,11 @@ export const publishDocsSpecs = async (
 /** `docs.pr_state`: `gh pr view` of a docs pull request. */
 export const docsPrState = async (
   args: DocsPrStateArgs,
-  deps: DocsDeps,
+  deps: DocsDeps & { signal?: AbortSignal },
 ): Promise<DocsPrStateResult> => {
-  const repo = await docsRepoOf(args, deps);
-  const view = await deps.exec(
+  const exec = withSignal(deps.exec, deps.signal);
+  const repo = await docsRepoOf(args, { ...deps, exec });
+  const view = await exec(
     'gh',
     [
       'pr',
@@ -74,6 +78,7 @@ export const docsPrState = async (
 };
 
 export const createDocsHandlers = (deps: DocsDeps): DocsHandlers => ({
-  'docs.publish_specs': (args) => publishDocsSpecs(args, deps),
-  'docs.pr_state': (args) => docsPrState(args, deps),
+  'docs.publish_specs': (args, signal) =>
+    publishDocsSpecs(args, { ...deps, signal }),
+  'docs.pr_state': (args, signal) => docsPrState(args, { ...deps, signal }),
 });

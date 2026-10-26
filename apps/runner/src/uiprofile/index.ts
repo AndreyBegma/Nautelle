@@ -18,6 +18,7 @@ export { UiProfileLearner, type UiProfileLearnerOptions } from './learn';
 export type UiProfileHandlers = {
   [N in UiProfileCommandName]: (
     args: CommandArgs<N>,
+    signal?: AbortSignal,
   ) => Promise<CommandResult<N>> | CommandResult<N>;
 };
 

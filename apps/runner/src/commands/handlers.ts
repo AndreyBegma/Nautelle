@@ -1,6 +1,8 @@
 import type {
   Capabilities,
   Host,
+  SessionMessageArgs,
+  SessionMessageResult,
   TerminalAttachArgs,
   TerminalAttachResult,
   WatchedProject,
@@ -27,7 +29,7 @@ import {
 } from '../control/orchestrator';
 import { messageSlot, stopSlot } from '../control/slot';
 import type { DemoHandlers } from '../demos';
-import type { Exec } from '../detect/exec';
+import { type Exec, withSignal } from '../detect/exec';
 import type { DocsHandlers } from '../docs';
 import type { HandoffHandlers } from '../handoff';
 import type { NormalizeHandlers } from '../normalize';
@@ -41,7 +43,6 @@ import { inspectProject, refreshProject } from '../projects/inspect';
 import { pushCheck } from '../projects/push-check';
 import { scanProjectRules } from '../projects/rule-scan';
 import type { RepoHandlers } from '../repo';
-import type { SessionMessenger } from '../session';
 import type { SkillHandlers } from '../skills';
 import type { StewardHandlers } from '../steward';
 import type { UiProfileHandlers } from '../uiprofile';
@@ -85,7 +86,10 @@ export interface HandlerContext {
   pollCollectors?: CollectorPollDeps['pollNow'];
   /** Interactive attaches (spec 29); absent means this runner cannot attach. */
   terminal?: {
-    attach(args: TerminalAttachArgs): Promise<TerminalAttachResult>;
+    attach(
+      args: TerminalAttachArgs,
+      signal?: AbortSignal,
+    ): Promise<TerminalAttachResult>;
   };
   /** Skills (spec 24); absent means this runner does not serve them. */
   skills?: SkillHandlers;
@@ -108,7 +112,12 @@ export interface HandlerContext {
   /** Context handoff (#449); absent means this runner does not serve it. */
   handoff?: HandoffHandlers;
   /** A person's messages to sessions (#489); absent means this runner does not serve them. */
-  sessionMessage?: SessionMessenger;
+  sessionMessage?: {
+    message(
+      args: SessionMessageArgs,
+      signal?: AbortSignal,
+    ): Promise<SessionMessageResult>;
+  };
   /** The assistant's code commands (#622); absent means this runner does not serve them. */
   repo?: RepoHandlers;
   /** The launch prefix's calls (#751); absent means this runner does not serve them. */
@@ -191,20 +200,25 @@ const noUiProfile = (): never => {
 
 /** One handler per allowlisted command; each later command adds its own here. */
 export const createHandlers = (context: HandlerContext): CommandHandlers => {
-  const deps = { exec: context.exec, fs: context.fs };
-  const control = {
-    exec: context.exec,
+  // #754 D2: what a command spawns gets its signal, so a timeout kills it.
+  const execOf = (signal?: AbortSignal) => withSignal(context.exec, signal);
+  const deps = (signal?: AbortSignal) => ({
+    exec: execOf(signal),
+    fs: context.fs,
+  });
+  const control = (signal?: AbortSignal) => ({
+    exec: execOf(signal),
     clock: context.clock,
     watchedProjects: context.watchedProjects,
     profiles: context.profiles,
     policy: context.policy,
     realpath: context.realpath,
-  };
-  const approvals = {
-    exec: context.exec,
+  });
+  const approvals = (signal?: AbortSignal) => ({
+    exec: execOf(signal),
     clock: context.clock,
     watchedProjects: context.watchedProjects,
-  };
+  });
   return {
     'runner.ping': () => ({ pong: true, ts: isoNow(context.clock) }),
     'runner.describe': async () => ({
@@ -212,27 +226,32 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       runnerVersion: context.runnerVersion,
       capabilities: await context.detectCapabilities(),
     }),
-    'project.inspect': ({ path }) => inspectProject(path, deps),
-    'project.refresh': (args) =>
-      refreshProject(args, context.watchedProjects(), deps),
-    'project.scan_rules': ({ path }) => scanProjectRules(path, deps),
+    'project.inspect': ({ path }, signal) => inspectProject(path, deps(signal)),
+    'project.refresh': (args, signal) =>
+      refreshProject(args, context.watchedProjects(), deps(signal)),
+    'project.scan_rules': ({ path }, signal) =>
+      scanProjectRules(path, deps(signal)),
     'project.discover': () =>
       discoverProjects(context.policy().allowedRoots, context.fs),
-    'project.push_check': ({ path }) => pushCheck(path, deps),
+    'project.push_check': ({ path }, signal) => pushCheck(path, deps(signal)),
     'session.backfill': (args) =>
       sessionBackfill(args, {
         backfill: context.backfillSessions,
         watchedProjects: context.watchedProjects,
       }),
-    'orchestrator.start': (args) => startOrchestrator(args, control),
-    'orchestrator.stop': (args) => stopOrchestrator(args, control),
-    'orchestrator.status': (args) => orchestratorStatus(args, control),
-    'orchestrator.message': (args) => messageOrchestrator(args, control),
-    'slot.stop': (args) => stopSlot(args, control),
-    'slot.message': (args) => messageSlot(args, control),
-    'issue.create': (args) =>
+    'orchestrator.start': (args, signal) =>
+      startOrchestrator(args, control(signal)),
+    'orchestrator.stop': (args, signal) =>
+      stopOrchestrator(args, control(signal)),
+    'orchestrator.status': (args, signal) =>
+      orchestratorStatus(args, control(signal)),
+    'orchestrator.message': (args, signal) =>
+      messageOrchestrator(args, control(signal)),
+    'slot.stop': (args, signal) => stopSlot(args, control(signal)),
+    'slot.message': (args, signal) => messageSlot(args, control(signal)),
+    'issue.create': (args, signal) =>
       issueCreate(args, {
-        exec: context.exec,
+        exec: execOf(signal),
         watchedProjects: context.watchedProjects,
       }),
     'issues.refresh': (args) =>
@@ -242,148 +261,162 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
         watchedProjects: context.watchedProjects,
         pollNow: context.pollCollectors ?? (async () => []),
       }),
-    'pr.inspect': (args) => prInspect(args, approvals),
-    'pr.approve': (args) => prApprove(args, approvals),
-    'pr.requestChanges': (args) => prRequestChanges(args, approvals),
-    'pr.voidApproval': (args) => prVoidApproval(args, approvals),
-    'terminal.attach': (args) => {
+    'pr.inspect': (args, signal) => prInspect(args, approvals(signal)),
+    'pr.approve': (args, signal) => prApprove(args, approvals(signal)),
+    'pr.requestChanges': (args, signal) =>
+      prRequestChanges(args, approvals(signal)),
+    'pr.voidApproval': (args, signal) =>
+      prVoidApproval(args, approvals(signal)),
+    'terminal.attach': (args, signal) => {
       if (!context.terminal) {
         throw new CommandFailure(
           'unsupported',
           'this runner does not serve terminal attaches',
         );
       }
-      return context.terminal.attach(args);
+      return context.terminal.attach(args, signal);
     },
-    'skill.search': (args) =>
-      context.skills?.['skill.search'](args) ?? noSkills(),
-    'skill.inspect': (args) =>
-      context.skills?.['skill.inspect'](args) ?? noSkills(),
-    'skill.install': (args) =>
-      context.skills?.['skill.install'](args) ?? noSkills(),
-    'skill.uninstall': (args) =>
-      context.skills?.['skill.uninstall'](args) ?? noSkills(),
-    'skill.list': (args) => context.skills?.['skill.list'](args) ?? noSkills(),
-    'skill.run': (args) => context.skills?.['skill.run'](args) ?? noSkills(),
-    'skill.cancel': (args) =>
-      context.skills?.['skill.cancel'](args) ?? noSkills(),
-    'plan.turn': (args) => context.planner?.['plan.turn'](args) ?? noPlanner(),
-    'plan.cancel': (args) =>
-      context.planner?.['plan.cancel'](args) ?? noPlanner(),
-    'plan.close': (args) =>
-      context.planner?.['plan.close'](args) ?? noPlanner(),
-    'plan.publish_specs': (args) =>
-      context.planner?.['plan.publish_specs'](args) ?? noPlanner(),
-    'plan.queue_issues': (args) =>
-      context.planner?.['plan.queue_issues'](args) ?? noPlanner(),
-    'uiprofile.build': (args) =>
-      context.uiprofile?.['uiprofile.build'](args) ?? noUiProfile(),
-    'uiprofile.fingerprint': (args) =>
-      context.uiprofile?.['uiprofile.fingerprint'](args) ?? noUiProfile(),
-    'uiprofile.cancel': (args) =>
-      context.uiprofile?.['uiprofile.cancel'](args) ?? noUiProfile(),
-    'uiprofile.learn': (args) =>
-      context.uiprofile?.['uiprofile.learn'](args) ?? noUiProfile(),
-    'worktree.status': (args) =>
+    'skill.search': (args, signal) =>
+      context.skills?.['skill.search'](args, signal) ?? noSkills(),
+    'skill.inspect': (args, signal) =>
+      context.skills?.['skill.inspect'](args, signal) ?? noSkills(),
+    'skill.install': (args, signal) =>
+      context.skills?.['skill.install'](args, signal) ?? noSkills(),
+    'skill.uninstall': (args, signal) =>
+      context.skills?.['skill.uninstall'](args, signal) ?? noSkills(),
+    'skill.list': (args, signal) =>
+      context.skills?.['skill.list'](args, signal) ?? noSkills(),
+    'skill.run': (args, signal) =>
+      context.skills?.['skill.run'](args, signal) ?? noSkills(),
+    'skill.cancel': (args, signal) =>
+      context.skills?.['skill.cancel'](args, signal) ?? noSkills(),
+    'plan.turn': (args, signal) =>
+      context.planner?.['plan.turn'](args, signal) ?? noPlanner(),
+    'plan.cancel': (args, signal) =>
+      context.planner?.['plan.cancel'](args, signal) ?? noPlanner(),
+    'plan.close': (args, signal) =>
+      context.planner?.['plan.close'](args, signal) ?? noPlanner(),
+    'plan.publish_specs': (args, signal) =>
+      context.planner?.['plan.publish_specs'](args, signal) ?? noPlanner(),
+    'plan.queue_issues': (args, signal) =>
+      context.planner?.['plan.queue_issues'](args, signal) ?? noPlanner(),
+    'uiprofile.build': (args, signal) =>
+      context.uiprofile?.['uiprofile.build'](args, signal) ?? noUiProfile(),
+    'uiprofile.fingerprint': (args, signal) =>
+      context.uiprofile?.['uiprofile.fingerprint'](args, signal) ??
+      noUiProfile(),
+    'uiprofile.cancel': (args, signal) =>
+      context.uiprofile?.['uiprofile.cancel'](args, signal) ?? noUiProfile(),
+    'uiprofile.learn': (args, signal) =>
+      context.uiprofile?.['uiprofile.learn'](args, signal) ?? noUiProfile(),
+    'worktree.status': (args, signal) =>
       worktreeStatus(args, {
-        exec: context.exec,
+        exec: execOf(signal),
         watchedProjects: context.watchedProjects,
       }),
-    'card.run': (args) => context.cards?.['card.run'](args) ?? noCards(),
-    'card.stop': (args) => context.cards?.['card.stop'](args) ?? noCards(),
-    'card.collect': (args) =>
-      context.cards?.['card.collect'](args) ?? noCards(),
-    'card.close': (args) => context.cards?.['card.close'](args) ?? noCards(),
-    'card.merge': (args) =>
+    'card.run': (args, signal) =>
+      context.cards?.['card.run'](args, signal) ?? noCards(),
+    'card.stop': (args, signal) =>
+      context.cards?.['card.stop'](args, signal) ?? noCards(),
+    'card.collect': (args, signal) =>
+      context.cards?.['card.collect'](args, signal) ?? noCards(),
+    'card.close': (args, signal) =>
+      context.cards?.['card.close'](args, signal) ?? noCards(),
+    'card.merge': (args, signal) =>
       context.cards
         ? mergeCard(args, {
-            exec: context.exec,
+            exec: execOf(signal),
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
-    'card.prClose': (args) =>
+    'card.prClose': (args, signal) =>
       context.cards
         ? closeCardPr(args, {
-            exec: context.exec,
+            exec: execOf(signal),
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
-    'card.checks': (args) =>
+    'card.checks': (args, signal) =>
       context.cards
         ? cardChecks(args, {
-            exec: context.exec,
+            exec: execOf(signal),
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
-    'card.ciRetrigger': (args) =>
+    'card.ciRetrigger': (args, signal) =>
       context.cards
         ? retriggerCardCi(args, {
-            exec: context.exec,
+            exec: execOf(signal),
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
-    'card.prRetarget': (args) =>
+    'card.prRetarget': (args, signal) =>
       context.cards
         ? retargetCardPr(args, {
-            exec: context.exec,
+            exec: execOf(signal),
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
-    'card.prOpen': (args) =>
+    'card.prOpen': (args, signal) =>
       context.cards
         ? openCardPr(args, {
-            exec: context.exec,
+            exec: execOf(signal),
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
     // #884: review steps (ADR-0084), advertised like every handler (ADR-0023).
-    'card.review': (args) => context.cards?.['card.review'](args) ?? noCards(),
-    'card.reviewStop': (args) =>
-      context.cards?.['card.reviewStop'](args) ?? noCards(),
-    'card.reviewPublish': (args) =>
+    'card.review': (args, signal) =>
+      context.cards?.['card.review'](args, signal) ?? noCards(),
+    'card.reviewStop': (args, signal) =>
+      context.cards?.['card.reviewStop'](args, signal) ?? noCards(),
+    'card.reviewPublish': (args, signal) =>
       context.cards
         ? publishCardReview(args, {
-            exec: context.exec,
+            exec: execOf(signal),
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
-    'card.demo': (args) => context.demos?.['card.demo'](args) ?? noDemo(),
-    'cards.extract': (args) =>
-      context.capture?.['cards.extract'](args) ?? noCapture(),
-    'text.normalize': (args) =>
-      context.normalize?.['text.normalize'](args) ?? noNormalize(),
-    'card.assess': (args) =>
-      context.assess?.['card.assess'](args) ?? noAssess(),
-    'docs.publish_specs': (args) =>
-      context.docs?.['docs.publish_specs'](args) ?? noDocs(),
-    'docs.pr_state': (args) =>
-      context.docs?.['docs.pr_state'](args) ?? noDocs(),
-    'session.nudge': (args) =>
-      context.steward?.['session.nudge'](args) ?? noSteward(),
-    'session.dismiss': (args) =>
-      context.steward?.['session.dismiss'](args) ?? noSteward(),
-    'card.resume': (args) =>
-      context.steward?.['card.resume'](args) ?? noSteward(),
-    'digest.compose': (args) =>
-      context.steward?.['digest.compose'](args) ?? noSteward(),
-    'card.handoff.set': (args) =>
-      context.handoff?.['card.handoff.set'](args) ?? noHandoff(),
-    'session.message': (args) => {
+    'card.demo': (args, signal) =>
+      context.demos?.['card.demo'](args, signal) ?? noDemo(),
+    'cards.extract': (args, signal) =>
+      context.capture?.['cards.extract'](args, signal) ?? noCapture(),
+    'text.normalize': (args, signal) =>
+      context.normalize?.['text.normalize'](args, signal) ?? noNormalize(),
+    'card.assess': (args, signal) =>
+      context.assess?.['card.assess'](args, signal) ?? noAssess(),
+    'docs.publish_specs': (args, signal) =>
+      context.docs?.['docs.publish_specs'](args, signal) ?? noDocs(),
+    'docs.pr_state': (args, signal) =>
+      context.docs?.['docs.pr_state'](args, signal) ?? noDocs(),
+    'session.nudge': (args, signal) =>
+      context.steward?.['session.nudge'](args, signal) ?? noSteward(),
+    'session.dismiss': (args, signal) =>
+      context.steward?.['session.dismiss'](args, signal) ?? noSteward(),
+    'card.resume': (args, signal) =>
+      context.steward?.['card.resume'](args, signal) ?? noSteward(),
+    'digest.compose': (args, signal) =>
+      context.steward?.['digest.compose'](args, signal) ?? noSteward(),
+    'card.handoff.set': (args, signal) =>
+      context.handoff?.['card.handoff.set'](args, signal) ?? noHandoff(),
+    'session.message': (args, signal) => {
       if (!context.sessionMessage) {
         throw new CommandFailure(
           'unsupported',
           'this runner does not serve session messages',
         );
       }
-      return context.sessionMessage.message(args);
+      return context.sessionMessage.message(args, signal);
     },
-    'repo.search': (args) => context.repo?.['repo.search'](args) ?? noRepo(),
-    'repo.read': (args) => context.repo?.['repo.read'](args) ?? noRepo(),
-    'code.ask': (args) => context.repo?.['code.ask'](args) ?? noRepo(),
-    'rules.compress': (args) =>
-      context.prefix?.['rules.compress'](args) ?? noPrefix(),
-    'prefix.propose': (args) =>
-      context.prefix?.['prefix.propose'](args) ?? noPrefix(),
+    'repo.search': (args, signal) =>
+      context.repo?.['repo.search'](args, signal) ?? noRepo(),
+    'repo.read': (args, signal) =>
+      context.repo?.['repo.read'](args, signal) ?? noRepo(),
+    'code.ask': (args, signal) =>
+      context.repo?.['code.ask'](args, signal) ?? noRepo(),
+    'rules.compress': (args, signal) =>
+      context.prefix?.['rules.compress'](args, signal) ?? noPrefix(),
+    'prefix.propose': (args, signal) =>
+      context.prefix?.['prefix.propose'](args, signal) ?? noPrefix(),
   };
 };
 

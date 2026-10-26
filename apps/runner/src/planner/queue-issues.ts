@@ -4,9 +4,9 @@ import type {
   PlanQueueIssuesResult,
   WatchedProject,
 } from '@nautelle/shared/protocol';
-import { CommandFailure } from '../commands/failure';
+import { CommandFailure, stopIfAborted } from '../commands/failure';
 import { readyLabelOf, watchedById } from '../commands/queue/project';
-import type { Exec } from '../detect/exec';
+import { type Exec, withSignal } from '../detect/exec';
 import { resolveFleetProject } from '../fleet/project';
 import { errorMessage, type Logger } from '../log';
 import { GH_TIMEOUT_MS, stderrLine } from '../skills/deps';
@@ -15,6 +15,8 @@ export interface QueueIssuesDeps {
   exec: Exec;
   watchedProjects: () => readonly WatchedProject[];
   log: Logger;
+  /** #754 D3: no further issue is labelled once the command timed out. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -29,7 +31,8 @@ export const queueIssues = async (
   deps: QueueIssuesDeps,
 ): Promise<PlanQueueIssuesResult> => {
   const project = watchedById(args.projectId, deps.watchedProjects());
-  const fleet = await resolveFleetProject(deps.exec, project);
+  const exec = withSignal(deps.exec, deps.signal);
+  const fleet = await resolveFleetProject(exec, project);
   if (!fleet.github) {
     throw new CommandFailure(
       'not_a_repository',
@@ -41,8 +44,9 @@ export const queueIssues = async (
   const labelled: number[] = [];
   let lastError = '';
   for (const number of args.numbers) {
+    stopIfAborted(deps.signal, `gh issue edit ${number}`);
     try {
-      const result = await deps.exec(
+      const result = await exec(
         'gh',
         [
           'issue',

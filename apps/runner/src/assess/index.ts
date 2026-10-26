@@ -12,7 +12,10 @@ export {
 
 /** The one `card.assess` handler (issue #322 D5). */
 export type AssessHandlers = {
-  [N in AssessCommandName]: (args: CommandArgs<N>) => Promise<CommandResult<N>>;
+  [N in AssessCommandName]: (
+    args: CommandArgs<N>,
+    signal?: AbortSignal,
+  ) => Promise<CommandResult<N>>;
 };
 
 export const createAssessHandlers = (
