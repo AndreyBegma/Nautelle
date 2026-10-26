@@ -35,7 +35,7 @@ import {
   cardRefusalText,
   feedbackPrompt,
   finishConfirm,
-  HEAD_MOVED_TEXT,
+  headMovedPrompt,
   headPrefix,
   isConfirmStep,
   messagePrompt,
@@ -299,8 +299,16 @@ export class TelegramCardService {
         await this.record(authorized, 'accept', 'denied', {
           reason: 'head_moved',
         });
-        return answer(HEAD_MOVED_TEXT, {
-          ...cleared,
+        const moved = headMovedPrompt(
+          {
+            ...card,
+            shortId,
+            baseBranch: authorized.project.baseBranch,
+          },
+          pr,
+        );
+        return answer(moved.text, {
+          replyMarkup: { inline_keyboard: moved.keyboard },
           editMessageId: messageId,
         });
       }

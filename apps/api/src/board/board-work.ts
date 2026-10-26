@@ -33,6 +33,7 @@ import {
   isDependencySatisfied,
   isDivergedBranchError,
   positionForIndex,
+  prDiffUrl,
   type Role,
   RUN_UPDATED_LIVE_EVENT,
   type RunLiveChange,
@@ -730,7 +731,7 @@ export class BoardWork implements OnModuleInit {
     project: BoardProject,
     card: Pick<
       CardWithRounds,
-      'id' | 'number' | 'prNumber' | 'issueNumber' | 'rounds'
+      'id' | 'number' | 'prNumber' | 'prUrl' | 'issueNumber' | 'rounds'
     >,
     headSha: string,
     deleteBranch: boolean,
@@ -788,7 +789,23 @@ export class BoardWork implements OnModuleInit {
         409,
         BOARD_ERROR.mergeFailed,
         output.message || `The merge of #${pr} was refused`,
-        { reason: output.error },
+        {
+          reason: output.error,
+          // C-415: the head the PR is at now, so a client reviews and accepts it.
+          ...(output.error === 'head_changed' && output.headSha
+            ? {
+                headSha: output.headSha,
+                ...(card.prUrl
+                  ? {
+                      diffUrl: prDiffUrl({
+                        url: card.prUrl,
+                        headSha: output.headSha,
+                      }),
+                    }
+                  : {}),
+              }
+            : {}),
+        },
       );
     }
     await this.audit.record({

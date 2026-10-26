@@ -6,6 +6,7 @@ import {
   type CardPullRequestView,
   type CardReviewAction,
   cardLabel,
+  shortHeadSha,
 } from '@nautelle/shared';
 import { callbackCodec } from './callback-data';
 import type { InlineKeyboardButton } from './telegram-client';
@@ -334,8 +335,31 @@ export const boardErrorText = (
   );
 };
 
-export const HEAD_MOVED_TEXT =
-  'The pull request has new commits since this message. Tap Accept again to see them.';
+/**
+ * C-415: the answer to Accept and merge on a head that moved — the new head
+ * and a fresh Accept button bound to it, so one more tap merges what the
+ * person has now been shown. Without a readable pull request there is no
+ * head to offer.
+ */
+export const headMovedPrompt = (
+  card: Parameters<typeof acceptConfirm>[0],
+  pr: CardPullRequestView | null,
+): { text: string; keyboard: InlineKeyboardButton[][] } => {
+  if (pr === null) {
+    return {
+      text: 'The pull request has new commits since this message, and it could not be read. Open the card again.',
+      keyboard: [],
+    };
+  }
+  const prompt = acceptConfirm(card, pr);
+  return {
+    text: [
+      `The pull request has new commits since this message. It is now at ${shortHeadSha(pr.headSha)}; nothing was merged.`,
+      ...prompt.text.split('\n'),
+    ].join('\n'),
+    keyboard: prompt.keyboard,
+  };
+};
 
 /** The service line of an action that worked. */
 export const resultLine = (
