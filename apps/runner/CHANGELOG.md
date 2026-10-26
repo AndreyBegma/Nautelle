@@ -26,6 +26,20 @@ upgrade.
   rewrote (such as Next.js's `next-env.d.ts`) are checked out from `HEAD`
   after the recording, so they no longer reach the card's pull request
   (#949).
+- **Away mode remembers similar tool calls.** The permission hook forwards the
+  rules Claude Code suggests (checked and redacted like the tool input) and
+  waits as long as the request lives by the API's clock instead of a fixed 280
+  seconds; a request a stored rule approved is answered at once (C-401). The
+  card wiring's hook timeout is 12 hours and five minutes.
+- **The inspection reports push access and the DemoFlow config.**
+  `project.inspect` says whether the runner's GitHub login can push to the
+  repository and whether it has a `demoflow.config.json`, for the Ready to run
+  block on project Settings (C-395).
+- **Every tab of a question form is relayed.** The question reader reads
+  multi-select tabs and their Next/Submit row and reports the form's tabs and
+  step; an answer counts only once the selector moves on (#967).
+- **`card_run` answers a queued card with its place** in the run queue
+  (C-412).
 
 ## 0.17.0
 
