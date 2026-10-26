@@ -14,6 +14,7 @@ import { BoardBudgetPause } from './board-budget-pause';
 import { BoardBulk } from './board-bulk';
 import { BoardCommands } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
+import { BoardFixWaits } from './board-fix-waits';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardPlanCards } from './board-plan-cards';
 import { BoardPrincipals } from './board-principal';
@@ -61,6 +62,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardBulk,
     BoardCommands,
     BoardDependencies,
+    // C-418: fix rounds refused for room go before To Do when a slot frees.
+    BoardFixWaits,
     BoardInboxService,
     BoardPlanCards,
     // C-181: whom an automatic round runs as.
