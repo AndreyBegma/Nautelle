@@ -13,6 +13,7 @@ import {
   rulesChanged,
   rulesToDraft,
   rulesToRequest,
+  switchesRequest,
 } from './settings';
 
 const rule = (id: string, pattern: string, labelId: string, position = 0) => ({
@@ -119,6 +120,25 @@ describe('path rule draft', () => {
     );
     expect(ruleProblems(draft).list).toContain(
       String(LABEL_RULES_PER_PROJECT_MAX),
+    );
+  });
+});
+
+describe('switchesRequest', () => {
+  const saved = { issueOnRun: true, specOnRun: false, maxRunning: 3 };
+
+  test('sends the saved required settings with the changed switch', () => {
+    expect(switchesRequest(saved, { labelSuggest: false })).toEqual({
+      issueOnRun: true,
+      specOnRun: false,
+      maxRunning: 3,
+      labelSuggest: false,
+    });
+  });
+
+  test('leaves the other switch out so the API keeps it', () => {
+    expect(switchesRequest(saved, { labelPaths: true })).not.toHaveProperty(
+      'labelSuggest',
     );
   });
 });

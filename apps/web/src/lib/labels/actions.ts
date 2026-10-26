@@ -9,6 +9,7 @@ import type {
   UpdateProjectLabelRequest,
 } from '@nautelle/shared';
 import { api } from '../api';
+import { switchesRequest } from './settings';
 
 /** `/projects/:id/labels` (ADR-0125): members read, a project admin writes. */
 const base = (projectId: string) =>
@@ -45,11 +46,14 @@ export const replaceLabelRules = (
   api<LabelPathRuleView[]>(`${base(projectId)}/rules`, { method: 'PUT', body });
 
 /** The two automatic-labelling switches live in the Board's settings. */
-export const saveLabelSwitches = (
+export const saveLabelSwitches = async (
   projectId: string,
-  body: Pick<UpdateBoardSettingsRequest, 'labelSuggest' | 'labelPaths'>,
-) =>
-  api<BoardSettingsView>(
-    `/projects/${encodeURIComponent(projectId)}/board-settings`,
-    { method: 'PUT', body },
-  );
+  change: Pick<UpdateBoardSettingsRequest, 'labelSuggest' | 'labelPaths'>,
+) => {
+  const path = `/projects/${encodeURIComponent(projectId)}/board-settings`;
+  const current = await api<BoardSettingsView>(path);
+  return api<BoardSettingsView>(path, {
+    method: 'PUT',
+    body: switchesRequest(current, change),
+  });
+};

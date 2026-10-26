@@ -6,6 +6,7 @@ import {
   type LabelPathRuleView,
   labelPatternProblem,
   type ProjectLabelView,
+  type UpdateBoardSettingsRequest,
 } from '@nautelle/shared';
 import { ApiError } from '../api';
 import { describeBoardError } from '../board/format';
@@ -118,6 +119,24 @@ export function ruleProblems(draft: readonly RuleDraft[]): {
 }
 
 /** Moves the item at `from` by `by` places, staying inside the list. */
+/**
+ * The board settings PUT always rewrites `issueOnRun`, `specOnRun` and
+ * `maxRunning`, so a switch change has to send the saved values back with it;
+ * the optional fields it leaves out stay as they are.
+ */
+export const switchesRequest = (
+  current: Pick<
+    UpdateBoardSettingsRequest,
+    'issueOnRun' | 'specOnRun' | 'maxRunning'
+  >,
+  change: Pick<UpdateBoardSettingsRequest, 'labelSuggest' | 'labelPaths'>,
+): UpdateBoardSettingsRequest => ({
+  issueOnRun: current.issueOnRun,
+  specOnRun: current.specOnRun,
+  maxRunning: current.maxRunning,
+  ...change,
+});
+
 export function moved<T>(list: readonly T[], from: number, by: number): T[] {
   const to = from + by;
   if (to < 0 || to >= list.length || from < 0 || from >= list.length) {

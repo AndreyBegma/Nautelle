@@ -175,11 +175,6 @@ export function LabelList({
                   {cards} {cards === 1 ? 'card' : 'cards'}
                 </span>
                 <div className="flex min-w-32 flex-1 items-center justify-end gap-1 text-ink-3 text-xs">
-                  {combined.length > 0 ? (
-                    <span className="truncate">
-                      Combines {combined.join(', ')}
-                    </span>
-                  ) : null}
                   {isAdmin ? (
                     <>
                       <Button
@@ -227,6 +222,11 @@ export function LabelList({
                     </>
                   ) : null}
                 </div>
+                {combined.length > 0 ? (
+                  <p className="m-0 basis-full pl-5 text-ink-3 text-xs">
+                    Combines {combined.join(', ')}
+                  </p>
+                ) : null}
               </li>
             );
           })}
