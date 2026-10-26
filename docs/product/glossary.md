@@ -9,7 +9,7 @@
 | **Project** | a git repository on a runner, connected by path |
 | **Docs source** | where a project's specs / ADRs / roadmap live — in-repo folder or a separate repository |
 | **Runtime** | an agent CLI: `claude` or `codex` |
-| **Runtime profile** | how to launch a runtime on a runner: binary, environment (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`), extra args. E.g. `claude-blacktoorroot` |
+| **Runtime profile** | how to launch a runtime on a runner: binary, environment (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`), extra args. E.g. `claude-work` |
 | **Adapter** | runner code that launches, observes and parses one runtime |
 | **Orchestrator** | a session running `/code-sentinel:orchestrator` for one project |
 | **Round** | one orchestrator pass that writes `round-<HHMM>.md` |
