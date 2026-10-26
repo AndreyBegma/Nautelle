@@ -108,6 +108,84 @@ describe('push and draft PR (#359 D1)', () => {
     ).toEqual([amended, first]);
   });
 
+  /**
+   * C-419: GitHub's "Update branch" — a base commit lands on origin/main, and
+   * a merge of it into the pushed branch lands on origin/<branch>.
+   */
+  const githubUpdatesBranch = async (
+    f: Awaited<ReturnType<typeof setup>>['f'],
+    files: Record<string, string>,
+  ) => {
+    const gh = join(f.ws, 'github');
+    await f.run(f.root, 'worktree', 'add', '-q', '-b', 'gh-base', gh, 'main');
+    f.write(gh, files);
+    await f.commitAll(gh, 'chore: base moves on');
+    await f.run(gh, 'push', '-q', 'origin', 'gh-base:main');
+    await f.run(gh, 'checkout', '-q', '--detach', `origin/${BRANCH}`);
+    await f.run(gh, 'merge', '-q', '--no-edit', 'gh-base');
+    await f.run(gh, 'push', '-q', 'origin', `HEAD:refs/heads/${BRANCH}`);
+    return f.run(gh, 'rev-parse', 'HEAD');
+  };
+
+  it("folds GitHub's Update branch merge into the local commits and pushes a merge (C-419)", async () => {
+    const { f, record, deps, originHead, head } = await setup();
+    f.write(record.worktree, { 'a.txt': 'a\n' });
+    const first = await f.commitAll(record.worktree, 'feat: a');
+    await pushCardHead(deps, record);
+    const updated = await githubUpdatesBranch(f, { 'base.txt': 'base\n' });
+    f.write(record.worktree, { 'b.txt': 'b\n' });
+    const second = await f.commitAll(record.worktree, 'feat: b');
+
+    const step = await pushCardHead(deps, { ...record, pushedHead: first });
+
+    expect(step?.pushed).toBe(true);
+    expect(await originHead()).toBe(await head());
+    expect(
+      (await f.run(record.worktree, 'log', '-1', '--format=%P', 'HEAD')).split(
+        ' ',
+      ),
+    ).toEqual([second, updated]);
+  });
+
+  it('a conflicting Update branch merge is aborted and raises branch_diverged (C-419)', async () => {
+    const { f, record, deps, originHead, head } = await setup();
+    f.write(record.worktree, { 'a.txt': 'a\n' });
+    const first = await f.commitAll(record.worktree, 'feat: a');
+    await pushCardHead(deps, record);
+    const updated = await githubUpdatesBranch(f, { 'c.txt': 'base\n' });
+    f.write(record.worktree, { 'c.txt': 'mine\n' });
+    const second = await f.commitAll(record.worktree, 'feat: mine');
+
+    await expect(
+      pushCardHead(deps, { ...record, pushedHead: first }),
+    ).rejects.toThrow(updated.slice(0, 8));
+
+    expect(await head()).toBe(second);
+    expect(await originHead()).toBe(updated);
+    expect(await f.run(record.worktree, 'status', '--porcelain')).toBe('');
+  });
+
+  it('foreign commits on the remote branch still raise branch_diverged (C-419)', async () => {
+    const { f, record, deps, originHead } = await setup();
+    f.write(record.worktree, { 'a.txt': 'a\n' });
+    const first = await f.commitAll(record.worktree, 'feat: a');
+    await pushCardHead(deps, record);
+    const other = join(f.ws, 'other');
+    await f.run(f.root, 'worktree', 'add', '-q', '-b', 'other', other, 'main');
+    f.write(other, { 'x.txt': 'x\n' });
+    await f.commitAll(other, 'feat: x');
+    await f.run(other, 'merge', '-q', '--no-edit', first);
+    await f.run(other, 'push', '-q', 'origin', `HEAD:refs/heads/${BRANCH}`);
+    const foreign = await f.run(other, 'rev-parse', 'HEAD');
+    f.write(record.worktree, { 'b.txt': 'b\n' });
+    await f.commitAll(record.worktree, 'feat: b');
+
+    await expect(
+      pushCardHead(deps, { ...record, pushedHead: first }),
+    ).rejects.toThrow(foreign.slice(0, 8));
+    expect(await originHead()).toBe(foreign);
+  });
+
   it('nothing ahead of the base: nothing is pushed or opened', async () => {
     const { f, record, deps, originHead } = await setup();
     expect(await pushCardHead(deps, record)).toBeNull();
