@@ -2,28 +2,33 @@
   "schemaVersion": 1,
   "name": "Away mode remembers similar tool calls, and a request waits as long as the project says",
   "description": "C-401: a tool call asked in away mode can be allowed once, for similar calls in the session, or always in the project, by Claude Code's suggested rule. Reading a secret always asks. Rules are listed and removable in Settings, and the request timeout is a project and account setting.",
-  "viewport": { "width": 1440, "height": 900 },
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
   "steps": [
-    { "action": "marker", "title": "Sign in" },
-    { "action": "navigate", "path": "/login?next=/projects/demo-project" },
-    { "action": "wait", "ms": 3000 },
-    {
-      "action": "fill",
-      "target": { "label": "Email" },
-      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
-    },
-    {
-      "action": "fill",
-      "target": { "label": "Password" },
-      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
-    },
-    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
     {
       "action": "waitFor",
-      "target": { "role": "link", "name": "Board", "exact": true },
+      "target": {
+        "role": "link",
+        "name": "Board",
+        "exact": true
+      },
       "timeoutMs": 30000
     },
-    { "action": "marker", "title": "An away session waits on two tool calls" },
+    {
+      "action": "marker",
+      "title": "An away session waits on two tool calls"
+    },
     {
       "action": "navigate",
       "path": "/projects/demo-project/queue?tab=approvals",
@@ -31,13 +36,18 @@
     },
     {
       "action": "waitFor",
-      "target": { "css": "li button[aria-label=\"Approve: Use Bash\"]" },
+      "target": {
+        "css": "li button[aria-label=\"Approve: Use Bash\"]"
+      },
       "caption": "An unattended Claude Code session asks to run its tests and to read .env.",
       "timeoutMs": 30000
     },
     {
       "action": "click",
-      "target": { "role": "button", "name": "Details: Use Bash" }
+      "target": {
+        "role": "button",
+        "name": "Details: Use Bash"
+      }
     },
     {
       "action": "waitFor",
@@ -48,28 +58,49 @@
       "timeoutMs": 15000,
       "zoom": true
     },
-    { "action": "screenshot", "name": "approvals-pending" },
-    { "action": "marker", "title": "Allow similar calls in this session" },
+    {
+      "action": "screenshot",
+      "name": "approvals-pending"
+    },
+    {
+      "action": "marker",
+      "title": "Allow similar calls in this session"
+    },
     {
       "action": "click",
-      "target": { "css": "li button[aria-label=\"Approve: Use Bash\"]" }
+      "target": {
+        "css": "li button[aria-label=\"Approve: Use Bash\"]"
+      }
     },
     {
       "action": "waitFor",
-      "target": { "role": "radiogroup", "name": "Similar calls" },
+      "target": {
+        "role": "radiogroup",
+        "name": "Similar calls"
+      },
       "caption": "Besides this call, similar calls can be allowed by Claude Code's suggested rule.",
       "timeoutMs": 15000,
       "zoom": true
     },
     {
       "action": "click",
-      "target": { "role": "radio", "name": "Allow similar in this session" },
+      "target": {
+        "role": "radio",
+        "name": "Allow similar in this session"
+      },
       "caption": "Allow similar in this session: Bash(bun run test:*) until the session ends."
     },
-    { "action": "screenshot", "name": "remember-choice" },
+    {
+      "action": "screenshot",
+      "name": "remember-choice"
+    },
     {
       "action": "click",
-      "target": { "role": "button", "name": "Approve", "exact": true }
+      "target": {
+        "role": "button",
+        "name": "Approve",
+        "exact": true
+      }
     },
     {
       "action": "waitFor",
@@ -82,25 +113,41 @@
     {
       "action": "waitFor",
       "state": "hidden",
-      "target": { "css": "li button[aria-label=\"Approve: Use Bash\"]" },
+      "target": {
+        "css": "li button[aria-label=\"Approve: Use Bash\"]"
+      },
       "timeoutMs": 15000
     },
-    { "action": "marker", "title": "A dangerous call always asks" },
+    {
+      "action": "marker",
+      "title": "A dangerous call always asks"
+    },
     {
       "action": "click",
-      "target": { "css": "li button[aria-label=\"Approve: Use Read\"]" }
+      "target": {
+        "css": "li button[aria-label=\"Approve: Use Read\"]"
+      }
     },
     {
       "action": "waitFor",
-      "target": { "text": "Always asks: touches a secret or credential file" },
+      "target": {
+        "text": "Always asks: touches a secret or credential file"
+      },
       "caption": "Reading .env is never remembered: deleting files, protected pushes and secrets always ask.",
       "timeoutMs": 15000,
       "zoom": true
     },
-    { "action": "screenshot", "name": "secret-always-asks" },
+    {
+      "action": "screenshot",
+      "name": "secret-always-asks"
+    },
     {
       "action": "click",
-      "target": { "role": "button", "name": "Cancel", "exact": true }
+      "target": {
+        "role": "button",
+        "name": "Cancel",
+        "exact": true
+      }
     },
     {
       "action": "marker",
@@ -113,12 +160,17 @@
     },
     {
       "action": "waitFor",
-      "target": { "text": "Allowed tool calls", "exact": true },
+      "target": {
+        "text": "Allowed tool calls",
+        "exact": true
+      },
       "timeoutMs": 30000
     },
     {
       "action": "waitFor",
-      "target": { "text": "Bash(bun run test:*)" },
+      "target": {
+        "text": "Bash(bun run test:*)"
+      },
       "caption": "The rule just made is listed with the project rule, each removable and audited.",
       "timeoutMs": 15000,
       "zoom": true
@@ -131,24 +183,46 @@
       },
       "timeoutMs": 15000
     },
-    { "action": "screenshot", "name": "settings-rules" },
+    {
+      "action": "screenshot",
+      "name": "settings-rules"
+    },
     {
       "action": "waitFor",
-      "target": { "text": "Request timeout", "exact": true },
+      "target": {
+        "text": "Request timeout",
+        "exact": true
+      },
       "caption": "The project's request timeout: from 1 minute to 12 hours, 5 minutes by default.",
       "timeoutMs": 15000,
       "zoom": true
     },
-    { "action": "marker", "title": "An account timeout for your own sessions" },
-    { "action": "navigate", "path": "/account", "timeoutMs": 30000 },
+    {
+      "action": "marker",
+      "title": "An account timeout for your own sessions"
+    },
+    {
+      "action": "navigate",
+      "path": "/account",
+      "timeoutMs": 30000
+    },
     {
       "action": "waitFor",
-      "target": { "text": "Away mode timeout", "exact": true },
+      "target": {
+        "text": "Away mode timeout",
+        "exact": true
+      },
       "caption": "Without a project timeout, your own setting applies, then the 5 minute default.",
       "timeoutMs": 30000,
       "zoom": true
     },
-    { "action": "screenshot", "name": "account-timeout" },
-    { "action": "wait", "ms": 1500 }
+    {
+      "action": "screenshot",
+      "name": "account-timeout"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    }
   ]
 }
