@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "name": "Runner pages and Connect follow runner.updated",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/admin/runners"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Admin › Runners refetches on runner.updated, no 10 s poll"
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Runners",
+        "exact": true
+      },
+      "text": "Runners",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "marker",
+      "title": "The Connect dialog sees a runner come online within a second"
+    },
+    {
+      "action": "navigate",
+      "path": "/projects?connect=1"
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Connect project",
+        "exact": true
+      },
+      "text": "Connect project",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    }
+  ]
+}

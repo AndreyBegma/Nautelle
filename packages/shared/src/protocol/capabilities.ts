@@ -302,6 +302,12 @@ export const capabilitiesSchema = z.object({
    */
   cardDemo: z.boolean().optional(),
   /**
+   * C-503 (ADR-0126): the runner takes `readOnly` on `card.run` — an
+   * analysis card's round. `card.run` args are strict, so the API sends the
+   * field only when this is `true`. Absent means `false`.
+   */
+  cardReadOnly: z.boolean().optional(),
+  /**
    * C-369: the runner's pinned DemoFlow — the version it runs through `npx`
    * and whether it is set up (Node new enough, the package fetched,
    * `demoflow setup` installed Chromium). `reason` says why it is not ready —
@@ -373,6 +379,10 @@ export const prefixOverlaysAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `card.demo` (ADR-0090); absent is `false`. */
 export const cardDemoAvailable = (capabilities: Capabilities): boolean =>
   capabilities.cardDemo === true;
+
+/** Whether the API may send `card.run`'s `readOnly` (ADR-0126); absent is `false`. */
+export const cardReadOnlyAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.cardReadOnly === true;
 
 /** The runner's policy (ADR-0047); null for a runner older than it. */
 export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {

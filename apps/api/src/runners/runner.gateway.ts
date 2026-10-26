@@ -23,6 +23,7 @@ import {
   type RunnerPeer,
 } from './runner-connections';
 import { RunnerIngestService } from './runner-ingest.service';
+import { RunnerLive } from './runner-live';
 import { RunnerLocalRequests } from './runner-local-requests';
 import { RUNNER_OPTIONS, type RunnerOptions } from './runner-options';
 import { RunnerReplacements } from './runner-replacements';
@@ -54,6 +55,7 @@ interface Deps {
   localRequests: RunnerLocalRequests;
   connectHooks: RunnerConnectHooks;
   replacements: RunnerReplacements;
+  runnerLive: RunnerLive;
   options: RunnerOptions;
   logger: Logger;
 }
@@ -297,6 +299,8 @@ class RunnerSocket {
     // After the welcome: a `subscribe` sent from here is the runner's first.
     this.deps.streams.connected(live);
     this.deps.logger.log(`runner ${runnerId} connected`);
+    // C-479: a takeover publishes too — the row's hello fields changed.
+    this.deps.runnerLive.updated(runnerId, 'online');
     // Off the frame queue (#329 D4): a hook may send a command, whose result
     // arrives on this same queue.
     void this.deps.connectHooks.connected(runnerId);
@@ -338,8 +342,9 @@ class RunnerSocket {
 
   /** Both close paths may run; the second finds nothing left to do. */
   private detach(live: LiveConnection): void {
-    this.deps.connections.detach(live);
+    const wasCurrent = this.deps.connections.detach(live);
     this.deps.streams.disconnected(live);
+    if (wasCurrent) this.deps.runnerLive.updated(live.runnerId, 'offline');
   }
 }
 
@@ -365,6 +370,7 @@ export class RunnerGateway implements OnGatewayConnection {
     private readonly localRequests: RunnerLocalRequests,
     private readonly connectHooks: RunnerConnectHooks,
     private readonly replacements: RunnerReplacements,
+    private readonly runnerLive: RunnerLive,
     @Inject(RUNNER_OPTIONS) private readonly options: RunnerOptions,
   ) {}
 
@@ -377,6 +383,7 @@ export class RunnerGateway implements OnGatewayConnection {
       localRequests: this.localRequests,
       connectHooks: this.connectHooks,
       replacements: this.replacements,
+      runnerLive: this.runnerLive,
       options: this.options,
       logger: this.logger,
     });

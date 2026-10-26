@@ -4,8 +4,11 @@ import {
   type BoardCardView,
   type BoardView,
 } from '@nautelle/shared';
+import { BoardFixWaits, CARD_FIX_WAIT_MAX_MS } from './board-fix-waits';
+import { BoardReview } from './board-review';
 import { BoardRunQueue } from './board-run-queue';
-import { BoardWorld } from './testing/board-e2e';
+import { BoardShipping } from './board-shipping';
+import { BoardWorld, cardChecks, ok } from './testing/board-e2e';
 
 /**
  * C-398 (docs/specs/card-398-run-queue-at-the-worker-limit-a-card-wai.md,
@@ -242,5 +245,142 @@ describe('run queue (e2e, C-398)', () => {
       effort: 'high',
     });
     expect(await w.ctx.prisma.boardRunQueueCard.count()).toBe(0);
+  });
+
+  /**
+   * C-418 (docs/specs/card-418-fix-rounds-wait-their-turn-for-a-slot.md): a
+   * `ci_fix` or `review_fix` round refused at the limit takes the next free
+   * slot before a queued To Do card, for at most `CARD_FIX_WAIT_MAX_MS`.
+   */
+  describe('fix rounds at the limit (C-418)', () => {
+    beforeEach(() => {
+      w.checksServed = true;
+    });
+
+    /** The card's round ran a minute and its session ended: the worker is done. */
+    const ended = async (card: { id: string }) => {
+      const round = await w.ctx.prisma.boardCardRound.findFirstOrThrow({
+        where: { cardId: card.id },
+        orderBy: { round: 'desc' },
+      });
+      await w.ctx.prisma.boardCardRound.update({
+        where: { id: round.id },
+        data: { startedAt: new Date(Date.now() - 60_000) },
+      });
+      await w.deliver('card_run.phase_changed', {
+        cardId: card.id,
+        runId: round.runId,
+        projectId: w.a,
+        at: new Date().toISOString(),
+        phase: 'ended',
+        exitCode: 0,
+      });
+      await w.work.settled();
+    };
+
+    const triggers = async (card: { id: string }) =>
+      (
+        await w.ctx.prisma.boardCardRound.findMany({
+          where: { cardId: card.id },
+          orderBy: { round: 'asc' },
+          select: { trigger: true },
+        })
+      ).map((r) => r.trigger);
+
+    /**
+     * `fixer` and `busy` run on 2 slots, the limit drops to 1, and `fixer`'s
+     * worker ends: its fix round is refused for room. `next` is then queued.
+     */
+    const fixWaits = async () => {
+      await maxRunning(2);
+      const [fixer, busy, next] = await cards(3);
+      expect((await w.runCard(fixer.number)).status).toBe(200);
+      expect((await w.runCard(busy.number)).status).toBe(200);
+      await maxRunning(1);
+      await ended(fixer);
+      const queued = await w.runCard(next.number);
+      expect((queued.body as BoardCardDetail).queue).not.toBeNull();
+      return { fixer, busy, next };
+    };
+
+    it('a ci_fix round refused for room takes the freed slot; the queued To Do card waits', async () => {
+      w.handlers['card.checks'] = () =>
+        ok(
+          cardChecks({
+            checks: [{ name: 'ci/check', bucket: 'fail', link: null }],
+          }),
+        );
+      const { fixer, busy, next } = await fixWaits();
+      expect(await triggers(fixer)).toEqual(['run']);
+
+      await finishRound(busy);
+      expect(await triggers(fixer)).toEqual(['run', 'ci_fix']);
+      expect(await started()).toEqual([
+        fixer.number,
+        busy.number,
+        fixer.number,
+      ]);
+      expect((await face(next.number))?.queue).toMatchObject({
+        state: 'queued',
+        place: 1,
+      });
+      expect(w.ctx.app.get(BoardFixWaits).has(w.a)).toBe(false);
+    });
+
+    it('a review_fix round refused for room waits the same way', async () => {
+      const review = { reviewEnabled: true, publishReviewComments: false };
+      await w.ctx.prisma.boardSettings.upsert({
+        where: { projectId: w.a },
+        create: { projectId: w.a, ...review },
+        update: review,
+      });
+      await w.ctx.prisma.projectReviewStep.create({
+        data: {
+          projectId: w.a,
+          position: 0,
+          name: 'Security',
+          type: 'peer_review',
+          enabled: true,
+          instructions: 'Review it as Security.',
+        },
+      });
+      const { fixer, busy, next } = await fixWaits();
+      const session = w.reviews().at(-1)?.session;
+      expect(typeof session).toBe('string');
+      await w.ctx.app
+        .get(BoardReview)
+        .report({ id: w.a, runnerId: w.runnerId }, session as string, {
+          findings: [
+            { severity: 'blocking', title: 'Password logged', body: 'It is.' },
+          ],
+        });
+      await w.ctx.app.get(BoardShipping).check(fixer.id);
+      expect(await triggers(fixer)).toEqual(['run']);
+      expect(w.ctx.app.get(BoardFixWaits).has(w.a)).toBe(true);
+
+      await finishRound(busy);
+      expect(await triggers(fixer)).toEqual(['run', 'review_fix']);
+      expect((await face(next.number))?.queue).toMatchObject({
+        state: 'queued',
+        place: 1,
+      });
+    });
+
+    it('a wait older than 15 min no longer holds To Do', async () => {
+      w.handlers['card.checks'] = () =>
+        ok(
+          cardChecks({
+            checks: [{ name: 'ci/check', bucket: 'fail', link: null }],
+          }),
+        );
+      const { fixer, busy, next } = await fixWaits();
+      const waits = w.ctx.app.get(BoardFixWaits);
+      expect(waits.has(w.a)).toBe(true);
+      waits.add(w.a, fixer.id, Date.now() - CARD_FIX_WAIT_MAX_MS - 1);
+
+      await finishRound(busy);
+      expect(await triggers(fixer)).toEqual(['run']);
+      expect(await started()).toEqual([fixer.number, busy.number, next.number]);
+    });
   });
 });

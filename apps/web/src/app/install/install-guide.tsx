@@ -24,8 +24,8 @@ import { api } from '../../lib/api';
 import {
   ADD_RUNNER_PATH,
   installGuide,
-  RUNNER_README_URL,
   RUNNER_REQUIREMENTS,
+  RUNNER_SOURCE_BUILD_URL,
 } from '../../lib/runners/install';
 
 /** One string: an expression followed by text loses the space between them. */
@@ -345,7 +345,7 @@ export function InstallGuide() {
               <p className="text-sm">
                 No prebuilt binary for your machine?{' '}
                 <a
-                  href={RUNNER_README_URL}
+                  href={RUNNER_SOURCE_BUILD_URL}
                   target="_blank"
                   rel="noreferrer"
                   className={linkClass}

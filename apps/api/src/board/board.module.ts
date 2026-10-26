@@ -8,13 +8,18 @@ import { RunnersModule } from '../runners/runners.module';
 import { SessionMessageModule } from '../session-message/session-message.module';
 import { BoardController } from './board.controller';
 import { BoardService, FleetCardEditsRef } from './board.service';
+import { BoardAnalysis } from './board-analysis';
 import { BoardAutoRun } from './board-auto-run';
 import { BoardBackgroundStall } from './board-background-stall';
 import { BoardBudgetPause } from './board-budget-pause';
 import { BoardBulk } from './board-bulk';
 import { BoardCommands } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
+import { BoardFixWaits } from './board-fix-waits';
 import { BoardInboxService } from './board-inbox.service';
+import { BoardLabelsController } from './board-labels.controller';
+import { BoardLabels, CardLabelSuggestRef } from './board-labels.service';
+import { BoardPathLabels } from './board-path-labels';
 import { BoardPlanCards } from './board-plan-cards';
 import { BoardPrincipals } from './board-principal';
 import { BoardReview } from './board-review';
@@ -29,6 +34,7 @@ import { BoardTerminalService } from './board-terminal.service';
 import { BoardWaitService } from './board-wait.service';
 import { BoardWork } from './board-work';
 import { CollectRetryTimer } from './collect-retry-timer';
+import { PathLabelsRef } from './path-labels-ref';
 
 /**
  * The project Board (issue #242, ADR-0024): cards Nautelle owns, each worked
@@ -49,8 +55,15 @@ import { CollectRetryTimer } from './collect-retry-timer';
     SessionMessageModule,
   ],
   // #309: claiming attachments onto a card is a card route.
-  controllers: [BoardController, BoardAttachmentsController],
+  // C-497: card labels are their own routes.
+  controllers: [
+    BoardController,
+    BoardAttachmentsController,
+    BoardLabelsController,
+  ],
   providers: [
+    // C-503: an analysis card's finish — a report and proposed cards.
+    BoardAnalysis,
     // #443: accepting a card may start the Run of a card that waited for it.
     BoardAutoRun,
     // #390: a round stuck on its own background task raises one warning.
@@ -61,7 +74,11 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardBulk,
     BoardCommands,
     BoardDependencies,
+    // C-418: fix rounds refused for room go before To Do when a slot frees.
+    BoardFixWaits,
     BoardInboxService,
+    // C-497: a project's card labels and the one way automation writes them.
+    BoardLabels,
     BoardPlanCards,
     // C-181: whom an automatic round runs as.
     BoardPrincipals,
@@ -83,7 +100,10 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardStacks,
     BoardTerminalService,
     BoardWork,
+    BoardPathLabels,
+    CardLabelSuggestRef,
     CollectRetryTimer,
+    PathLabelsRef,
     FleetCardEditsRef,
   ],
   // `BoardRoundsService` too: approving a card's design may start round 1 (#243 D6).
@@ -94,9 +114,13 @@ import { CollectRetryTimer } from './collect-retry-timer';
   // `BoardReview`: a review session's `report_review` (#884).
   // `BoardDependencies`, `BoardRunQueue`: a person's session sets them (C-377).
   exports: [
+    // C-503: the local `card.finishAnalysis` method.
+    BoardAnalysis,
     // #578: the Telegram bot accepts and dismisses suggestions.
     BoardDependencies,
     BoardInboxService,
+    // C-500, C-501: the model's suggestion and the path rules label cards.
+    BoardLabels,
     BoardPlanCards,
     BoardReview,
     BoardRoundsService,
@@ -108,6 +132,7 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardTerminalService,
     BoardWaitService,
     BoardWork,
+    CardLabelSuggestRef,
     FleetCardEditsRef,
   ],
 })

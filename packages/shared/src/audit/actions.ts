@@ -181,6 +181,16 @@ export const AUDIT_ACTIONS = [
   'session_content.purged',
   'card.created',
   'card.updated',
+  /**
+   * C-497 (ADR-0125): a project label created, changed or deleted, and the
+   * path rules replaced (`before`/`after` `{rules}`).
+   */
+  'label.created',
+  'label.updated',
+  'label.deleted',
+  'label.rules_replaced',
+  /** C-497: a person set a card's labels (`before`/`after` `{labels}`, names). */
+  'card.labels_changed',
   /** #480: a stack made from a confirmed intake (`after: { number, title, stages, cards, design }`). */
   'stack.created',
   /** #480: a stack's title or body, or the cards of its stages, changed. */

@@ -1,10 +1,13 @@
 import {
+  type MyOnboardingFacts,
   type OnboardingCardStage,
   type OnboardingFacts,
   profileAgentdockOf,
 } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
+import type { AuthUser } from '../auth/auth-request';
 import { PrismaService } from '../database/prisma.service';
+import { ProjectAccessService } from '../projects/project-access.service';
 
 /**
  * C-396: the facts behind Getting started. Read from rows other features
@@ -13,29 +16,70 @@ import { PrismaService } from '../database/prisma.service';
  */
 @Injectable()
 export class OnboardingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: ProjectAccessService,
+  ) {}
 
-  async facts(): Promise<OnboardingFacts> {
-    const [projects, runners, firstCard, app, installations, users] =
-      await Promise.all([
-        this.prisma.project.findMany({
-          select: {
-            id: true,
-            runnerId: true,
-            rootPath: true,
-            defaultProfileId: true,
-            orchestratorSettings: { select: { profileId: true } },
-          },
-        }),
-        this.prisma.runner.findMany({
-          where: { revokedAt: null },
-          select: { capabilities: true },
-        }),
-        this.firstCard(),
-        this.prisma.gitHubApp.count(),
-        this.prisma.gitHubInstallation.count({ where: { suspended: false } }),
-        this.prisma.user.count(),
-      ]);
+  /** C-476: the caller's own steps — nothing about anyone else. */
+  async mine(
+    user: Pick<AuthUser, 'id' | 'role' | 'projectScope'>,
+  ): Promise<MyOnboardingFacts> {
+    const [notifications, rounds, projectCount] = await Promise.all([
+      this.notificationsOn(user.id),
+      this.prisma.boardCardRound.count({ where: { authorId: user.id } }),
+      this.prisma.project.count({ where: this.access.visibleWhere(user) }),
+    ]);
+    return { notifications, cardRun: rounds > 0, projectCount };
+  }
+
+  /** C-476: `userId` linked Telegram or turned on email for a kind. */
+  private async notificationsOn(userId: string): Promise<boolean> {
+    const [telegram, email] = await Promise.all([
+      this.prisma.telegramLink.count({ where: { userId } }),
+      this.prisma.notificationRule.count({
+        where: { userId, email: { in: ['immediate', 'digest'] } },
+      }),
+    ]);
+    return telegram > 0 || email > 0;
+  }
+
+  /** `adminId`: the caller, whose own notifications count. */
+  async facts(adminId: string): Promise<OnboardingFacts> {
+    const [
+      projects,
+      runners,
+      firstCard,
+      app,
+      installations,
+      users,
+      providers,
+      notifications,
+      slack,
+    ] = await Promise.all([
+      this.prisma.project.findMany({
+        select: {
+          id: true,
+          runnerId: true,
+          rootPath: true,
+          defaultProfileId: true,
+          orchestratorSettings: { select: { profileId: true } },
+        },
+      }),
+      this.prisma.runner.findMany({
+        where: { revokedAt: null },
+        select: { capabilities: true },
+      }),
+      this.firstCard(),
+      this.prisma.gitHubApp.count(),
+      this.prisma.gitHubInstallation.count({ where: { suspended: false } }),
+      this.prisma.user.count(),
+      this.prisma.llmProviderSetting.count({
+        where: { keyCiphertext: { not: null }, capUsd: { gt: 0 } },
+      }),
+      this.notificationsOn(adminId),
+      this.prisma.slackWebhook.count(),
+    ]);
 
     return {
       profile: projects.some(
@@ -52,6 +96,8 @@ export class OnboardingService {
       firstCard,
       githubApp: app > 0 && installations > 0,
       teammates: users > 1,
+      aiProvider: providers > 0,
+      notifications: notifications || slack > 0,
     };
   }
 

@@ -31,6 +31,7 @@ import {
   LOCAL_STACK_STAGE_TITLE_MAX,
   LOCAL_STACK_STAGES_MAX,
   LOCAL_STACK_TITLE_MAX,
+  LOCAL_WORK_CARD_KINDS,
   type LocalMethodName,
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
@@ -216,14 +217,15 @@ export const MCP_TOOLS = [
       args: z
         .record(z.string(), z.unknown())
         .describe(
-          'orchestrator_start: {mode?: "start"|"next"}; orchestrator_stop: {}; pr_approve: {pr: number}; tool_use: {toolName: string}; card_accept: {card: number, merge?: boolean} — merge also merges the card’s pull request while it is open.',
+          'orchestrator_start: {mode?: "start"|"next"}; orchestrator_stop: {}; pr_approve: {pr: number}; tool_use: {toolName: string}; card_accept: {card: number, merge?: boolean} — merge also merges the card’s pull request while it is open, at the head it has when you ask: if the pull request moves before the approval, nothing is merged and action_status shows result {error: "head_moved", headSha} — ask again.',
         ),
       summary: z.string().min(1).max(ACTION_REQUEST_SUMMARY_MAX),
     },
   },
   {
     name: 'action_status',
-    description: 'The state of an action request made with request_action.',
+    description:
+      'The state of an action request made with request_action, and its result once it ran (why it failed, when it did).',
     method: 'action.status',
     input: { id: z.string().min(1).max(64) },
   },
@@ -409,7 +411,7 @@ export const MCP_TOOLS = [
         .optional()
         .describe('What is being done and why; markdown.'),
       kind: z
-        .enum(LOCAL_CARD_KINDS)
+        .enum(LOCAL_WORK_CARD_KINDS)
         .optional()
         .describe('feature or bug, only when it is obvious.'),
     },

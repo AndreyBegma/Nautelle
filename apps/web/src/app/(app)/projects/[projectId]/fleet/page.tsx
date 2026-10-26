@@ -9,6 +9,7 @@ import {
   FLEET_LIVE_EVENT,
   type FleetGraph,
   type FleetView,
+  type FleetWorkingView,
   type OrchestratorSettingsView,
   projectRoleAtLeast,
 } from '@nautelle/shared';
@@ -35,7 +36,6 @@ import { usePageActions } from '../../../../../components/shell/use-page-actions
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
 import type { TerminalTarget } from '../../../../../components/terminal/terminal-view';
 import { api } from '../../../../../lib/api';
-import { fetchBoard } from '../../../../../lib/board/actions';
 import {
   boardNewPlanHref,
   boardNewWorkHref,
@@ -112,7 +112,7 @@ function FleetWorkspace() {
 
   /** Bumped by a live push; the fleet and the graph depend on it. */
   const [version, setVersion] = useState(0);
-  /** Bumped by a Board push; Working now depends on it (C-397). */
+  /** Bumped by a Board push; Working now depends on it (C-397, C-473). */
   const [boardVersion, setBoardVersion] = useState(0);
   const [, setNow] = useState(0);
   const [startOpen, setStartOpen] = useState(false);
@@ -199,14 +199,14 @@ function FleetWorkspace() {
       ),
     [projectId],
   );
-  // C-397: who works now is read off the Board's cards.
-  const board = useSection(
-    () => fetchBoard(projectId),
+  // C-473 (ADR-0122): who works now is its own read, not the whole Board.
+  const atWork = useSection(
+    () => api<FleetWorkingView>(`/projects/${projectId}/fleet/working`),
     [projectId, version, boardVersion],
   );
   const working = useMemo(
-    () => (board.data ? workingNow(board.data) : undefined),
-    [board.data],
+    () => (atWork.data ? workingNow(atWork.data) : undefined),
+    [atWork.data],
   );
   const orchestratorStatus = fleet.data?.orchestrator.status;
   const reasons = useControlReasons({

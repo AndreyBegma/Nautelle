@@ -52,3 +52,14 @@ export const PROTECTED_PATHS_MAX = 100;
 export const protectedPathsSchema = z
   .array(z.string().min(1).max(4096))
   .max(PROTECTED_PATHS_MAX);
+
+/** C-501: at most this many changed paths are reported; the rest are dropped. */
+export const CHANGED_PATHS_MAX = 1000;
+
+/**
+ * C-501: every path a pushed branch changes against its base, sorted. Absent
+ * from a runner older than C-501: unknown.
+ */
+export const changedPathsSchema = z
+  .array(z.string().min(1).max(4096))
+  .max(CHANGED_PATHS_MAX);

@@ -215,6 +215,45 @@ describe('board accept with merge (e2e, #273)', () => {
       expect(await w.audit('card.merged')).toHaveLength(0);
     });
 
+    it('head_changed carries the current headSha and its diff, and accepting that head merges it (C-415)', async () => {
+      await finished();
+      const MOVED = 'c'.repeat(40);
+      w.handlers['card.merge'] = (args) =>
+        args.headSha === MOVED
+          ? ok({
+              merged: true,
+              alreadyMerged: false,
+              method: 'merge',
+              mergeCommit: null,
+              issueClosed: true,
+            })
+          : ok({
+              merged: false,
+              error: 'head_changed',
+              message: 'The head moved',
+              headSha: MOVED,
+            });
+      const refused = await post(1, 'accept', {
+        merge: { headSha: HEAD_SHA },
+      });
+      expect(refused.status).toBe(409);
+      expect(refused.body).toMatchObject({
+        error: 'merge_failed',
+        reason: 'head_changed',
+        headSha: MOVED,
+        diffUrl: `https://github.com/acme/widget/pull/77/files/${MOVED}`,
+      });
+      expect((await w.card(1)).column).toBe('finished');
+      // One step later: the refusal's head, merged — never any other.
+      const accepted = await post(1, 'accept', { merge: { headSha: MOVED } });
+      expect(accepted.status).toBe(200);
+      expect(w.sent('card.merge').map((a) => a.headSha)).toEqual([
+        HEAD_SHA,
+        MOVED,
+      ]);
+      expect(accepted.body.column).toBe('completed');
+    });
+
     it('no PR → 409 no_pull_request, nothing sent', async () => {
       await w.createCard();
       await w.runCard(1);

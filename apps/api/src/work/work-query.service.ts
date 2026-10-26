@@ -54,7 +54,7 @@ export const workSourceOfCard = (card: {
  * projects the caller operates — Inbox suggestions, across the projects they
  * can see, in one keyset `(updatedAt, id)` descending. Each source reads a
  * page plus one in that order (L-25) and the two are merged by cursor here; a
- * plan task's status is derived after the join (as `GET /tasks`), so a status
+ * plan task's status is derived after the join (as the former `GET /tasks`), so a status
  * filter reads the tasks on in bounded batches (`pageWorkTasks`).
  */
 @Injectable()
@@ -224,6 +224,8 @@ export class WorkQueryService {
     if (query.source && query.source !== 'plan') return NONE;
     // Plan tasks never enter the Inbox (D2).
     if (query.status === 'inbox') return NONE;
+    // C-503: a plan task is never an analysis.
+    if (query.kind === 'analysis') return NONE;
     const tasks: Prisma.PlanTaskWhereInput[] = [];
     if (query.kind) tasks.push({ kind: query.kind });
     if (search) {

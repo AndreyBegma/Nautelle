@@ -3,8 +3,8 @@ import {
   ACTION_REQUEST_SUMMARY_MAX,
   type ActionRequestKind,
   BOARD_CARD_BODY_MAX,
-  BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
+  WORK_CARD_KINDS,
 } from '@nautelle/shared';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
@@ -45,7 +45,7 @@ const draft = z.object({
   project,
   title: z.string().trim().min(1).max(BOARD_CARD_TITLE_MAX),
   body: z.string().max(BOARD_CARD_BODY_MAX).describe('Markdown'),
-  kind: z.enum(BOARD_CARD_KINDS).optional(),
+  kind: z.enum(WORK_CARD_KINDS).optional(),
 });
 
 /** Bytes of a tool's data sent back to the model. */

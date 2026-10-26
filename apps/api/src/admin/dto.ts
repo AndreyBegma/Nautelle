@@ -1,4 +1,5 @@
 import {
+  ADMIN_USERS_SEARCH_MAX,
   type ApproveUserRequest,
   type RegistrationState,
   ROLES,
@@ -7,12 +8,30 @@ import {
   USER_STATUSES,
   type UserStatus,
 } from '@nautelle/shared';
-import { IsBoolean, IsIn, IsOptional } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class ListUsersQuery {
   @IsOptional()
   @IsIn(USER_STATUSES)
   status?: UserStatus;
+
+  /** Matches part of the email or the name, ignoring case. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(ADMIN_USERS_SEARCH_MAX)
+  q?: string;
+
+  /** `nextCursor` of the previous page. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  cursor?: string;
 }
 
 export class ApproveUserDto implements ApproveUserRequest {

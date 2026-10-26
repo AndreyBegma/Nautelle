@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import type { OnboardingFacts } from '@nautelle/shared';
-import { currentStep, gettingStarted } from './steps';
+import type { MyOnboardingFacts, OnboardingFacts } from '@nautelle/shared';
+import { currentStep, gettingStarted, operatorGettingStarted } from './steps';
 
 const ids = (state: ReturnType<typeof gettingStarted>, done: boolean) =>
   state.steps.filter((s) => !s.optional && s.done === done).map((s) => s.id);
@@ -19,7 +19,20 @@ const NOTHING: OnboardingFacts = {
   firstCard: 'none',
   githubApp: false,
   teammates: false,
+  aiProvider: false,
+  notifications: false,
 };
+
+const NEW_OPERATOR: MyOnboardingFacts = {
+  notifications: false,
+  cardRun: false,
+  projectCount: 0,
+};
+
+const me = (overrides: Partial<MyOnboardingFacts> = {}): MyOnboardingFacts => ({
+  ...NEW_OPERATOR,
+  ...overrides,
+});
 
 const facts = (overrides: Partial<OnboardingFacts> = {}): OnboardingFacts => ({
   ...NOTHING,
@@ -133,8 +146,10 @@ describe('gettingStarted', () => {
         pushCheck: PASSED,
         firstCard: 'pr',
         githubApp: true,
+        notifications: true,
       }),
     });
+    expect(state.audience).toBe('admin');
     expect(state.complete).toBe(true);
     expect(state.done).toBe(7);
     expect(
@@ -142,7 +157,30 @@ describe('gettingStarted', () => {
     ).toEqual([
       ['github', true],
       ['invite', false],
+      ['ai', false],
+      ['notifications', true],
     ]);
+  });
+
+  test('the AI provider and notifications steps link to their pages and tick from their facts', () => {
+    const state = gettingStarted({
+      runners: { kind: 'online', online: 1 },
+      projects: [PROJECT],
+      facts: facts({ aiProvider: true }),
+    });
+    const step = (id: string) => state.steps.find((s) => s.id === id);
+    expect(step('ai')).toMatchObject({
+      optional: true,
+      done: true,
+      href: '/admin/ai-providers',
+    });
+    expect(step('notifications')).toMatchObject({
+      optional: true,
+      done: false,
+      href: '/account/notifications',
+    });
+    // Optional: neither counts towards "N of 7".
+    expect(state.total).toBe(7);
   });
 
   test('a project with its runner offline is not complete', () => {
@@ -163,5 +201,59 @@ describe('gettingStarted', () => {
     });
     expect(ids(state, true)).toEqual([]);
     expect(state.steps.every((s) => !s.done)).toBe(true);
+  });
+});
+
+describe('operatorGettingStarted', () => {
+  const SHARED = [{ id: 'p1' }];
+
+  test('a new operator with no project: three steps, 0 of 3, opens on the project', () => {
+    const state = operatorGettingStarted({ projects: [], me: me() });
+    expect(state.audience).toBe('operator');
+    expect(state.steps.map((s) => [s.id, s.optional])).toEqual([
+      ['open', false],
+      ['notifications', false],
+      ['card', false],
+    ]);
+    expect(state.done).toBe(0);
+    expect(state.total).toBe(3);
+    expect(currentStep(state)).toMatchObject({
+      id: 'open',
+      href: '/projects',
+    });
+    // No project to run a card in yet.
+    expect(state.steps.find((s) => s.id === 'card')?.href).toBeUndefined();
+    expect(state.project).toBeNull();
+  });
+
+  test('a shared project: the next step turns on notifications, the card step links to its Board', () => {
+    const state = operatorGettingStarted({
+      projects: SHARED,
+      me: me({ projectCount: 1 }),
+    });
+    expect(ids(state, true)).toEqual(['open']);
+    expect(currentStep(state)).toMatchObject({
+      id: 'notifications',
+      href: '/account/notifications',
+    });
+    expect(state.steps.find((s) => s.id === 'card')?.href).toBe(
+      '/projects/p1/board',
+    );
+  });
+
+  test('notifications on and a card run complete it', () => {
+    const state = operatorGettingStarted({
+      projects: SHARED,
+      me: me({ projectCount: 1, notifications: true, cardRun: true }),
+    });
+    expect(state.done).toBe(3);
+    expect(state.complete).toBe(true);
+    expect(currentStep(state)).toBeUndefined();
+  });
+
+  test('facts not loaded are never read as done', () => {
+    const state = operatorGettingStarted({ projects: SHARED, me: null });
+    expect(state.steps.every((s) => !s.done)).toBe(true);
+    expect(state.complete).toBe(false);
   });
 });

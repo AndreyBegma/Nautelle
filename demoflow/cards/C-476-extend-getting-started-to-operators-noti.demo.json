@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "name": "Getting started: an AI provider and notifications for admins, three steps for operators",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Two new optional steps"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "heading",
+        "name": "Getting started",
+        "exact": true
+      },
+      "caption": "An admin's checklist still counts its seven required steps.",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "heading",
+        "name": "Optional",
+        "exact": true
+      }
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "Add an AI provider"
+      },
+      "caption": "Add an AI provider is done once a provider is enabled with a key."
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "Turn on notifications"
+      },
+      "caption": "Turn on notifications is done once Telegram is linked, email is on, or a Slack webhook is set."
+    },
+    {
+      "action": "screenshot",
+      "name": "optional-steps"
+    },
+    {
+      "action": "marker",
+      "title": "Turn on notifications"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Open notifications",
+        "exact": true
+      },
+      "caption": "The step opens the caller's own notification settings."
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Things that need a person, where to get them, and which projects to silence.",
+        "exact": true
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "screenshot",
+      "name": "notifications"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "Things that need a person, where to get them, and which projects to silence.",
+        "exact": true
+      },
+      "caption": "Link Telegram or turn on email here, and Getting started marks the step done."
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    }
+  ]
+}

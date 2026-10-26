@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type {
   PlanDetail,
   PlanListView,
@@ -5,7 +6,6 @@ import type {
   PlannerSettingsView,
   PlanTaskVersionsView,
   RunPage,
-  TaskPage,
 } from '@nautelle/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { capabilities } from '../runners/testing/runner-e2e';
@@ -268,15 +268,6 @@ describe('planner (e2e)', () => {
       const again = await h.author.send('post', `${h.base(created.id)}/send`);
       expect(again.status).toBe(200);
       expect(h.sentOf('issue.create')).toHaveLength(2);
-
-      const tasks = (await h.author.get('/tasks')).body as TaskPage;
-      expect(tasks.items.map((t) => [t.key, t.status])).toEqual(
-        expect.arrayContaining([
-          ['t1', 'queued'],
-          ['t2', 'queued'],
-          ['t3', 'rejected'],
-        ]),
-      );
     });
 
     it('publishes features as one docs pull request and queues them when it merges (docs_pr)', async () => {
@@ -803,6 +794,98 @@ describe('planner (e2e)', () => {
       const third = h.sentOf('plan.turn')[2];
       expect(third.prompt).toContain('Action: `decompose`');
       expect((await h.detail(plan.id)).status).toBe('drafting');
+    });
+  });
+
+  describe('after a move to another runner (C-477, ADR-0107)', () => {
+    /** What the move writes: a new plan session, no task sessions. */
+    const moved = async (planId: string): Promise<string> => {
+      const sessionId = randomUUID();
+      await h.ctx.prisma.plan.update({
+        where: { id: planId },
+        data: { sessionId, sessionSince: new Date() },
+      });
+      await h.ctx.prisma.planTask.updateMany({
+        where: { planId },
+        data: { sessionId: null },
+      });
+      return sessionId;
+    };
+
+    it('starts the new plan session, then resumes it and forks tasks from it', async () => {
+      const plan = await h.createPlan('dialogue');
+      await h.finish(
+        plan.id,
+        block({
+          action: 'clarify',
+          questions: [question('p1', true)],
+          done: false,
+        }),
+      );
+      const sessionId = await moved(plan.id);
+
+      const answer = await h.author.send('post', `${h.base(plan.id)}/turns`, {
+        answers: [{ questionId: 'p1', text: 'Only CSV' }],
+      });
+      expect(answer.status).toBe(201);
+      // The clarify turn before the move ran on the old machine.
+      expect(h.sentOf('plan.turn')[1].session).toEqual({
+        id: sessionId,
+        resume: false,
+      });
+
+      await h.finish(
+        plan.id,
+        block({ action: 'clarify', questions: [], done: true }),
+      );
+      expect(h.sentOf('plan.turn')[2].session).toEqual({
+        id: sessionId,
+        resume: true,
+      });
+      await h.finish(
+        plan.id,
+        block({
+          action: 'decompose',
+          title: 'Exporter',
+          tasks: [task('t1', { questions: [question('q1', true)] })],
+        }),
+      );
+
+      const grill = await h.author.send(
+        'post',
+        `${h.base(plan.id)}/tasks/t1/turns`,
+        { answers: [{ questionId: 'q1', optionId: 'yes' }] },
+      );
+      expect(grill.status).toBe(201);
+      expect(h.sentOf('plan.turn')[3].session).toMatchObject({
+        resume: true,
+        forkFrom: sessionId,
+      });
+    });
+
+    it('starts a task in a session of its own until a plan turn runs on the new runner', async () => {
+      const plan = await threeTasks();
+      await moved(plan.id);
+
+      const turn = await h.author.send(
+        'post',
+        `${h.base(plan.id)}/tasks/t2/turns`,
+        { answers: [{ questionId: 'q1', optionId: 'yes' }] },
+      );
+      expect(turn.status).toBe(201);
+      const grill = h.sentOf('plan.turn')[1].session as Record<string, unknown>;
+      // Nothing to fork: the plan session exists only on the old machine.
+      expect(grill).toEqual({ id: expect.stringMatching(UUID), resume: false });
+
+      await h.finish(
+        plan.id,
+        block({ action: 'grill', taskKey: 't2', questions: [], done: true }),
+      );
+      // The chained write resumes the task's new session.
+      expect(h.sentOf('plan.turn')[2].session).toEqual({
+        id: grill.id,
+        resume: true,
+      });
     });
   });
 
