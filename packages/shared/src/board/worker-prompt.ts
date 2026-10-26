@@ -42,7 +42,10 @@ import type { BoardCardKind } from './types';
  * signs in off camera in `setup`, uses locators that match one element, and
  * is recorded on a merged base before the round finishes. Version 26 (C-525):
  * the demo has a marker per step, a caption on the change, a final
- * `assertVisible` on the result, and no `wait` steps for pacing.
+ * `assertVisible` on the result, and explicit `wait` steps (1500 ms after the
+ * step that shows a result, 3000 ms at the end) because the runner's pinned
+ * DemoFlow does not pace recordings yet. These waits go away when the pin
+ * moves to the paced release (DemoFlow C-203, a follow-up).
  */
 export const CARD_WORKER_PROMPT_VERSION = 26;
 
@@ -546,7 +549,7 @@ const demoLines = (demo: CardWorkerDemo): string[] => [
   '- Steps the video need not show, such as signing in, go in the scenario\'s `setup`: DemoFlow runs them off camera and the video opens on the page they end on. Include a fragment from `demoflow/fragments/` when the project has one — `{ "action": "include", "fragment": "sign-in", "with": { "next": "/path" } }` — instead of copying its steps, and start `steps` at the first step that matters.',
   '- Use locators that match exactly one element; Playwright fails the run on two matches (a label on two fields, text in a list row and an `<option>`). Scope to a region, use role and name with `exact`, or add a unique label or test id.',
   '- Make the video followable: put one `marker` (`{ "action": "marker", "title": "…" }`) before each user-visible step, give the step that shows the change a `caption`, and end `steps` with an `assertVisible` on the end result (the created post, the saved setting) with a `caption`. The result is the last thing on screen — never navigate away after it.',
-  '- Do not add `wait` steps just to slow the video down: the DemoFlow engine paces the recording itself (a dwell after each step, a hold on the final state, slower typing). A step overrides the default only when it must.',
+  '- The recording engine does not pace the video yet, so pace it yourself: after the step that shows a result add `{ "action": "wait", "ms": 1500 }`, and end the scenario with the captioned `assertVisible` followed by `{ "action": "wait", "ms": 3000 }` so the result stays on screen. Add no other `wait` steps.',
   '- Before recording, merge the latest base branch (`origin/<base>`, named under Branch below): selectors break when another merged card changed the UI.',
   `- Before finishing, record the scenario, not only validate it — a valid scenario still fails at run time. Run DemoFlow against the app from \`demoflow.config.json\` with \`--port $${CARD_ENV_PORT} --fresh-app\` and the env names above set locally (a throwaway demo account when the app seeds one), and fix the scenario until the run completes.`,
   '- If the card changes no UI, skip the scenario.',

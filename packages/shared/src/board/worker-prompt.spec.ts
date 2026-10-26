@@ -873,11 +873,10 @@ describe('worker prompt v26 — a followable demo (C-525)', () => {
     expect(demo).toContain('never navigate away after it');
   });
 
-  it('forbids wait steps for pacing', () => {
-    expect(demo).toContain(
-      'Do not add `wait` steps just to slow the video down',
-    );
-    expect(demo).toContain('paces the recording itself');
+  it('asks for a wait after the result and a longer one at the end', () => {
+    expect(demo).toContain('{ "action": "wait", "ms": 1500 }');
+    expect(demo).toContain('{ "action": "wait", "ms": 3000 }');
+    expect(demo).toContain('Add no other `wait` steps');
   });
 });
 
