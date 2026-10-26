@@ -46,6 +46,21 @@ describe('parseNormalizeOutput', () => {
     });
   });
 
+  it('never yields a task: a person makes one (C-509, ADR-0127)', () => {
+    const answer = block({
+      fields: [
+        {
+          id: 'title',
+          english: 'Add the Stripe secret',
+          alreadyEnglish: false,
+        },
+        { id: 'body', alreadyEnglish: true },
+      ],
+      kind: 'task',
+    });
+    expect(reasonOf(answer, card)).toBe('invalid_shape');
+  });
+
   it('refuses no block, two blocks and an unclosed block', () => {
     const one = block({ fields: [{ id: 'body', alreadyEnglish: true }] });
     expect(reasonOf('Just text.', comment)).toBe('no_block');

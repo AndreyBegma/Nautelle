@@ -392,7 +392,7 @@ export interface BoardCardView {
    */
   warmupSavedUsd?: string | null;
   // C-509 (ADR-0127) task cards — optional so no route must fill them yet;
-  // absent reads as none. Every other kind reads `null`.
+  // absent reads as none. Every other kind leaves them out.
   /** A task's assignee; `null` while unassigned (an Inbox candidate, or one who left). */
   assignee?: TaskAssigneeView | null;
   /** A task's checklist progress — the face's `2/5`; `null` without items. */

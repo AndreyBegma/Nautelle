@@ -779,7 +779,7 @@ const taskOf = (
   const fact = facts.tasks?.get(card.id);
   return {
     assignee: fact?.assignee ?? null,
-    checklist: fact?.checklist ?? { done: 0, total: 0 },
+    checklist: fact && fact.checklist.total > 0 ? fact.checklist : null,
     taskNote: card.taskNote,
     raisedFor: fact?.raisedFor ?? null,
   };
