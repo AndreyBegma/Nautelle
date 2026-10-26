@@ -34,6 +34,7 @@ import {
   isTerminalCard,
   mergeMethodText,
   mergeRequest,
+  movedHeadNotice,
   noMergeRequest,
 } from '../../lib/board/accept';
 import { fetchPullRequest } from '../../lib/board/actions';
@@ -54,6 +55,7 @@ export function AcceptDialog({
   card,
   busy,
   version,
+  headMoved = false,
   runnerCommands,
   onAccept,
   unlanded = null,
@@ -65,6 +67,8 @@ export function AcceptDialog({
   card: BoardCardView | undefined;
   busy: boolean;
   version: number;
+  /** C-415: the last Accept was refused as the PR's head moved; the banner shows the new head. */
+  headMoved?: boolean;
   /** What the runner advertised; gates the branch cleanup (#329 D9). */
   runnerCommands?: RunnerCommands | null;
   /** `merge` merges, `closePr` closes the PR, `{}` only moves the card. */
@@ -142,6 +146,10 @@ export function AcceptDialog({
     options.closePr &&
     effectivePath === 'no_merge';
 
+  // C-415: the refusal's new head, as the dialog now shows it and binds Accept to.
+  const moved =
+    headMoved && choice?.kind === 'merge' && pr ? movedHeadNotice(pr) : null;
+
   const accept = () => {
     if (!card || !choice) return;
     if (choice.kind === 'already_merged') {
@@ -188,7 +196,13 @@ export function AcceptDialog({
                 disabled={busy || choice === null || !card}
                 onClick={accept}
               >
-                {acceptPrimaryLabel(choice, effectivePath, closing, busy)}
+                {acceptPrimaryLabel(
+                  choice,
+                  effectivePath,
+                  closing,
+                  busy,
+                  moved !== null,
+                )}
               </Button>
             </>
           )
@@ -209,6 +223,7 @@ export function AcceptDialog({
             canClose={canClose}
             closing={closing}
             busy={busy}
+            moved={moved}
             onPath={setPath}
             onOptions={setOptions}
           />
@@ -237,6 +252,7 @@ export function AcceptBody({
   canClose,
   closing,
   busy,
+  moved = null,
   onPath,
   onOptions,
 }: {
@@ -249,6 +265,7 @@ export function AcceptBody({
   canClose: boolean;
   closing: boolean;
   busy: boolean;
+  moved?: { shortSha: string; diffUrl: string } | null;
   onPath: (path: AcceptPath) => void;
   onOptions: (options: AcceptOptions) => void;
 }) {
@@ -256,6 +273,7 @@ export function AcceptBody({
   const twoPaths = choice.kind === 'merge';
   return (
     <div className="flex flex-col gap-3 text-sm">
+      {moved ? <MovedHeadBanner moved={moved} /> : null}
       {pr ? <PullRequestBlock pr={pr} card={card} /> : null}
       {twoPaths ? (
         <SegmentedControl role="group" aria-label="What Accept does">
@@ -312,6 +330,40 @@ export function AcceptBody({
         </Banner>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * C-415: the merge was refused because the branch moved. The dialog has read
+ * the pull request again; Accept now merges the head named here, never one
+ * the person has not been shown.
+ */
+function MovedHeadBanner({
+  moved,
+}: {
+  moved: { shortSha: string; diffUrl: string };
+}) {
+  const href = githubUrl(moved.diffUrl);
+  return (
+    <Banner tone="warn" title="The branch moved">
+      The pull request is now at{' '}
+      <code className="font-mono">{moved.shortSha}</code>; nothing was merged.
+      {href ? (
+        <>
+          {' '}
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2"
+          >
+            Review the changes
+          </a>
+          .
+        </>
+      ) : null}{' '}
+      Accept {moved.shortSha} merges exactly this head.
+    </Banner>
   );
 }
 

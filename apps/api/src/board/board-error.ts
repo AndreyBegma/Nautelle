@@ -14,7 +14,13 @@ import { HttpException } from '@nestjs/common';
  */
 type BoardErrorExtra = Pick<
   BoardErrorBody,
-  'reason' | 'source' | 'profileKey' | 'dependencies' | 'cards' | 'headSha' | 'diffUrl'
+  | 'reason'
+  | 'source'
+  | 'profileKey'
+  | 'dependencies'
+  | 'cards'
+  | 'headSha'
+  | 'diffUrl'
 >;
 
 /**
