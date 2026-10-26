@@ -36,7 +36,9 @@ describe('effectiveProjectRole', () => {
     ['admin', 'admin', 'admin'],
   ];
 
-  it.each(cases)('global %s, override %p -> %s', (globalRole, override, expected) => {
+  it.each(
+    cases,
+  )('global %s, override %p -> %s', (globalRole, override, expected) => {
     expect(effectiveProjectRole(globalRole, override)).toBe(expected);
   });
 });
