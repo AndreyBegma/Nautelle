@@ -7,6 +7,7 @@ import {
 } from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import { answer, english, OPUS } from '../assistant/testing/scripted-answers';
+import { writeStarterLabels } from '../board/starter-labels';
 import { LLM_SECRETS_KEY_ENV } from '../llm/llm-secrets';
 import { requestOf } from '../llm/providers/testing';
 import { createLlmE2eApp, type LlmE2eContext } from '../llm/testing/llm-e2e';
@@ -17,6 +18,7 @@ import {
   type Session,
 } from '../test/e2e-app';
 import { BOARD_ASK_LIMIT } from './board-ai.controller';
+import { BoardLabelSuggest } from './board-label-suggest.service';
 import { BoardTriage } from './board-triage.service';
 
 const MASTER_KEY = randomBytes(32).toString('base64');
@@ -674,6 +676,152 @@ describe('Ask the Board and triage hints (e2e)', () => {
         expect((await draft(alice, { text: `Card ${i}` })).status).toBe(200);
       }
       expect((await draft(alice, { text: 'One more' })).status).toBe(429);
+    });
+  });
+
+  describe('Label suggestion for a new card (C-500)', () => {
+    let suggest: jest.SpyInstance;
+
+    beforeEach(async () => {
+      await writeStarterLabels(ctx.prisma, dock);
+      suggest = jest.spyOn(ctx.app.get(BoardLabelSuggest), 'suggest');
+    });
+    afterEach(() => suggest.mockRestore());
+
+    const create = async (body: object = {}) => {
+      const res = await alice.send('post', `/projects/${dock}/board/cards`, {
+        title: 'Fix the sidebar layout',
+        body: 'The sidebar overlaps the content on narrow screens.',
+        ...body,
+      });
+      expect(res.status).toBe(201);
+      return res.body as { id: string; number: number };
+    };
+    /**
+     * The suggestion of the create, which the create itself never awaits; its
+     * failure is the create's log line, not an error here.
+     */
+    const suggested = async () => {
+      expect(suggest).toHaveBeenCalledTimes(1);
+      await suggest.mock.results[0].value.catch(() => undefined);
+    };
+    const labelsOf = async (cardId: string) =>
+      (
+        await ctx.prisma.boardCardLabel.findMany({
+          where: { cardId },
+          include: { label: true },
+        })
+      )
+        .map((r) => `${r.label.name}:${r.source}`)
+        .sort();
+    const labelCalls = () =>
+      calls.filter((c) => c.system.startsWith('You label'));
+
+    it('labels the card live from the answer of the cheap model, tagged card_labels', async () => {
+      script.push(json({ labels: ['Frontend', 'docs', 'nonsense'] }));
+      const card = await create();
+      await suggested();
+      expect(await labelsOf(card.id)).toEqual(['docs:model', 'frontend:model']);
+      expect(labelCalls()).toHaveLength(1);
+      const row = await ctx.prisma.llmCall.findFirstOrThrow({
+        where: { feature: 'card_labels' },
+      });
+      expect(row.outcome).toBe('ok');
+    });
+
+    it('keeps at most two labels', async () => {
+      script.push(json({ labels: ['frontend', 'backend', 'docs'] }));
+      const card = await create();
+      await suggested();
+      expect(await labelsOf(card.id)).toHaveLength(2);
+    });
+
+    it('leaves the card unlabelled on names the project does not have', async () => {
+      script.push(json({ labels: ['nonsense', 'other'] }));
+      const card = await create();
+      await suggested();
+      expect(await labelsOf(card.id)).toEqual([]);
+    });
+
+    it('leaves the card unlabelled on an answer out of contract', async () => {
+      script.push(answer([{ text: ['Sure, frontend.'] }]));
+      const card = await create();
+      await suggested();
+      expect(await labelsOf(card.id)).toEqual([]);
+    });
+
+    it('leaves the card unlabelled when no provider is set up', async () => {
+      await ctx.prisma.$executeRawUnsafe(
+        'TRUNCATE TABLE llm_provider_settings CASCADE',
+      );
+      const card = await create();
+      await suggested();
+      expect(await labelsOf(card.id)).toEqual([]);
+      expect(labelCalls()).toHaveLength(0);
+    });
+
+    it('leaves the card unlabelled when the model times out', async () => {
+      ctx.providerFetch.mockImplementation(async (input, init) => {
+        const { body } = await requestOf(input, init);
+        calls.push({ system: String(body?.system ?? ''), body: body ?? {} });
+        throw new DOMException('The operation timed out.', 'TimeoutError');
+      });
+      const card = await create();
+      await suggested();
+      expect(await labelsOf(card.id)).toEqual([]);
+      expect(labelCalls()).toHaveLength(1);
+    });
+
+    it('makes no call when the project switched suggestions off', async () => {
+      await ctx.prisma.boardSettings.upsert({
+        where: { projectId: dock },
+        update: { labelSuggest: false },
+        create: { projectId: dock, labelSuggest: false },
+      });
+      const card = await create();
+      expect(suggest).not.toHaveBeenCalled();
+      expect(await labelsOf(card.id)).toEqual([]);
+      expect(calls).toHaveLength(0);
+    });
+
+    it('makes no call when the person gave labels', async () => {
+      const docs = await ctx.prisma.projectLabel.findFirstOrThrow({
+        where: { projectId: dock, name: 'docs' },
+      });
+      const card = await create({ labelIds: [docs.id] });
+      expect(suggest).not.toHaveBeenCalled();
+      expect(await labelsOf(card.id)).toEqual(['docs:person']);
+      expect(calls).toHaveLength(0);
+    });
+
+    it("keeps a person's edit made before the answer", async () => {
+      const docs = await ctx.prisma.projectLabel.findFirstOrThrow({
+        where: { projectId: dock, name: 'docs' },
+      });
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const answered = json({ labels: ['frontend', 'docs'] });
+      ctx.providerFetch.mockImplementation(async (input, init) => {
+        const { body } = await requestOf(input, init);
+        calls.push({ system: String(body?.system ?? ''), body: body ?? {} });
+        await gate;
+        return answered;
+      });
+      const card = await create();
+      const set = await alice.send(
+        'put',
+        `/projects/${dock}/board/cards/${card.number}/labels`,
+        { labelIds: [docs.id] },
+      );
+      expect(set.status).toBe(200);
+      release();
+      await suggested();
+      expect(await labelsOf(card.id)).toEqual([
+        'docs:person',
+        'frontend:model',
+      ]);
     });
   });
 });
