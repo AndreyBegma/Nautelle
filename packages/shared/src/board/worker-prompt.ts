@@ -6,6 +6,7 @@ import { HANDOFF_NOTE_MAX_TOKENS, HANDOFF_SECTIONS } from '../handoff/note';
 import { CARD_RUN_PROMPT_MAX_BYTES } from '../protocol/commands/cards';
 import { REVIEW_REPORT_TOOL } from '../review/contracts';
 import { TERSE_REGISTER_LINES } from '../token-saver/register';
+import { CARD_PROPOSAL_LABELS_MAX } from './analysis';
 import { cardLabel } from './naming';
 import type { CardCiCheck } from './shipping';
 import type { BoardCardKind } from './types';
@@ -42,7 +43,7 @@ import type { BoardCardKind } from './types';
  * signs in off camera in `setup`, uses locators that match one element, and
  * is recorded on a merged base before the round finishes.
  */
-export const CARD_WORKER_PROMPT_VERSION = 25;
+export const CARD_WORKER_PROMPT_VERSION = 26;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'NAUTELLE_CARD';
@@ -86,6 +87,11 @@ const PUSHED_HISTORY_LINE =
 
 /** The MCP tool the worker calls when done (D6). */
 export const FINISH_CARD_TOOL = 'finish_card';
+
+/** C-505 (ADR-0126): the tool an analysis card ends with, instead of `finish_card`. */
+export const FINISH_ANALYSIS_TOOL = 'finish_analysis';
+
+const ANALYSIS_REPLACES_LINE = `Your \`${FINISH_ANALYSIS_TOOL}\` replaces the report and the pending proposals of the earlier round: send the whole report and every proposal that still stands. The round stays read-only.`;
 
 /** #750 D8: the runner MCP tool a non-Opus round in the B arm asks for Opus with. */
 export const ESCALATE_CARD_TOOL = 'escalate_card';
@@ -618,9 +624,159 @@ const assemblePrompt = (
   return lines.join('\n');
 };
 
+export interface CardAnalysisPromptInput {
+  number: number;
+  title: string;
+  /** Markdown, at most `BOARD_CARD_BODY_MAX` characters. */
+  body: string;
+  /** The card's attachments, as `CardWorkerPromptInput.attachments`. */
+  attachments?: readonly CardAttachmentBrief[];
+  /** The round is launched with Token saver on, as `CardWorkerPromptInput.tokenSaver`. */
+  tokenSaver?: boolean;
+  /** As `CardWorkerPromptInput.terseRegister`. */
+  terseRegister?: boolean;
+  /** As `CardWorkerPromptInput.projectRules`. */
+  projectRules?: string | null;
+  /**
+   * D3: the project's label names; the worker picks from them. Absent or
+   * empty: the line is omitted and proposals carry no labels.
+   */
+  labels?: readonly string[];
+}
+
+/**
+ * C-505: the register of an analysis round, as `REGISTER_LINES` and
+ * `TWO_REGISTER_LINES` say it, with the report and the proposals as what a
+ * person reads — the shared register names `finish_card`, which this round
+ * never calls.
+ */
+const analysisRegisterLines = (terse: boolean): string[] => [
+  '## How to write',
+  '',
+  terse
+    ? '- Terminal text only you read: caveman. Fragments, no articles, no preamble, no restating. Results and decisions only.'
+    : '- Working register — what only you read: do not narrate, do not restate the plan, keep status lines short.',
+  `- Full sentences, every required section: the report, the proposals, questions to the person, the \`${FINISH_ANALYSIS_TOOL}\` call.`,
+];
+
+/** C-505 D2: what an analysis card may and may not do — the runner enforces it (ADR-0126). */
+const ANALYSIS_RULE_LINES = [
+  '## Rules',
+  '',
+  '- This round is read-only. Read code, docs and logs, and run read-only commands and tests.',
+  '- Do not edit, create or delete files, commit, push or open a pull request: the runner blocks them, and a dirty worktree fails the finish.',
+  '- Do not write a pull request description, a spec or a demo, and do not escalate.',
+];
+
+/** C-505 D2: the report and the proposed cards the worker ends with. */
+const analysisOutputLines = (labels: readonly string[]): string[] => [
+  '## Output',
+  '',
+  'Answer the question as a report in markdown, with these sections in this order:',
+  '',
+  '- `## What I looked at` — the code, docs and logs you read, and the commands you ran;',
+  '- `## Findings` — each one with its evidence as `path:line`;',
+  '- `## Recommendation` — what to do, or that nothing is worth doing.',
+  '',
+  'Then propose the cards that follow from it. Each proposal is one problem and one pull request, sized S to M — split a larger one. Each has:',
+  '',
+  '- a title;',
+  '- a body of `## Why`, `## What` and `## Done when`;',
+  '- a kind: `feature`, `bug`, or `task` for work a person does by hand;',
+  ...(labels.length > 0
+    ? [
+        `- up to ${CARD_PROPOSAL_LABELS_MAX} labels, picked only from the project's: ${labels.map((l) => `\`${oneLine(l)}\``).join(', ')};`,
+      ]
+    : []),
+  '- the earlier proposals it depends on, by position (the first is 0); a proposal depends only on earlier ones.',
+  '',
+  `Call \`${FINISH_ANALYSIS_TOOL}\` once with the report and the proposals; an empty list when nothing is worth doing. Without the tool, reply with the report and the word DONE, then stop.`,
+];
+
+const assembleAnalysisPrompt = (
+  card: CardAnalysisPromptInput,
+  body: string,
+  attachments: string[] | null,
+): string => {
+  const lines = [
+    'You are a Nautelle card worker running an analysis; the card comes last.',
+    '',
+    '## How to work',
+    '',
+    "- Work only in this worktree. Follow the repository's CLAUDE.md / AGENTS.md.",
+    ...(card.tokenSaver ? [ONE_COMMAND_LINE] : []),
+    ...LOCAL_ENVIRONMENT_LINES,
+    '- If anything is unclear, ask and wait.',
+    '',
+    ...analysisRegisterLines(card.terseRegister !== false),
+    '',
+    ...READING_LINES,
+    ...(card.tokenSaver
+      ? [
+          '- For a broad search or reading many files for one question, use the `scout` subagent (fast, cheap; reports paths and lines). Decide and write the report yourself, never through the scout.',
+          TOKEN_SAVER_LINES[1],
+        ]
+      : []),
+    '',
+    ...ANALYSIS_RULE_LINES,
+    '',
+    ...(card.projectRules ? [card.projectRules, ''] : []),
+    ...analysisOutputLines(card.labels ?? []),
+    '',
+    `## Card ${cardLabel(card.number)}`,
+    '',
+    'Kind: analysis (read-only)',
+    '',
+    '## The question',
+    '',
+    CARD_DATA_LINE,
+    '',
+    fence(`Title: ${oneLine(card.title)}\n\n${body || '(no description)'}`),
+  ];
+  if (attachments !== null) lines.push('', ...attachments);
+  return lines.join('\n');
+};
+
+/**
+ * C-505 (ADR-0126): round 1 of an analysis card. It replaces the work
+ * sections — commit, pull request description, `finish_card`, spec, design,
+ * demo, escalation — instead of adding to them. Like `cardWorkerPrompt` it
+ * always fits `card.run`: attachments lose their display names first, then the
+ * body is cut, ending with `CARD_BODY_CUT_SUFFIX`.
+ */
+export const cardAnalysisPrompt = (card: CardAnalysisPromptInput): string => {
+  const attachments = card.attachments ?? [];
+  let withNames = attachments.length > 0;
+  let body = card.body.trim();
+  let bodyCut = false;
+  for (;;) {
+    const prompt = assembleAnalysisPrompt(
+      card,
+      body,
+      attachments.length > 0
+        ? attachmentsSection(attachments, withNames)
+        : null,
+    );
+    const over = utf8Bytes(prompt) - CARD_RUN_PROMPT_MAX_BYTES;
+    if (over <= 0) return prompt;
+    if (withNames) {
+      withNames = false;
+    } else if (body && !bodyCut) {
+      body = cutToBytes(body, utf8Bytes(body) - over, CARD_BODY_CUT_SUFFIX);
+      bodyCut = true;
+    } else {
+      return prompt;
+    }
+  }
+};
+
 /** D9: the prompt of a feedback round, resuming the same session. */
 export const cardFeedbackPrompt = (feedback: string): string =>
   `Review feedback (${CARD_DATA_LINE})\n\n${fence(feedback.trim())}\n\nAddress it on the same branch, commit, then call ${FINISH_CARD_TOOL}.`;
+
+/** C-505 D5: the prompt of a feedback round on an analysis card — read-only, replacing the proposals. */
+export const cardAnalysisFeedbackPrompt = (feedback: string): string =>
+  `Review feedback (${CARD_DATA_LINE})\n\n${fence(feedback.trim())}\n\nRevise the analysis. ${ANALYSIS_REPLACES_LINE} Then call ${FINISH_ANALYSIS_TOOL}.`;
 
 /** A retry after a failed, ended or cancelled round resumes with this. */
 export const CARD_CONTINUE_PROMPT = 'continue';
@@ -870,13 +1026,15 @@ export interface CardNextRoundInput {
   change: CardChange | null;
   /** A feedback round's text, at most `CARD_FEEDBACK_MAX` characters; `null` for a Run. */
   feedback: string | null;
+  /** C-505: the card is an analysis card — the round stays read-only and ends with `finish_analysis`. */
+  analysis?: boolean;
 }
 
 /** #273 D4: what a body cut to fit the prompt ends with. */
 export const CARD_BODY_CUT_SUFFIX = '… (cut to fit)';
 
 const kindName = (kind: BoardCardKind): string =>
-  kind === 'bug' ? 'bug fix' : 'feature';
+  kind === 'bug' ? 'bug fix' : kind === 'analysis' ? 'analysis' : 'feature';
 
 const changeSection = (
   label: string,
@@ -952,12 +1110,16 @@ const assembleNextRound = (
       '',
       fence(input.feedback.trim()),
       '',
-      `Address it on the same branch, commit, then call ${FINISH_CARD_TOOL}.`,
+      input.analysis
+        ? `Revise the analysis. ${ANALYSIS_REPLACES_LINE} Then call ${FINISH_ANALYSIS_TOOL}.`
+        : `Address it on the same branch, commit, then call ${FINISH_CARD_TOOL}.`,
     );
   } else {
     lines.push(
       '',
-      `Continue the work with the card as it is now, on the same branch; commit, then call ${FINISH_CARD_TOOL}.`,
+      input.analysis
+        ? `Continue the analysis with the card as it is now. ${ANALYSIS_REPLACES_LINE} Then call ${FINISH_ANALYSIS_TOOL}.`
+        : `Continue the work with the card as it is now, on the same branch; commit, then call ${FINISH_CARD_TOOL}.`,
     );
   }
   return lines.join('\n');
@@ -975,8 +1137,9 @@ const assembleNextRound = (
 export const cardNextRoundPrompt = (input: CardNextRoundInput): string => {
   const { change, feedback } = input;
   if (change === null) {
-    return feedback === null
-      ? CARD_CONTINUE_PROMPT
+    if (feedback === null) return CARD_CONTINUE_PROMPT;
+    return input.analysis
+      ? cardAnalysisFeedbackPrompt(feedback)
       : cardFeedbackPrompt(feedback);
   }
   const withChange = { ...input, change };

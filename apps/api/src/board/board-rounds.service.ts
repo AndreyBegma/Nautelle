@@ -12,6 +12,7 @@ import {
   type CardRoundPhase,
   type CardRoundTrigger,
   type CardWorkerDemo,
+  cardAnalysisPrompt,
   cardAttachmentSnapshotSchema,
   cardBranch,
   cardChange,
@@ -43,6 +44,7 @@ import {
   cardEffortAvailable,
   cardEscalateAvailable,
   cardFreshStartAvailable,
+  cardReadOnlyAvailable,
   cardRunArgsSchema,
   cardStartBranchAvailable,
   ISSUE_TITLE_MAX,
@@ -888,7 +890,10 @@ export class BoardRoundsService {
     const project = await this.work.project(card.projectId);
     if (isActiveRoundPhase(card.rounds[0]?.phase)) throw this.running();
     // #359: the runner pushes during the round and opens a draft PR (D1).
+    // C-505 (ADR-0126): an analysis card is read-only — it ships nothing.
+    const analysis = card.kind === 'analysis';
     const ships =
+      !analysis &&
       card.source !== 'fleet' &&
       card.source !== 'terminal' &&
       this.commands.servesChecks(project.runnerId);
@@ -951,18 +956,33 @@ export class BoardRoundsService {
     const specDir = target.kind === 'code_repo' ? target.specDir : null;
     const firstStart = !resume;
     // #243 D6: a needed design is approved before the worker starts.
-    const design = trigger === 'run' ? await this.approvedDesign(card) : null;
+    const design =
+      trigger === 'run' && !analysis ? await this.approvedDesign(card) : null;
     // #480: the card's stack — its place, and its approved design as reference.
-    const stack = firstStart ? await this.stacks.contextOf(card.id) : null;
+    const stack =
+      firstStart && !analysis ? await this.stacks.contextOf(card.id) : null;
     // #359 D4: every card gets its spec file where there is a place for it;
     // without one (#379: no Spec folder, or a remote docs repository with no
     // local clone) it runs without, as readiness says.
-    const writesSpec = firstStart && card.specPath === null;
+    const writesSpec = !analysis && firstStart && card.specPath === null;
     if (writesSpec && target.kind === 'docs_repo') {
       this.commands.assertReady(project.runnerId, 'docs.publish_specs');
     }
 
     this.commands.assertReady(project.runnerId, 'card.run');
+    const capabilities = await this.capabilitiesOf(project.runnerId);
+    // C-505 D4: a runner that cannot run read-only never gets the card — it
+    // would write — so the Run is refused and the card stays where it is.
+    if (
+      analysis &&
+      (capabilities === null || !cardReadOnlyAvailable(capabilities))
+    ) {
+      throw new BoardFailure(
+        503,
+        BOARD_ERROR.commandUnavailable,
+        'The runner does not run analysis cards (read-only rounds); update it',
+      );
+    }
     await this.assertRoomFor(project.id, card.id, trigger);
     await this.attachments.assertClaimable(
       project.id,
@@ -984,7 +1004,6 @@ export class BoardRoundsService {
       card.rounds.length === 0,
     );
     const byType = flags[MODEL_BY_TYPE] === true;
-    const capabilities = await this.capabilitiesOf(project.runnerId);
     // #322 D2: the launch's model, else the card's, else the recommendation.
     // #663: the effort beside it the same way; a `ci_fix` round defaults to
     // `sonnet` at `low` (ADR-0068 §5). #750 D3: in the B arm of
@@ -1026,7 +1045,8 @@ export class BoardRoundsService {
     // a spec directory there is no spec file, and an issue holds the spec.
     let issue = { number: card.issueNumber, url: card.issueUrl };
     const wantsIssue =
-      card.issueOnRun || (card.kindSource === 'auto' && card.kind === 'bug');
+      !analysis &&
+      (card.issueOnRun || (card.kindSource === 'auto' && card.kind === 'bug'));
     if (firstStart && wantsIssue && issue.number === null) {
       const created = boardOutput(
         'issue.create',
@@ -1065,7 +1085,7 @@ export class BoardRoundsService {
     // session worked — when it is a card branch and the runner takes the
     // field; the runner then uses it only when origin has it.
     const startChoice = startBranchChoice(
-      taken,
+      analysis ? null : taken,
       branch,
       followUp,
       capabilities !== null && cardStartBranchAvailable(capabilities),
@@ -1078,16 +1098,17 @@ export class BoardRoundsService {
     if (writesSpec && target.kind === 'docs_repo') {
       specPr = await this.publishSpec(project, card, target, issue, actor);
     }
-    const specPath =
-      specPr?.path ??
-      card.specPath ??
-      (specDir
-        ? cardSpecPath(specDir, {
-            number: card.number,
-            title: card.title,
-            issueNumber: issue.number,
-          })
-        : null);
+    const specPath = analysis
+      ? null
+      : (specPr?.path ??
+        card.specPath ??
+        (specDir
+          ? cardSpecPath(specDir, {
+              number: card.number,
+              title: card.title,
+              issueNumber: issue.number,
+            })
+          : null));
     // #243 D7, #441: round 1 commits every frame of the approved variant
     // into the card's branch, as stored — without the viewer's pin helper,
     // which is never stored.
@@ -1154,21 +1175,21 @@ export class BoardRoundsService {
     const projectRules = prefix.projectRules;
     // #750 D8: a non-Opus round of the B arm may ask for Opus, once.
     const escalate =
+      !analysis &&
       byType &&
       !isOpusModel(model) &&
       card.escalatedAt === null &&
       capabilities !== null &&
       cardEscalateAvailable(capabilities);
-    const demo = cardRoundDemo(
-      card,
-      await this.demoSettings(project.id),
-      capabilities,
-    );
+    const demo = analysis
+      ? null
+      : cardRoundDemo(card, await this.demoSettings(project.id), capabilities);
     const nextRound = (change: CardChange | null) =>
       cardNextRoundPrompt({
         label: cardLabel(card.number),
         change,
         feedback: trigger === 'feedback' ? feedback : null,
+        analysis,
       });
     // #750 D9: an escalation resumes the card's work, with the finding.
     const nextPrompt = nextRound(changeSinceLastRound(card, attachmentBriefs));
@@ -1180,56 +1201,66 @@ export class BoardRoundsService {
         ? escalation
           ? escalationRoundPrompt(card, nextPrompt, nextRound(null))
           : nextPrompt
-        : cardWorkerPrompt({
-            number: card.number,
-            title: card.title,
-            body: card.body,
-            kind: card.kind,
-            // #854: the branch the round is expected to work on.
-            branch: startBranch ?? branch,
-            base,
-            specPath,
-            specPr: specPr
-              ? { repo: specPr.repo, url: specPr.url, branch: specPr.branch }
-              : null,
-            issueNumber: issue.number,
-            design:
-              designFrames.length > 0 && design
+        : analysis
+          ? cardAnalysisPrompt({
+              number: card.number,
+              title: card.title,
+              body: card.body,
+              attachments: attachmentBriefs,
+              projectRules,
+              ...cardPromptSaver(saver),
+              labels: await this.projectLabelNames(project.id),
+            })
+          : cardWorkerPrompt({
+              number: card.number,
+              title: card.title,
+              body: card.body,
+              kind: card.kind,
+              // #854: the branch the round is expected to work on.
+              branch: startBranch ?? branch,
+              base,
+              specPath,
+              specPr: specPr
+                ? { repo: specPr.repo, url: specPr.url, branch: specPr.branch }
+                : null,
+              issueNumber: issue.number,
+              design:
+                designFrames.length > 0 && design
+                  ? {
+                      frames: designFrames.map((f) => ({
+                        name: f.name,
+                        path: f.path,
+                      })),
+                      rationale: design.rationale,
+                      comments: design.comments,
+                    }
+                  : null,
+              stack: stack
                 ? {
-                    frames: designFrames.map((f) => ({
-                      name: f.name,
-                      path: f.path,
-                    })),
-                    rationale: design.rationale,
-                    comments: design.comments,
+                    label: stackLabel(stack.number),
+                    title: stack.title,
+                    stage: stack.stage,
+                    stageTitle: stack.stageTitle,
+                    stageCount: stack.stageCount,
+                    design:
+                      stack.design && stackFrames.length > 0
+                        ? {
+                            frames: stackFrames.map((f) => ({
+                              name: f.name,
+                              path: f.path,
+                            })),
+                            rationale: stack.design.rationale,
+                          }
+                        : null,
                   }
                 : null,
-            stack: stack
-              ? {
-                  label: stackLabel(stack.number),
-                  title: stack.title,
-                  stage: stack.stage,
-                  stageTitle: stack.stageTitle,
-                  stageCount: stack.stageCount,
-                  design:
-                    stack.design && stackFrames.length > 0
-                      ? {
-                          frames: stackFrames.map((f) => ({
-                            name: f.name,
-                            path: f.path,
-                          })),
-                          rationale: stack.design.rationale,
-                        }
-                      : null,
-                }
-              : null,
-            attachments: attachmentBriefs,
-            projectRules,
-            ...cardPromptSaver(saver),
-            // #750 D8: the text goes with the tool the runner offers.
-            ...cardPromptEscalate(escalate),
-            demo,
-          });
+              attachments: attachmentBriefs,
+              projectRules,
+              ...cardPromptSaver(saver),
+              // #750 D8: the text goes with the tool the runner offers.
+              ...cardPromptEscalate(escalate),
+              demo,
+            });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null && specPr === null
         ? [{ path: specPath, content: specContent(card, issue.number) }]
@@ -1253,6 +1284,7 @@ export class BoardRoundsService {
       model,
       ...(effort !== null ? { effort } : {}),
       permissionMode,
+      ...(analysis ? { readOnly: true as const } : {}),
       ...(ships
         ? {
             pullRequest: cardDraftPullRequest({
@@ -1363,7 +1395,8 @@ export class BoardRoundsService {
                 sessionPrefix: prefix.session,
               }
             : {}),
-          branch,
+          // C-505 D4: an analysis card has no branch; the one sent is the worktree's.
+          ...(analysis ? {} : { branch }),
           specPath,
           ...(choosesBase
             ? {
@@ -1452,7 +1485,8 @@ export class BoardRoundsService {
           : { ciFix: fix.reason }
         : {}),
       ...(autoRunAfter !== null ? { autoRunAfter } : {}),
-      branch,
+      branch: analysis ? null : branch,
+      ...(analysis ? { readOnly: true } : {}),
       ...(followUp ? { newBranch: true } : {}),
       resume,
       ...(fresh ? { fresh } : {}),
@@ -1699,6 +1733,16 @@ export class BoardRoundsService {
 
   /** #663: whether the project's runner advertises `cardEffort`. */
   /** The runner's capability advert (ADR-0023); `null` when unreadable. */
+  /** C-505 D3: the project's label names, in their order; none without labels. */
+  private async projectLabelNames(projectId: string): Promise<string[]> {
+    const rows = await this.prisma.projectLabel.findMany({
+      where: { projectId },
+      orderBy: { position: 'asc' },
+      select: { name: true },
+    });
+    return rows.map((r) => r.name);
+  }
+
   private async capabilitiesOf(runnerId: string): Promise<Capabilities | null> {
     const runner = await this.prisma.runner.findUnique({
       where: { id: runnerId },
