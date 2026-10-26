@@ -48,6 +48,7 @@ import {
   userRef,
   userSelect,
 } from './plan-mapper';
+import { PlanCloser } from './plan-closer';
 import { PlanStore } from './plan-store';
 import { type PlanCaller, PlanTurnService } from './plan-turn.service';
 import { toTaskVersionView, versionTurns } from './plan-versions';
@@ -104,6 +105,7 @@ export class PlanService implements OnModuleInit {
     private readonly textOwners: TextOwners,
     private readonly attachments: AttachmentsService,
     private readonly userSettings: UserSettingsService,
+    private readonly closer: PlanCloser,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -662,22 +664,8 @@ export class PlanService implements OnModuleInit {
   }
 
   /** `plan.close`, best effort (D15). */
-  async close(plan: Plan, caller: PlanCaller): Promise<void> {
-    try {
-      const project = await this.store.project(plan.projectId);
-      const result = await this.commands.send(
-        project.runnerId,
-        'plan.close',
-        { planId: plan.id, projectId: plan.projectId },
-        { role: caller.role, ctx: caller.ctx },
-      );
-      if (result.status !== 'ok') {
-        this.logger.warn(`plan ${plan.id}: plan.close ${result.status}`);
-      }
-    } catch (error) {
-      if (!(error instanceof PlannerFailure)) throw error;
-      this.logger.warn(`plan ${plan.id}: plan.close: ${error.message}`);
-    }
+  close(plan: Plan, caller: PlanCaller): Promise<void> {
+    return this.closer.close(plan, caller);
   }
 
   private touch(planId: string) {

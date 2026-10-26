@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type { CreatePlanCardsResponse, PlanDetail } from '@nautelle/shared';
 import { block, decomposed, PlannerHarness, task } from './testing/planner-e2e';
 
@@ -101,6 +102,29 @@ describe('Create cards (e2e, #337)', () => {
       (await h.author.send('post', `${h.base(plan.id)}/send`, {})).status,
     ).toBe(409);
     expect(await h.ctx.prisma.boardCard.count()).toBe(4);
+    // Done: the worktree goes once; the refused second call sends nothing.
+    expect(h.sentOf('plan.close')).toEqual([
+      { planId: plan.id, projectId: h.projectId },
+    ]);
+  });
+
+  it('a plan.close that fails is logged and the plan stays done', async () => {
+    const plan = await graph();
+    await approve(plan, 't1', 't2', 't3', 't4');
+    h.handlers['plan.close'] = () => {
+      throw new Error('runner went away');
+    };
+    const warn = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+
+    expect((await createCards(plan.id)).status).toBe(201);
+
+    expect(h.sentOf('plan.close')).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('plan.close: runner went away'),
+    );
+    expect((await h.detail(plan.id)).status).toBe('done');
   });
 
   it('leaves rejected tasks out, and refuses while a task needs talk or a dependency is not approved', async () => {

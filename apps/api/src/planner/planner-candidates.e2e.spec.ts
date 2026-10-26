@@ -283,6 +283,7 @@ describe('New work candidates (e2e, #592)', () => {
     expect(rejected.body.status).toBe('rejected');
     expect(await h.auditOf('plan.candidate_rejected')).toHaveLength(1);
     expect((await h.detail(plan.id)).status).toBe('reviewing');
+    expect(h.sentOf('plan.close')).toHaveLength(0);
 
     // Decided already: no second decision, no edit.
     const twice = await reject(first);
@@ -302,6 +303,9 @@ describe('New work candidates (e2e, #592)', () => {
     expect(await cards()).toHaveLength(0);
     const done = await h.detail(plan.id);
     expect(done.status).toBe('done');
+    expect(h.sentOf('plan.close')).toEqual([
+      { planId: plan.id, projectId: h.projectId },
+    ]);
     expect(candidates(done).map((c) => c.status)).toEqual([
       'rejected',
       'rejected',

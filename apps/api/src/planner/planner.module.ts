@@ -7,6 +7,7 @@ import { ReadinessModule } from '../readiness';
 import { RunnersModule } from '../runners/runners.module';
 import { SettingsModule } from '../settings/settings.module';
 import { CardDesignTurnService } from './card-design-turn.service';
+import { PlanCloser } from './plan-closer';
 import { PlanService } from './plan.service';
 import { PlanCandidatesService } from './plan-candidates.service';
 import { PlanCardsService } from './plan-cards.service';
@@ -45,6 +46,7 @@ import { StackDesignTurnService } from './stack-design-turn.service';
     PlanDocsSink,
     PlanCandidatesService,
     PlanCardsService,
+    PlanCloser,
     PlanSendService,
     PlanService,
     PlanStore,
