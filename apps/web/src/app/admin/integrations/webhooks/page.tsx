@@ -11,16 +11,18 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
-import type {
-  ProjectSummary,
-  WebhookView,
-  WebhookWithSecret,
+import {
+  type ProjectSummary,
+  WEBHOOK_LIVE_EVENTS,
+  type WebhookView,
+  type WebhookWithSecret,
 } from '@nautelle/shared';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { PageHeader } from '../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';
 import { api } from '../../../../lib/api';
 import { Time } from '../../../../lib/format/time';
+import { useLiveRefresh } from '../../../../lib/live/use-live-refresh';
 import { useSection } from '../../../../lib/section/use-section';
 import {
   CIRCUIT_LABEL,
@@ -37,8 +39,6 @@ import {
 import { TargetsCard } from './targets-card';
 import { WebhookDialog } from './webhook-dialog';
 import { WebhookSheet } from './webhook-sheet';
-
-const POLL_MS = 15_000;
 
 const revealWebhook = (
   title: string,
@@ -69,10 +69,9 @@ export default function AdminWebhooksPage() {
   const [revealed, setRevealed] = useState<RevealedSecret | null>(null);
   const reload = webhooks.retry;
 
-  useEffect(() => {
-    const timer = setInterval(reload, POLL_MS);
-    return () => clearInterval(timer);
-  }, [reload]);
+  useLiveRefresh([], [WEBHOOK_LIVE_EVENTS.deliveryUpdated], reload, {
+    extraTopics: ['admin'],
+  });
 
   return (
     <div className="flex flex-col gap-6">
