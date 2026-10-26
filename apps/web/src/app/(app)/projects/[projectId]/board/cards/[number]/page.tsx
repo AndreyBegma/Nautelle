@@ -10,6 +10,7 @@ import { CardNotFound } from '../../../../../../../components/board/card-not-fou
 import type { TerminalAccess } from '../../../../../../../components/board/card-sheet';
 import { CardDetailBody } from '../../../../../../../components/board/card-sheet';
 import { useCardTab } from '../../../../../../../components/board/card-tabs';
+import { TaskSheetBody } from '../../../../../../../components/board/task-sheet';
 import { useCardActions } from '../../../../../../../components/board/use-card-actions';
 import { fetchCard } from '../../../../../../../lib/board/actions';
 import {
@@ -80,7 +81,17 @@ export default function CardPage() {
   return (
     <div className="flex flex-col gap-3">
       <div>{back}</div>
-      {card.data ? (
+      {card.data?.kind === 'task' ? (
+        <TaskSheetBody
+          key={card.data.id}
+          layout="page"
+          sheetTitle={`${card.data.label} ${card.data.title}`}
+          projectId={projectId}
+          card={card.data}
+          canOperate={canOperate}
+          onSaved={card.retry}
+        />
+      ) : card.data ? (
         <CardDetailBody
           // A new round resets the form; a refetch mid-typing does not.
           key={`${card.data.id}:${card.data.rounds.length}`}

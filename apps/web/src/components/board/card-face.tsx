@@ -1,3 +1,4 @@
+import { Avatar } from '@andrewbehma/glass-ui/avatar';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
@@ -17,6 +18,7 @@ import {
 } from '../../lib/board/format';
 import { prChipText } from '../../lib/board/pull-request';
 import { ciDot, readinessLine } from '../../lib/board/shipping';
+import { taskLine, taskProgress } from '../../lib/board/task';
 import { githubUrl } from '../../lib/url';
 import { ApproveRunLink } from './card-design';
 import { FaceIcons, KindIcon } from './card-face-icons';
@@ -64,8 +66,10 @@ export function CardFace({
   focused?: boolean;
   onOpen: (card: BoardCardView) => void;
 }) {
-  const offer = approveRunOffer(card);
-  const state = faceState(card);
+  // C-510: a task has no run, so no run pill, approve offer or PR footer.
+  const task = card.kind === 'task';
+  const offer = task ? null : approveRunOffer(card);
+  const state = task ? null : faceState(card);
   const readiness = readinessLine(card);
   const suggestion = isSuggestion(card);
   const note = 'break-words text-xs text-ink-2';
@@ -114,6 +118,11 @@ export function CardFace({
           className="flex flex-wrap items-center gap-x-1.5 gap-y-1 empty:hidden"
         >
           {suggestion ? <SuggestionBadges card={card} /> : null}
+          {task ? (
+            <span data-task-line="" className={note}>
+              {taskLine(card)}
+            </span>
+          ) : null}
           {state ? (
             <Tooltip content={state.title}>
               <span data-face-state={state.status}>
@@ -154,7 +163,8 @@ export function CardFace({
           <p className={note}>{card.captureWhy}</p>
         ) : null}
         <FaceLinks projectId={projectId} card={card} suggestion={suggestion} />
-        {card.prNumber !== null ? <CardFooter card={card} /> : null}
+        {task ? <TaskFooter card={card} /> : null}
+        {!task && card.prNumber !== null ? <CardFooter card={card} /> : null}
       </div>
     </SelectionFrame>
   );
@@ -205,6 +215,42 @@ function FaceLinks({
         <NextLink href={source} className={TEXT_LINK}>
           Source session
         </NextLink>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * C-510: where a code card has its PR and CI, a task has the assignee's avatar
+ * and the checklist's `2/4`. Nothing is drawn for a task with neither.
+ */
+function TaskFooter({ card }: { card: BoardCardView }) {
+  const progress = taskProgress(card);
+  if (!card.assignee && !progress) return null;
+  return (
+    <div
+      data-card-row="footer"
+      className="mt-0.5 flex items-center gap-1.5 border-line border-t pt-1.5 text-xs"
+    >
+      {card.assignee ? (
+        <span
+          data-task-assignee=""
+          role="img"
+          aria-label={`Assignee ${card.assignee.name}`}
+          title={card.assignee.name}
+          className="inline-flex"
+        >
+          <Avatar size="sm" name={card.assignee.name} className="size-5" />
+        </span>
+      ) : null}
+      {progress ? (
+        <span
+          data-task-progress=""
+          className="tabular-nums text-ink-2"
+          title="Checklist items ticked"
+        >
+          {progress}
+        </span>
       ) : null}
     </div>
   );

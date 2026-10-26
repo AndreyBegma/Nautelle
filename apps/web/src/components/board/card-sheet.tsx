@@ -147,6 +147,7 @@ import { MovePicker } from './move-picker';
 import { ReviewSection } from './review-section';
 import { RoundFacts, RoundSummary, RoundTokenSaver } from './round-facts';
 import { SuggestionSheetBody } from './suggestion-sheet';
+import { TaskSheetBody } from './task-sheet';
 import { TriageHints } from './triage-hints';
 import type { CardActions } from './use-card-actions';
 import { useCardMove } from './use-card-move';
@@ -480,7 +481,7 @@ export function focusSheetTitle(anchor: Element | null): boolean {
 }
 
 /** Rendered inside a `SheetContent`: moves the initial focus to the title. */
-function InitialFocus() {
+export function InitialFocus() {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     focusSheetTitle(ref.current);
@@ -1672,21 +1673,33 @@ export function CardSheet({
     >
       {number !== undefined ? (
         card && card.number === number && !error && card.column !== 'inbox' ? (
-          <CardDetailBody
-            // A new round resets the form; a push mid-typing does not.
-            key={`${card.id}:${card.rounds.length}`}
-            sheetTitle={sheetTitle}
-            projectId={projectId}
-            card={card}
-            canOperate={canOperate}
-            actions={actions}
-            terminal={terminal}
-            runnerName={runnerName}
-            onSaved={onChanged}
-            onClose={close}
-            tab={tab}
-            onTabChange={setTab}
-          />
+          card.kind === 'task' ? (
+            <TaskSheetBody
+              key={card.id}
+              sheetTitle={sheetTitle}
+              projectId={projectId}
+              card={card}
+              canOperate={canOperate}
+              onSaved={onChanged}
+              onClose={close}
+            />
+          ) : (
+            <CardDetailBody
+              // A new round resets the form; a push mid-typing does not.
+              key={`${card.id}:${card.rounds.length}`}
+              sheetTitle={sheetTitle}
+              projectId={projectId}
+              card={card}
+              canOperate={canOperate}
+              actions={actions}
+              terminal={terminal}
+              runnerName={runnerName}
+              onSaved={onChanged}
+              onClose={close}
+              tab={tab}
+              onTabChange={setTab}
+            />
+          )
         ) : (
           <SheetContent
             side={cardSheetSide(narrow)}

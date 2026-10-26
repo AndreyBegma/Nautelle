@@ -56,6 +56,17 @@ describe('card action rules', () => {
     ).toBe(false);
   });
 
+  it('a task has no worker: no Run, retry or Stop whatever its column (C-510)', () => {
+    expect(canRun(card({ kind: 'task' }))).toBe(false);
+    expect(
+      canRetry(card({ kind: 'task', column: 'in_progress', round: null })),
+    ).toBe(false);
+    expect(
+      canStop(card({ kind: 'task', queue: { state: 'queued' } as never })),
+    ).toBe(false);
+    expect(canRun(card({ kind: 'feature' }))).toBe(true);
+  });
+
   it('Retry: an In progress card whose round is no longer active', () => {
     expect(
       canRetry(card({ column: 'in_progress', round: round('cancelled') })),

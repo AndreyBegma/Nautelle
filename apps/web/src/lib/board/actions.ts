@@ -4,6 +4,7 @@ import type {
   AcceptSuggestionRequest,
   AddCardDependencyRequest,
   AddStackCardRequest,
+  AddTaskChecklistItemRequest,
   BoardCardDetail,
   BoardCardView,
   BoardSettingsView,
@@ -21,9 +22,11 @@ import type {
   CreateBoardStackRequest,
   DismissAllResult,
   RunBoardCardRequest,
+  TaskDoneRequest,
   UpdateBoardCardRequest,
   UpdateBoardSettingsRequest,
   UpdateBoardStackRequest,
+  UpdateTaskChecklistItemRequest,
 } from '@nautelle/shared';
 import { api } from '../api';
 import type { MoveCardBody } from './board-state';
@@ -107,6 +110,53 @@ export const removeDependency = (
     `${cardPath(projectId, number)}/dependencies/${dependsOn}`,
     { method: 'DELETE' },
   );
+
+/** C-510 (ADR-0127): a task's checklist and Done. Each answers the fresh card. */
+export const addTaskItem = (
+  projectId: string,
+  number: number,
+  body: AddTaskChecklistItemRequest,
+) =>
+  api<BoardCardDetail>(`${cardPath(projectId, number)}/checklist`, {
+    method: 'POST',
+    body,
+  });
+
+export const updateTaskItem = (
+  projectId: string,
+  number: number,
+  itemId: string,
+  body: UpdateTaskChecklistItemRequest,
+) =>
+  api<BoardCardDetail>(
+    `${cardPath(projectId, number)}/checklist/${encodeURIComponent(itemId)}`,
+    { method: 'PATCH', body },
+  );
+
+export const removeTaskItem = (
+  projectId: string,
+  number: number,
+  itemId: string,
+) =>
+  api<BoardCardDetail>(
+    `${cardPath(projectId, number)}/checklist/${encodeURIComponent(itemId)}`,
+    { method: 'DELETE' },
+  );
+
+export const doneTask = (
+  projectId: string,
+  number: number,
+  body: TaskDoneRequest = {},
+) =>
+  api<BoardCardDetail>(`${cardPath(projectId, number)}/done`, {
+    method: 'POST',
+    body,
+  });
+
+export const reopenTask = (projectId: string, number: number) =>
+  api<BoardCardDetail>(`${cardPath(projectId, number)}/reopen`, {
+    method: 'POST',
+  });
 
 export const sendFeedback = (
   projectId: string,
