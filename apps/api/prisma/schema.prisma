@@ -43,6 +43,8 @@ model User {
 
   approvedBy                  User?                         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
   recoveryCodes               UserRecoveryCode[]
+  passwordResetLinks          PasswordResetLink[]           @relation("PasswordResetLinkUser")
+  passwordResetLinksCreated   PasswordResetLink[]           @relation("PasswordResetLinkCreatedBy")
   approvedUsers               User[]                        @relation("UserApprovals")
   sessions                    UserSession[]
   apiTokens                   ApiToken[]                    @relation("ApiTokenOwner")
@@ -169,6 +171,40 @@ model UserRecoveryCode {
 
   @@unique([userId, codeHash])
   @@map("user_recovery_codes")
+}
+
+enum PasswordResetKind {
+  password
+  two_factor
+}
+
+enum PasswordResetVia {
+  admin
+  email
+}
+
+/// C-402 (ADR-0113): a one-time link that sets a new password — from an admin
+/// in Admin › Users, or emailed by Forgot password. Only the SHA-256 of its
+/// 256-bit token is stored. It works once and before `expiresAt`; a new link
+/// for the same person replaces their unused ones.
+model PasswordResetLink {
+  id          String            @id @default(cuid())
+  userId      String
+  tokenHash   String            @unique
+  kind        PasswordResetKind
+  via         PasswordResetVia
+  /// The admin who made it; null for an emailed link or a deleted admin.
+  createdById String?
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime          @default(now())
+
+  user      User  @relation("PasswordResetLinkUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("PasswordResetLinkCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_links")
 }
 
 /// A login session. Named `UserSession` because `Session` is reserved for agent

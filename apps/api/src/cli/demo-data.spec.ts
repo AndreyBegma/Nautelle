@@ -8,6 +8,7 @@ import {
   DEMO_CARDS,
   DEMO_FAILED_RUNS,
   DEMO_PROJECT_ID,
+  DEMO_TEAMMATE,
   DEMO_TOOL_CALLS,
   DemoDataError,
   demoDatabaseUrl,
@@ -54,7 +55,10 @@ describe('demo database names', () => {
 
 describe('seedDemo', () => {
   const prisma = () => ({
-    user: { findUnique: jest.fn().mockResolvedValue({ id: 'u1' }) },
+    user: {
+      findUnique: jest.fn().mockResolvedValue({ id: 'u1' }),
+      upsert: jest.fn(),
+    },
     runner: { upsert: jest.fn() },
     project: { upsert: jest.fn() },
     boardSettings: { upsert: jest.fn() },
@@ -244,6 +248,23 @@ describe('seedDemo', () => {
     });
     expect(db.designRevision.upsert).toHaveBeenCalledTimes(1);
     expect(db.designFrame.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('seeds an active teammate with a password nobody knows (C-402)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+
+    expect(db.user.upsert).toHaveBeenCalledTimes(1);
+    const [{ where, update, create }] = db.user.upsert.mock.calls[0];
+    expect(where).toEqual({ id: DEMO_TEAMMATE.id });
+    expect(update).toEqual({});
+    expect(create).toMatchObject({
+      email: DEMO_TEAMMATE.email,
+      role: 'operator',
+      status: 'active',
+      approvedById: 'u1',
+    });
+    expect(create.passwordHash).toMatch(/^\$argon2id\$/);
   });
 
   it('needs the admin to exist', async () => {
