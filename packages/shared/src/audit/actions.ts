@@ -89,6 +89,10 @@ export const AUDIT_ACTIONS = [
   'telegram.board',
   /** #578: a card's review action from Telegram (`after: { number, action }`). */
   'telegram.card',
+  /** C-405: a Slack webhook was set or its events changed (`after: { scope, events, urlChanged }`; never the URL). */
+  'slack.configure',
+  /** C-405: a Slack webhook was removed (`after: { scope }`). */
+  'slack.clear',
   'terminal.attached',
   'terminal.detached',
   'skill.installed',

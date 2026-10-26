@@ -1,6 +1,6 @@
 # ADR-0108: Notifications go out on channels, and email is one, over SMTP from the environment
 
-Status: accepted · Date: 2026-10-25 ·
+Status: accepted; §1 amended by [ADR-0109](0109-slack-notifications-go-through-an-incoming-webhook-per-project-or-workspace.md) for channel-scoped destinations (Slack) · Date: 2026-10-25 ·
 Spec: [`docs/specs/card-404-email-notifications-over-smtp-from-env-i.md`](../specs/card-404-email-notifications-over-smtp-from-env-i.md) ·
 Relates to: [spec 22](../specs/22-notifications-and-telegram.md), [ADR-0096](0096-a-cards-demo-video-goes-to-telegram-as-a-notification-with-merge-and-feedback.md), [ADR-0014](0014-server-originated-events-live-in-events.md) ·
 Card: C-404 (stack S-16, stage 1)
@@ -40,6 +40,12 @@ Constraints:
    may use; a muted notification gets its delivery rows as `skipped: muted`,
    never sent. A folded notification gets no new delivery on any channel: the
    first one already told the person.
+   *Amended by [ADR-0109](0109-slack-notifications-go-through-an-incoming-webhook-per-project-or-workspace.md)
+   §5:* this applies to destinations that belong to a person. Slack posts to
+   a project's or the workspace's channel, one message per notification, so it
+   is not a `NotificationDeliveryChannel`: it has its own `slack_deliveries`
+   outbox fed before recipients are applied, its own per-webhook toggles, and
+   no mutes or folding.
 2. **Email is configured by `SMTP_URL`, nothing else.** `SMTP_URL`
    (`smtp://` with STARTTLS when offered, or `smtps://`) and an optional
    `SMTP_FROM` are read at start-up. They are never stored in the database.
@@ -84,8 +90,11 @@ Constraints:
   without opening the app or linking Telegram.
 - C-402 sends its reset email through `MailService` and checks
   `MailService.configured` before it offers self-service reset.
-- C-405 adds Slack as a channel without a new ADR: a channel value, a rule
-  field and a sender.
+- ~~C-405 adds Slack as a channel without a new ADR: a channel value, a rule
+  field and a sender.~~ Superseded: C-405 recorded
+  [ADR-0109](0109-slack-notifications-go-through-an-incoming-webhook-per-project-or-workspace.md),
+  which keeps Slack out of `notification_deliveries` because a channel message
+  is one per notification, not one per person.
 - Changing the SMTP server is an environment change and an API restart, as
   for the database. There is no way to set it from the app.
 - An email address is the person's sign-in address; there is no separate

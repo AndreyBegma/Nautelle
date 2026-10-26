@@ -52,6 +52,7 @@ import { RulesTab } from './rules/rules-tab';
 import { SessionsTab } from './sessions-tab';
 import { SettingsIndex } from './settings-index';
 import { SettingsSearchBox } from './settings-search-box';
+import { SlackTab } from './slack-tab';
 import { StewardTab } from './steward-tab';
 import { TokenSaverTab } from './token-saver-tab';
 
@@ -93,6 +94,9 @@ const BLOCKS: Readonly<
   ),
   members: ({ project, isAdmin }) => (
     <MembersTab projectId={project.id} isAdmin={isAdmin} />
+  ),
+  slack: ({ project, isAdmin }) => (
+    <SlackTab projectId={project.id} isAdmin={isAdmin} />
   ),
   budget: ({ project, isAdmin }) => (
     <BudgetTab projectId={project.id} isAdmin={isAdmin} />

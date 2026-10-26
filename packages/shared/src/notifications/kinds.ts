@@ -30,6 +30,8 @@ import type { Role } from '../auth';
  * the project's `demoTelegram` is on (C-372, ADR-0096): the video itself, with
  * Merge and Feedback buttons, so it is Telegram only and goes to operators and
  * admins only — the people who can act on it.
+ * `card.failed` comes from a card's round failing, and `card.merged` from its
+ * pull request merging (C-405); they name the card only, never error text.
  */
 export const NOTIFICATION_KINDS = [
   'person.needed',
@@ -50,6 +52,8 @@ export const NOTIFICATION_KINDS = [
   'card.background_stalled',
   'card.paused',
   'card.demo',
+  'card.failed',
+  'card.merged',
   'cards.suggested',
   'steward.incident',
   'account.throttled',
@@ -234,6 +238,20 @@ export const NOTIFICATION_KIND_SPECS: Record<
     viewerDefaults: { inApp: false, telegram: false },
     operatorsOnly: true,
     noEmail: true,
+  },
+  'card.failed': {
+    scope: 'project',
+    source: 'card.failed (C-405)',
+    channels: BOTH,
+    defaults: ON_ON,
+    viewerDefaults: { inApp: false, telegram: false },
+  },
+  'card.merged': {
+    scope: 'project',
+    source: 'card.merged (C-405)',
+    channels: BOTH,
+    defaults: ON_OFF,
+    viewerDefaults: { inApp: false, telegram: false },
   },
   'cards.suggested': {
     scope: 'project',

@@ -12,6 +12,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { MailService } from '../mail/mail.service';
+import { enqueueSlack } from '../slack/slack-outbox';
 import { channelsFor, muteActive } from './notification-rules.service';
 
 type Tx = Prisma.TransactionClient;
@@ -56,8 +57,9 @@ const ACTIVE = 'active' as const;
  * Recipients (D2), rules and mutes (D3), folding (D6) and the Telegram and
  * email delivery bookkeeping, inside the caller's transaction. Sending is not
  * here: a `pending` delivery is what the Telegram module or
- * `EmailDeliveryService` picks up, and a `digested` email waits for its
- * person's daily digest (C-404).
+ * `EmailDeliveryService` picks up, a `digested` email waits for its person's
+ * daily digest (C-404), and a `pending` Slack delivery (C-405) is what the
+ * Slack module sends.
  */
 @Injectable()
 export class NotificationWriter {
@@ -101,6 +103,9 @@ export class NotificationWriter {
     input: NotificationInput,
     recipients: Recipient[],
   ): Promise<WrittenNotification[]> {
+    // C-405 (ADR-0109): the project's Slack channel, once per notification
+    // and whoever the people are — before the empty-recipients return.
+    await enqueueSlack(tx, input);
     if (recipients.length === 0) return [];
     const userIds = recipients.map((r) => r.userId);
     const [rules, mutes, links] = await Promise.all([

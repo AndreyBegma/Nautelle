@@ -31,6 +31,8 @@ const SECTION_OF: Record<NotificationKind, DigestSection> = {
   'card.background_stalled': 'waiting',
   'card.paused': 'waiting',
   'card.demo': 'done',
+  'card.failed': 'waiting',
+  'card.merged': 'done',
   'cards.suggested': 'waiting',
   'steward.incident': 'waiting',
   'account.throttled': 'other',

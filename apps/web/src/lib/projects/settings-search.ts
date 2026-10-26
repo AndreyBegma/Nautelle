@@ -87,6 +87,14 @@ export const SETTINGS_CATALOGUE: readonly SettingEntry[] = [
   { item: 'rules', label: 'Scan project for rules' },
   { item: 'rules', label: 'Import rules from Markdown' },
   { item: 'rules', label: 'Applies to card types' },
+  // Project › Slack
+  {
+    item: 'slack',
+    label: 'Slack incoming webhook',
+    help: 'Notifications post to a Slack channel.',
+    keywords: 'notifications channel',
+  },
+  { item: 'slack', label: 'Send test message' },
   // Automation › Orchestrator
   {
     item: 'orchestrator',

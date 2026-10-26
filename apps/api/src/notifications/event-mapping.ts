@@ -2,7 +2,9 @@ import {
   blockingDialogText,
   CARD_BACKGROUND_STALLED_EVENT,
   CARD_DEMO_EVENT,
+  CARD_FAILED_EVENT,
   CARD_FINISHED_EVENT,
+  CARD_MERGED_EVENT,
   CARD_PAUSED_EVENT,
   CARD_WAITING_EVENT,
   CARDS_SUGGESTED_EVENT,
@@ -341,8 +343,42 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
         card: number,
       };
     }
+    // C-405: only the API records them; they name the card and its PR, never
+    // the round's error, which can quote the pane.
+    case CARD_FAILED_EVENT:
+    case CARD_MERGED_EVENT: {
+      if (event.source !== API_EVENT_SOURCE) return null;
+      const number = positiveInt(data.number);
+      if (!number) return null;
+      const title = oneLine(data.title, 120);
+      const card = title
+        ? `${cardLabel(number)} "${title}"`
+        : `Card ${cardLabel(number)}`;
+      if (event.type === CARD_FAILED_EVENT) {
+        return {
+          kind: 'card.failed',
+          slot: null,
+          issue: null,
+          title: `${card} failed`,
+          body: 'Its round did not run to the end. Open the card to see why, then run it again.',
+          page: 'board',
+          card: number,
+        };
+      }
+      const pr = positiveInt(data.prNumber);
+      return {
+        kind: 'card.merged',
+        slot: null,
+        issue: null,
+        title: `${card} is merged`,
+        body: pr ? `PR #${pr} merged.` : 'Its pull request merged.',
+        page: 'board',
+        card: number,
+      };
+    }
     // C-372: only the API records it, while the project's `demoTelegram` is
-    // on. The Telegram message carries the video; the draft names the card.
+    // on, or (C-405) while a Slack webhook posts its demos. The Telegram
+    // message carries the video; the draft names the card.
     case CARD_DEMO_EVENT: {
       if (event.source !== API_EVENT_SOURCE) return null;
       const number = positiveInt(data.number);

@@ -55,6 +55,9 @@ the database cannot be read without it.
 
 - **The Telegram bot**: set up under **Admin › Integrations › Telegram**; it
   needs the encryption key, which every install has.
+- **Slack**: an incoming webhook URL under **Admin › Integrations › Slack** for
+  every project, or in a project's **Settings › Slack** for that project only.
+  It is sealed with the same key.
 - **Email notifications**: `SMTP_URL` (and optionally `SMTP_FROM`) in
   `api.env`, for example `SMTP_URL=smtps://user:password@smtp.example.com:465`
   — percent-encode an `@` or `:` in the user or password. Restart the API, then

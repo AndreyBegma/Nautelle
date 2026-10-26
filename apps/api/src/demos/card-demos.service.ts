@@ -46,6 +46,7 @@ import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
 import { bearerToken } from '../runners/credentials';
 import { recordServerEvent } from '../server-events/server-events';
+import { slackPosts } from '../slack/slack-outbox';
 import { demoOutdated } from './demo-outdated';
 import { DemoRunner } from './demo-runner';
 import { DemoSettingsService } from './demo-settings.service';
@@ -823,8 +824,10 @@ export class CardDemosService {
   /**
    * C-372: the `card.demo` server event of a demo that became ready or
    * failed, in the transaction that records its activity — only while the
-   * project's `demoTelegram` is on. A skipped demo sends nothing, and neither
-   * does one that is no longer the card's (`demoOutdated`).
+   * project's `demoTelegram` is on or, C-405, its Slack webhook posts the
+   * demo; with `demoTelegram` off it is marked `telegram: false` and reaches
+   * no person. A skipped demo sends nothing, and neither does one that is no
+   * longer the card's (`demoOutdated`).
    */
   private async telegramEvent(
     tx: Prisma.TransactionClient,
@@ -836,6 +839,7 @@ export class CardDemosService {
       where: { id: demo.cardId },
       select: {
         id: true,
+        projectId: true,
         number: true,
         title: true,
         ciHeadSha: true,
@@ -849,7 +853,15 @@ export class CardDemosService {
         },
       },
     });
-    if (!(card.project.boardSettings?.demoTelegram ?? true)) return;
+    const telegram = card.project.boardSettings?.demoTelegram ?? true;
+    if (
+      !telegram &&
+      !(await slackPosts(tx, card.projectId, [
+        demo.status === 'ready' ? 'demo' : 'failed',
+      ]))
+    ) {
+      return;
+    }
     if (await demoOutdated(tx, demo, card.ciHeadSha)) return;
     const data: CardDemoEventData = {
       cardId: card.id,
@@ -860,6 +872,7 @@ export class CardDemosService {
       status: demo.status,
       reason: demo.status === 'failed' ? demo.reason : null,
       size: demo.status === 'ready' ? demo.size : null,
+      telegram,
     };
     await recordServerEvent(tx, {
       source: API_EVENT_SOURCE,

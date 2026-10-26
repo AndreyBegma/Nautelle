@@ -8,11 +8,13 @@ import type {
   EmailIntegrationStatus,
   GitHubAppView,
   InboundTriggerView,
+  SlackWebhookStatus,
   TelegramIntegrationStatus,
   WebhookView,
 } from '@nautelle/shared';
 import {
   GitBranch,
+  Hash,
   type LucideIcon,
   Mail,
   Send,
@@ -26,6 +28,7 @@ import {
   emailStatus,
   gitHubAppStatus,
   type IntegrationStatus,
+  slackStatus,
   telegramStatus,
   triggersStatus,
   UNAVAILABLE,
@@ -97,6 +100,10 @@ export default function IntegrationsPage() {
     () => api<TelegramIntegrationStatus>('/admin/integrations/telegram'),
     [],
   );
+  const slack = useSection(
+    () => api<SlackWebhookStatus>('/admin/integrations/slack'),
+    [],
+  );
   const email = useSection(
     () => api<EmailIntegrationStatus>('/admin/integrations/email'),
     [],
@@ -127,6 +134,13 @@ export default function IntegrationsPage() {
           purpose="Notifications and approvals in each person’s own Telegram chat."
           href="/admin/integrations/telegram"
           status={statusOf(telegram, telegramStatus)}
+        />
+        <IntegrationCard
+          icon={Hash}
+          title="Slack"
+          purpose="Finished cards, demos and failures posted to a channel through an incoming webhook."
+          href="/admin/integrations/slack"
+          status={statusOf(slack, slackStatus)}
         />
         <IntegrationCard
           icon={Mail}
