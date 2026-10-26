@@ -67,7 +67,10 @@ export class BoardAutoRun implements OnModuleInit {
    * commit, so the last one to commit sees every dependency satisfied; of
    * those that race (a dependency's Finished, then its Accept), the row lock
    * lets one through and the rest re-read the switch off. The Run starts
-   * exactly once, as the person the claimed row names (C-181).
+   * exactly once, as the person the claimed row names (C-181). C-417: a card
+   * with two or more dependencies not landed in the base is not claimed — the
+   * Run would be refused `dependencies_unmerged`, so it waits (the switch
+   * stays on) until a merge (`BoardWork.markMerged`) tries it again.
    */
   private async claim(
     cardId: string,
@@ -87,6 +90,23 @@ export class BoardAutoRun implements OnModuleInit {
             WHERE dep."cardId" = card.id
               AND target."column" NOT IN ('finished', 'completed')
          )
+         AND (
+           SELECT count(*)
+             FROM board_card_dependencies AS dep
+             JOIN board_cards AS target ON target.id = dep."dependsOnId"
+            WHERE dep."cardId" = card.id
+              AND NOT (
+                CASE
+                  WHEN target."mergedAt" IS NOT NULL THEN target."prBase" IS NULL
+                  ELSE target."column" = 'completed'
+                    AND NOT (
+                      target."prNumber" IS NOT NULL
+                      AND target."prState" IS DISTINCT FROM 'merged'
+                      AND target."prState" IS DISTINCT FROM 'closed'
+                    )
+                END
+              )
+         ) <= 1
       RETURNING card."autoRunArmedById"`;
     return rows.length === 1 ? { armedById: rows[0].autoRunArmedById } : null;
   }
