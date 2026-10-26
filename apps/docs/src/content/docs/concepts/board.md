@@ -12,7 +12,7 @@ planner and accepted by a person. Cards are numbered per project, `C-1`,
 
 | Column | What it means |
 |---|---|
-| **Inbox** | Suggestions waiting for a person. A suggestion leaves the Inbox only when someone accepts it. |
+| **Suggestions** | Suggestions waiting for a person. A suggestion leaves Suggestions only when someone accepts it. |
 | **To Do** | Accepted work, ready to run. |
 | **In progress** | A worker is on it. |
 | **Finished** | The worker is done and the checks are green. The pull request is not merged yet. |

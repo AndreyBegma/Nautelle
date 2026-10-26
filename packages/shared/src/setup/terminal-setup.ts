@@ -121,7 +121,7 @@ export interface TerminalSetupFacts {
 }
 
 export const TERMINAL_SETUP_CLOSING =
-  "Suggestions from your terminal sessions appear in the Board's Inbox; accept one to make it a card.";
+  "Suggestions from your terminal sessions appear in the Board's Suggestions; accept one to make it a card.";
 
 /** #719: how long a session or card run makes a profile one the project uses. */
 export const TERMINAL_SETUP_USE_WINDOW_DAYS = 30;
