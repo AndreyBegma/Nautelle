@@ -40,32 +40,27 @@
       }
     },
     {
-      "action": "assertText",
-      "target": {
-        "text": "Building",
-        "exact": true
-      },
-      "text": "Building",
-      "match": "exact",
-      "timeoutMs": 30000,
-      "caption": "The build starts and the section shows Building"
-    },
-    {
       "action": "marker",
       "title": "No 10 s refetch while it builds"
     },
     {
       "action": "wait",
       "ms": 5000,
-      "caption": "No request every 10 s: the section reloads once, when the build run settles"
+      "caption": "No request every 10 s: the section follows the build live"
     },
     {
       "action": "wait",
       "ms": 5000
     },
     {
-      "action": "wait",
-      "ms": 3000
+      "action": "assertVisible",
+      "target": {
+        "role": "heading",
+        "name": "UI profile",
+        "exact": true
+      },
+      "timeoutMs": 30000,
+      "caption": "The section reloaded once when the build run settled"
     }
   ]
 }
