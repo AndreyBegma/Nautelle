@@ -68,7 +68,7 @@ Loop until nothing is left in scope:
 | `ci` to `red` | `board_card` for `ciChecks`; `card_feedback {card, text}` naming the failing checks and what to fix. |
 | `ci` to `green` on a finished card | Merge policy (D4). |
 | `pr_merged` | `request_action card_accept` (D5). |
-| `column` to `todo`/`inbox`, deleted card | Someone moved it. Drop it from your scope; do not fight the person. |
+| `column` to `todo`/`inbox` (Suggestions), deleted card | Someone moved it. Drop it from your scope; do not fight the person. |
 
 4. Run the next card as a slot frees. Then wait again.
 
@@ -119,7 +119,7 @@ Finished; ask what the person wants instead of re-filing it.
 | Origin | `card_create` |
 |---|---|
 | The person asked for the card | No `candidate`: it goes to To Do. |
-| You propose it on your own | `candidate: true`: it goes to the Inbox for the person to accept. |
+| You propose it on your own | `candidate: true`: it goes to Suggestions for the person to accept. |
 
 Never create a card that duplicates one in `board_list`. `kind` only when obvious.
 
@@ -167,7 +167,7 @@ on the first change or at the timeout (`timeoutSec` 0–300, default 300), plus 
   summarize or after a long wait ("board cursor: ..."). After a compaction, resume
   with the last cursor you wrote down, not none. With none you re-read
   `board_list` and miss what changed meanwhile.
-- `cards` narrows to the cards you conduct (up to 50). Leave it off to see every card outside Inbox and Completed.
+- `cards` narrows to the cards you conduct (up to 50). Leave it off to see every card outside Suggestions and Completed.
 - An empty `events` is a quiet board, not an error. Call again with the new cursor.
 - Never poll `board_list` in a loop instead of waiting.
 

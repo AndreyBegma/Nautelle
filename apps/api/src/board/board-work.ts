@@ -287,7 +287,7 @@ const refusalOf = (
       ? boardError(
           409,
           BOARD_ERROR.invalidMove,
-          'A suggestion leaves the Inbox only for To Do, and nothing else enters it',
+          'A suggestion leaves Suggestions only for To Do, and nothing else enters it',
         )
       : boardError(409, BOARD_ERROR.moveRefused, MOVE_REFUSED[decision.error], {
           reason: decision.error,

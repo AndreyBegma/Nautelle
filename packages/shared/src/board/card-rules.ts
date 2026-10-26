@@ -95,7 +95,7 @@ export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
     'A worker is running on this card. Stop it first, or mark the card finished.',
   automatic_to_completed: 'Only a person completes a card.',
   card_completed: 'This card is already completed.',
-  invalid_move: 'A suggestion leaves the Inbox only by Accept, into To Do.',
+  invalid_move: 'A suggestion leaves Suggestions only by Accept, into To Do.',
   plan_task_derived: PLAN_TASK_MOVE_REFUSAL_TEXT,
 };
 
@@ -131,7 +131,7 @@ export const blockingDialogText = (dialog: PaneDialog): string =>
   `${BLOCKING_DIALOG_TEXT[dialog]} blocks the worker’s session. Open its terminal and answer it.`;
 
 export const COLUMN_TITLE: Record<BoardColumn, string> = {
-  inbox: 'Inbox',
+  inbox: 'Suggestions',
   todo: 'To Do',
   in_progress: 'In progress',
   finished: 'Finished',

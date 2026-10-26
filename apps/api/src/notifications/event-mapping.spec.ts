@@ -401,7 +401,7 @@ describe('draftFor (spec 22 D1)', () => {
         slot: null,
         issue: null,
         title: '3 cards were suggested',
-        body: 'Capture found follow-up work in a session; review it in the Inbox.',
+        body: 'Capture found follow-up work in a session; review it in Suggestions on the Board.',
         page: 'board',
       });
       expect(JSON.stringify(draft)).not.toContain('secret');

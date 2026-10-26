@@ -79,7 +79,7 @@ export const KIND_EXAMPLE: Record<NotificationKind, string> = {
   'card.demo': 'C-12 demo · PR #160 · CI green, with Merge and Feedback',
   'card.failed': 'Card C-12 failed: its round did not run to the end',
   'card.merged': 'Card C-12 is merged: PR #160 merged',
-  'cards.suggested': '3 cards suggested in the luna-watch Inbox',
+  'cards.suggested': '3 cards suggested in the luna-watch Suggestions',
   'steward.incident':
     'C-12 needs you: API error persisted after 2 nudges — open the terminal',
   'account.throttled':
