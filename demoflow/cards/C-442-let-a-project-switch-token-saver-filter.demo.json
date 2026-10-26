@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "name": "Switch a Token saver filter family off",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project/token-saver"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "The filter families"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "role": "heading", "name": "Filter families", "exact": true },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "[role='switch'][aria-labelledby='filter-family-ops'][aria-checked='true']"
+      },
+      "timeoutMs": 30000,
+      "caption": "Every family filters by default, each with what it saved in the range."
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "marker",
+      "title": "Switch Git and operations off"
+    },
+    {
+      "action": "click",
+      "target": { "role": "switch", "name": "Git and operations", "exact": true }
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "[role='switch'][aria-labelledby='filter-family-ops'][aria-checked='false']"
+      },
+      "timeoutMs": 15000,
+      "caption": "Saved for the project: it applies from the next launch."
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "marker",
+      "title": "Reload: it stays off"
+    },
+    {
+      "action": "navigate",
+      "path": "/projects/demo-project/token-saver"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "role": "heading", "name": "Filter families", "exact": true },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "[role='switch'][aria-labelledby='filter-family-ops'][aria-checked='false']"
+      },
+      "timeoutMs": 30000,
+      "caption": "After a reload Git and operations is still off; the other families stay on."
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "[role='switch'][aria-labelledby='filter-family-js'][aria-checked='true']"
+      }
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    }
+  ]
+}
