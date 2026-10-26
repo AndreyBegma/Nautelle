@@ -7,8 +7,8 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { BudgetFormDialog } from '../../../components/budgets/budget-form-dialog';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
-import { api } from '../../../lib/api';
 import { settingsItemHref } from '../../../lib/projects/settings-sections';
+import { fetchAllUsers } from '../../../lib/users/list';
 
 /**
  * "Set a budget" (#213) — the page's one primary. With a project in view it
@@ -33,7 +33,7 @@ export function SetBudget({
 
   useEffect(() => {
     if (!open || !isAdmin) return;
-    api<AdminUser[]>('/admin/users?status=active')
+    fetchAllUsers('active')
       .then((list) => {
         if (Array.isArray(list)) setUsers(list);
       })

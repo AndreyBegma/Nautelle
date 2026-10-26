@@ -55,6 +55,7 @@ import {
 } from '../../../lib/filters/use-url-filters';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
+import { fetchAllUsers } from '../../../lib/users/list';
 
 /** The page polls; the budget tab is the one that listens to live events. */
 const POLL_MS = 15_000;
@@ -92,7 +93,7 @@ function AdminBudgets() {
     api<ProjectSummary[]>('/projects')
       .then(setProjects)
       .catch(() => undefined);
-    api<AdminUser[]>('/admin/users?status=active')
+    fetchAllUsers('active')
       .then(setUsers)
       .catch(() => undefined);
   }, []);

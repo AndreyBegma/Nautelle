@@ -1,4 +1,11 @@
-import { type AdminUser, AUTH_ERROR, type Role } from '@nautelle/shared';
+import {
+  ADMIN_USERS_PAGE_SIZE,
+  type AdminUser,
+  type AdminUsersPage,
+  AUTH_ERROR,
+  type Role,
+  USER_STATUSES,
+} from '@nautelle/shared';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Prisma, User, UserStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -27,12 +34,65 @@ export class AdminUsersService {
     private readonly twoFactor: TwoFactorService,
   ) {}
 
-  async list(status?: UserStatus): Promise<AdminUser[]> {
-    const users = await this.prisma.user.findMany({
-      where: status ? { status } : {},
-      orderBy: { createdAt: 'asc' },
-    });
-    return users.map(toAdminUser);
+  /**
+   * `ADMIN_USERS_PAGE_SIZE` a page: pending oldest first (who waited longest),
+   * every other status newest first. The cursor is the last row's `createdAt`
+   * and id, so a row deleted between two pages cannot end the list. `counts`
+   * ignores `q`, so the tabs always show totals.
+   */
+  async list(
+    filters: { status?: UserStatus; q?: string; cursor?: string } = {},
+  ): Promise<AdminUsersPage> {
+    const q = filters.q?.trim();
+    const oldestFirst = filters.status === 'pending';
+    const dir = oldestFirst ? 'asc' : 'desc';
+    const beyond = oldestFirst ? 'gt' : 'lt';
+    const after = filters.cursor ? parseCursor(filters.cursor) : undefined;
+    const clauses: Prisma.UserWhereInput[] = [];
+    if (filters.status) clauses.push({ status: filters.status });
+    if (q) {
+      clauses.push({
+        OR: [
+          { email: { contains: q, mode: 'insensitive' } },
+          { name: { contains: q, mode: 'insensitive' } },
+        ],
+      });
+    }
+    if (after) {
+      clauses.push({
+        OR: [
+          { createdAt: { [beyond]: after.createdAt } },
+          { createdAt: after.createdAt, id: { [beyond]: after.id } },
+        ],
+      });
+    }
+    const [rows, grouped] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { AND: clauses },
+        orderBy: [{ createdAt: dir }, { id: dir }],
+        take: ADMIN_USERS_PAGE_SIZE + 1,
+      }),
+      this.prisma.user.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+    ]);
+    const page = rows.slice(0, ADMIN_USERS_PAGE_SIZE);
+    const last = page[page.length - 1];
+    const counts = Object.fromEntries(
+      USER_STATUSES.map((status) => [
+        status,
+        grouped.find((row) => row.status === status)?._count._all ?? 0,
+      ]),
+    ) as AdminUsersPage['counts'];
+    return {
+      items: page.map(toAdminUser),
+      nextCursor:
+        rows.length > ADMIN_USERS_PAGE_SIZE && last
+          ? `${last.createdAt.toISOString()}_${last.id}`
+          : null,
+      counts,
+    };
   }
 
   /** Approval sets the status and the role in one action (spec D4). */
@@ -227,6 +287,16 @@ export class AdminUsersService {
  */
 const lockAdminSet = (tx: Tx) =>
   tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('agentdock:admin-set'))`;
+
+function parseCursor(cursor: string): { createdAt: Date; id: string } {
+  const split = cursor.indexOf('_');
+  const createdAt = new Date(cursor.slice(0, split));
+  const id = cursor.slice(split + 1);
+  if (split < 0 || !id || Number.isNaN(createdAt.getTime())) {
+    throw new BadRequestException('Invalid cursor');
+  }
+  return { createdAt, id };
+}
 
 const isActiveAdmin = (user: User): boolean =>
   user.role === 'admin' && user.status === 'active';

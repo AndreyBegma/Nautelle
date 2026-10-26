@@ -60,6 +60,7 @@ describe('seedDemo', () => {
     user: {
       findUnique: jest.fn().mockResolvedValue({ id: 'u1' }),
       upsert: jest.fn(),
+      createMany: jest.fn(),
     },
     runner: { upsert: jest.fn() },
     project: { upsert: jest.fn() },
@@ -93,6 +94,16 @@ describe('seedDemo', () => {
     for (const call of db.boardCard.upsert.mock.calls) {
       expect(call[0].update).toEqual({});
     }
+  });
+
+  it('seeds enough accounts for a second page of Admin › Users (C-483)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    const call = db.user.createMany.mock.calls[0][0];
+    expect(call.skipDuplicates).toBe(true);
+    expect(
+      call.data.filter((u: { status: string }) => u.status === 'active').length,
+    ).toBeGreaterThan(50);
   });
 
   it("seeds the finished card's round with its model and effort (C-359)", async () => {
