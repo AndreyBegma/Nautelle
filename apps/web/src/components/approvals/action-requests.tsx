@@ -22,6 +22,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
   cardAcceptArgs,
+  cardAcceptHead,
   cardAcceptMergeText,
   describeActionRequestError,
   formatCountdown,
@@ -61,6 +62,7 @@ export function RequestCell({ request }: { request: ActionRequestSummary }) {
   const issue = issueQueueArgs(request);
   const accept = cardAcceptArgs(request);
   const mergeText = cardAcceptMergeText(request);
+  const acceptHead = cardAcceptHead(request);
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="font-medium">{requestTitle(request)}</span>
@@ -108,6 +110,22 @@ export function RequestCell({ request }: { request: ActionRequestSummary }) {
             Pull request #{accept.prNumber}
           </a>
           {mergeText ? <span className="text-ink-3">{mergeText}</span> : null}
+          {/* C-416: the head the approval merges, and nothing newer. */}
+          {acceptHead ? (
+            <>
+              <span className="text-ink-3">
+                at <code className="font-mono">{acceptHead.shortHead}</code>
+              </span>
+              <a
+                href={acceptHead.diffUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-ink"
+              >
+                View the diff
+              </a>
+            </>
+          ) : null}
         </span>
       ) : mergeText ? (
         <span className="text-sm text-ink-3">{mergeText}</span>
@@ -125,14 +143,18 @@ export function RequestCell({ request }: { request: ActionRequestSummary }) {
   );
 }
 
-/** " at 0b6445a" after a `pr_approve` request's title: the head it was bound to. */
+/**
+ * " at 0b6445a" after the title of a `pr_approve` request, or of a merging
+ * `card_accept` one (C-416): the head it was bound to.
+ */
 function HeadSuffix({ request }: { request: ActionRequestSummary }) {
-  const pr = prApproveArgs(request);
-  if (!pr) return null;
+  const shortHead =
+    prApproveArgs(request)?.shortHead ?? cardAcceptHead(request)?.shortHead;
+  if (!shortHead) return null;
   return (
     <span className="text-ink-3">
       {' '}
-      at <code className="font-mono">{pr.shortHead}</code>
+      at <code className="font-mono">{shortHead}</code>
     </span>
   );
 }
@@ -384,7 +406,11 @@ export function RecentRequests({
               </TableCell>
               <TableCell>
                 <span className="line-clamp-2 break-words">
-                  {request.note ?? '—'}
+                  {request.note ??
+                    (request.status === 'failed'
+                      ? resultMessage(request.result)
+                      : null) ??
+                    '—'}
                 </span>
               </TableCell>
             </TableRow>

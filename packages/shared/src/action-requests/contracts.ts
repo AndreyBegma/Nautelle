@@ -245,6 +245,13 @@ export const cardAcceptBoundArgsSchema = z.strictObject({
   title: z.string().max(ACTION_REQUEST_CARD_TITLE_MAX),
   prNumber: z.number().int().positive().nullable(),
   prUrl: z.url({ protocol: /^https?$/ }).nullable(),
+  /**
+   * C-416: the PR head a merging accept was created at — the one the
+   * approver is shown and the only one the approval merges. Null when it
+   * merges nothing; absent on rows stored before C-416, which merge the
+   * head the PR has at the decision.
+   */
+  headSha: headShaSchema.nullable().optional(),
 });
 export type CardAcceptBoundArgs = z.infer<typeof cardAcceptBoundArgsSchema>;
 
@@ -297,6 +304,12 @@ export const actionRequestSummarySchema = z.object({
    * allow" would store (`toolRuleLabel`), or why nothing may be remembered.
    */
   remember: actionRequestRememberSchema.nullable().optional(),
+  /**
+   * C-416: what running an approved request returned, or why it failed
+   * (`{error, message}`, and `headSha` with a `card_accept`'s `head_moved`);
+   * null until it ran. Optional: an older API sends none.
+   */
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 export type ActionRequestSummary = z.infer<typeof actionRequestSummarySchema>;
 

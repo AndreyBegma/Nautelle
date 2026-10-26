@@ -1,6 +1,6 @@
 # Product requirements — Nautelle
 
-Status: draft · Owner: Andrey Begma · Last reviewed: 2026-10-25
+Status: draft · Owner: Andrey Begma · Last reviewed: 2026-10-26
 
 ## Problem
 
@@ -35,9 +35,10 @@ It works, but:
    its outcome, tokens and API-equivalent cost.
 3. The fleet can be steered from the UI without opening a terminal: start/stop
    the orchestrator, stop a slot, message a worker, approve a merge.
-4. Claude Code and Codex are equal citizens behind one adapter interface, each
-   launched through a configurable runtime profile (e.g. `claude rc` =
-   `CLAUDE_CONFIG_DIR=~/.claude-profiles/blacktoorroot`).
+4. Claude Code is the runtime, launched through a configurable runtime profile
+   (e.g. `claude rc` = `CLAUDE_CONFIG_DIR=~/.claude-work`) behind one adapter
+   interface. Codex is frozen and not developed further
+   ([spec 741](../specs/741-one-quota-detector-and-resume-at-reset.md)).
 5. Works locally and remotely: the control plane talks to a runner on each
    machine, never to the machine's filesystem directly.
 
@@ -48,8 +49,9 @@ It works, but:
 - A general-purpose project tracker. Nautelle has a Board, but only for work
   the fleet can run: a card is one unit of agent work with a worker, a pull
   request and a review (ADR-0024). It has no estimates, sprints, custom fields
-  or non-agent tasks. GitHub issues stay the queue for the orchestrator
-  (ADR-0004), and a card's pull request lives on GitHub.
+  or non-agent tasks. Cards are the one work model; the Queue shows incoming
+  GitHub issues and makes a card from one, and the web does not create issues
+  (ADR-0098). A card's pull request lives on GitHub.
 - Prompt management, evals, LLM-as-judge, datasets.
 - Arbitrary remote shell. The runner executes a typed allowlist only (ADR-0010).
 
@@ -64,21 +66,25 @@ Delivery order is in [roadmap.md](roadmap.md).
 | **Projects** | connect a local repository path on a runner; detect origin, config, base branch, and **where its documentation lives** (in-repo or separate repo, ADR-0012) |
 | **Agent fleet** | live slots: issue, branch, worktree, runtime, model, last checkpoint, PR + checks, idle/quota/prompt state |
 | **Orchestrator control** | start / stop / `next` / `status` per project through a runtime profile; stop a slot; message a worker; open a read-only live pane |
-| **Task queue** | GitHub issues with the ready label and their computed state (READY / IN FLIGHT / BLOCKED — work / BLOCKED — person / NO SPEC); create an issue from the UI |
-| **Board** | cards in columns (To Do → In progress → Review → Completed) that Nautelle owns; a dedicated interactive worker per card, with a review loop, designs, dependencies and stacks; terminal and fleet work appear as cards too (ADR-0024, ADR-0028, ADR-0030, ADR-0035, ADR-0054) |
+| **Task queue** | incoming GitHub issues with the ready label and their computed state (READY / IN FLIGHT / BLOCKED — work / BLOCKED — person / NO SPEC); "Make a card" turns one into a card; issues are not created from the web (ADR-0098) |
+| **Board** | cards in columns (Inbox → To Do → In progress → Finished → Completed) that Nautelle owns; a dedicated interactive worker per card, with a review loop, designs, dependencies and stacks; terminal and fleet work appear as cards too (ADR-0024, ADR-0028, ADR-0030, ADR-0035, ADR-0054) |
 | **Planner & designs** | a brief becomes cards through an interview; a per-card HTML design is reviewed with pins and approved before the card runs (ADR-0022, ADR-0034, ADR-0037) |
 | **Steward** | watches cards and runs for stuck work, fixes the safe cases itself, and sends one digest a day to Telegram and Activity (ADR-0040) |
 | **Merge approval** | per-project switch; green PRs wait in an approval queue (Approve / Request changes) when on |
 | **Activity feed** | every event across projects, filterable, live |
-| **Sessions** | Claude Code and Codex sessions of connected projects (all sessions for admin): turn → LLM request / tool / subagent tree, waterfall, tokens and cost per node |
+| **Sessions** | Claude Code sessions of connected projects (Codex sessions already ingested stay visible) (all sessions for admin): turn → LLM request / tool / subagent tree, waterfall, tokens and cost per node |
 | **Execution history** | rounds, slots, skill runs, scheduled runs — outcome, duration, PR, tokens, cost |
-| **Cost & tokens** | API-equivalent cost from a versioned price table; by project, issue, slot, model, runtime, user, day; budgets (alert or hard stop) per project and per user |
+| **Cost & tokens** | API-equivalent cost from a versioned price table; by project, issue, slot, model, runtime, user, day; budgets (alert or hard stop) per project and per user; a reached hard budget pauses running card rounds and resume continues the session (ADR-0101) |
 | **Skills** | browse skills.sh; install to a project or globally, per runtime; run a skill on a project with chosen runtime profile and model, in an isolated worktree; output is a report or a PR (configurable) |
 | **Cron** | schedule = skill/orchestrator command + project + args + profile + model; runner executes; missed-run policy (skip / catch up) |
 | **Webhooks** | inbound (signed POST → run a skill / wake orchestrator; GitHub App events) and outbound (signed, retried, delivery log, test button) |
-| **Notifications** | in-app centre + Telegram bot (gate, credential, decision, prompt pane, queue dry, budget) |
+| **Notifications** | channels per event (gate, credential, decision, prompt pane, queue dry, budget): in-app centre, the Inbox (ADR-0106), Telegram bot (ADR-0046), email over SMTP (ADR-0108) and Slack incoming webhook (ADR-0109) |
+| **Inbox** | one server read of everything that waits on the person (ADR-0106) |
+| **Away mode** | permission prompts go to the web and Telegram; "allow similar" remembers tool calls as rules (ADR-0105) |
+| **Account security** | TOTP two-factor with recovery codes (ADR-0081), personal API tokens never above the owner's role (ADR-0104), account recovery by a one-time link (ADR-0113) |
+| **Run queue** | a run at the agent limit queues the card in To Do order (ADR-0102) |
 | **Audit** | append-only, hash-chained log of every privileged action with before/after |
-| **Codex** | Codex workers in orchestrator slots and Codex as orchestrator, both selectable per project |
+| **Codex** | frozen: workers and orchestrator design kept as the record, not selectable or developed (ADR-0013, spec 741) |
 
 ## Success measures
 
