@@ -10,9 +10,8 @@ import { Select } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { toast } from '@andrewbehma/glass-ui/toast';
-import {
-  type ProjectDetail,
-  RUN_UPDATED_LIVE_EVENT,
+import type {
+  ProjectDetail,
   UiProfileRebuildResult,
   UiProfileVersionsView,
   UiProfileVersionView,
@@ -33,9 +32,9 @@ import {
   rebuildRunnerGate,
 } from '../../../../../../lib/design/format';
 import { runHref, uiProfileApi } from '../../../../../../lib/design/href';
+import { shouldReloadOnRunUpdate } from '../../../../../../lib/design/profile-live';
 import { PROFILE_SOURCE_LABEL } from '../../../../../../lib/design/profile-memory';
 import { Time } from '../../../../../../lib/format/time';
-import { parseRunUpdate } from '../../../../../../lib/history/format';
 import { useLive } from '../../../../../../lib/live/use-live';
 import { runnerGateCopy } from '../../../../../../lib/planner/runner-support';
 import { useErrorToast } from '../../../../../../lib/section/use-error-toast';
@@ -104,9 +103,7 @@ export function ProfileSection({
   const buildRunId = profile.data?.buildRunId ?? null;
   // The API publishes `run.updated` when the build run settles; reload then.
   useLive(`project:${projectId}`, (message) => {
-    if (!building || message.event !== RUN_UPDATED_LIVE_EVENT) return;
-    if (parseRunUpdate(message.data)?.id !== buildRunId) return;
-    retry();
+    if (shouldReloadOnRunUpdate(message, building, buildRunId)) retry();
   });
   // A missed event must not leave the page on "building" for good.
   useEffect(() => {

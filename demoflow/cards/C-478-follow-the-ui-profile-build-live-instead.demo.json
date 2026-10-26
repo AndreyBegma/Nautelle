@@ -25,18 +25,47 @@
       "title": "The UI profile section shows its build state"
     },
     {
-      "action": "assertVisible",
+      "action": "click",
       "target": {
         "role": "button",
-        "name": "Build",
+        "name": "Build"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Rebuild",
+        "exact": true
+      }
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "text": "Building",
         "exact": true
       },
+      "text": "Building",
+      "match": "exact",
       "timeoutMs": 30000,
-      "caption": "A build reloads this section when its run settles, with no 10 s refetch"
+      "caption": "The build starts and the section shows Building"
+    },
+    {
+      "action": "marker",
+      "title": "No 10 s refetch while it builds"
     },
     {
       "action": "wait",
-      "ms": 2000
+      "ms": 5000,
+      "caption": "No request every 10 s: the section reloads once, when the build run settles"
+    },
+    {
+      "action": "wait",
+      "ms": 5000
+    },
+    {
+      "action": "wait",
+      "ms": 3000
     }
   ]
 }
