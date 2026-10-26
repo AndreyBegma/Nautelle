@@ -17,6 +17,7 @@ import { generatePairingCode, hashPairingCode } from './credentials';
 import { RunnerCommandService } from './runner-command.service';
 import { type LiveConnection, RunnerConnections } from './runner-connections';
 import { runnerError } from './runner-error';
+import { RunnerLive } from './runner-live';
 import {
   toAdminCapabilities,
   toAdminEvent,
@@ -58,6 +59,7 @@ export class RunnersService {
     private readonly commands: RunnerCommandService,
     private readonly audit: AuditService,
     private readonly release: RunnerReleaseService,
+    private readonly runnerLive: RunnerLive,
     @Inject(RUNNER_OPTIONS) private readonly options: RunnerOptions,
   ) {}
 
@@ -74,6 +76,7 @@ export class RunnersService {
       return { runner: created, ...(await this.issueCode(tx, created.id)) };
     });
     this.logger.log(`runner ${runner.id} created`);
+    this.runnerLive.updated(runner.id, 'offline');
     await this.audit.record({
       ...ctx,
       action: 'runner.create',
@@ -202,9 +205,11 @@ export class RunnersService {
         after: { name: runner.name },
         result: 'ok',
       });
+      const status = this.status(runner, live);
+      this.runnerLive.updated(id, status);
       return toAdminRunner(
         runner,
-        this.status(runner, live),
+        status,
         runner._count.profiles,
         this.release.latest,
       );
@@ -243,6 +248,7 @@ export class RunnersService {
     });
     this.connections.disconnect(id, RUNNER_CLOSE_CODES.unauthorized, 'revoked');
     this.logger.log(`runner ${id} revoked`);
+    if (!before.revokedAt) this.runnerLive.updated(id, 'revoked');
     await this.audit.record({
       ...ctx,
       action: 'runner.revoke',

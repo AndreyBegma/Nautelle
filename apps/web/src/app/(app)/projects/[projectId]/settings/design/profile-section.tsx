@@ -32,8 +32,10 @@ import {
   rebuildRunnerGate,
 } from '../../../../../../lib/design/format';
 import { runHref, uiProfileApi } from '../../../../../../lib/design/href';
+import { shouldReloadOnRunUpdate } from '../../../../../../lib/design/profile-live';
 import { PROFILE_SOURCE_LABEL } from '../../../../../../lib/design/profile-memory';
 import { Time } from '../../../../../../lib/format/time';
+import { useLive } from '../../../../../../lib/live/use-live';
 import { runnerGateCopy } from '../../../../../../lib/planner/runner-support';
 import { useErrorToast } from '../../../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../../../lib/section/use-section';
@@ -41,8 +43,8 @@ import { ProfileEditor } from './profile-editor';
 import { ProfileMemory } from './profile-memory';
 import { ProfilePreview } from './profile-preview';
 
-/** While a build runs the page asks again; a build takes minutes. */
-const BUILDING_POLL_MS = 10_000;
+/** The live event reloads the page; this poll only covers a lost one. */
+const BUILDING_SAFETY_POLL_MS = 60_000;
 
 /**
  * Settings → Design → UI profile (spec 223 D12–D14): status, versions, the
@@ -98,9 +100,15 @@ export function ProfileSection({
 
   const { retry } = profile;
   const building = profile.data?.status === 'building';
+  const buildRunId = profile.data?.buildRunId ?? null;
+  // The API publishes `run.updated` when the build run settles; reload then.
+  useLive(`project:${projectId}`, (message) => {
+    if (shouldReloadOnRunUpdate(message, building, buildRunId)) retry();
+  });
+  // A missed event must not leave the page on "building" for good.
   useEffect(() => {
     if (!building) return;
-    const timer = setInterval(retry, BUILDING_POLL_MS);
+    const timer = setInterval(retry, BUILDING_SAFETY_POLL_MS);
     return () => clearInterval(timer);
   }, [building, retry]);
 
