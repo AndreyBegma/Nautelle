@@ -69,6 +69,8 @@ export interface LiveRefreshOptions {
   safetyMs?: number;
   /** Topics followed beside the projects' (`admin`, for unassigned sessions). */
   extraTopics?: readonly string[];
+  /** False follows nothing and never polls (a closed dialog); default true. */
+  enabled?: boolean;
 }
 
 /**
@@ -93,6 +95,7 @@ export function useLiveRefresh(
     fallbackMs = LIVE_FALLBACK_POLL_MS,
     safetyMs,
     extraTopics = [],
+    enabled = true,
   } = options;
   const latest = useRef(reload);
   useEffect(() => {
@@ -101,7 +104,9 @@ export function useLiveRefresh(
   const { paused } = useLivePaused();
 
   const { followed, covered } = followedProjectTopics(projectIds);
-  const topics = [...followed.map((id) => `project:${id}`), ...extraTopics];
+  const topics = enabled
+    ? [...followed.map((id) => `project:${id}`), ...extraTopics]
+    : [];
   const topicsKey = topics.join(',');
   // The resync event is the client's "you missed something" signal.
   const eventsKey = [...new Set([BOARD_CHANGED_EVENT, ...events])].join(',');
@@ -122,7 +127,11 @@ export function useLiveRefresh(
     };
   }, [topicsKey, eventsKey, delayMs]);
 
-  const pollMs = paused || !covered ? fallbackMs : safetyMs;
+  const pollMs = !enabled
+    ? undefined
+    : paused || !covered
+      ? fallbackMs
+      : safetyMs;
   useEffect(() => {
     if (pollMs === undefined) return;
     const timer = setInterval(() => latest.current(), pollMs);

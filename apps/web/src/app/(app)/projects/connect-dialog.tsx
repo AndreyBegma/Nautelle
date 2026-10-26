@@ -38,14 +38,12 @@ import {
   noOnlineRunnerCopy,
   suggestedPathOf,
 } from '../../../lib/projects/format';
+import { useRunnersLive } from '../../../lib/runners/use-runners-live';
 import { DocsDetails } from './docs-details';
 import { RepositoryPicker } from './repository-picker';
 import { RuleCandidateList } from './rule-candidates';
 
 const yesNo = (value: boolean) => (value ? 'found' : 'not found');
-
-/** While the dialog is open; the runner usually comes up in another window. */
-const RUNNERS_POLL_MS = 10_000;
 
 const REASON_ID = 'connect-project-reason';
 
@@ -269,6 +267,8 @@ export function ConnectDialog({
   const [pushCheck, setPushCheck] = useState<PushCheck>({ status: 'idle' });
   /** Only the newest scan may land: a path edit makes an older one stale. */
   const scanSeq = useRef(0);
+  /** The open dialog's runner list reload; null while closed. */
+  const loadRunners = useRef<(() => void) | null>(null);
 
   /** Forgets the rule scan and the push check of the previous inspection. */
   const resetScan = () => {
@@ -309,13 +309,15 @@ export function ConnectDialog({
           failedOnce = true;
         });
     load();
-    // The admin is usually starting the runner in another window.
-    const timer = setInterval(load, RUNNERS_POLL_MS);
+    loadRunners.current = load;
     return () => {
       current = false;
-      clearInterval(timer);
+      loadRunners.current = null;
     };
   }, [open]);
+  // The admin is usually starting the runner in another window (C-479): it
+  // shows up on `runner.updated`, not on the next poll.
+  useRunnersLive(() => loadRunners.current?.(), open);
 
   const runners = (allRunners ?? []).filter((runner) =>
     isRunnerOnline(runner.status),
