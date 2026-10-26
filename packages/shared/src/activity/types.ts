@@ -469,6 +469,8 @@ const AUDIT_TITLES: Record<string, string> = {
   'user.update': 'User updated',
   'user.delete': 'User deleted',
   'user.two_factor_reset': 'User two-factor sign-in reset',
+  'user.reset_link': 'User reset link made',
+  'auth.password_reset': 'Password reset with a link',
   'settings.registration': 'Registration settings changed',
   'settings.two_factor': 'Two-factor requirement changed',
   'runner.create': 'Runner created',

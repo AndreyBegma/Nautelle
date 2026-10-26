@@ -15,6 +15,16 @@ export const AUDIT_ACTIONS = [
   /** C-403: a personal API token was created or revoked (by its owner or an admin). */
   'auth.api_token_create',
   'auth.api_token_revoke',
+  /**
+   * C-402: Forgot password asked for a link — recorded against the email as
+   * typed, never the account, so it says no more than the response did.
+   */
+  'auth.password_reset_request',
+  /**
+   * C-402: a reset link redeemed (`meta: { via, kind, sessionId }`), or a
+   * refused try (`denied`, `meta.reason`).
+   */
+  'auth.password_reset',
   'user.create',
   'user.approve',
   'user.reject',
@@ -22,6 +32,8 @@ export const AUDIT_ACTIONS = [
   'user.delete',
   /** C-189: an admin turned off another account's two-factor sign-in. */
   'user.two_factor_reset',
+  /** C-402: an admin made a one-time reset link (`after: { kind, expiresAt }`). */
+  'user.reset_link',
   'settings.registration',
   /** C-189: an admin changed whether admins must use two-factor sign-in. */
   'settings.two_factor',
