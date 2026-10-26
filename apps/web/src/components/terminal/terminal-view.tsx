@@ -16,10 +16,7 @@ import type { Terminal as XTerm } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef, useState } from 'react';
 import { ApiUnreachableError, api } from '../../lib/api';
-import {
-  AttachSupervisor,
-  isTransientCloseCode,
-} from '../../lib/terminal/attach';
+import { AttachSupervisor, shouldReattach } from '../../lib/terminal/attach';
 import {
   CLOSE_REASON_LABEL,
   clampSize,
@@ -117,11 +114,14 @@ export function TerminalView({
   target,
   mode,
   onStatus,
+  onDemoted,
 }: {
   projectId: string;
   target: TerminalTarget;
   mode: TerminalMode;
   onStatus: (status: TerminalStatus) => void;
+  /** A write attach came back as read after a drop: press Take control again. */
+  onDemoted?: () => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const historyHost = useRef<HTMLDivElement>(null);
@@ -129,6 +129,11 @@ export function TerminalView({
   const backToLive = useRef(() => {});
   const report = useRef(onStatus);
   report.current = onStatus;
+  const demoted = useRef(onDemoted);
+  demoted.current = onDemoted;
+  // The mode this view opened with; a drop may lower it, never the other way
+  // (Take control remounts the view).
+  const openedAs = useRef(mode);
   const slot = target.kind === 'slot' ? target.slot : undefined;
   const runId = target.kind === 'skill_run' ? target.runId : undefined;
   const sessionId = target.kind === 'manual' ? target.sessionId : undefined;
@@ -141,6 +146,8 @@ export function TerminalView({
     if (!element || !historyElement) return;
     let disposed = false;
     let socket: WebSocket | undefined;
+    // Reattaches ask for read when the view was in control (spec 29 D7).
+    let attachMode: TerminalMode = openedAs.current;
     let cleanup = () => {};
 
     const status = (next: TerminalStatus) => {
@@ -155,8 +162,8 @@ export function TerminalView({
       if (disposed) return;
 
       const term = new Terminal({
-        cursorBlink: mode === 'write',
-        disableStdin: mode === 'read',
+        cursorBlink: attachMode === 'write',
+        disableStdin: attachMode === 'read',
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
         fontSize: 13,
         lineHeight: 1.2,
@@ -188,7 +195,7 @@ export function TerminalView({
       };
       backToLive.current = () => {
         closePast();
-        if (mode === 'write') term.focus();
+        if (attachMode === 'write') term.focus();
       };
       const askHistory = () => {
         if (socket?.readyState !== WebSocket.OPEN) return;
@@ -324,23 +331,23 @@ export function TerminalView({
       const request: TicketRequest = {
         kind,
         projectId,
-        mode,
+        mode: attachMode,
         ...(slot ? { slot } : {}),
         ...(runId ? { runId } : {}),
         ...(sessionId ? { sessionId } : {}),
         ...(cardId ? { cardId } : {}),
       };
 
-      if (mode === 'write') {
+      if (openedAs.current === 'write') {
         // Nothing goes to the PTY while the history is open (#522).
         term.onData((data) => {
           if (socket?.readyState !== WebSocket.OPEN) return;
-          if (controller.state !== 'live') return;
+          if (controller.state !== 'live' || attachMode !== 'write') return;
           for (const bytes of inputFrames(data)) socket.send(bytes);
         });
         term.onBinary((data) => {
           if (socket?.readyState !== WebSocket.OPEN) return;
-          if (controller.state !== 'live') return;
+          if (controller.state !== 'live' || attachMode !== 'write') return;
           socket.send(Uint8Array.from(data, (c) => c.charCodeAt(0)));
         });
       }
@@ -378,6 +385,8 @@ export function TerminalView({
 
         // The last word wins: a `closed` frame explains the close that follows.
         let outcome: TerminalStatus | undefined;
+        let refused = false;
+        let endReason: TerminalCloseReason | undefined;
 
         ws.onmessage = (event) => {
           if (stale()) return;
@@ -397,17 +406,19 @@ export function TerminalView({
           if (value.type === 'attached') {
             attached = true;
             supervisor.attached();
-            if (mode === 'write') term.focus();
+            if (attachMode === 'write') term.focus();
           } else if (value.type === 'history') {
             const lines = controller.received(value);
             if (lines) showPast(lines);
           } else if (value.type === 'error') {
+            refused = true;
             outcome = {
               phase: 'refused',
               message: describeRefusal(value.code, value.heldBy, value.message),
             };
           } else {
             const reason: TerminalCloseReason = value.reason;
+            endReason = reason;
             outcome = { phase: 'ended', message: CLOSE_REASON_LABEL[reason] };
           }
         };
@@ -415,8 +426,26 @@ export function TerminalView({
           if (stale()) return;
           // An answer can no longer arrive; a shown history stays readable.
           if (controller.state === 'loading') closePast();
-          if (!attached && !outcome && isTransientCloseCode(event.code)) {
+          const retry = shouldReattach({
+            attached,
+            refused,
+            reason: endReason,
+            code: event.code,
+          });
+          if (retry && !attached) {
             supervisor.attemptFailed();
+            return;
+          }
+          if (retry) {
+            // The runner dropped the socket; the session may still run. The
+            // xterm stays, tmux redraws it. A hold may have moved on: read.
+            if (attachMode === 'write') {
+              attachMode = 'read';
+              term.options.disableStdin = true;
+              term.options.cursorBlink = false;
+              demoted.current?.();
+            }
+            supervisor.dropped();
             return;
           }
           supervisor.dispose();
@@ -466,7 +495,7 @@ export function TerminalView({
       cleanup();
       setHistory('live');
     };
-  }, [projectId, kind, slot, runId, sessionId, cardId, mode]);
+  }, [projectId, kind, slot, runId, sessionId, cardId]);
 
   return (
     <div className="relative h-full min-h-64 w-full">
