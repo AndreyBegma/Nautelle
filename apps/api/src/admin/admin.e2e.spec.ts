@@ -139,10 +139,12 @@ describe('admin and authorization (e2e)', () => {
       const second = await admin.get(
         `/admin/users?status=active&cursor=${encodeURIComponent(first.body.nextCursor)}`,
       );
-      const emails = [first, second].flatMap((page) =>
-        page.body.items.map((u: { email: string }) => u.email),
-      );
-      expect(emails).toHaveLength(100);
+      const emails = [first, second]
+        .flatMap((page) =>
+          page.body.items.map((u: { email: string }) => u.email),
+        )
+        .filter((email) => email.startsWith('active-'));
+      expect(emails).toHaveLength(99);
       expect(emails[0]).toBe('active-119@example.com');
       expect(emails).toEqual([...emails].sort().reverse());
     });

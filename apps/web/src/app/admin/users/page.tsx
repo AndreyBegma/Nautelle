@@ -170,7 +170,11 @@ function UsersTable({ viewer }: { viewer: string }) {
       let page = await fetchUsersPage({ status: tab, q });
       const rows: AdminUser[] = [];
       for (let i = 0; i < more.pages && page.nextCursor; i++) {
-        page = await fetchUsersPage({ status: tab, q, cursor: page.nextCursor });
+        page = await fetchUsersPage({
+          status: tab,
+          q,
+          cursor: page.nextCursor,
+        });
         rows.push(...page.items);
       }
       setLoaded({
