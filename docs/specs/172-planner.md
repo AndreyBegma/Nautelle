@@ -49,7 +49,7 @@ All tasks of all plans are also listed on one **Tasks** page.
   - `plan.queue_issues`: add the ready label.
 - **API:**
   - plans, turns, task review, revise, visibility, send to fleet;
-  - `GET /tasks` across projects;
+  - `GET /tasks` across projects (removed in C-472; `GET /work` replaced it);
   - instructions and settings at the global and project level;
   - audit records and live pushes.
 - **Web:**

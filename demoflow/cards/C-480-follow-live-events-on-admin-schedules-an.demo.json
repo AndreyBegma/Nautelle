@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "name": "Admin Schedules and Budgets follow live events",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/admin/schedules"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Admin Schedules follows the admin topic, no 15 s poll"
+    },
+    {
+      "action": "assertText",
+      "target": { "role": "heading", "name": "Schedules", "exact": true },
+      "text": "Schedules",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "marker",
+      "title": "Admin Budgets follows the same topic"
+    },
+    {
+      "action": "navigate",
+      "path": "/admin/budgets"
+    },
+    {
+      "action": "assertText",
+      "target": { "role": "heading", "name": "Budgets", "exact": true },
+      "text": "Budgets",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    }
+  ]
+}

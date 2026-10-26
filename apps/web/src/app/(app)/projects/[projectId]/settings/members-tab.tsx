@@ -24,6 +24,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import { describeProjectError } from '../../../../../lib/projects/format';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
+import { fetchAllUsers } from '../../../../../lib/users/list';
 
 /** "" is no override. */
 const NO_OVERRIDE = '';
@@ -51,7 +52,7 @@ function AddMemberDialog({
     if (!open) return;
     setUserId('');
     setOverride(NO_OVERRIDE);
-    api<AdminUser[]>('/admin/users?status=active')
+    fetchAllUsers('active')
       .then(setUsers)
       .catch((err) => showError(describeProjectError(err)));
   }, [open, showError]);
