@@ -25,6 +25,18 @@ describe('card model assessment (e2e, #322 D5–D8)', () => {
     return response.body;
   };
 
+  it('never assesses a task: a person does it (C-509, ADR-0127)', async () => {
+    const { number } = await w.createCard({
+      kind: 'task',
+      title: 'Add the Stripe secret',
+      assigneeId: w.operatorId,
+    });
+    const outcomes = await w.drain();
+    expect(outcomes.filter((o) => o.kind === 'started')).toEqual([]);
+    expect(w.assessed()).toEqual([]);
+    expect((await w.card(number)).assessRunId).toBeNull();
+  });
+
   it('#445: sends the token saver only to a runner that advertises it', async () => {
     await w.createCard({ kind: 'feature' });
     const off = await startOne();
