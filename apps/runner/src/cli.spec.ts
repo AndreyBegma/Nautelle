@@ -580,6 +580,35 @@ describe('nautelle-runner CLI', () => {
     expect(output()).not.toContain(TOKEN);
   });
 
+  describe('status git auth (C-441 D3)', () => {
+    const statusWith = async (ghStatus: number | null) => {
+      const exec: Exec = async (binary, args) =>
+        binary === 'gh' && ghStatus !== null
+          ? { code: args[0] === 'auth' ? ghStatus : 0, stdout: '', stderr: '' }
+          : null;
+      await runCli(['status'], deps({ exec }));
+      return stdout.join('');
+    };
+
+    it('shows gh when it is logged in to github.com', async () => {
+      expect(await statusWith(0)).toContain(
+        'git auth: gh (github.com over HTTPS)',
+      );
+    });
+
+    it('shows native with a login hint when gh is installed but logged out', async () => {
+      expect(await statusWith(1)).toContain(
+        'git auth: native — run `gh auth login`',
+      );
+    });
+
+    it('shows plain native when gh is not installed', async () => {
+      const text = await statusWith(null);
+      expect(text).toContain('git auth: native\n');
+      expect(text).not.toContain('gh auth login');
+    });
+  });
+
   describe('run', () => {
     const paired = (
       disabledCommands: string[] = [],

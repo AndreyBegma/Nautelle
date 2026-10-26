@@ -181,7 +181,7 @@ export const runDaemon = async (
 ): Promise<StopReason> => {
   const { config, home, clock, log } = options;
   // #329 D1: every git child of the runner goes through this one wrapper.
-  const gitAuth = new GitAuth(options.exec);
+  const gitAuth = new GitAuth(options.exec, () => clock.now());
   // #327: a tmux server the runner starts never lives in the unit's cgroup.
   const tmuxServer = new TmuxServerGuard({
     env: options.env ?? process.env,
