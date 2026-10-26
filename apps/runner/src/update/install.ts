@@ -44,9 +44,16 @@ export const detectInstall = (binary: string): Install => {
   return { kind: 'unknown' };
 };
 
-/** The global install of `version` with `manager`, as an argv. */
-export const installArgv = (manager: Manager, version: string): string[] => {
-  const spec = `${PACKAGE_NAME}@${version}`;
+/**
+ * The global install of `version` with `manager`, as an argv. `name` is the
+ * meta package unless the platform package is installed on its own.
+ */
+export const installArgv = (
+  manager: Manager,
+  version: string,
+  name: string = PACKAGE_NAME,
+): string[] => {
+  const spec = `${name}@${version}`;
   switch (manager) {
     case 'npm':
       return ['npm', 'install', '-g', spec];
@@ -65,6 +72,15 @@ export const manualCommand = (install: Install, version: string): string =>
     ? `brew upgrade ${PACKAGE_NAME}`
     : installArgv('npm', version).join(' ');
 
+/** What the update left of the service's unit or agent. */
+export type UnitState =
+  /** It points at a binary that is still there. */
+  | 'intact'
+  /** It pointed at a removed binary and `install-service` wrote it again. */
+  | 'rewritten'
+  /** It points at a removed binary and the rewrite did not work. */
+  | 'stale';
+
 export interface ServiceRestart {
   /** The command that makes the service manager probe whether it runs. */
   probe: readonly [string, readonly string[]];
@@ -74,31 +90,40 @@ export interface ServiceRestart {
 
 /**
  * How to tell whether the runner's service is running, and how to restart
- * it. `reinstall` is set when the update removed the binary the service
- * points at (pnpm keeps each version in its own directory): the unit or
- * agent has to be written again before the restart.
+ * it. A `stale` unit (the update removed the binary it points at; pnpm keeps
+ * each version in its own directory) has to be written again before the
+ * restart; a `rewritten` one only has to be loaded.
  */
 export const serviceRestart = (
   os: string,
   uid: number,
   launchAgentFile: string,
-  reinstall: boolean,
+  unit: UnitState,
 ): ServiceRestart | null => {
   if (os === 'linux') {
+    const restart = `systemctl --user restart ${SERVICE_NAME}`;
+    const reload = 'systemctl --user daemon-reload';
     return {
       probe: ['systemctl', ['--user', 'is-active', '--quiet', SERVICE_NAME]],
-      restart: reinstall
-        ? `${SERVICE_NAME} install-service && systemctl --user daemon-reload && systemctl --user restart ${SERVICE_NAME}`
-        : `systemctl --user restart ${SERVICE_NAME}`,
+      restart:
+        unit === 'stale'
+          ? `${SERVICE_NAME} install-service && ${reload} && ${restart}`
+          : unit === 'rewritten'
+            ? `${reload} && ${restart}`
+            : restart,
     };
   }
   if (os === 'darwin') {
     const target = `gui/${uid}/${LAUNCH_AGENT_LABEL}`;
+    const reload = `launchctl bootout ${target} && launchctl bootstrap gui/${uid} ${launchAgentFile}`;
     return {
       probe: ['launchctl', ['print', target]],
-      restart: reinstall
-        ? `${SERVICE_NAME} install-service && launchctl bootout ${target} && launchctl bootstrap gui/${uid} ${launchAgentFile}`
-        : `launchctl kickstart -k ${target}`,
+      restart:
+        unit === 'stale'
+          ? `${SERVICE_NAME} install-service && ${reload}`
+          : unit === 'rewritten'
+            ? reload
+            : `launchctl kickstart -k ${target}`,
     };
   }
   return null;

@@ -55,6 +55,8 @@ interface Harness {
   asked: string[];
   installs: string[][];
   probes: string[][];
+  /** The `version` and `install-service` calls on the runner itself. */
+  runner: string[][];
   requests: string[];
 }
 
@@ -65,6 +67,9 @@ const harness = (
     installCode?: number | Error;
     existing?: string[];
     serviceActive?: boolean;
+    /** What each `version` call prints; the last one repeats. */
+    versions?: string[];
+    installServiceCode?: number;
   } = {},
 ): Harness => {
   const {
@@ -76,6 +81,8 @@ const harness = (
     installCode = 0,
     existing = [NPM_BINARY],
     serviceActive = false,
+    versions = ['0.15.0 linux-x64'],
+    installServiceCode = 0,
     ...rest
   } = overrides;
   const stderr: string[] = [];
@@ -83,7 +90,17 @@ const harness = (
   const installs: string[][] = [];
   const probes: string[][] = [];
   const { fetch, requests } = fakeRegistry(registry);
+  const runner: string[][] = [];
+  let versionCalls = 0;
   const exec: Exec = async (binary, args) => {
+    if (binary.endsWith('nautelle-runner')) {
+      runner.push([binary, ...args]);
+      if (args[0] === 'install-service') {
+        return { code: installServiceCode, stdout: '', stderr: '' };
+      }
+      const stdout = versions[Math.min(versionCalls++, versions.length - 1)];
+      return { code: 0, stdout: `${stdout}\n`, stderr: '' };
+    }
     probes.push([binary, ...args]);
     return { code: serviceActive ? 0 : 3, stdout: '', stderr: '' };
   };
@@ -119,7 +136,7 @@ const harness = (
     uid: 501,
     ...rest,
   };
-  return { deps, stderr, asked, installs, probes, requests };
+  return { deps, stderr, asked, installs, probes, runner, requests };
 };
 
 const run = async (h: Harness): Promise<void> => {
@@ -505,15 +522,6 @@ describe('startUpdateCheck', () => {
     );
   });
 
-  it('asks to rewrite the unit when the update removed the binary it runs', async () => {
-    const h = harness({ serviceActive: true });
-    h.deps.exists = (path) => path === h.deps.paths.serviceFile;
-    await run(h);
-    expect(h.stderr.join('')).toContain(
-      'nautelle-runner install-service && systemctl --user daemon-reload && systemctl --user restart nautelle-runner',
-    );
-  });
-
   it('says how to restart an active launchd agent on macOS', async () => {
     const binary =
       '/usr/local/lib/node_modules/nautelle-runner/node_modules/nautelle-runner-darwin-arm64/bin/nautelle-runner';
@@ -535,6 +543,113 @@ describe('startUpdateCheck', () => {
     ]);
     expect(h.stderr.join('')).toContain(
       'launchctl kickstart -k gui/501/com.nautelle.runner',
+    );
+  });
+
+  it('checks the binary the install left before saying Updated', async () => {
+    const h = harness();
+    await run(h);
+    expect(h.runner).toEqual([[NPM_BINARY, 'version']]);
+    expect(h.stderr.join('')).toContain('Updated nautelle-runner to 0.15.0.');
+  });
+
+  it('installs the platform package when the meta install left no binary', async () => {
+    const h = harness({ versions: ['', '0.15.0 linux-x64'] });
+    await run(h);
+    expect(h.installs).toEqual([
+      ['npm', 'install', '-g', 'nautelle-runner@0.15.0'],
+      ['npm', 'install', '-g', 'nautelle-runner-linux-x64@0.15.0'],
+    ]);
+    const text = h.stderr.join('');
+    expect(text).toContain('installing nautelle-runner-linux-x64 directly');
+    expect(text).toContain('Updated nautelle-runner to 0.15.0.');
+  });
+
+  it('prints the rollback and never Updated when the repair fails too', async () => {
+    const h = harness({ versions: ['0.14.0 linux-x64'] });
+    await run(h);
+    expect(h.installs).toHaveLength(2);
+    const text = h.stderr.join('');
+    expect(text).toContain(
+      'Roll back with: npm install -g nautelle-runner@0.14.0',
+    );
+    expect(text).not.toContain('Updated');
+  });
+
+  it('rolls back when the platform install itself fails', async () => {
+    let calls = 0;
+    const h = harness({ versions: [''] });
+    h.deps.install = async (argv) => {
+      h.installs.push([...argv]);
+      return calls++ === 0 ? 0 : 1;
+    };
+    await run(h);
+    const text = h.stderr.join('');
+    expect(text).toContain('exited with 1.');
+    expect(text).toContain(
+      'Roll back with: npm install -g nautelle-runner@0.14.0',
+    );
+    expect(text).not.toContain('Updated');
+    expect(h.runner).toHaveLength(1);
+  });
+
+  it('checks the binary on the PATH when the old path is gone', async () => {
+    const h = harness({
+      binary:
+        '/home/ada/.local/share/pnpm/global/5/node_modules/nautelle-runner-linux-x64/bin/nautelle-runner',
+    });
+    h.deps.exists = () => false;
+    await run(h);
+    expect(h.runner[0]).toEqual(['nautelle-runner', 'version']);
+    expect(h.stderr.join('')).toContain('Updated');
+  });
+
+  it('rewrites the systemd unit when the binary it ran is gone', async () => {
+    const h = harness({ serviceActive: true });
+    h.deps.exists = (path) => path === h.deps.paths.serviceFile;
+    await run(h);
+    expect(h.runner).toContainEqual(['nautelle-runner', 'install-service']);
+    expect(h.stderr.join('')).toContain(
+      'Restart it to run 0.15.0:\n  systemctl --user daemon-reload && systemctl --user restart nautelle-runner\n',
+    );
+    expect(h.stderr.join('')).not.toContain('install-service');
+  });
+
+  it('rewrites the launchd agent when the binary it ran is gone', async () => {
+    const h = harness({
+      os: 'darwin',
+      arch: 'arm64',
+      binary:
+        '/usr/local/lib/node_modules/nautelle-runner/node_modules/nautelle-runner-darwin-arm64/bin/nautelle-runner',
+      serviceActive: true,
+      versions: ['0.15.0 darwin-arm64'],
+      registry: {
+        'nautelle-runner': '0.15.0',
+        'nautelle-runner-darwin-arm64': '0.15.0',
+      },
+    });
+    h.deps.exists = (path) => path === h.deps.paths.launchAgentFile;
+    await run(h);
+    expect(h.runner).toContainEqual(['nautelle-runner', 'install-service']);
+    expect(h.stderr.join('')).toContain(
+      `launchctl bootout gui/501/com.nautelle.runner && launchctl bootstrap gui/501 ${h.deps.paths.launchAgentFile}`,
+    );
+  });
+
+  it('leaves a unit that still points at a binary alone', async () => {
+    const h = harness({ serviceActive: true });
+    h.deps.exists = (path) =>
+      path === NPM_BINARY || path === h.deps.paths.serviceFile;
+    await run(h);
+    expect(h.runner.map((call) => call[1])).toEqual(['version']);
+  });
+
+  it('prints the full rewrite command when install-service fails', async () => {
+    const h = harness({ serviceActive: true, installServiceCode: 1 });
+    h.deps.exists = (path) => path === h.deps.paths.serviceFile;
+    await run(h);
+    expect(h.stderr.join('')).toContain(
+      'nautelle-runner install-service && systemctl --user daemon-reload',
     );
   });
 
