@@ -111,7 +111,7 @@ export function Rail({
   const projectName = projects.find(
     (project) => project.id === projectId,
   )?.displayName;
-  // C-396: admins only (the provider loads nothing for others).
+  // C-396, C-476: admins and operators (the provider loads nothing for viewers).
   const { setup } = useGettingStarted();
 
   const badges: Record<string, RailBadge | undefined> = {
@@ -242,9 +242,11 @@ export function Rail({
                 value={setup.done}
                 max={setup.total}
                 label={
-                  setup.project
-                    ? `Finish setup · ${setup.project.displayName}`
-                    : 'Finish setup'
+                  setup.audience === 'operator'
+                    ? 'Getting started'
+                    : setup.project
+                      ? `Finish setup · ${setup.project.displayName}`
+                      : 'Finish setup'
                 }
                 hint={`${setup.done} / ${setup.total}`}
               />

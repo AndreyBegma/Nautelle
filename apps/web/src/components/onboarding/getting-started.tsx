@@ -106,7 +106,8 @@ function StepBody({
 }: {
   step: Step;
   state: State;
-  runners: RunnersFact;
+  /** Admins only: the pair step's runners. */
+  runners: RunnersFact | undefined;
   onChange: () => void;
 }) {
   switch (step.id) {
@@ -122,7 +123,7 @@ function StepBody({
         </>
       );
     case 'pair': {
-      if (runners.kind !== 'offline') {
+      if (runners?.kind !== 'offline') {
         return (
           <p>
             Add a runner on the Runners page and run the pairing command it
@@ -179,6 +180,21 @@ function StepBody({
           Add a card on the Board with what you want done and run it. An agent
           works in its own worktree and opens a pull request for you to review
           and merge.
+        </p>
+      );
+    case 'open':
+      return (
+        <p>
+          No project is shared with you yet. Ask an administrator to add you to
+          one; it shows on this page once they do.
+        </p>
+      );
+    case 'notifications':
+      return (
+        <p>
+          Nautelle tells you when a card waits for you, a pull request is ready
+          or a run fails. Link Telegram or turn on email for the events you care
+          about.
         </p>
       );
     default:
@@ -245,9 +261,18 @@ function StepRow({
   );
 }
 
+/** What the checklist is for, under its title. */
+const INTRO: Record<State['audience'], string> = {
+  admin:
+    'Nautelle drives agents on your own machines. These steps take you to a first card with a pull request.',
+  operator:
+    'An administrator has set Nautelle up. These steps take you to your first card.',
+};
+
 /**
  * Getting started (issue #132, C-396): the first-run steps for an admin, with the
- * commands for the step they are on. The caller hides it once `complete`.
+ * commands for the step they are on, or an operator's three (C-476). The
+ * caller hides it once `complete`.
  */
 export function GettingStarted({
   state,
@@ -255,7 +280,8 @@ export function GettingStarted({
   onChange,
 }: {
   state: State;
-  runners: RunnersFact;
+  /** Admins only: the pair step tells a paired runner from none. */
+  runners?: RunnersFact;
   /** A step was done here: look at the facts again. */
   onChange: () => void;
 }) {
@@ -271,10 +297,7 @@ export function GettingStarted({
     >
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-bold">Getting started</h2>
-        <p className="text-sm text-ink-2">
-          Nautelle drives agents on your own machines. These steps take you to a
-          first card with a pull request.
-        </p>
+        <p className="text-sm text-ink-2">{INTRO[state.audience]}</p>
       </div>
       <Progress
         value={state.done}
@@ -299,14 +322,16 @@ export function GettingStarted({
           </StepRow>
         ))}
       </ol>
-      <div className="flex flex-col gap-3 border-t border-line pt-4">
-        <h3 className="text-sm font-semibold">Optional</h3>
-        <ul className="flex flex-col gap-3">
-          {optional.map((step) => (
-            <StepRow key={step.id} step={step} open={false} />
-          ))}
-        </ul>
-      </div>
+      {optional.length > 0 ? (
+        <div className="flex flex-col gap-3 border-t border-line pt-4">
+          <h3 className="text-sm font-semibold">Optional</h3>
+          <ul className="flex flex-col gap-3">
+            {optional.map((step) => (
+              <StepRow key={step.id} step={step} open={false} />
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </Card>
   );
 }

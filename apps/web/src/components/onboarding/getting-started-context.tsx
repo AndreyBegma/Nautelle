@@ -1,6 +1,10 @@
 'use client';
 
-import type { OnboardingFacts, ProjectSummary } from '@nautelle/shared';
+import type {
+  MyOnboardingFacts,
+  OnboardingFacts,
+  ProjectSummary,
+} from '@nautelle/shared';
 import {
   createContext,
   type ReactNode,
@@ -13,13 +17,17 @@ import type { Loadable, RunnersFact } from '../../lib/prerequisites/facts';
 import { usePrerequisites } from '../../lib/prerequisites/use-prerequisites';
 import { useSection } from '../../lib/section/use-section';
 import { useCurrentUser } from '../shell/user-context';
-import { type GettingStarted, gettingStarted } from './steps';
+import {
+  type GettingStarted,
+  gettingStarted,
+  operatorGettingStarted,
+} from './steps';
 
 /** While setup is unfinished, the admin is usually pairing on another screen. */
 const SETUP_POLL_MS = 15_000;
 
 export interface GettingStartedValue {
-  /** Undefined until the runners and projects have loaded, and for non-admins. */
+  /** Undefined until its facts have loaded, and for viewers. */
   setup: GettingStarted | undefined;
   runners: Loadable<RunnersFact>;
   /** Looks again now, e.g. after a step was done on this page. */
@@ -34,12 +42,15 @@ const GettingStartedContext = createContext<GettingStartedValue>({
 
 /**
  * Getting started for the whole shell (C-396): the Overview's checklist and
- * the rail's setup link read the same state, loaded once. Admins only; it
- * polls while a required step is open, since steps finish elsewhere (Runners,
- * a terminal, the Board).
+ * the rail's setup link read the same state, loaded once. An admin's steps set
+ * Nautelle up; an operator's (C-476) take them to their first card; viewers
+ * get none. It polls while a required step is open, since steps finish
+ * elsewhere (Runners, a terminal, Notifications, the Board).
  */
 export function GettingStartedProvider({ children }: { children: ReactNode }) {
-  const isAdmin = useCurrentUser().role === 'admin';
+  const role = useCurrentUser().role;
+  const isAdmin = role === 'admin';
+  const guided = isAdmin || role === 'operator';
   const { runners, reload: reloadRunners } = usePrerequisites({
     runners: isAdmin,
   });
@@ -55,24 +66,37 @@ export function GettingStartedProvider({ children }: { children: ReactNode }) {
         : Promise.resolve(undefined),
     [isAdmin],
   );
+  const me = useSection(
+    () =>
+      guided
+        ? api<MyOnboardingFacts>('/onboarding/me')
+        : Promise.resolve(undefined),
+    [guided],
+  );
 
-  const setup =
-    isAdmin && runners.state === 'ready' && projects.data !== undefined
+  const setup = isAdmin
+    ? runners.state === 'ready' && projects.data !== undefined
       ? gettingStarted({
           runners: runners.value,
           projects: projects.data,
           facts: facts.data ?? null,
+          me: me.data ?? null,
         })
+      : undefined
+    : guided && me.data !== undefined
+      ? operatorGettingStarted(me.data)
       : undefined;
-  const settingUp = isAdmin && setup?.complete !== true;
+  const settingUp = guided && setup?.complete !== true;
 
   const { refresh: refreshProjects } = projects;
   const { refresh: refreshFacts } = facts;
+  const { refresh: refreshMe } = me;
   const reload = useCallback(() => {
     reloadRunners();
     refreshProjects();
     refreshFacts();
-  }, [reloadRunners, refreshProjects, refreshFacts]);
+    refreshMe();
+  }, [reloadRunners, refreshProjects, refreshFacts, refreshMe]);
 
   useEffect(() => {
     if (!settingUp) return;
