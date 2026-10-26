@@ -501,11 +501,6 @@ export interface TaskRow {
   updatedAt: string;
 }
 
-export interface TaskPage {
-  items: TaskRow[];
-  nextCursor: string | null;
-}
-
 /** One version of the instructions (`planner_instructions` row). */
 export interface PlannerInstructionsVersion {
   id: string;

@@ -1,6 +1,6 @@
 # ADR-0098: One work model — cards everywhere, Fleet shows who works, Queue shows incoming issues
 
-Status: accepted · Date: 2026-10-25 ·
+Status: accepted · Date: 2026-10-25 · Amended by [ADR-0122](0122-fleet-working-now-reads-only-the-cards-at-work.md) (§2: Working now has its own read) ·
 Spec: [`docs/specs/card-397-one-work-model-cards-everywhere-fleet-as.md`](../specs/card-397-one-work-model-cards-everywhere-fleet-as.md) ·
 Amends: [ADR-0030](0030-terminal-work-and-fleet-work-appear-on-the-board.md) §4 ·
 Relates to: [ADR-0024](0024-board-cards-and-dedicated-card-workers.md), [ADR-0037](0037-new-work-is-one-intake-that-can-split.md) ·

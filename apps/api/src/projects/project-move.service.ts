@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   ACTIVE_CARD_ROUND_PHASES,
   type ProjectMoveCheck,
@@ -156,6 +157,7 @@ export class ProjectMoveService {
         : {}
       : { docsSource: { upsert: { create: detected, update: detected } } };
     let updated: ProjectWithRelations;
+    let plansReset = 0;
     try {
       updated = await this.prisma.$transaction(async (tx) => {
         // A round queued between the check above and this write would run
@@ -197,6 +199,7 @@ export class ProjectMoveService {
           where: { projectId, designSessionId: { not: null } },
           data: { designSessionId: null },
         });
+        plansReset = await resetPlanSessions(tx, projectId);
         return row;
       });
     } catch (error) {
@@ -235,6 +238,7 @@ export class ProjectMoveService {
         defaultProfileId: profileId,
         docs: updated.docsSource ? docsSummary(updated.docsSource) : null,
         worktrees: worktrees.map((w) => w.path),
+        plansReset,
       },
       result: 'ok',
     });
@@ -258,6 +262,7 @@ export class ProjectMoveService {
       ),
       from,
       worktrees,
+      plansReset,
     };
   }
 
@@ -352,6 +357,34 @@ const refuseRunningWork = async (db: Db, projectId: string): Promise<void> => {
       `Stop what runs first: ${running.join(', ')}`,
     );
   }
+};
+
+/**
+ * C-477: the plans' Claude sessions live on the old machine too. A plan's
+ * session id is required, so each plan gets a new one; its turns before
+ * `sessionSince` ran in the old one, and a task has nothing to fork until a
+ * plan turn runs on the new runner. Returns how many plans were reset.
+ */
+const resetPlanSessions = async (
+  tx: Prisma.TransactionClient,
+  projectId: string,
+): Promise<number> => {
+  const plans = await tx.plan.findMany({
+    where: { projectId },
+    select: { id: true },
+  });
+  const sessionSince = new Date();
+  for (const plan of plans) {
+    await tx.plan.update({
+      where: { id: plan.id },
+      data: { sessionId: randomUUID(), sessionSince },
+    });
+  }
+  await tx.planTask.updateMany({
+    where: { plan: { projectId }, sessionId: { not: null } },
+    data: { sessionId: null },
+  });
+  return plans.length;
 };
 
 /**

@@ -16,8 +16,6 @@ import {
   PLAN_MODES,
   PLAN_REVIEW_DECISIONS,
   PLAN_TASK_KINDS,
-  PLAN_TASK_LIVE_STATUSES,
-  PLAN_TASK_STATUSES,
   PLAN_VISIBILITIES,
   PLANNER_MAX_OPTIONS,
   PLANNER_MAX_QUESTIONS,
@@ -30,15 +28,12 @@ import {
   type PlannerSpecOutput,
   type PlanReviewDecision,
   type PlanTaskKind,
-  type PlanTaskLiveStatus,
   type PlanTaskReviewRequest,
-  type PlanTaskStatus,
   type PlanVisibility,
   type PlanVisibilityRequest,
   STACK_BODY_MAX,
   STACK_STAGE_TITLE_MAX,
   STACK_TITLE_MAX,
-  type TasksQuery,
   type UpdatePlanCandidateRequest,
 } from '@nautelle/shared';
 import { Type } from 'class-transformer';
@@ -359,40 +354,4 @@ export class PlannerSettingsDto implements PlannerSettingsUpdateRequest {
   @IsString()
   @MaxLength(INSTRUCTIONS_MAX_LENGTH)
   instructionsOverride?: string;
-}
-
-const TASK_FILTER_STATUSES = [
-  ...PLAN_TASK_STATUSES,
-  ...PLAN_TASK_LIVE_STATUSES,
-] as const;
-
-/** `GET /tasks`. */
-export class TasksQueryDto implements TasksQuery {
-  @IsOptional()
-  @IsString()
-  @MaxLength(ID_MAX_LENGTH)
-  projectId?: string;
-
-  @IsOptional()
-  @IsIn(PLAN_TASK_KINDS)
-  kind?: PlanTaskKind;
-
-  @IsOptional()
-  @IsIn(TASK_FILTER_STATUSES)
-  status?: PlanTaskStatus | PlanTaskLiveStatus;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(ID_MAX_LENGTH)
-  planId?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  q?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  cursor?: string;
 }

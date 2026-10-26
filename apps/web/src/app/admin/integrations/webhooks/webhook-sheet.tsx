@@ -29,7 +29,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ConfirmGate } from '../../../../components/confirm/confirm-gate';
 import { api } from '../../../../lib/api';
 import { Time } from '../../../../lib/format/time';
-import { useLive } from '../../../../lib/live/use-live';
+import { useLiveRefresh } from '../../../../lib/live/use-live-refresh';
 import { useErrorToast } from '../../../../lib/section/use-error-toast';
 import {
   attemptErrorLabel,
@@ -44,8 +44,6 @@ import {
   VERIFY_SAMPLE,
 } from '../../../../lib/webhooks/format';
 import { MaskedUrl } from '../../../../lib/webhooks/masked-url';
-
-const POLL_MS = 15_000;
 
 type Confirm = 'rotate' | 'delete';
 
@@ -117,12 +115,10 @@ export function WebhookSheet({
       return;
     }
     void load();
-    const timer = setInterval(load, POLL_MS);
-    return () => clearInterval(timer);
   }, [webhookId, load]);
 
-  useLive(webhookId ? 'admin' : null, (message) => {
-    if (message.event === WEBHOOK_LIVE_EVENTS.deliveryUpdated) void load();
+  useLiveRefresh([], [WEBHOOK_LIVE_EVENTS.deliveryUpdated], load, {
+    extraTopics: webhookId ? ['admin'] : [],
   });
 
   const loadMore = async () => {

@@ -12,13 +12,11 @@ import {
   hasActivityFilters,
   itemMeta,
   itemTitle,
-  LIVE_PROJECT_BUDGET,
   matchesQuery,
   mergeItems,
   moreFilterCount,
   PROJECT_ACTIVITY_FILTER_CODEC,
   parseLiveItem,
-  planLive,
   prLink,
   queryString,
   STEWARD_TYPE_OPTIONS,
@@ -129,43 +127,6 @@ describe('parseLiveItem', () => {
     expect(parseLiveItem(null)).toBeNull();
     expect(parseLiveItem({ id: 'x' })).toBeNull();
     expect(parseLiveItem({ ...item(), id: 'abc' })).toBeNull();
-  });
-});
-
-describe('planLive', () => {
-  const ids = (n: number) => Array.from({ length: n }, (_, i) => `p${i}`);
-
-  test('a fixed or filtered project follows only its own topic', () => {
-    expect(
-      planLive({ projectId: 'p9', projectIds: ids(40), isAdmin: true }),
-    ).toEqual({ topics: ['project:p9'], poll: false });
-  });
-
-  test('within the budget: one topic per project, admin adds the admin topic', () => {
-    const plan = planLive({
-      projectIds: ids(LIVE_PROJECT_BUDGET),
-      isAdmin: true,
-    });
-    expect(plan.poll).toBe(false);
-    expect(plan.topics).toHaveLength(LIVE_PROJECT_BUDGET + 1);
-    expect(plan.topics.at(-1)).toBe('admin');
-    expect(planLive({ projectIds: ids(2), isAdmin: false }).topics).toEqual([
-      'project:p0',
-      'project:p1',
-    ]);
-  });
-
-  test('past the budget: no subscriptions, poll instead', () => {
-    expect(
-      planLive({ projectIds: ids(LIVE_PROJECT_BUDGET + 1), isAdmin: true }),
-    ).toEqual({ topics: [], poll: true });
-  });
-
-  test('a member of no project still gets admin when admin', () => {
-    expect(planLive({ projectIds: [], isAdmin: true }).topics).toEqual([
-      'admin',
-    ]);
-    expect(planLive({ projectIds: [], isAdmin: false }).topics).toEqual([]);
   });
 });
 

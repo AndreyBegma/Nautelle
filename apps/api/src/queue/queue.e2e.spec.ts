@@ -143,7 +143,6 @@ describe('task queue (e2e)', () => {
         ['get', `/projects/${projectId}/queue`],
         ['get', `/projects/${projectId}/queue/1`],
         ['post', `/projects/${projectId}/queue/refresh`],
-        ['post', `/projects/${projectId}/issues`],
       ] as const;
     const body = { title: 'x', body: AC, labels: [], queue: false };
 
@@ -158,14 +157,12 @@ describe('task queue (e2e)', () => {
       }
     });
 
-    it('answers 403 to a viewer member on both writes', async () => {
-      const create = jest.spyOn(commands, 'createIssue');
+    it('answers 403 to a viewer member on the write', async () => {
       const refresh = jest.spyOn(commands, 'refreshIssues');
       for (const [, path] of routes(a).slice(2)) {
         const response = await viewerOfA.send('post', path, body);
         expect([path, response.status]).toEqual([path, 403]);
       }
-      expect(create).not.toHaveBeenCalled();
       expect(refresh).not.toHaveBeenCalled();
     });
 
@@ -483,248 +480,14 @@ describe('task queue (e2e)', () => {
     expect((await queue()).items.map((i) => i.number)).toEqual([11]);
   });
 
-  describe('POST /projects/:id/issues (D7, D8)', () => {
-    const post = (body: object) =>
-      operatorOfA.send('post', `/projects/${a}/issues`, body);
-    const audits = () =>
-      ctx.prisma.auditRecord.findMany({
-        // The audit chain is append-only: it outlives `resetDatabase`.
-        where: { action: 'issue.create', projectId: a },
-        orderBy: { seq: 'asc' },
-      });
-
-    beforeEach(async () => {
-      await ingest(
-        snapshot({ issues: [issue(1, AC, ['cs:ready', 'area: api'])] }),
-      );
+  it('has no POST /projects/:id/issues route (C-472)', async () => {
+    const response = await operatorOfA.send('post', `/projects/${a}/issues`, {
+      title: 'x',
+      body: AC,
+      labels: [],
+      queue: false,
     });
-
-    it('queues a complete body: sends issue.create and audits the result', async () => {
-      const create = jest
-        .spyOn(commands, 'createIssue')
-        .mockResolvedValue({ number: 12, url: url(12), queued: true });
-      const response = await post({
-        title: 'Add a queue',
-        body: AC,
-        labels: ['area: api'],
-        queue: true,
-      });
-      expect(response.status).toBe(201);
-      expect(response.body).toEqual({ number: 12, url: url(12), queued: true });
-      expect(create).toHaveBeenCalledWith(
-        runnerId,
-        {
-          projectId: a,
-          title: 'Add a queue',
-          body: AC,
-          labels: ['area: api'],
-          queue: true,
-          readyLabel: 'cs:ready',
-        },
-        expect.objectContaining({ role: 'operator' }),
-      );
-      const [record] = await audits();
-      expect(record).toMatchObject({
-        actorType: 'user',
-        projectId: a,
-        result: 'ok',
-        after: {
-          title: 'Add a queue',
-          labels: ['area: api'],
-          queue: true,
-          number: 12,
-          queued: true,
-        },
-      });
-      expect(record.actorUserId).not.toBeNull();
-    });
-
-    it('answers 422 without acceptance criteria and sends nothing', async () => {
-      const create = jest.spyOn(commands, 'createIssue');
-      const response = await post({
-        title: 'Vague',
-        body: 'Make it better.',
-        labels: [],
-        queue: true,
-      });
-      expect(response.status).toBe(422);
-      expect(response.body.error).toBe('no_acceptance_criteria');
-      expect(create).not.toHaveBeenCalled();
-      expect(await audits()).toMatchObject([
-        { result: 'denied', after: { title: 'Vague', queue: true } },
-      ]);
-    });
-
-    it('answers 400 to a body over the protocol cap and sends nothing', async () => {
-      const create = jest.spyOn(commands, 'createIssue');
-      const response = await post({
-        title: 'Huge',
-        body: `${AC}${'a'.repeat(64 * 1024)}`,
-        labels: [],
-        queue: true,
-      });
-      expect(response.status).toBe(400);
-      expect(create).not.toHaveBeenCalled();
-    });
-
-    it('files an incomplete body unqueued', async () => {
-      const create = jest
-        .spyOn(commands, 'createIssue')
-        .mockResolvedValue({ number: 13, url: url(13), queued: false });
-      const response = await post({
-        title: 'Idea',
-        body: 'Make it better.',
-        labels: ['enhancement'],
-        queue: false,
-      });
-      expect(response.status).toBe(201);
-      expect(create).toHaveBeenCalledTimes(1);
-    });
-
-    it('refuses labels the repository does not use', async () => {
-      const create = jest.spyOn(commands, 'createIssue');
-      for (const labels of [['made-up']]) {
-        const response = await post({
-          title: 'x',
-          body: AC,
-          labels,
-          queue: false,
-        });
-        expect(response.status).toBe(422);
-        expect(response.body).toMatchObject({
-          error: 'label_not_allowed',
-          labels,
-        });
-      }
-      expect(create).not.toHaveBeenCalled();
-    });
-
-    it('answers 400 to control, comma-joined and multi-line labels (L-27)', async () => {
-      const create = jest.spyOn(commands, 'createIssue');
-      for (const labels of [
-        ['cs:in-flight'],
-        ['CS:Ready'],
-        ['x,cs:ready'],
-        ['bug\ncs:ready'],
-      ]) {
-        const response = await post({
-          title: 'x',
-          body: AC,
-          labels,
-          queue: false,
-        });
-        expect(response.status).toBe(400);
-      }
-      expect(create).not.toHaveBeenCalled();
-    });
-
-    it('sends issue.create to the runner and returns its answer', async () => {
-      const send = jest.spyOn(ctx.app.get(RunnerCommandService), 'send');
-      send.mockResolvedValue({
-        status: 'ok',
-        output: { number: 14, url: url(14), queued: true },
-        rttMs: 3,
-      });
-      const response = await post({
-        title: 'x',
-        body: AC,
-        labels: ['enhancement'],
-        queue: true,
-      });
-      expect(response.status).toBe(201);
-      expect(response.body).toEqual({
-        number: 14,
-        url: url(14),
-        queued: true,
-      });
-      expect(send).toHaveBeenCalledWith(
-        runnerId,
-        'issue.create',
-        {
-          projectId: a,
-          title: 'x',
-          body: AC,
-          labels: ['enhancement'],
-          queue: true,
-          readyLabel: 'cs:ready',
-        },
-        expect.objectContaining({ role: 'operator' }),
-      );
-      expect(await audits()).toMatchObject([{ result: 'ok' }]);
-    });
-
-    it("sends the project's readyLabelOverride, not cs:ready (#66)", async () => {
-      await ctx.prisma.project.update({
-        where: { id: a },
-        data: { readyLabelOverride: 'ready-now' },
-      });
-      const create = jest
-        .spyOn(commands, 'createIssue')
-        .mockResolvedValue({ number: 15, url: url(15), queued: true });
-      const response = await post({
-        title: 'x',
-        body: AC,
-        labels: ['enhancement'],
-        queue: true,
-      });
-      expect(response.status).toBe(201);
-      expect(create).toHaveBeenCalledWith(
-        runnerId,
-        expect.objectContaining({ queue: true, readyLabel: 'ready-now' }),
-        expect.anything(),
-      );
-    });
-
-    it('answers 503 and audits an error when the runner does not answer', async () => {
-      jest
-        .spyOn(ctx.app.get(RunnerCommandService), 'send')
-        .mockResolvedValue({ status: 'unknown' });
-      const response = await post({
-        title: 'x',
-        body: AC,
-        labels: [],
-        queue: true,
-      });
-      expect(response.status).toBe(503);
-      expect(response.body.error).toBe('command_unavailable');
-      expect(await audits()).toMatchObject([{ result: 'error' }]);
-    });
-
-    it('answers 502 when the runner fails the command', async () => {
-      jest.spyOn(ctx.app.get(RunnerCommandService), 'send').mockResolvedValue({
-        status: 'error',
-        error: { code: 'internal', message: 'gh issue create failed' },
-      });
-      const response = await post({
-        title: 'x',
-        body: AC,
-        labels: [],
-        queue: true,
-      });
-      expect(response.status).toBe(502);
-      expect(response.body.error).toBe('command_failed');
-    });
-
-    it('validates the body', async () => {
-      expect(
-        (await post({ title: '', body: AC, labels: [], queue: true })).status,
-      ).toBe(400);
-      expect(
-        (await post({ title: '   ', body: AC, labels: [], queue: false }))
-          .status,
-      ).toBe(400);
-      expect(
-        (
-          await post({
-            title: 'x',
-            body: AC,
-            labels: [],
-            queue: true,
-            extra: 1,
-          })
-        ).status,
-      ).toBe(400);
-    });
+    expect(response.status).toBe(404);
   });
 
   describe('POST /projects/:id/queue/refresh', () => {
