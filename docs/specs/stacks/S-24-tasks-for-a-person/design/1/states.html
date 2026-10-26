@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>States · S-24 Tasks for a person</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--font-sans:"SF Pro Text","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-scrim:rgb(10 16 34/.3);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-ink:#ade58f;--color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250/.18);--color-hue-7-ink:#cbbcff;--glass-sheen:rgb(255 255 255/.06);--glass-scrim-strong:rgb(9 9 12/.64);--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--size-field:28px}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-hue-1:#1f64d6;--color-hue-2:#00805e;--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-ink:#2f6617;--color-hue-7:#7244e0;--color-hue-7-ink:#5b30c4;--color-hue-2-soft:color-mix(in oklab,var(--color-hue-2) 13%,transparent);--color-hue-3-soft:color-mix(in oklab,var(--color-hue-3) 13%,transparent);--color-hue-7-soft:color-mix(in oklab,var(--color-hue-7) 13%,transparent);--glass-sheen:rgb(255 255 255/.4);--glass-scrim-strong:rgb(255 255 255/.82);--glass-edge:rgb(20 40 110/.12);--glass-spec:rgb(255 255 255/.7);--glass-shadow-strong:rgb(20 40 110/.18);--glass-shadow-clear:rgb(20 40 110/.06)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink);font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+body{margin:0;padding:24px}
+h1,h2,p{margin:0}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.mono{font-family:var(--font-mono)}
+code{font-family:var(--font-mono);font-size:12px;padding:1px 5px;border-radius:4px;background:var(--color-hover)}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 24px 64px var(--glass-shadow-strong)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--size-control);padding:0 12px;border-radius:var(--radius-control);border:1px solid transparent;font:inherit;font-size:13px;font-weight:500;white-space:nowrap;color:var(--color-ink);cursor:pointer}
+.btn--solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn--glass{background:var(--color-raised);border-color:var(--color-line-strong)}
+.btn--ghost{background:transparent;color:var(--color-ink-2)}
+.btn--sm{height:24px;padding:0 8px;font-size:12px;border-radius:4px}
+.input{width:100%;height:var(--size-field);padding:0 10px;border-radius:var(--radius-control);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-size:13px}
+.input::placeholder{color:var(--color-ink-3)}
+.badge{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:18px;min-width:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;line-height:1;background:var(--color-hover);color:var(--color-ink-2)}
+.status-pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:500;line-height:1;white-space:nowrap;background:var(--s-soft);color:var(--s-ink)}
+.status-pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--s)}
+.status-pill--done{--s:var(--color-hue-3);--s-soft:var(--color-hue-3-soft);--s-ink:var(--color-hue-3-ink)}
+.status-pill--running{--s:var(--color-hue-2);--s-soft:var(--color-hue-2-soft);--s-ink:var(--color-hue-2-ink)}
+.banner{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--radius-surface);border:1px solid color-mix(in oklab,var(--b,var(--color-info)) 30%,transparent);background:color-mix(in oklab,var(--b,var(--color-info)) 10%,transparent);font-size:13px}
+.banner svg{color:var(--b,var(--color-info));margin-top:2px}
+.banner__title{font-weight:600}
+.banner--danger{--b:var(--color-danger)}.banner--ok{--b:var(--color-ok)}
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:36px 24px}
+.empty__icon{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;background:var(--color-hover);color:var(--color-ink-2)}
+.empty__title{font-size:15px;font-weight:600}
+.empty__desc{font-size:13px;color:var(--color-ink-2);max-width:44ch}
+.skeleton{display:block;border-radius:4px;background:linear-gradient(90deg,var(--color-hover),color-mix(in oklab,var(--color-ink) 10%,transparent),var(--color-hover));background-size:200% 100%;height:12px;animation:sh 1.4s linear infinite}
+@keyframes sh{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skeleton{animation:none}}
+.dialog{width:100%;max-width:440px;border-radius:var(--radius-sheet);padding:20px;display:flex;flex-direction:column;gap:12px}
+.dialog__title{font-size:16px;line-height:24px;font-weight:600}
+.dialog__body{font-size:13px;color:var(--color-ink-2)}
+.dialog__actions{display:flex;justify-content:space-between;gap:8px;margin-top:8px}
+.kind{display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:4px;background:var(--color-hover);color:var(--color-ink-2);font-size:11px;font-weight:600}
+.s-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:20px;align-items:start}
+.state{display:flex;flex-direction:column;gap:10px}
+.state__label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.stage{padding:16px;border-radius:var(--radius-surface);background:color-mix(in oklab,var(--color-surface) 60%,transparent);border:1px solid var(--color-line);display:flex;flex-direction:column;gap:12px}
+.scrimbox{padding:28px 16px;border-radius:var(--radius-surface);background:var(--color-scrim);border:1px solid var(--color-line);display:flex;justify-content:center}
+.col{display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--radius-surface);background:color-mix(in oklab,var(--color-surface) 60%,transparent);border:1px solid var(--color-line)}
+.col__head{display:flex;justify-content:space-between;padding:2px 4px;font-size:12px;font-weight:500;color:var(--color-ink-2)}
+.sk-card{padding:12px;border-radius:var(--radius-surface);display:flex;flex-direction:column;gap:10px}
+.deps>div{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:13px}
+.deps>div+div{border-top:1px solid var(--color-line)}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:6px">
+    <span class="eyebrow">S-24 · States</span>
+    <h1 style="font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em">Empty, loading and error</h1>
+  </header>
+  <div class="states">
+    <section class="state" aria-label="Empty Board filter">
+      <span class="state__label"><span class="badge">Empty</span>Kind: Task, no tasks yet</span>
+      <div class="surface-content" style="border-radius:var(--radius-surface)">
+        <div class="empty">
+          <span class="empty__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg></span>
+          <p class="empty__title">No tasks for people yet</p>
+          <p class="empty__desc">A task is work a person does. Code cards can wait on it, and stuck workers raise one when they need a hand.</p>
+          <button type="button" class="btn btn--glass" style="margin-top:4px">New task</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="state" aria-label="Empty checklist">
+      <span class="state__label"><span class="badge">Empty</span>Task without a checklist</span>
+      <div class="stage">
+        <div class="s-title" style="margin:0">Checklist</div>
+        <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+          <p style="padding:12px;font-size:13px" class="ink-2">No items. Mark done is enough for this task.</p>
+          <div style="display:flex;gap:8px;padding:8px 12px;border-top:1px solid var(--color-line);background:var(--color-hover)"><input class="input" placeholder="Add an item" aria-label="New checklist item"><button type="button" class="btn btn--glass">Add</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="state" aria-label="Loading">
+      <span class="state__label"><span class="badge">Loading</span>Board column and task sheet</span>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px">
+        <div class="col" aria-busy="true">
+          <div class="col__head"><span>In progress</span><span class="badge">…</span></div>
+          <div class="sk-card surface-content"><span class="skeleton" style="width:30%"></span><span class="skeleton" style="width:90%"></span><span class="skeleton" style="width:55%"></span></div>
+          <div class="sk-card surface-content"><span class="skeleton" style="width:30%"></span><span class="skeleton" style="width:75%"></span></div>
+        </div>
+        <div class="glass-strong" style="border-radius:var(--radius-sheet);padding:16px;display:flex;flex-direction:column;gap:12px" aria-busy="true">
+          <span class="skeleton" style="width:25%"></span>
+          <span class="skeleton" style="width:85%;height:16px"></span>
+          <span class="skeleton" style="width:35%;height:20px;border-radius:999px"></span>
+          <span class="skeleton" style="width:100%;height:44px;border-radius:8px"></span>
+          <span class="skeleton" style="width:70%"></span>
+          <span class="skeleton" style="width:60%"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="state" aria-label="Checklist unavailable">
+      <span class="state__label"><span class="badge">Error</span>Checklist failed to load</span>
+      <div class="stage">
+        <div class="s-title" style="margin:0">Checklist</div>
+        <div class="surface-content" style="border-radius:var(--radius-surface)">
+          <div class="empty" style="padding:24px">
+            <span class="empty__icon" style="color:var(--color-danger)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></span>
+            <p class="empty__title">The checklist isn't available</p>
+            <p class="empty__desc">The API didn't answer. The task itself is fine; Mark done still works.</p>
+            <button type="button" class="btn btn--glass btn--sm">Try again</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="state" aria-label="Resume failed">
+      <span class="state__label"><span class="badge">Error</span>Done saved, the session couldn't resume</span>
+      <div class="stage">
+        <div style="display:flex;align-items:center;gap:8px"><span class="mono ink-3" style="font-size:12px">C-530</span><span class="kind">Task</span><span class="status-pill status-pill--done">Done</span></div>
+        <div class="banner banner--danger" role="alert"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><div style="flex:1"><div class="banner__title">C-522 couldn't resume its session</div><div class="ink-2">slot-3 went offline while it waited. Resume it on the next free slot, or start it fresh from the last commit.</div></div></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn btn--ghost">Start fresh</button><button type="button" class="btn btn--glass">Resume on next slot</button></div>
+      </div>
+    </section>
+
+    <section class="state" aria-label="Confirm with open items">
+      <span class="state__label"><span class="badge">Confirm</span>Mark done with open items</span>
+      <div class="scrimbox">
+        <div class="dialog glass-strong" role="alertdialog" aria-labelledby="cd-t">
+          <h2 id="cd-t" class="dialog__title">Mark C-530 done with 2 open items?</h2>
+          <p class="dialog__body">The open items stay unchecked. C-522 resumes its session and C-531 starts.</p>
+          <div class="dialog__actions"><button type="button" class="btn btn--ghost">Cancel</button><button type="button" class="btn btn--solid">Mark done</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="state" aria-label="Done">
+      <span class="state__label"><span class="badge">Done</span>Dependants continue by themselves</span>
+      <div class="stage">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="mono ink-3" style="font-size:12px">C-530</span><span class="kind">Task</span><span class="status-pill status-pill--done">Done</span><span class="ink-3" style="font-size:12px">by Andrew B. · just now</span></div>
+        <div class="banner banner--ok" role="status"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><div><div class="banner__title">Done. The work it held up continues.</div></div></div>
+        <div class="deps surface-content" style="border-radius:var(--radius-surface)">
+          <div><span class="mono ink-3" style="font-size:11px">C-522</span><span style="flex:1;min-width:0">Retry failed charges with idempotency keys</span><span class="status-pill status-pill--running" style="height:20px;font-size:11px">Running · slot-3</span></div>
+          <div><span class="mono ink-3" style="font-size:11px">C-531</span><span style="flex:1;min-width:0">Verify Stripe webhook signatures</span><span class="badge">Queued</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</body>
+</html>

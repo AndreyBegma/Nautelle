@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Breakdown · S-24 Tasks for a person</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--font-sans:"SF Pro Text","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-ok:#5fd3a0;--color-info:#5fb4f0;--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-ink:#a4c8ff;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-ink:#ade58f;--color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0/.18);--color-hue-4-ink:#f5c25c;--color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59/.18);--color-hue-5-ink:#f9a77c;--color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250/.18);--color-hue-7-ink:#cbbcff;--glass-sheen:rgb(255 255 255/.06);--glass-scrim-strong:rgb(9 9 12/.64);--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--size-field:28px}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-info:#03629a;--color-hue-1:#1f64d6;--color-hue-1-ink:#1550b0;--color-hue-3:#3a7d1c;--color-hue-3-ink:#2f6617;--color-hue-4:#b36b00;--color-hue-4-ink:#8a5200;--color-hue-5:#c24e00;--color-hue-5-ink:#9c3d00;--color-hue-7:#7244e0;--color-hue-7-ink:#5b30c4;--color-hue-1-soft:color-mix(in oklab,var(--color-hue-1) 13%,transparent);--color-hue-3-soft:color-mix(in oklab,var(--color-hue-3) 13%,transparent);--color-hue-4-soft:color-mix(in oklab,var(--color-hue-4) 13%,transparent);--color-hue-5-soft:color-mix(in oklab,var(--color-hue-5) 13%,transparent);--color-hue-7-soft:color-mix(in oklab,var(--color-hue-7) 13%,transparent);--glass-sheen:rgb(255 255 255/.4);--glass-scrim-strong:rgb(255 255 255/.82);--glass-edge:rgb(20 40 110/.12);--glass-spec:rgb(255 255 255/.7);--glass-shadow-strong:rgb(20 40 110/.18);--glass-shadow-clear:rgb(20 40 110/.06)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink);font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+body{margin:0;padding:24px}
+h1,h2,p{margin:0}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.mono{font-family:var(--font-mono)}
+code{font-family:var(--font-mono);font-size:12px;padding:1px 5px;border-radius:4px;background:var(--color-hover)}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 24px 64px var(--glass-shadow-strong)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--size-control);padding:0 12px;border-radius:var(--radius-control);border:1px solid transparent;font:inherit;font-size:13px;font-weight:500;white-space:nowrap;color:var(--color-ink);cursor:pointer}
+.btn--solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn--glass{background:var(--color-raised);border-color:var(--color-line-strong)}
+.btn--ghost{background:transparent;color:var(--color-ink-2)}
+.input,.select{width:100%;height:var(--size-field);padding:0 10px;border-radius:var(--radius-control);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-size:13px}
+.input::placeholder{color:var(--color-ink-3)}
+.checkbox{width:16px;height:16px;accent-color:var(--color-accent);margin:2px 0 0}
+.badge{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:18px;min-width:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;line-height:1;background:var(--color-hover);color:var(--color-ink-2)}
+.status-pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;line-height:1;white-space:nowrap;background:var(--s-soft);color:var(--s-ink)}
+.status-pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--s)}
+.status-pill--waiting{--s:var(--color-hue-1);--s-soft:var(--color-hue-1-soft);--s-ink:var(--color-hue-1-ink)}
+.status-pill--paused{--s:var(--color-hue-4);--s-soft:var(--color-hue-4-soft);--s-ink:var(--color-hue-4-ink)}
+.status-pill--blocked{--s:var(--color-hue-5);--s-soft:var(--color-hue-5-soft);--s-ink:var(--color-hue-5-ink)}
+.status-pill--done{--s:var(--color-hue-3);--s-soft:var(--color-hue-3-soft);--s-ink:var(--color-hue-3-ink)}
+.banner{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--radius-surface);border:1px solid color-mix(in oklab,var(--color-info) 30%,transparent);background:color-mix(in oklab,var(--color-info) 10%,transparent);font-size:13px}
+.banner svg{color:var(--color-info);margin-top:2px}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:10px 20px;margin:0;font-size:13px;align-items:center}
+.kv dt{color:var(--color-ink-3)}.kv dd{margin:0;min-width:0}
+.board-card{padding:10px 12px;border-radius:var(--radius-surface);display:flex;flex-direction:column;gap:8px}
+.board-card__id{font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3)}
+.board-card__title{font-size:13px;font-weight:500;line-height:18px}
+.board-card__foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.board__col{display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--radius-surface);background:color-mix(in oklab,var(--color-surface) 60%,transparent);border:1px solid var(--color-line)}
+.board__head{display:flex;justify-content:space-between;padding:2px 4px;font-size:12px;font-weight:500;color:var(--color-ink-2)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--swatch)}
+.bc-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.kind{display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:4px;background:var(--color-hover);color:var(--color-ink-2);font-size:11px;font-weight:600}
+.avatar{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;background:var(--color-hue-7-soft);color:var(--color-hue-7-ink);font-size:10px;font-weight:600}
+.prog{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--color-ink-2);font-variant-numeric:tabular-nums}
+.prog i{display:block;width:32px;height:4px;border-radius:999px;background:var(--color-hover);overflow:hidden}
+.prog i b{display:block;height:100%;background:var(--color-ink-3)}
+.spacer{flex:1}
+.dep{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-ink-2)}
+.dep b{font-family:var(--font-mono);font-weight:500;font-size:11px;color:var(--color-ink)}
+.raised{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-ink-3);padding-top:8px;border-top:1px solid var(--color-line)}
+.is-selected{box-shadow:0 0 0 2px var(--color-accent)}
+.s-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.cl{list-style:none;margin:0;padding:0}
+.cl li+li{border-top:1px solid var(--color-line)}
+.cl label{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;font-size:13px}
+.cl label:has(input:checked) span{color:var(--color-ink-3);text-decoration:line-through}
+.cl-add{display:flex;gap:8px;padding:8px 12px;border-top:1px solid var(--color-line);background:var(--color-hover)}
+.deps>div{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:13px}
+.deps>div+div{border-top:1px solid var(--color-line)}
+.chan{display:flex;flex-wrap:wrap;gap:6px}
+.chan span{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:999px;background:var(--color-hover);font-size:12px;color:var(--color-ink-2)}
+.chan svg{color:var(--color-ok)}
+/* breakdown */
+.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,1fr);gap:24px;align-items:start}
+.compose{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:12px}
+.zone{position:relative;border-radius:var(--radius-surface);outline:1px dashed color-mix(in oklab,var(--color-accent) 60%,transparent);outline-offset:4px}
+.mk{position:absolute;top:-12px;left:-12px;z-index:2;width:22px;height:22px;border-radius:999px;background:var(--color-accent);color:var(--color-on-accent);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px var(--color-ground)}
+.sheet{border-radius:var(--radius-sheet);display:flex;flex-direction:column}
+.sheet__head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--color-line)}
+.sheet__body{padding:16px;display:flex;flex-direction:column;gap:20px}
+.sheet__foot{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--color-line)}
+.legend{list-style:none;margin:0;padding:0;border-radius:var(--radius-surface);overflow:hidden}
+.legend li{display:grid;grid-template-columns:22px 1fr;gap:12px;padding:12px 16px}
+.legend li+li{border-top:1px solid var(--color-line)}
+.legend .n{width:22px;height:22px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.legend h3{margin:0;font-size:13px;font-weight:600;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.legend p{font-size:13px;color:var(--color-ink-2);margin-top:2px}
+.legend .cmp{font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3);margin-top:4px}
+.tag{font-family:var(--font-mono);font-size:11px;font-weight:500;padding:0 6px;height:18px;line-height:18px;border-radius:4px;background:var(--color-hover);color:var(--color-ink-2)}
+@media (max-width:1100px){.grid{grid-template-columns:1fr}}
+@media (max-width:700px){body{padding:14px}.compose{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:6px">
+    <span class="eyebrow">S-24 · Breakdown</span>
+    <h1 style="font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em">Tasks for a person on the Work board</h1>
+    <p class="ink-2" style="max-width:72ch">Numbered zones are what the stack adds. Everything else is the existing Board, Sheet and shell.</p>
+  </header>
+  <div class="grid">
+    <div class="stack">
+      <div class="zone" style="display:flex;gap:8px;flex-wrap:wrap;padding:8px"><span class="mk">1</span>
+        <select class="select" style="width:auto;min-width:130px" aria-label="Kind"><option>Kind: Task</option></select>
+        <button type="button" class="btn btn--solid">New ▾</button>
+        <div class="surface-content" style="border-radius:var(--radius-surface);padding:4px;display:flex;flex-direction:column;font-size:13px;min-width:160px"><span style="padding:4px 8px">Code card</span><span style="padding:4px 8px;background:var(--color-hover);border-radius:4px">Task for a person</span></div>
+      </div>
+      <div class="compose">
+        <div class="board__col">
+          <div class="board__head"><span>In progress / Waiting</span><span class="badge">3</span></div>
+          <div class="zone"><span class="mk">2</span>
+            <article class="board-card surface-content is-selected">
+              <div class="bc-top"><span class="board-card__id">C-530</span><span class="kind">☑ Task</span></div>
+              <span class="board-card__title">Add the Stripe webhook secret to the staging env</span>
+              <div class="board-card__foot"><span class="status-pill status-pill--waiting">Waiting on you</span><span class="spacer"></span><span class="prog"><i><b style="width:33%"></b></i>1/3</span><span class="avatar">AB</span></div>
+              <div class="zone raised" style="outline-offset:2px"><span class="mk" style="top:-6px;left:auto;right:-10px">3</span>Raised by slot-3 on <span class="mono" style="font-size:11px">C-522</span></div>
+            </article>
+          </div>
+          <div class="zone"><span class="mk">4</span>
+            <article class="board-card surface-content">
+              <span class="board-card__id">C-522</span>
+              <span class="board-card__title">Retry failed charges with idempotency keys</span>
+              <div class="board-card__foot"><span class="status-pill status-pill--paused">Session paused</span><span class="swatch" style="--swatch:var(--color-hue-7)"></span></div>
+              <div class="dep">🔗 Waits for <b>C-530</b></div>
+            </article>
+          </div>
+          <article class="board-card surface-content">
+            <span class="board-card__id">C-531</span>
+            <span class="board-card__title">Verify Stripe webhook signatures on staging</span>
+            <div class="board-card__foot"><span class="status-pill status-pill--blocked">Blocked</span></div>
+            <div class="dep">🔗 Waits for <b>C-530</b></div>
+          </article>
+        </div>
+        <aside class="sheet glass-strong" aria-label="C-530 sheet">
+          <div class="sheet__head"><span><span class="mono ink-3" style="font-size:12px">C-530</span> <span class="kind">☑ Task</span></span><span class="ink-3">✕</span></div>
+          <div class="sheet__body">
+            <div class="zone" style="display:flex;flex-direction:column;gap:8px"><span class="mk">5</span>
+              <h2 style="font-size:16px;line-height:22px;font-weight:600">Add the Stripe webhook secret to the staging env</h2>
+              <span class="status-pill status-pill--waiting" style="align-self:flex-start">Waiting on you</span>
+            </div>
+            <div class="zone banner"><span class="mk">6</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg><div><b>C-522's session is paused on this task</b><div class="ink-2">Mark it done and slot-3 resumes.</div></div></div>
+            <dl class="kv">
+              <dt>Assignee</dt><dd><span class="avatar">AB</span> Andrew B.</dd>
+              <dt>Raised by</dt><dd>slot-3 worker on <span class="mono" style="font-size:12px">C-522</span></dd>
+              <dt class="zone" style="outline-offset:2px"><span class="mk" style="top:-8px;left:-26px">7</span>Created via</dt><dd class="mono" style="font-size:12px">MCP · card_create</dd>
+              <dt class="zone" style="outline-offset:2px"><span class="mk" style="top:-8px;left:-26px">8</span>Notified</dt><dd class="chan"><span>✓ Inbox</span><span>✓ Telegram</span><span>✓ Email</span><span>✓ Slack</span></dd>
+            </dl>
+            <div class="zone"><span class="mk">9</span>
+              <div class="s-title">Checklist <span class="prog"><i><b style="width:33%"></b></i>1/3</span></div>
+              <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+                <ul class="cl"><li><label><input type="checkbox" class="checkbox" checked><span>Create a test-mode webhook endpoint</span></label></li><li><label><input type="checkbox" class="checkbox"><span>Put the secret into <code>env/api.env</code></span></label></li><li><label><input type="checkbox" class="checkbox"><span>Restart the staging API</span></label></li></ul>
+                <div class="cl-add"><input class="input" placeholder="Add an item" aria-label="New item"><button type="button" class="btn btn--glass">Add</button></div>
+              </div>
+            </div>
+            <div class="zone"><span class="mk">10</span>
+              <div class="s-title">Waiting on this <span class="badge">2</span></div>
+              <div class="deps surface-content" style="border-radius:var(--radius-surface)"><div><span class="mono ink-3" style="font-size:11px">C-522</span><span style="flex:1">Retry failed charges</span><span class="status-pill status-pill--paused">Resumes</span></div><div><span class="mono ink-3" style="font-size:11px">C-531</span><span style="flex:1">Verify signatures</span><span class="status-pill status-pill--blocked">Starts</span></div></div>
+            </div>
+          </div>
+          <div class="sheet__foot"><button type="button" class="btn btn--ghost">Reassign</button><span class="spacer"></span><span class="zone" style="display:inline-flex;outline-offset:3px"><span class="mk">11</span><button type="button" class="btn btn--solid">✓ Mark done</button></span></div>
+        </aside>
+      </div>
+    </div>
+    <ol class="legend surface-content">
+      <li><span class="n">1</span><div><h3>Create and filter by kind <span class="tag">C-510</span></h3><p>"New" opens a menu: Code card or Task for a person. A Kind select in the Toolbar filters the Board, stored in the URL like the other filters.</p><p class="cmp">Button solid · Menu · Toolbar Select</p></div></li>
+      <li><span class="n">2</span><div><h3>A clean task face <span class="tag">C-510</span></h3><p>No agent, branch, cost or demo chip: a task never runs on a slot. A square "Task" tag, the assignee's initials, checklist progress and a StatusPill (Not started, Waiting on you, Done). The bar is neutral; it turns ok only when complete.</p><p class="cmp">board-card · Badge shape=square · StatusPill</p></div></li>
+      <li><span class="n">3</span><div><h3>Raised by a worker <span class="tag">C-511</span></h3><p>When a stuck worker raises the task, the face names the slot and the card it came from. Person-made tasks have no such line.</p></div></li>
+      <li><span class="n">4</span><div><h3>Code cards wait on a person <span class="tag">C-509</span></h3><p>Dependants use the existing statuses: Blocked if not started, Session paused if its worker paused to wait. "Waits for C-530" opens the task.</p><p class="cmp">StatusPill blocked / paused</p></div></li>
+      <li><span class="n">5</span><div><h3>Task sheet <span class="tag">C-510</span></h3><p>Opens from the card, same Detail Sheet as code cards, with title, status and age first.</p><p class="cmp">Sheet (glass-strong)</p></div></li>
+      <li><span class="n">6</span><div><h3>Resume promise <span class="tag">C-511</span></h3><p>An info Banner, only for worker-raised tasks: Done resumes the paused session, so the person knows what the click does.</p><p class="cmp">Banner info</p></div></li>
+      <li><span class="n">7</span><div><h3>Where it came from <span class="tag">C-513</span></h3><p>Board, Telegram (/task or the assistant) or MCP card_create. A task made in Telegram can be marked done from the same message.</p><p class="cmp">KeyValueList</p></div></li>
+      <li><span class="n">8</span><div><h3>Delivered to <span class="tag">C-512</span></h3><p>The assignee's Inbox plus their enabled channels. A ✓ means delivered; a failed channel shows a warn Badge with a retry.</p></div></li>
+      <li><span class="n">9</span><div><h3>Optional checklist <span class="tag">C-509 · C-510</span></h3><p>Items tick in place and save instantly; the add row follows the glob-list pattern from Settings. A task without items shows the add row only.</p><p class="cmp">Checkbox · Input · Button glass</p></div></li>
+      <li><span class="n">10</span><div><h3>Waiting on this <span class="tag">C-509</span></h3><p>Every dependant and what Done does to it: Resumes (a paused session) or Starts (a queued card).</p></div></li>
+      <li><span class="n">11</span><div><h3>Mark done <span class="tag">C-509</span></h3><p>The sheet's one solid action. With open items it asks first in a ConfirmDialog. Done satisfies the dependants, and the Board moves them by itself.</p><p class="cmp">Button solid · ConfirmDialog</p></div></li>
+    </ol>
+  </div>
+</div>
+</body>
+</html>
