@@ -127,7 +127,7 @@ export class BoardLabels {
   ) {}
 
   async view(projectId: string): Promise<ProjectLabelsResponse> {
-    const [labels, rules, settings] = await Promise.all([
+    const [labels, rules, settings, counts] = await Promise.all([
       this.labels(projectId),
       this.prisma.projectLabelPathRule.findMany({
         where: { projectId },
@@ -137,10 +137,18 @@ export class BoardLabels {
         where: { projectId },
         select: { labelSuggest: true, labelPaths: true },
       }),
+      this.prisma.boardCardLabel.groupBy({
+        by: ['labelId'],
+        where: { removed: false, label: { projectId } },
+        _count: { _all: true },
+      }),
     ]);
     return {
       labels: labels.map(projectLabelView),
       rules: rules.map(labelRuleView),
+      cardCounts: Object.fromEntries(
+        counts.map((row) => [row.labelId, row._count._all]),
+      ),
       suggest: settings?.labelSuggest ?? true,
       paths: settings?.labelPaths ?? true,
     };
