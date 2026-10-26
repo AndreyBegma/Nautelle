@@ -277,6 +277,8 @@ export interface ProjectMoveResult {
   from: { runnerId: string; runnerName: string; rootPath: string };
   /** Left on the old machine; nothing there was touched. */
   worktrees: ProjectMoveWorktree[];
+  /** C-477: the project's plans, each given a new session on the new runner. */
+  plansReset: number;
 }
 
 /** `PATCH /projects/:id` (admin). `null` clears an optional field. */
