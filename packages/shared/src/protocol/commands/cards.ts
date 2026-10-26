@@ -64,6 +64,8 @@ export const CARD_TIMEOUTS_MS = {
   reviewStop: 30_000,
   /** #884: `gh api` once, and again without inline comments. */
   reviewPublish: 60_000,
+  /** C-457: fetch the base, and the two heads when missing; then local reads. */
+  headDelta: 90_000,
 } as const;
 
 /** `card.run` prompt: one argv element read from `launch.json`, never a shell string (D5). */
@@ -1088,3 +1090,70 @@ export const cardReviewCommands = {
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CardReviewCommandName = keyof typeof cardReviewCommands;
+
+// card.headDelta
+
+/**
+ * C-457 (ADR-0001, ADR-0010, advertised per ADR-0023): whether the head `to`
+ * of a card PR only merges the base into an earlier head `from`, cleanly — the
+ * fact a review step or a demo of `from` carries over to `to` on. `to` is one
+ * when it has exactly two parents, one of them `from` and the other in
+ * `origin/<base>`, and its tree is the tree `git merge-tree --write-tree`
+ * makes of the two. A hand-resolved conflict or any extra edit is not one.
+ *
+ * Read-only on the repository: the runner fetches `base`, and `from` and `to`
+ * when it lacks them, then reads commits — no checkout, no worktree.
+ */
+export const cardHeadDeltaArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  /** The earlier head. */
+  from: headShaSchema,
+  /** The newer head. */
+  to: headShaSchema,
+  /** The branch the PR goes into — the project base. */
+  base: gitRefSchema,
+});
+export type CardHeadDeltaArgs = z.infer<typeof cardHeadDeltaArgsSchema>;
+
+/**
+ * Why `to` is not a base merge of `from`: `not_a_merge` — not exactly two
+ * parents; `parent_mismatch` — neither parent is `from`; `not_on_base` — the
+ * other parent is not in `origin/<base>`; `tree_differs` — its tree is not the
+ * clean merge's (a conflict resolved by hand, or an extra edit);
+ * `unknown_commit` — `from` or `to` could not be fetched; `git_too_old` — git
+ * has no `merge-tree --write-tree` (2.38).
+ */
+export const cardHeadDeltaReasonSchema = z.enum([
+  'not_a_merge',
+  'parent_mismatch',
+  'not_on_base',
+  'tree_differs',
+  'unknown_commit',
+  'git_too_old',
+]);
+export type CardHeadDeltaReason = z.infer<typeof cardHeadDeltaReasonSchema>;
+
+export const cardHeadDeltaResultSchema = z.discriminatedUnion('baseMerge', [
+  z.object({ baseMerge: z.literal(true) }),
+  z.object({
+    baseMerge: z.literal(false),
+    reason: cardHeadDeltaReasonSchema,
+  }),
+]);
+export type CardHeadDeltaResult = z.infer<typeof cardHeadDeltaResultSchema>;
+
+/**
+ * C-457: `card.headDelta`, an operator command, in the `commands` allowlist
+ * beside the review commands.
+ */
+export const cardHeadDeltaCommands = {
+  'card.headDelta': {
+    args: cardHeadDeltaArgsSchema,
+    result: cardHeadDeltaResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.headDelta,
+  },
+} as const satisfies Record<string, CommandDefinition>;
+
+export type CardHeadDeltaCommandName = keyof typeof cardHeadDeltaCommands;

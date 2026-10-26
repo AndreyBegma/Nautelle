@@ -5,6 +5,8 @@ import {
   type CardCiRetriggerArgs,
   type CardCiRetriggerResult,
   type CardCommandName,
+  type CardHeadDeltaArgs,
+  type CardHeadDeltaResult,
   type CardPrCloseArgs,
   type CardPrCloseResult,
   type CardPrOpenArgs,
@@ -21,6 +23,7 @@ import {
   cardChecksResultSchema,
   cardCiRetriggerResultSchema,
   cardCommands,
+  cardHeadDeltaResultSchema,
   cardPrCloseResultSchema,
   cardPrOpenResultSchema,
   cardPrRetargetResultSchema,
@@ -89,6 +92,7 @@ export class BoardCommands {
       | 'card.prClose'
       | 'card.prRetarget'
       | 'card.prOpen'
+      | 'card.headDelta'
       | 'card.review'
       | 'card.reviewStop'
       | 'card.reviewPublish'
@@ -264,6 +268,37 @@ export class BoardCommands {
     );
     if (result.status !== 'ok') return result;
     const output = cardPrRetargetResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
+  }
+
+  /** C-457: whether the connected runner advertises `card.headDelta`. */
+  servesHeadDelta(runnerId: string): boolean {
+    if (!this.presence.isConnected(runnerId)) return false;
+    return (
+      this.presence.commandSupport(runnerId, 'card.headDelta') === 'supported'
+    );
+  }
+
+  /** C-457: whether a newer PR head only merges the base into an earlier one. */
+  async headDelta(
+    runnerId: string,
+    args: CardHeadDeltaArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<CardHeadDeltaResult>> {
+    this.assertReady(runnerId, 'card.headDelta');
+    const result = await this.commands.send(
+      runnerId,
+      'card.headDelta',
+      args,
+      options,
+    );
+    if (result.status !== 'ok') return result;
+    const output = cardHeadDeltaResultSchema.safeParse(result.output);
     return output.success
       ? { status: 'ok', output: output.data }
       : {
