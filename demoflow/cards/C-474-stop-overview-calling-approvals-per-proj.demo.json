@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "name": "Overview no longer asks every project for approvals",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Overview loads its projects from one fleet call; what waits is the Inbox's"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "testId": "inbox-preview"
+      },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "screenshot",
+      "name": "overview-without-approvals"
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    }
+  ]
+}

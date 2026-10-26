@@ -3,7 +3,7 @@
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Select } from '@andrewbehma/glass-ui/field';
+import { Input, Select } from '@andrewbehma/glass-ui/field';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
   Table,
@@ -13,6 +13,7 @@ import {
 } from '@andrewbehma/glass-ui/table';
 import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import {
+  ADMIN_USERS_SEARCH_MAX,
   type AdminUser,
   type CreatePasswordResetLinkRequest,
   type PasswordResetLinkResponse,
@@ -23,7 +24,7 @@ import {
   type UserStatus,
 } from '@nautelle/shared';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { ConfirmGate } from '../../../components/confirm/confirm-gate';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
@@ -31,6 +32,7 @@ import { DisabledReason } from '../../../components/prerequisites/disabled-reaso
 import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { api, describeError } from '../../../lib/api';
+import { useSearchDraft } from '../../../lib/filters/use-url-filters';
 import { Time } from '../../../lib/format/time';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
@@ -41,6 +43,7 @@ import {
   ROLE_LABEL,
   roleChangeNeedsConfirm,
 } from '../../../lib/users/format';
+import { fetchUsersPage } from '../../../lib/users/list';
 import { AdminApiTokensCard } from './api-tokens-card';
 import { type Confirmation, confirmationCopy } from './confirmation';
 import { RegistrationCard } from './registration-card';
@@ -87,44 +90,103 @@ function EmptyTab({
 }
 
 function UsersTable({ viewer }: { viewer: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  // `?tab=` carries the tab and `?q=` the search; without a tab the page opens
+  // on Active, or on the first tab that has accounts.
+  const picked = USER_STATUSES.find((status) => status === params.get('tab'));
+  const q = params.get('q') ?? '';
   const section = useSection(
-    () =>
-      Promise.all(
-        USER_STATUSES.map((status) =>
-          api<AdminUser[]>(`/admin/users?status=${status}`),
-        ),
-      ).then((results) => results.flat()),
-    [],
+    () => fetchUsersPage({ status: picked ?? 'active', q }),
+    [picked, q],
   );
+  // Pages after the first, loaded with "Load more". They belong to one tab and
+  // search; a row action refreshes them in place instead of starting over.
+  const queryKey = `${picked ?? 'active'}|${q}`;
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    items: AdminUser[];
+    nextCursor: string | null;
+    pages: number;
+  } | null>(null);
+  const more = loaded?.key === queryKey ? loaded : null;
+  const [loadingMore, setLoadingMore] = useState(false);
+  const firstLoad = useRef(true);
   const registration = useSection(
     () => api<RegistrationState>('/admin/settings/registration'),
     [],
   );
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
   const showError = useErrorToast();
   const [roles, setRoles] = useState<Record<string, Role>>({});
   const [confirm, setConfirm] = useState<Confirmation>();
   const [confirming, setConfirming] = useState(false);
   // C-402: the reset link just created, shown once.
   const [issued, setIssued] = useState<IssuedResetLink | null>(null);
-  // `?tab=` carries the tab; without it the page opens on Active, or on the
-  // first tab that has accounts.
-  const picked = USER_STATUSES.find((status) => status === params.get('tab'));
-  const setTab = (next: UserStatus) => {
+  const setParam = (key: 'tab' | 'q', next: string) => {
     const copy = new URLSearchParams(params.toString());
-    copy.set('tab', next);
+    if (next) copy.set(key, next);
+    else copy.delete(key);
     router.replace(`${pathname}?${copy.toString()}`, { scroll: false });
   };
-  const users = section.data ?? [];
-  const counts = Object.fromEntries(
-    USER_STATUSES.map((status) => [
-      status,
-      users.filter((user) => user.status === status).length,
-    ]),
-  ) as Record<UserStatus, number>;
-  const tab = picked ?? defaultUsersTab(counts);
+  const setTab = (next: UserStatus) => setParam('tab', next);
+  const search = useSearchDraft(q, (value) => setParam('q', value.trim()));
+  const counts = section.data?.counts;
+  const tab = picked ?? 'active';
+  // Without `?tab=`, an empty Active tab hands over to the first with accounts,
+  // once, from the unfiltered totals: a search never switches the tab.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `setTab` only rewrites the URL
+  useEffect(() => {
+    if (!counts || !firstLoad.current) return;
+    firstLoad.current = false;
+    const fallback = picked ? undefined : defaultUsersTab(counts);
+    if (fallback && fallback !== 'active') setTab(fallback);
+  }, [counts]);
+  const items = [...(section.data?.items ?? []), ...(more?.items ?? [])];
+  const nextCursor = more
+    ? more.nextCursor
+    : (section.data?.nextCursor ?? null);
+  const loadMore = async () => {
+    if (!nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const page = await fetchUsersPage({ status: tab, q, cursor: nextCursor });
+      setLoaded({
+        key: queryKey,
+        items: [...(more?.items ?? []), ...page.items],
+        nextCursor: page.nextCursor,
+        pages: (more?.pages ?? 0) + 1,
+      });
+    } catch (err) {
+      showError(describeError(err));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+  // After a row action: walk the pages already on screen again.
+  const refreshLoaded = async () => {
+    if (!more) return;
+    try {
+      let page = await fetchUsersPage({ status: tab, q });
+      const rows: AdminUser[] = [];
+      for (let i = 0; i < more.pages && page.nextCursor; i++) {
+        page = await fetchUsersPage({
+          status: tab,
+          q,
+          cursor: page.nextCursor,
+        });
+        rows.push(...page.items);
+      }
+      setLoaded({
+        key: queryKey,
+        items: rows,
+        nextCursor: page.nextCursor,
+        pages: more.pages,
+      });
+    } catch {
+      setLoaded(null);
+    }
+  };
 
   const run = async (task: () => Promise<unknown>) => {
     try {
@@ -133,6 +195,7 @@ function UsersTable({ viewer }: { viewer: string }) {
       showError(describeError(err));
     }
     section.retry();
+    await refreshLoaded();
   };
 
   const roleOf = (user: AdminUser): Role => roles[user.id] ?? user.role;
@@ -377,6 +440,19 @@ function UsersTable({ viewer }: { viewer: string }) {
         <TwoFactorPolicyCard />
       </div>
 
+      <Input
+        aria-label="Search accounts"
+        type="search"
+        className="mb-4 max-w-sm"
+        value={search.draft}
+        maxLength={ADMIN_USERS_SEARCH_MAX}
+        placeholder="Search by email or name"
+        onChange={(e) => search.setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') search.flush();
+        }}
+      />
+
       <TabGroup
         value={tab}
         onValueChange={(next) => setTab(next as UserStatus)}
@@ -387,7 +463,7 @@ function UsersTable({ viewer }: { viewer: string }) {
               <Tab key={status} value={status} className="whitespace-nowrap">
                 <span className="inline-flex items-center gap-2">
                   {label}
-                  {section.data ? (
+                  {counts ? (
                     <Badge
                       tone={
                         status === 'pending' && counts.pending > 0
@@ -410,14 +486,31 @@ function UsersTable({ viewer }: { viewer: string }) {
               title: 'Accounts are not answering',
               stillWorks: 'People who are signed in stay signed in.',
             }}
-            isEmpty={(list) => !list.some((user) => user.status === tab)}
+            isEmpty={(page) => !page.items.some((user) => user.status === tab)}
             skeleton={<Skeleton className="h-48 w-full" />}
             empty={
-              <EmptyTab tab={tab} registrationOpen={registration.data?.open} />
+              q ? (
+                <EmptyState
+                  title="No matching accounts"
+                  description={`No ${tab} account has “${q}” in its email or name. Other tabs may.`}
+                />
+              ) : (
+                <EmptyTab
+                  tab={tab}
+                  registrationOpen={registration.data?.open}
+                />
+              )
             }
           >
-            {renderTable}
+            {() => renderTable(items)}
           </AsyncSection>
+          {nextCursor ? (
+            <div className="mt-4 flex justify-center">
+              <Button variant="glass" disabled={loadingMore} onClick={loadMore}>
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </Button>
+            </div>
+          ) : null}
         </TabPanel>
       </TabGroup>
 

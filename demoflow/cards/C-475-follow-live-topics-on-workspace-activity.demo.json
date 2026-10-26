@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "name": "Sessions and Activity follow live topics",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/sessions"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Sessions without a filter follows every project live"
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Sessions",
+        "exact": true
+      },
+      "text": "Sessions",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "marker",
+      "title": "Activity follows the same topics"
+    },
+    {
+      "action": "navigate",
+      "path": "/activity"
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Activity",
+        "exact": true
+      },
+      "text": "Activity",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    }
+  ]
+}

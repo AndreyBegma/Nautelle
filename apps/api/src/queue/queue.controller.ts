@@ -1,11 +1,9 @@
 import type {
-  CreateIssueResult,
   QueueIssueDetail,
   QueueRefreshResult,
   QueueView,
 } from '@nautelle/shared';
 import {
-  Body,
   Controller,
   Get,
   HttpCode,
@@ -23,13 +21,12 @@ import {
   ProjectRole,
   type ResolvedProjectAccess,
 } from '../projects';
-import { CreateIssueDto, QueueListQuery } from './dto';
+import { QueueListQuery } from './dto';
 import { QueueService } from './queue.service';
 import { QueueQueryService } from './queue-query.service';
 
 /**
- * The task queue (spec 19 "API"). Reading needs membership; filing an issue
- * or asking for a poll needs operator on the project (D10). A project the
+ * The task queue (spec 19 "API"). Reading needs membership; asking for a poll needs operator on the project (D10). A project the
  * caller cannot see is 404, an anonymous caller 401.
  */
 @Controller('projects/:projectId')
@@ -67,15 +64,5 @@ export class QueueController {
     @AuditCtx() ctx: AuditContext,
   ): Promise<QueueRefreshResult> {
     return this.queue.refresh({ ...access, ctx });
-  }
-
-  @Post('issues')
-  @ProjectRole('operator')
-  createIssue(
-    @ProjectAccess() access: ResolvedProjectAccess,
-    @Body() dto: CreateIssueDto,
-    @AuditCtx() ctx: AuditContext,
-  ): Promise<CreateIssueResult> {
-    return this.queue.createIssue({ ...access, ctx }, dto);
   }
 }
