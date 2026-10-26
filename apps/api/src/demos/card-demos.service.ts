@@ -160,7 +160,7 @@ const clipReason = (reason: string): string =>
  * while it is queued or recording, so a late event or a second upload never
  * reopens a finished one. A failed demo is a warning, never a gate.
  *
- * C-370 (ADR-0095): the Board records a feature card's green head that
+ * C-370 (ADR-0095): the Board records any card's green head that
  * touches the project's UI paths (`autoRecord`), once per head; a newer head
  * supersedes a demo in flight; auto-merge waits for a demo in flight, at most
  * `DEMO_MERGE_WAIT_MS` (`holds`), and so does a `review_fix` round (#946).
@@ -317,7 +317,7 @@ export class CardDemosService {
   }
 
   /**
-   * C-370: the Board's trigger, on a feature card's green head — #946: as
+   * C-370: the Board's trigger, on a card's green head — #946: as
    * soon as it reads green, before the review steps decide. Once per head,
    * whatever came of it, so nothing retries: a head with a demo — automatic
    * or "Record again" — is left alone. The PR's changed files decide: one
@@ -332,10 +332,6 @@ export class CardDemosService {
     headSha: string,
     inspect: () => Promise<DemoPrFiles>,
   ): Promise<void> {
-    if (card.kind !== 'feature') {
-      this.skip(card, headSha, 'only a feature card records one');
-      return;
-    }
     const memo = `${card.id}:${headSha}`;
     if (this.noUi.has(memo)) return;
     const settings = await this.settings.view(project.id);
@@ -401,12 +397,12 @@ export class CardDemosService {
   }
 
   /**
-   * #946: the Board does not ask for a feature card's green head — its PR
+   * #946: the Board does not ask for a card's green head — its PR
    * conflicts, so a fix round replaces the head — and says so once, as
    * `autoRecord` does for every head it does not record.
    */
   deferred(card: DemoCard, headSha: string, reason: string): void {
-    if (card.kind === 'feature') this.skip(card, headSha, reason);
+    this.skip(card, headSha, reason);
   }
 
   /** #946: why a head gets no automatic demo, logged once per head and reason. */
