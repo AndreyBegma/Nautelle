@@ -181,6 +181,7 @@ describe('Accept after the PR head moved (C-415)', () => {
     const refetched = pr({ headSha: NEW });
     const choice = acceptChoice(77, refetched, { fleet: false });
     expect(choice).toEqual({ kind: 'merge', headSha: NEW });
+    if (choice?.kind !== 'merge') throw new Error('expected a merge choice');
     const moved = movedHeadNotice(refetched);
 
     const html = renderToStaticMarkup(
