@@ -18,6 +18,7 @@ import {
   type AdminUser,
   BUDGET_SCOPES,
   BUDGET_STATES,
+  BUDGET_UPDATED_LIVE_EVENT,
   type BudgetRecomputeResult,
   type BudgetView,
   type ProjectSummary,
@@ -53,11 +54,12 @@ import {
   useFilterChips,
   useUrlFilters,
 } from '../../../lib/filters/use-url-filters';
+import { useLiveRefresh } from '../../../lib/live/use-live-refresh';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
 
-/** The page polls; the budget tab is the one that listens to live events. */
-const POLL_MS = 15_000;
+/** The page follows `admin`; this poll only catches what an event missed. */
+const SAFETY_POLL_MS = 60_000;
 
 function AdminBudgets() {
   const url = useUrlFilters(BUDGET_FILTER_CODEC);
@@ -82,10 +84,10 @@ function AdminBudgets() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [recomputing, setRecomputing] = useState(false);
 
-  useEffect(() => {
-    const timer = setInterval(load, POLL_MS);
-    return () => clearInterval(timer);
-  }, [load]);
+  useLiveRefresh([], [BUDGET_UPDATED_LIVE_EVENT], load, {
+    extraTopics: ['admin'],
+    safetyMs: SAFETY_POLL_MS,
+  });
 
   // The create form's pickers; the page works without them (edit, override).
   useEffect(() => {
