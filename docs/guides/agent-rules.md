@@ -26,7 +26,6 @@ scripts/      — db-start-docker.sh (up → migrate → seed)
 | Command | What it does |
 |---|---|
 | `bun install` | install all workspaces |
-| `bun install` | install all workspaces |
 | `bun run build` | build everything (turbo, cached) |
 | `bun run start:dev` | api + web in watch mode |
 | `bun run lint` | lint every workspace (turbo) |
