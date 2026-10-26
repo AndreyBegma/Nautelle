@@ -280,7 +280,8 @@ export class BoardReview {
         findings,
       });
     } catch (error) {
-      // No room, a budget stop, the runner away: the next poll tries again.
+      // No room, a budget stop, the runner away: the next poll tries again —
+      // C-418: no room, the run queue as soon as a slot frees.
       if (!this.retryable(error)) throw error;
       this.logger.warn(
         `review_fix round of ${cardLabel(card.number)} not started: ${error.message}`,

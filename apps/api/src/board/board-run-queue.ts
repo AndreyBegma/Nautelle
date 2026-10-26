@@ -3,6 +3,7 @@ import {
   type BoardStackDetail,
   type CardRoundPhase,
   cardLabel,
+  isActiveRoundPhase,
   isStackGated,
   type Role,
   type StackRunPause,
@@ -23,9 +24,10 @@ import { RunnerConnectHooks } from '../runners/runner-connect-hooks';
 import { BoardCommands } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
 import { autoRunFailureOf, boardError } from './board-error';
+import { BoardFixWaits } from './board-fix-waits';
 import { toSettingsView } from './board-mapper';
 import { BoardRoundsService } from './board-rounds.service';
-import { shippingAutoStart } from './board-shipping';
+import { BoardShipping, shippingAutoStart } from './board-shipping';
 import { BoardStacks } from './board-stacks';
 import { ACTIVE_PHASES, type BoardActor, BoardWork } from './board-work';
 import type { RunBoardCardDto } from './dto';
@@ -142,7 +144,8 @@ const optionsOf = (options: Prisma.JsonValue): RunBoardCardDto =>
  * run until a person presses Run stack again; a card queued on its own leaves
  * the queue with the refusal stored on the card. Stop removes queued cards
  * and leaves running ones alone. The queue survives a restart: bootstrap
- * resumes it.
+ * resumes it. C-418: a `ci_fix` or `review_fix` round refused for room
+ * (`BoardFixWaits`) goes first — while one waits, no To Do card starts.
  */
 @Injectable()
 export class BoardRunQueue
@@ -164,6 +167,8 @@ export class BoardRunQueue
     private readonly audit: AuditService,
     private readonly commands: BoardCommands,
     private readonly connectHooks: RunnerConnectHooks,
+    private readonly shipping: BoardShipping,
+    private readonly fixWaits: BoardFixWaits,
   ) {}
 
   onModuleInit(): void {
@@ -422,6 +427,7 @@ export class BoardRunQueue
 
   /** One evaluation of the project's run queue. */
   private async tick(projectId: string): Promise<void> {
+    await this.serveFixes(projectId);
     const [runs, solo] = await Promise.all([
       this.prisma.boardStackRun.findMany({
         where: { state: 'running', stack: { projectId } },
@@ -515,8 +521,10 @@ export class BoardRunQueue
         a.entry.card.number - b.entry.card.number,
     );
     // Without its runner nothing starts, and nothing pauses: the run waits.
+    // C-418: nor while a fix round waits for a slot — it goes first.
     const { runnerId } = await this.work.project(projectId);
-    let held = !this.commands.isConnected(runnerId);
+    let held =
+      !this.commands.isConnected(runnerId) || this.fixWaits.has(projectId);
     for (const candidate of candidates) {
       const { run, entry } = candidate;
       if (run !== null && paused.has(run.id)) continue;
@@ -618,6 +626,60 @@ export class BoardRunQueue
 
     for (const stackId of changed) this.work.publishStack(projectId, stackId);
     for (const cardId of changedCards) this.work.publish(projectId, cardId);
+  }
+
+  /**
+   * C-418: the fix rounds refused for room take free slots before any To Do
+   * card, oldest first — `BoardShipping.check` reads the card's PR and starts
+   * its `ci_fix` or `review_fix` round the usual way; a refusal for room
+   * records the wait again. A card out of In progress and Finished, or whose
+   * round already started, waits no more. Without room or the runner, the
+   * waits stay.
+   */
+  private async serveFixes(projectId: string): Promise<void> {
+    const waits = this.fixWaits.take(projectId);
+    if (waits.length === 0) return;
+    const cards = new Map(
+      (
+        await this.prisma.boardCard.findMany({
+          where: { id: { in: waits.map((w) => w.cardId) }, projectId },
+          select: {
+            id: true,
+            column: true,
+            rounds: {
+              orderBy: { round: 'desc' },
+              take: 1,
+              select: { phase: true },
+            },
+          },
+        })
+      ).map((c) => [c.id, c]),
+    );
+    const { runnerId } = await this.work.project(projectId);
+    for (const [i, wait] of waits.entries()) {
+      const card = cards.get(wait.cardId);
+      if (card?.column !== 'in_progress' && card?.column !== 'finished') {
+        continue;
+      }
+      if (isActiveRoundPhase(card.rounds[0]?.phase)) continue;
+      if (
+        !this.commands.isConnected(runnerId) ||
+        !(await this.hasRoom(projectId))
+      ) {
+        for (const kept of waits.slice(i)) {
+          this.fixWaits.add(projectId, kept.cardId, kept.since);
+        }
+        return;
+      }
+      try {
+        await this.shipping.check(card.id);
+      } catch (error) {
+        this.logger.error(
+          `the waiting fix of card ${card.id} was not started`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
   }
 
   /**

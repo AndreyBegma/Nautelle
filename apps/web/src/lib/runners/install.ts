@@ -1,4 +1,5 @@
 import { pairCommand } from '@nautelle/shared';
+import { docsUrl } from '../docs-site';
 
 /**
  * The commands a first-time admin runs on the machine that holds the
@@ -55,8 +56,9 @@ export const ADD_RUNNER_PATH = `/admin/runners?${ADD_RUNNER_PARAM}=1`;
 export const PAIRING_CODE_PLACEHOLDER = 'XXXX-XXXX';
 
 /** Building from source, for a machine with neither. */
-export const RUNNER_README_URL =
-  'https://github.com/AndreyBegma/Nautelle/blob/main/apps/runner/README.md';
+export const RUNNER_SOURCE_BUILD_URL = docsUrl(
+  '/getting-started/pair-a-runner/#build-from-source',
+);
 
 /** The foreground daemon. */
 export const RUN_COMMAND = 'nautelle-runner run';

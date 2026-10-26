@@ -26,6 +26,6 @@ An account was protected by its password alone. ADR-0048 (D-05) answered guessin
 ## Consequences
 
 - A stolen password alone no longer signs in to an enrolled account.
-- Losing the phone and the recovery codes needs an admin; losing them as the only admin needs the database (clear the `totp*` columns of `users`).
+- Losing the phone and the recovery codes needs an admin; losing them as the only admin takes `admin:recover` in the API container, which prints a reset link (ADR-0113, ADR-0128); before that it needed the database (clear the `totp*` columns of `users`).
 - `APP_ENCRYPTION_KEY` becomes a dependency of sign-in for enrolled accounts: rotating or losing it locks them out of the second factor until an admin resets them.
 - Every audited action list gains `auth.two_factor_enable`, `auth.two_factor_disable`, `auth.two_factor_recovery_codes`, `user.two_factor_reset` and `settings.two_factor`.

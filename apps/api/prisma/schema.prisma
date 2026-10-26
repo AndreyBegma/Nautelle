@@ -2816,6 +2816,10 @@ model Plan {
   status           PlanStatus
   version          Int            @default(1)
   sessionId        String         @db.Uuid
+  /// C-477 (ADR-0107): when `sessionId` was replaced because the project
+  /// moved to another runner; only turns after it ran in that session. Null:
+  /// every turn did.
+  sessionSince     DateTime?
   /// The instructions version the plan runs with (D11).
   instructionsId   String
   contractVersion  Int

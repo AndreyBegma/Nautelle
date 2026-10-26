@@ -69,7 +69,6 @@ Migration directory: `apps/api/prisma/migrations/20261021000000_queue/`. New tab
 |---|---|---|---|
 | GET | `/projects/:id/queue?state=` | project member | ready issues with state, why, clears, source, priority, wave slots; held-for-lead rows from the latest round; `snapshotAt` |
 | GET | `/projects/:id/queue/:number` | project member | one issue: body (rendered by the web as markdown), state history from the latest rounds, blockers with links |
-| POST | `/projects/:id/issues` | project operator+ | `{ title, body, labels[], queue }` → sends `issue.create`; returns `{ number, url, queued, reason? }`; `422 no_acceptance_criteria` when `queue: true` and the body fails D7 |
 | POST | `/projects/:id/queue/refresh` | project operator+ | asks the runner for an immediate poll (command `issues.refresh { projectId }` — `project.refresh` re-inspects the root and cannot be scoped; note 1) → `{ changed, fetchedAt }` |
 | — | event ingest | runner gateway (#6) | `issues.snapshot`, `issue.closed` → cache → state computation |
 
@@ -99,7 +98,7 @@ Migration directory: `apps/api/prisma/migrations/20261021000000_queue/`. New tab
 - [ ] The collector sends `If-None-Match`; a `304` produces no event (asserted with a stubbed `gh`).
 - [ ] Creating an issue with `queue: true` and a body containing `## Acceptance criteria` + a `- [ ]` item creates it with the ready label; without them the API returns 422 and nothing is sent to the runner.
 - [ ] A new issue appears on an open queue page without reload within 5 s of the next snapshot.
-- [ ] **Authorization:** a non-member of project A gets 404 (per #10 D12) on every `/projects/A/queue*` and `/projects/A/issues` route even when a member of project B; a viewer member gets 403 on `POST /projects/A/issues` and `POST /projects/A/queue/refresh`; anonymous gets 401.
+- [ ] **Authorization:** a non-member of project A gets 404 (per #10 D12) on every `/projects/A/queue*` route even when a member of project B; a viewer member gets 403 on `POST /projects/A/queue/refresh`; anonymous gets 401.
 - [ ] `issue.create` writes an audit record with actor, project, title, labels and result.
 - [ ] `bun run check`, `bun run test`, `bun run build` pass.
 
