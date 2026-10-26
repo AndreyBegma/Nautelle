@@ -53,6 +53,10 @@
       "ms": 5000
     },
     {
+      "action": "press",
+      "key": "Escape"
+    },
+    {
       "action": "assertVisible",
       "target": {
         "role": "heading",
