@@ -19,7 +19,8 @@
       "action": "waitFor",
       "target": {
         "role": "heading",
-        "name": "Getting started"
+        "name": "Getting started",
+        "exact": true
       },
       "caption": "An admin's checklist still counts its seven required steps.",
       "timeoutMs": 30000
@@ -28,7 +29,8 @@
       "action": "assertVisible",
       "target": {
         "role": "heading",
-        "name": "Optional"
+        "name": "Optional",
+        "exact": true
       }
     },
     {
@@ -57,7 +59,8 @@
       "action": "click",
       "target": {
         "role": "link",
-        "name": "Open notifications"
+        "name": "Open notifications",
+        "exact": true
       },
       "caption": "The step opens the caller's own notification settings."
     },
@@ -72,6 +75,14 @@
     {
       "action": "screenshot",
       "name": "notifications"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "Things that need a person, where to get them, and which projects to silence.",
+        "exact": true
+      },
+      "caption": "Link Telegram or turn on email here, and Getting started marks the step done."
     },
     {
       "action": "wait",
