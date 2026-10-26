@@ -15,7 +15,7 @@ const isWithin = (path: string, root: string): boolean =>
  * - inside `<parent of root>/.wt-<basename of root>-<slot>`, the worktree
  *   `dispatch.sh` creates for a slot: that project and that slot — unless it
  *   is one the runner creates (`run-`, `skill-`, `card-`, `plan-`,
- *   `uiprofile-`, #242 D14; `review-`, #884), which is that project without
+ *   `uiprofile-`, #242 D14; `review-`, #884; `demo-`, C-456), which is that project without
  *   a slot;
  * - else the deepest watched root that is `cwd` or one of its ancestors;
  * - else nothing.

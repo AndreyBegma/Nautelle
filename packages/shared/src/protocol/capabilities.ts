@@ -302,6 +302,13 @@ export const capabilitiesSchema = z.object({
    */
   cardDemo: z.boolean().optional(),
   /**
+   * C-456: the runner takes `checkout` on `card.demo` — it records on a
+   * detached checkout of the PR head, for a card whose worktree is gone.
+   * `card.demo` args are strict, so the API sends the field only when this is
+   * `true`. Absent means `false`.
+   */
+  cardDemoCheckout: z.boolean().optional(),
+  /**
    * C-369: the runner's pinned DemoFlow — the version it runs through `npx`
    * and whether it is set up (Node new enough, the package fetched,
    * `demoflow setup` installed Chromium). `reason` says why it is not ready —
@@ -373,6 +380,12 @@ export const prefixOverlaysAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `card.demo` (ADR-0090); absent is `false`. */
 export const cardDemoAvailable = (capabilities: Capabilities): boolean =>
   capabilities.cardDemo === true;
+
+/** Whether the API may send `card.demo`'s `checkout` (C-456); absent is `false`. */
+export const cardDemoCheckoutAvailable = (
+  capabilities: Capabilities,
+): boolean =>
+  capabilities.cardDemo === true && capabilities.cardDemoCheckout === true;
 
 /** The runner's policy (ADR-0047); null for a runner older than it. */
 export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {
