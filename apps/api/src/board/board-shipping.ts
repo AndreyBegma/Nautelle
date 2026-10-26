@@ -967,8 +967,8 @@ export class BoardShipping
     try {
       await this.rounds.ciFix(project.id, card.number, input);
     } catch (error) {
-      // No room, a budget stop, the runner away: the next poll tries again.
-      // C-181: so does a mode or an access the round's person lacks (403),
+      // No room, a budget stop, the runner away: the next poll tries again —
+      // C-418: no room, the run queue as soon as a slot frees. C-181: so does a mode or an access the round's person lacks (403),
       // and their budget's stop.
       if (
         !(

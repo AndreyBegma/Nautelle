@@ -92,6 +92,7 @@ import {
   type StackedBase,
 } from './board-dependencies.service';
 import { autoRunFailureOf, BoardFailure, boardError } from './board-error';
+import { BoardFixWaits } from './board-fix-waits';
 import type { CardWithRounds } from './board-mapper';
 import { toSettingsView } from './board-mapper';
 import { BoardPrincipals } from './board-principal';
@@ -321,6 +322,7 @@ export class BoardRoundsService {
     private readonly assessor: CardAssessor,
     private readonly prefixLaunch: PrefixLaunchService,
     private readonly principals: BoardPrincipals,
+    private readonly fixWaits: BoardFixWaits,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -961,7 +963,7 @@ export class BoardRoundsService {
     }
 
     this.commands.assertReady(project.runnerId, 'card.run');
-    await this.assertRoom(project.id);
+    await this.assertRoomFor(project.id, card.id, trigger);
     await this.attachments.assertClaimable(
       project.id,
       card.id,
@@ -1279,7 +1281,7 @@ export class BoardRoundsService {
       const fresh = await this.work.lock(tx, card.id);
       const latest = fresh.rounds[0];
       if (isActiveRoundPhase(latest?.phase)) throw this.running();
-      await this.assertRoom(project.id, tx);
+      await this.assertRoomFor(project.id, card.id, trigger, tx);
       const next = (latest?.round ?? 0) + 1;
       const run = await tx.run.create({
         data: {
@@ -1410,6 +1412,7 @@ export class BoardRoundsService {
       });
       return created;
     });
+    this.fixWaits.drop(project.id, card.id);
     this.work.publishRun(project.id, round.runId, 'running');
     await this.attachments.recordClaim(
       project.id,
@@ -1716,6 +1719,29 @@ export class BoardRoundsService {
   /** Serializes round starts of one project, so `maxRunning` holds. */
   private async lockRoom(tx: Tx, projectId: string): Promise<void> {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`board-rounds:${projectId}`}))`;
+  }
+
+  /**
+   * `assertRoom` for a round of `trigger`. C-418: a `ci_fix` or `review_fix`
+   * refused for room waits for the next free slot before any To Do card.
+   */
+  private async assertRoomFor(
+    projectId: string,
+    cardId: string,
+    trigger: CardRoundTrigger,
+    db: Tx | PrismaService = this.prisma,
+  ): Promise<void> {
+    try {
+      await this.assertRoom(projectId, db);
+    } catch (error) {
+      if (
+        isFixRound(trigger) &&
+        autoRunFailureOf(error).code === BOARD_ERROR.maxRunning
+      ) {
+        this.fixWaits.add(projectId, cardId);
+      }
+      throw error;
+    }
   }
 
   /** D13: at most `maxRunning` active rounds per project → else 409 `max_running`. */
