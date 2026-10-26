@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { InboxView, PendingQuestion } from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
+import { ReadinessService } from '../readiness';
 import type { Session } from '../test/e2e-app';
 import { at, WorkWorld } from '../work/testing/work-e2e';
 
@@ -289,6 +290,66 @@ describe('inbox (e2e)', () => {
       'A:permission:Start the fleet',
       'B:permission:Bash: pwd',
     ]);
+  });
+
+  it('lists at most 50 pending requests per project, the oldest first (C-470)', async () => {
+    const { runnerId } = await w.ctx.prisma.project.findUniqueOrThrow({
+      where: { id: w.a },
+      select: { runnerId: true },
+    });
+    // 60 in A, all older than B's one: a cap across projects would hide B's.
+    await w.ctx.prisma.actionRequest.createMany({
+      data: Array.from({ length: 60 }, (_, i) => ({
+        projectId: w.a,
+        runnerId,
+        kind: 'tool_use' as const,
+        summary: `Bash: a${String(i).padStart(2, '0')}`,
+        args: { tool: 'Bash', input: { command: 'ls' } },
+        expiresAt: new Date(Date.now() + 3_600_000),
+        createdAt: new Date(at(0).getTime() + i * 1000),
+      })),
+    });
+    await request(w.b, 'Bash: b', at(5));
+
+    const all = rows(await inbox(w.admin), ['permission']);
+    const a = all.filter((r) => r.startsWith('A:'));
+    expect(a).toHaveLength(50);
+    expect(a[0]).toBe('A:permission:Bash: a00');
+    expect(a[49]).toBe('A:permission:Bash: a49');
+    expect(all.filter((r) => r.startsWith('B:'))).toEqual([
+      'B:permission:Bash: b',
+    ]);
+    // A's operator never sees B's; an operator of no project sees none.
+    const operator = rows(await inbox(w.operator), ['permission']);
+    expect(operator).toHaveLength(50);
+    expect(operator.every((r) => r.startsWith('A:'))).toBe(true);
+    expect(rows(await inbox(w.outsider), ['permission'])).toEqual([]);
+  });
+
+  it('a project whose readiness fails is missing; the others still list (C-470)', async () => {
+    await w.card({ project: w.a, number: 1, updatedAt: at(1) });
+    await w.card({ project: w.b, number: 1, updatedAt: at(1) });
+    const readiness = w.ctx.app.get(ReadinessService);
+    const viewMany = readiness.viewMany.bind(readiness);
+    const spy = jest
+      .spyOn(readiness, 'viewMany')
+      .mockImplementation(async (ids) => {
+        const views = await viewMany(ids);
+        views.set(w.a, new Error('boom'));
+        return views;
+      });
+    try {
+      const view = await inbox(w.admin);
+      expect(view.missing).toEqual([
+        expect.objectContaining({ projectId: w.a }),
+      ]);
+      const setup = view.items.filter((i) => i.kind === 'setup');
+      expect(setup.length).toBeGreaterThan(0);
+      expect(setup.every((i) => i.projectId === w.b)).toBe(true);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('only projects the caller operates contribute', async () => {
