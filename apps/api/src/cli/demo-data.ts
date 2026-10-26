@@ -74,6 +74,11 @@ export const DEMO_CARDS: ReadonlyArray<{
   needsPerson?: CardNeedsPersonReason;
   /** C-394: a design drawn and waiting for approval, with one frame. */
   design?: true;
+  /**
+   * C-443: tracked from a person's own terminal session, whose token-saver
+   * rows (`DEMO_TERMINAL_FILTERS`) are the card's saving.
+   */
+  terminal?: true;
 }> = [
   {
     title: 'Export the activity feed as CSV',
@@ -135,6 +140,27 @@ export const DEMO_CARDS: ReadonlyArray<{
     kind: 'feature',
     design: true,
   },
+  {
+    title: 'Tune the retry backoff',
+    column: 'in_progress',
+    kind: 'feature',
+    terminal: true,
+  },
+];
+
+/** C-443: the manual Claude session the terminal card of the demo Board tracks. */
+export const DEMO_TERMINAL_SESSION_ID = 'demo-session-terminal';
+
+/** C-443: what that session's filtered commands kept, by filter (bytes). */
+export const DEMO_TERMINAL_FILTERS: ReadonlyArray<{
+  filter: string;
+  commands: number;
+  rawBytes: number;
+  keptBytes: number;
+}> = [
+  { filter: 'js/jest', commands: 3, rawBytes: 48_000, keptBytes: 4_800 },
+  { filter: 'ops/git', commands: 4, rawBytes: 20_000, keptBytes: 6_000 },
+  { filter: 'js/tsc', commands: 2, rawBytes: 9_000, keptBytes: 3_000 },
 ];
 
 const DEMO_DESIGN_FRAME_HTML =
@@ -265,6 +291,57 @@ export const DEMO_EXTRA_USERS: ReadonlyArray<{
 ];
 
 /**
+ * C-443: the terminal card's session and its token-saver rows, each stored the
+ * way the runner reports a manual session's filtered commands.
+ */
+const seedTerminalSession = async (
+  prisma: Pick<PrismaClient, 'agentSession' | 'tokenSaverStat'>,
+  ownerId: string,
+  now: Date,
+): Promise<void> => {
+  await prisma.agentSession.upsert({
+    where: { id: DEMO_TERMINAL_SESSION_ID },
+    update: {},
+    create: {
+      id: DEMO_TERMINAL_SESSION_ID,
+      runnerId: DEMO_RUNNER_ID,
+      runtime: 'claude',
+      externalId: '0000c443-0000-4000-8000-000000000001',
+      projectId: DEMO_PROJECT_ID,
+      cwd: '/srv/demo/acme-shop',
+      gitBranch: 'tune-retry-backoff',
+      title: 'Tune the retry backoff',
+      origin: 'manual',
+      ownerId,
+      startedAt: new Date(now.getTime() - 45 * 60_000),
+      lastEventAt: now,
+    },
+  });
+  for (const stat of DEMO_TERMINAL_FILTERS) {
+    for (let command = 1; command <= stat.commands; command += 1) {
+      const id = `demo-stat-terminal-${stat.filter.replace('/', '-')}-${command}`;
+      await prisma.tokenSaverStat.upsert({
+        where: { id },
+        update: {},
+        create: {
+          id,
+          projectId: DEMO_PROJECT_ID,
+          runKind: 'manual',
+          filter: stat.filter,
+          rawBytes: Math.round(stat.rawBytes / stat.commands),
+          keptBytes: Math.round(stat.keptBytes / stat.commands),
+          bypassed: false,
+          passedThrough: false,
+          createdAt: new Date(now.getTime() - (30 - command) * 60_000),
+          sessionId: DEMO_TERMINAL_SESSION_ID,
+          sessionExternalId: '0000c443-0000-4000-8000-000000000001',
+        },
+      });
+    }
+  }
+};
+
+/**
  * Seeds the demo project and its cards for the admin `adminEmail`, who must
  * exist (`bun run admin:create`). Every row has a fixed key, so running it
  * again changes nothing.
@@ -281,6 +358,7 @@ export const seedDemo = async (
     | 'run'
     | 'boardCardRound'
     | 'agentSession'
+    | 'tokenSaverStat'
     | 'actionRequest'
     | 'toolUseRule'
     | 'boardRunQueueCard'
@@ -391,6 +469,9 @@ export const seedDemo = async (
 
   for (const [index, card] of DEMO_CARDS.entries()) {
     const number = index + 1;
+    if (card.terminal) {
+      await seedTerminalSession(prisma, admin.id, now);
+    }
     const created = await prisma.boardCard.upsert({
       where: { projectId_number: { projectId: DEMO_PROJECT_ID, number } },
       update: {},
@@ -409,6 +490,12 @@ export const seedDemo = async (
         createdById: admin.id,
         movedById: admin.id,
         movedAt: now,
+        ...(card.terminal
+          ? {
+              source: 'terminal' as const,
+              trackedSessionId: DEMO_TERMINAL_SESSION_ID,
+            }
+          : {}),
         // C-399: a paused card keeps its worktree branch and its session.
         ...(card.round?.paused
           ? {
