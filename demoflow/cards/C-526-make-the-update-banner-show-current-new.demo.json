@@ -55,19 +55,9 @@
       "caption": "Each way has its command in a code block with a copy button."
     },
     {
-      "action": "waitFor",
-      "target": {
-        "role": "button",
-        "name": "Copied"
-      },
-      "caption": "Copied: paste it on the server.",
-      "timeoutMs": 5000,
-      "zoom": true
-    },
-    {
       "action": "wait",
-      "ms": 3000,
-      "caption": "The command is on the clipboard; the web app never runs the upgrade itself."
+      "ms": 2500,
+      "caption": "Copy it, paste it on the server. The web app never runs the upgrade itself."
     }
   ]
 }
