@@ -1,6 +1,8 @@
 ---
 title: The Inbox, approvals and Away mode
 description: What waits on you, the four answers to a tool call, and how Away mode remembers similar calls.
+sidebar:
+  order: 1
 ---
 
 Most of the day in Nautelle is answering what agents ask. This page covers the
@@ -49,8 +51,9 @@ would from the card, the request or the design.
 ## Answering a tool call
 
 When Claude Code asks permission for a tool call and you are away, the request
-becomes a **tool-use request** that you answer in the web app, in the Inbox or
-in Telegram. There are four answers:
+becomes a **tool-use request** that you answer in the web app, in Telegram, or
+in the Inbox. In the web app, the same requests are also on the Approvals tab
+of the **Queue**. There are four answers:
 
 | Answer | What it does |
 |---|---|
@@ -62,6 +65,8 @@ in Telegram. There are four answers:
 In Telegram the buttons are the same four.
 
 ## Away mode
+
+To turn Away mode on or off, run `/nautelle:away` in a Claude Code session.
 
 In Away mode every call Claude Code would ask about locally is sent to you
 instead, so an unattended session waits for your answer rather than for a
