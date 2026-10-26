@@ -385,6 +385,8 @@ export class BoardTriage {
         triage.suggestedKind &&
         // A person who set the kind since needs no hint for it.
         triage.suggestedKind !== kind &&
+        // C-509 (ADR-0127): a task's kind is fixed when it is made.
+        kind !== 'task' &&
         !triage.kindDismissedAt &&
         !triage.kindAppliedAt
           ? { value: triage.suggestedKind, reason: triage.kindReason ?? '' }

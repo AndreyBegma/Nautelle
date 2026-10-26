@@ -42,6 +42,17 @@ export class BoardInboxService {
     const project = await this.work.project(projectId);
     const card = await this.work.card(projectId, number);
     if (card.column !== 'inbox') throw notInInbox();
+    // C-509 D2 (ADR-0127): a task's kind is fixed when it is made.
+    if (
+      dto.kind !== undefined &&
+      (dto.kind === 'task') !== (card.kind === 'task')
+    ) {
+      throw boardError(
+        422,
+        BOARD_ERROR.taskField,
+        "A task's kind is fixed when it is made",
+      );
+    }
     const edits = {
       ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
       ...(dto.body !== undefined ? { body: dto.body } : {}),

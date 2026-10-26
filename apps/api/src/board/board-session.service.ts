@@ -27,7 +27,7 @@ import type { BoardCard } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { BoardService } from './board.service';
-import { boardError } from './board-error';
+import { assertNotTask, boardError } from './board-error';
 import {
   BoardTerminalService,
   type ManualSession,
@@ -341,7 +341,8 @@ export class BoardSessionService {
     const decided = await this.prisma.$transaction(async (tx) => {
       await this.lock(tx, project.id);
       const card = await this.work.card(project.id, number, tx);
-      hideTask(card);
+      // C-509 (ADR-0127): a person does a task; no session takes it.
+      assertNotTask(card, 'session to take it');
       const label = cardLabel(card.number);
       if (card.trackedSessionId === session.id) {
         return { state: 'held' as const, card };

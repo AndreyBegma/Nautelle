@@ -218,6 +218,10 @@ export const AUDIT_ACTIONS = [
   // #750 D9: the worker's `escalate_card` (reason, model, relaunched).
   'card.escalated',
   'card.accepted',
+  /** C-509 (ADR-0127): a person pressed Done on a task (`after: { number, note? }`). */
+  'card.task_done',
+  /** C-509: a person reopened a done task (`after: { number }`). */
+  'card.task_reopened',
   /** C-389 (ADR-0100): the card's pull request merged, so it is Completed. */
   'card.completed_by_merge',
   'card.stopped',

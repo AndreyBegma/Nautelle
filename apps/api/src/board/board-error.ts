@@ -63,10 +63,9 @@ export const cardNotFound = (): BoardFailure =>
  * so every piece of runner work on one is refused `card_is_task`. `what` names
  * the refused work for the message.
  */
-export function assertNotTask<T extends { kind: BoardCardKind; number: number }>(
-  card: T,
-  what: string,
-): asserts card is T & { kind: RunnableCardKind } {
+export function assertNotTask<
+  T extends { kind: BoardCardKind; number: number },
+>(card: T, what: string): asserts card is T & { kind: RunnableCardKind } {
   if (card.kind !== 'task') return;
   throw boardError(
     409,

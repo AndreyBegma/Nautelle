@@ -30,6 +30,8 @@ import { BoardSessionMessages } from './board-session-message.service';
 import { BoardShipping } from './board-shipping';
 import { BoardSink } from './board-sink';
 import { BoardStacks } from './board-stacks';
+import { BoardTasks } from './board-tasks';
+import { BoardTasksController } from './board-tasks.controller';
 import { BoardTerminalService } from './board-terminal.service';
 import { BoardWaitService } from './board-wait.service';
 import { BoardWork } from './board-work';
@@ -60,6 +62,8 @@ import { PathLabelsRef } from './path-labels-ref';
     BoardController,
     BoardAttachmentsController,
     BoardLabelsController,
+    // C-509: a task card's checklist, Done and Reopen.
+    BoardTasksController,
   ],
   providers: [
     // C-503: an analysis card's finish — a report and proposed cards.
@@ -98,6 +102,8 @@ import { PathLabelsRef } from './path-labels-ref';
     BoardRunQueue,
     // #480: stacks — staged cards under one shared design.
     BoardStacks,
+    // C-509 (ADR-0127): task cards — a person's work with an assignee.
+    BoardTasks,
     BoardTerminalService,
     BoardWork,
     BoardPathLabels,

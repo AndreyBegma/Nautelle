@@ -908,6 +908,8 @@ export interface UpdateTaskChecklistItemRequest {
   text?: string;
   /** Tick or untick — the assignee, or operators and above. */
   done?: boolean;
+  /** Reorder: the item's new sort key, between its neighbours' — operators and above. */
+  position?: number;
 }
 
 /** C-509: `POST /board/cards/:number/done`. */

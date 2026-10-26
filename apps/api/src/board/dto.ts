@@ -3,6 +3,7 @@ import {
   type AcceptSuggestionRequest,
   type AddCardDependencyRequest,
   type AddStackCardRequest,
+  type AddTaskChecklistItemRequest,
   BOARD_CARD_BODY_MAX,
   BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
@@ -46,10 +47,15 @@ import {
   STACK_STAGE_TITLE_MAX,
   STACK_TITLE_MAX,
   type StackStageTitle,
+  TASK_CHECKLIST_MAX,
+  TASK_CHECKLIST_TEXT_MAX,
+  TASK_NOTE_MAX,
+  type TaskDoneRequest,
   type UpdateBoardCardRequest,
   type UpdateBoardSettingsRequest,
   type UpdateBoardStackRequest,
   type UpdateProjectLabelRequest,
+  type UpdateTaskChecklistItemRequest,
 } from '@nautelle/shared';
 import {
   type OrchestratorPermissionMode,
@@ -66,6 +72,7 @@ import {
   IsInt,
   IsISO8601,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
@@ -138,6 +145,25 @@ export class CreateBoardCardDto implements CreateBoardCardRequest {
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
   labelIds?: string[];
+
+  /** C-509 (ADR-0127): a task's assignee; the service checks membership. */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  assigneeId?: string;
+
+  /** C-509: a task's checklist, one line per item. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(TASK_CHECKLIST_MAX)
+  @IsString({ each: true })
+  @Matches(/\S/, { each: true, message: 'checklist items must not be blank' })
+  @Matches(/^[^\r\n]*$/, {
+    each: true,
+    message: 'checklist items must be one line',
+  })
+  @MaxLength(TASK_CHECKLIST_TEXT_MAX, { each: true })
+  checklist?: string[];
 }
 
 /** `PATCH /board/cards/:number`. `model: null` clears the override. */
@@ -222,6 +248,49 @@ export class UpdateBoardCardDto implements UpdateBoardCardRequest {
   @IsOptional()
   @IsBoolean()
   autoRunWhenReady?: boolean;
+
+  /** C-509 (ADR-0127): reassigns a task; the service checks membership. */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  assigneeId?: string;
+}
+
+/** C-509: `POST /board/cards/:number/checklist`. */
+export class AddTaskChecklistItemDto implements AddTaskChecklistItemRequest {
+  @IsString()
+  @Matches(/\S/, { message: 'text must not be blank' })
+  @Matches(/^[^\r\n]*$/, { message: 'text must be one line' })
+  @MaxLength(TASK_CHECKLIST_TEXT_MAX)
+  text!: string;
+}
+
+/** C-509: `PATCH /board/cards/:number/checklist/:itemId`. */
+export class UpdateTaskChecklistItemDto
+  implements UpdateTaskChecklistItemRequest
+{
+  @IsOptional()
+  @IsString()
+  @Matches(/\S/, { message: 'text must not be blank' })
+  @Matches(/^[^\r\n]*$/, { message: 'text must be one line' })
+  @MaxLength(TASK_CHECKLIST_TEXT_MAX)
+  text?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  done?: boolean;
+
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  position?: number;
+}
+
+/** C-509: `POST /board/cards/:number/done`. */
+export class TaskDoneDto implements TaskDoneRequest {
+  @IsOptional()
+  @IsString()
+  @MaxLength(TASK_NOTE_MAX)
+  note?: string;
 }
 
 /** `POST /board/cards/:number/move` (D7). */

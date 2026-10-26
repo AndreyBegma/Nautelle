@@ -106,6 +106,8 @@ export class CardAssessor {
       if (!this.queue.enabled) return;
       const found = await this.read(this.prisma, cardId);
       if (!found || found.card.assessmentHash === found.hash) return;
+      // C-509 (ADR-0127): a person does a task; no model is recommended for it.
+      if (found.card.kind === 'task') return;
       if (await this.asking(this.prisma, found.card.assessRunId, found.hash)) {
         return;
       }
@@ -128,6 +130,7 @@ export class CardAssessor {
     // A newer save queued its own job.
     if (hash !== data.hash) return { kind: 'none', why: 'input moved' };
     if (card.assessmentHash === hash) return { kind: 'none', why: 'assessed' };
+    if (card.kind === 'task') return { kind: 'none', why: 'task' };
     if (card.column === 'completed' || card.column === 'inbox') {
       return { kind: 'none', why: card.column };
     }
