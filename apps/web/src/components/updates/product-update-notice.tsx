@@ -116,6 +116,8 @@ function HowToUpdate({ release }: { release: ProductRelease }) {
             directory on the server. The API applies migrations when it starts.
           </Way>
           <Way n={2} title="Re-run install.sh" code={INSTALL_SCRIPT_COMMAND}>
+            Run in the directory that holds{' '}
+            <code className="font-mono text-ink">nautelle</code>, not inside it.
             Fetches the current compose file and keeps{' '}
             <code className="font-mono text-ink">.env</code> and its passwords.
           </Way>

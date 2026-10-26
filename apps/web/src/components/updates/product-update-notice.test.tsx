@@ -41,6 +41,8 @@ describe('ProductUpdateNotice (C-374, C-526)', () => {
     expect(html).toContain('docker compose pull');
     expect(html).toContain('docker compose up -d');
     expect(html).toContain('install.sh | sh');
+    expect(html).toContain('directory that holds');
+    expect(html).toContain('not inside it.');
     expect(html).toContain('NAUTELLE_VERSION=0.16.0');
     expect(html).toContain('Copy');
   });
