@@ -7,7 +7,8 @@ import { BoardWorld } from './testing/board-e2e';
 const ANALYSIS_SESSION = '0b7e7c1e-5d0f-4c1a-9a51-2f3c4d5e6f71';
 const FEATURE_SESSION = '0b7e7c1e-5d0f-4c1a-9a51-2f3c4d5e6f72';
 
-const REPORT = 'Two gaps in the fleet page.\n\n## Details\nThe runs scan is slow.';
+const REPORT =
+  'Two gaps in the fleet page.\n\n## Details\nThe runs scan is slow.';
 
 const proposal = (over: Record<string, unknown> = {}) => ({
   title: 'Index the runs table by project',
