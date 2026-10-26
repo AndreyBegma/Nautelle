@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "name": "The UI profile follows its build live instead of polling",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project/settings?tab=design"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "heading",
+        "name": "UI profile",
+        "exact": true
+      },
+      "timeoutMs": 60000
+    },
+    {
+      "action": "marker",
+      "title": "The UI profile section shows its build state"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "button",
+        "name": "Build",
+        "exact": true
+      },
+      "timeoutMs": 30000,
+      "caption": "A build reloads this section when its run settles, with no 10 s refetch"
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    }
+  ]
+}
