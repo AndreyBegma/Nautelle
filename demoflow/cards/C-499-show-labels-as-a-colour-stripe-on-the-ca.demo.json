@@ -25,10 +25,18 @@
       "timeoutMs": 30000
     },
     { "action": "click", "target": { "placeholder": "Add a label" } },
-    { "action": "fill", "target": { "placeholder": "Add a label" }, "value": "frontend" },
+    {
+      "action": "fill",
+      "target": { "placeholder": "Add a label" },
+      "value": "frontend"
+    },
     { "action": "press", "key": "Enter" },
     { "action": "wait", "ms": 1500 },
-    { "action": "fill", "target": { "placeholder": "Add a label" }, "value": "docs" },
+    {
+      "action": "fill",
+      "target": { "placeholder": "Add a label" },
+      "value": "docs"
+    },
     { "action": "press", "key": "Enter" },
     { "action": "wait", "ms": 1500 },
     {
@@ -47,7 +55,10 @@
     },
     { "action": "wait", "ms": 2000 },
     { "action": "screenshot", "name": "label-stripe-on-the-card" },
-    { "action": "marker", "title": "The Board filters by label, and the filter is in the URL" },
+    {
+      "action": "marker",
+      "title": "The Board filters by label, and the filter is in the URL"
+    },
     {
       "action": "select",
       "target": { "label": "Label", "exact": true },
