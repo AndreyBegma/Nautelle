@@ -139,6 +139,15 @@ describe('classifyCardKindEnglish', () => {
     ).toBe('bug');
   });
 
+  it('never reads a task-like title as a task (C-509, ADR-0127)', () => {
+    expect(
+      classifyCardKindEnglish(
+        'Task: add the Stripe secret to the vault',
+        'Assign this task to a person; a manual step, no code.',
+      ),
+    ).toBe('feature');
+  });
+
   it('matches each word of the list, in any case, as a whole word', () => {
     for (const title of [
       'Bug in login',

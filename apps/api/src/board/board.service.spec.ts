@@ -68,6 +68,7 @@ const service = (prisma: PrismaService) => {
     stacks as never,
     {} as never,
     {} as never,
+    {} as never,
   );
   return { board, work, stacks };
 };

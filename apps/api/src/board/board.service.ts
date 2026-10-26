@@ -53,7 +53,7 @@ import { CardAnalysisExpected } from './board-analysis';
 import { BoardCommands, boardOutput } from './board-commands';
 import { demoFactsFor } from './board-demo-facts';
 import { BoardDependencies } from './board-dependencies.service';
-import { boardError, cardNotFound } from './board-error';
+import { assertNotTask, boardError, cardNotFound } from './board-error';
 import { labelFactsFor } from './board-label-facts';
 import { BoardLabels } from './board-labels.service';
 import {
@@ -70,6 +70,8 @@ import {
 import { queuedCount, queueFactsFor } from './board-queue-facts';
 import { reviewFactsFor, reviewFindingsFor } from './board-review-facts';
 import { BoardStacks } from './board-stacks';
+import { taskFactsFor } from './board-task-facts';
+import { BoardTasks } from './board-tasks';
 import {
   ACTIVE_PHASES,
   BOARD_SYSTEM_ACTOR,
@@ -135,6 +137,7 @@ export class BoardService implements OnModuleInit {
     private readonly stacks: BoardStacks,
     private readonly economy: TokenEconomyService,
     private readonly labels: BoardLabels,
+    private readonly tasks: BoardTasks,
   ) {}
 
   /**
@@ -337,6 +340,13 @@ export class BoardService implements OnModuleInit {
           include: { createdCard: { select: { number: true, title: true } } },
         },
         originCard: { select: { number: true, title: true } },
+        // C-509: a task's checklist; empty for every other kind.
+        checklist: {
+          orderBy: { position: 'asc' },
+          include: {
+            doneBy: { select: { id: true, name: true, email: true } },
+          },
+        },
       },
     });
     if (!card || hiddenFrom(card, role)) {
@@ -449,6 +459,7 @@ export class BoardService implements OnModuleInit {
       demos,
       queue,
       labels,
+      tasks,
     ] = await Promise.all([
       usageByRun(this.prisma, runIds),
       sessionIds.length === 0
@@ -500,6 +511,8 @@ export class BoardService implements OnModuleInit {
       queueFactsFor(this.prisma, cards),
       // C-497: the labels of every card, in one query.
       labelFactsFor(this.prisma, cards),
+      // C-509: each task's assignee, checklist count and origin.
+      taskFactsFor(this.prisma, cards),
     ]);
     const runProfileKeys = new Map<string, string>();
     for (const run of runs) {
@@ -537,6 +550,7 @@ export class BoardService implements OnModuleInit {
       ...demos,
       ...queue,
       ...labels,
+      ...tasks,
       now: new Date(),
     };
   }
@@ -617,6 +631,9 @@ export class BoardService implements OnModuleInit {
     // C-497: the person's labels, refused before the card exists.
     const labelIds = [...new Set(dto.labelIds ?? [])];
     await this.labels.assertForCreate(projectId, labelIds);
+    // C-509 (ADR-0127): a task's assignee and fields, refused before it exists.
+    await this.tasks.checkCreate(projectId, dto);
+    const task = dto.kind === 'task';
     const card = await this.prisma.$transaction(async (tx) => {
       const next = await this.work.nextCard(tx, projectId);
       const position = await this.work.place(
@@ -642,7 +659,9 @@ export class BoardService implements OnModuleInit {
           issueOnRun: issue ? false : (dto.issueOnRun ?? dto.kind === 'bug'),
           issueNumber: issue?.number ?? null,
           issueUrl: issue?.url ?? null,
-          specOnRun: dto.specOnRun ?? settings.specOnRun,
+          // C-509: a task is never run, so it has no spec either.
+          specOnRun: task ? false : (dto.specOnRun ?? settings.specOnRun),
+          ...(task ? { assigneeId: dto.assigneeId } : {}),
           createdById: actor.userId,
           movedById: actor.userId,
           movedAt: now,
@@ -655,6 +674,8 @@ export class BoardService implements OnModuleInit {
         actor,
       );
       await this.labels.writeOnCreate(tx, created.id, labelIds, actor.userId);
+      if (task)
+        await this.tasks.writeChecklist(tx, created.id, dto.checklist ?? []);
       return created;
     });
     await this.audit.record({
@@ -670,6 +691,12 @@ export class BoardService implements OnModuleInit {
         specOnRun: card.specOnRun,
         issueNumber: card.issueNumber,
         ...(labelIds.length > 0 ? { labelIds } : {}),
+        ...(task
+          ? {
+              assigneeId: card.assigneeId,
+              checklist: dto.checklist?.length ?? 0,
+            }
+          : {}),
       },
       result: 'ok',
     });
@@ -767,6 +794,8 @@ export class BoardService implements OnModuleInit {
     actor: BoardActor,
   ): Promise<BoardCardDetail> {
     const card = await this.work.card(projectId, number);
+    // C-509 (ADR-0127): a task takes only a task's fields; checked first.
+    await this.tasks.checkUpdate(card, dto);
     const { continueAfterDesign, autoCollect, autoRunWhenReady, ...fields } =
       dto;
     // #282 D3: Automatic work is a terminal card's; refused before anything is written.
@@ -871,6 +900,9 @@ export class BoardService implements OnModuleInit {
         ? { profileKey: fields.profileKey }
         : {}),
       ...(issueLink ?? {}),
+      ...(fields.assigneeId !== undefined
+        ? { assigneeId: fields.assigneeId }
+        : {}),
     };
     // C-181 (D-09): a person who edits what an armed card runs becomes whom
     // its Auto-run runs as — never someone else's authority on their text.
@@ -1135,6 +1167,8 @@ export class BoardService implements OnModuleInit {
       dto.column === 'completed' &&
       card.column !== 'completed' &&
       card.source !== 'fleet' &&
+      // C-509 (ADR-0127): a task has no pull request; it is landed when done.
+      card.kind !== 'task' &&
       dto.confirmUnlanded !== true
     ) {
       const missing = await this.work.missingLanding(project, card.id);
@@ -1164,6 +1198,7 @@ export class BoardService implements OnModuleInit {
   ): Promise<BoardCardDetail> {
     const project = await this.work.project(projectId);
     const card = await this.work.card(projectId, number);
+    assertNotTask(card, 'worker to finish');
     if (!isActiveRoundPhase(card.rounds[0]?.phase)) {
       throw boardError(409, BOARD_ERROR.notRunning, 'No worker is running');
     }
@@ -1190,6 +1225,8 @@ export class BoardService implements OnModuleInit {
   ): Promise<AcceptBoardCardResponse> {
     const project = await this.work.project(projectId);
     const card = await this.work.card(projectId, number);
+    // C-509 (ADR-0127): a task never reaches Finished; Done completes it.
+    assertNotTask(card, 'pull request to accept');
     if (card.column !== 'finished') {
       throw boardError(
         409,
@@ -1380,6 +1417,7 @@ export class BoardService implements OnModuleInit {
       include: { trackedSession: { select: { gitBranch: true } } },
     });
     if (!card) throw cardNotFound();
+    assertNotTask(card, 'pull request to open');
     if (card.column !== 'finished' && card.column !== 'completed') {
       throw boardError(
         409,
@@ -1479,6 +1517,7 @@ export class BoardService implements OnModuleInit {
   ): Promise<BoardCardDetail> {
     const project = await this.work.project(projectId);
     const card = await this.work.card(projectId, number);
+    assertNotTask(card, 'worker to stop');
     if (!isActiveRoundPhase(card.rounds[0]?.phase)) {
       // C-398 (ADR-0102): Stop on a queued card takes it out of the run queue.
       const removed = await this.prisma.boardRunQueueCard.deleteMany({

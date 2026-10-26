@@ -9,26 +9,47 @@ import {
   type Role,
 } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
-import type { BoardColumn, Prisma } from '@prisma/client';
+import type { BoardCardKind, BoardColumn, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { boardError, cardNotFound } from './board-error';
+import { personName } from './board-task-facts';
 import { type BoardActor, BoardWork } from './board-work';
 import { hiddenFrom } from './inbox-access';
 
 type Tx = Prisma.TransactionClient;
 
 const DEPENDS_ON = {
-  dependsOn: { select: { number: true, column: true, title: true } },
+  dependsOn: {
+    select: {
+      number: true,
+      column: true,
+      title: true,
+      kind: true,
+      assignee: { select: { name: true, email: true } },
+    },
+  },
 } as const;
 
+/**
+ * C-509: a task says it is one and names its assignee, so a dependant reads
+ * "waits for Anna"; a code card's ref stays as it was.
+ */
 const refOf = (card: {
   number: number;
   column: BoardColumn;
+  kind: BoardCardKind;
+  assignee: { name: string | null; email: string } | null;
 }): CardDependencyRef => ({
   number: card.number,
   label: cardLabel(card.number),
   column: card.column,
+  ...(card.kind === 'task'
+    ? {
+        kind: card.kind,
+        assigneeName: card.assignee ? personName(card.assignee) : null,
+      }
+    : {}),
 });
 
 const byNumber = (a: { number: number }, b: { number: number }) =>
@@ -47,6 +68,8 @@ const STACK_FACTS = {
       prState: true,
       mergedAt: true,
       prBase: true,
+      kind: true,
+      assignee: { select: { name: true, email: true } },
       rounds: {
         orderBy: { round: 'desc' },
         take: 1,

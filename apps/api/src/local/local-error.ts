@@ -1,4 +1,4 @@
-import { BUDGET_ERROR } from '@nautelle/shared';
+import { BOARD_ERROR, BUDGET_ERROR } from '@nautelle/shared';
 import {
   LOCAL_BOARD_REFUSALS,
   LOCAL_DESIGN_REFUSALS,
@@ -76,6 +76,11 @@ export const toLocalError = (error: unknown): LocalError => {
   }
   if (code === BUDGET_ERROR.exceeded) {
     return new LocalError('budget_exceeded', message);
+  }
+  // C-509 (ADR-0127): a runner that predates tasks knows no `card_is_task`;
+  // the card it named is not one it can work.
+  if (code === BOARD_ERROR.cardIsTask) {
+    return new LocalError('invalid_args', message);
   }
   if (status === 404) return new LocalError('not_found', message);
   if (status === 401 || status === 403) {

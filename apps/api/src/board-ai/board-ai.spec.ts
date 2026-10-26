@@ -151,6 +151,16 @@ describe('parseTriageAnswer', () => {
     });
   });
 
+  it('never hints a task: a person makes one (C-509, ADR-0127)', () => {
+    expect(
+      parseTriageAnswer(
+        { kind: { value: 'task', reason: 'Add the Stripe secret by hand' } },
+        { kind: 'feature' },
+        new Set(),
+      ),
+    ).toEqual({ duplicates: [], kind: null, priority: null });
+  });
+
   it('ignores a malformed hint and refuses a non-object', () => {
     expect(
       parseTriageAnswer(

@@ -103,6 +103,8 @@ model User {
   boardCardsAutoRunArmed      BoardCard[]                   @relation("BoardCardAutoRunArmedBy")
   boardCardRounds             BoardCardRound[]
   boardCardProposalsDecided   BoardCardProposal[]           @relation("BoardCardProposalDecidedBy")
+  boardCardsAssigned          BoardCard[]                   @relation("BoardCardAssignee")
+  boardChecklistItemsDone     BoardCardChecklistItem[]      @relation("BoardCardChecklistDoneBy")
   boardSettingsUpdated        BoardSettings[]
   demoSecretsUpdated          ProjectDemoSecret[]
   cardDemosRequested          CardDemo[]
@@ -3305,6 +3307,9 @@ enum BoardCardKind {
   /// C-503 (ADR-0126): investigates read-only and ends with a report and
   /// proposed cards, never a pull request. Only a person picks it.
   analysis
+  /// C-509 (ADR-0127): work a person does — no session, runner, pull request
+  /// or demo; an assignee, a checklist and Done. Only a person picks it.
+  task
 }
 
 /// Shared `CARD_PROPOSAL_KINDS` (C-503 D4): what a proposed card becomes —
@@ -3658,6 +3663,14 @@ model BoardCard {
   /// C-503 (ADR-0126): the analysis card this card was created from, via
   /// Create selected; kept as its origin.
   originCardId            String?
+  /// C-509 (ADR-0127): the project member a `task` card is for; null for a
+  /// code card, a candidate task, or once the user is deleted or leaves the
+  /// project ("Unassigned").
+  assigneeId              String?
+  /// C-509: the note given with a task's Done, at most 2 000 characters.
+  taskNote                String?
+  /// C-509: the code card that raised this task (C-511); null otherwise.
+  raisedForCardId         String?
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
 
@@ -3665,6 +3678,12 @@ model BoardCard {
   originCard           BoardCard?             @relation("BoardCardOrigin", fields: [originCardId], references: [id], onDelete: SetNull)
   /// C-503: the cards created from this analysis card's proposals.
   originOf             BoardCard[]            @relation("BoardCardOrigin")
+  assignee             User?                  @relation("BoardCardAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  raisedForCard        BoardCard?             @relation("BoardCardRaisedFor", fields: [raisedForCardId], references: [id], onDelete: SetNull)
+  /// C-509: the tasks this code card raised (C-511).
+  raisedTasks          BoardCard[]            @relation("BoardCardRaisedFor")
+  /// C-509: a task's checklist, in `position` order.
+  checklist            BoardCardChecklistItem[]
   prBaseCard           BoardCard?             @relation("BoardCardPrBase", fields: [prBaseCardId], references: [id], onDelete: SetNull)
   /// #636: the cards stacked on this one's branch.
   stackedOn            BoardCard[]            @relation("BoardCardPrBase")
@@ -3724,7 +3743,30 @@ model BoardCard {
   @@index([prBaseCardId])
   @@index([queuedForSessionId])
   @@index([originCardId])
+  @@index([assigneeId, column])
+  @@index([raisedForCardId])
   @@map("board_cards")
+}
+
+/// C-509 (ADR-0127): one item of a task card's checklist, at most
+/// `TASK_CHECKLIST_MAX` per card. Ticking is the assignee's or an operator's.
+model BoardCardChecklistItem {
+  id         String    @id @default(cuid())
+  cardId     String
+  /// Fractional index, as a card's position in its column.
+  position   Float
+  /// At most 200 characters.
+  text       String
+  doneAt     DateTime?
+  /// Who ticked it; null while it is not done, or for a deleted user.
+  doneById   String?
+  createdAt  DateTime  @default(now())
+
+  card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  doneBy User?     @relation("BoardCardChecklistDoneBy", fields: [doneById], references: [id], onDelete: SetNull)
+
+  @@index([cardId, position])
+  @@map("board_card_checklist_items")
 }
 
 /// C-503 (ADR-0126): a card an analysis round proposes, from its

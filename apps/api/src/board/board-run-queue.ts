@@ -245,7 +245,9 @@ export class BoardRunQueue
         design: { select: { needed: true, status: true } },
         stages: {
           select: {
-            cards: { select: { id: true, number: true, column: true } },
+            cards: {
+              select: { id: true, number: true, column: true, kind: true },
+            },
           },
         },
       },
@@ -258,9 +260,11 @@ export class BoardRunQueue
         `${stackLabel(stack.number)} "${stack.title}": the stack design is not approved yet`,
       );
     }
+    // C-509 (ADR-0127): a person does a task, so the run never queues one;
+    // its dependants wait for its Done through the ordinary dependency.
     const todo = stack.stages
       .flatMap((s) => s.cards)
-      .filter((c) => c.column === 'todo')
+      .filter((c) => c.column === 'todo' && c.kind !== 'task')
       .sort((a, b) => a.number - b.number);
     const now = new Date();
     const added = await this.prisma.$transaction(async (tx) => {

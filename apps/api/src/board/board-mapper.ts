@@ -51,6 +51,8 @@ import {
   type RestartEstimate,
   restartEstimateSchema,
   type StewardCardChip,
+  type TaskAssigneeView,
+  type TaskChecklistItemView,
   type TaskDesignSummary,
   type TokenSavedView,
 } from '@nautelle/shared';
@@ -68,6 +70,7 @@ import {
 } from '@nautelle/shared/protocol';
 import {
   type BoardCard,
+  type BoardCardChecklistItem,
   type BoardCardProposal,
   type BoardCardPullRequest,
   type BoardCardReviewRun,
@@ -188,7 +191,21 @@ export type CardWithPeople = CardWithRounds & {
   proposals?: CardProposalRow[];
   /** C-503: the analysis card this one was created from, where read. */
   originCard?: { number: number; title: string } | null;
+  /** C-509: a task's checklist in position order, where the read included it. */
+  checklist?: CardChecklistRow[];
 };
+
+/** C-509: a checklist item with the person who ticked it. */
+export type CardChecklistRow = BoardCardChecklistItem & {
+  doneBy: { id: string; name: string | null; email: string } | null;
+};
+
+/** C-509: what a task's face shows besides its own columns. */
+export interface CardTaskFact {
+  assignee: TaskAssigneeView | null;
+  checklist: { done: number; total: number };
+  raisedFor: CardDependencyRef | null;
+}
 
 /** C-503: a proposal with the card Create selected made of it. */
 export type CardProposalRow = BoardCardProposal & {
@@ -334,6 +351,8 @@ export interface CardFacts {
   queue?: ReadonlyMap<string, CardQueueView>;
   /** C-497: each card's labels in label position order, by card id; absent is none. */
   labels?: ReadonlyMap<string, readonly CardLabelView[]>;
+  /** C-509: each task's assignee, checklist count and origin, by card id; absent for other kinds. */
+  tasks?: ReadonlyMap<string, CardTaskFact>;
   now: Date;
 }
 
@@ -745,7 +764,43 @@ export const toCardView = (
   steward: stewardChipOf(card, facts),
   ...restartOf(card, facts),
   escalated: card.escalatedAt !== null,
+  ...taskOf(card, facts),
 });
+
+/**
+ * C-509 (ADR-0127): a task's assignee, checklist count, Done note and the
+ * card that raised it. Other kinds carry none of these fields.
+ */
+const taskOf = (
+  card: Pick<CardFace, 'id' | 'kind' | 'taskNote'>,
+  facts: CardFacts,
+): Pick<BoardCardView, 'assignee' | 'checklist' | 'taskNote' | 'raisedFor'> => {
+  if (card.kind !== 'task') return {};
+  const fact = facts.tasks?.get(card.id);
+  return {
+    assignee: fact?.assignee ?? null,
+    checklist: fact && fact.checklist.total > 0 ? fact.checklist : null,
+    taskNote: card.taskNote,
+    raisedFor: fact?.raisedFor ?? null,
+  };
+};
+
+/** C-509: a task's checklist items, as its detail lists them. */
+const checklistItemsOf = (
+  rows: readonly CardChecklistRow[] | undefined,
+): TaskChecklistItemView[] =>
+  [...(rows ?? [])]
+    .sort((a, b) => a.position - b.position)
+    .map((item) => ({
+      id: item.id,
+      text: item.text,
+      position: item.position,
+      doneAt: iso(item.doneAt),
+      doneBy:
+        item.doneBy === null
+          ? null
+          : { id: item.doneBy.id, name: item.doneBy.name ?? item.doneBy.email },
+    }));
 
 const isEvidence = (value: Prisma.JsonValue): value is Prisma.JsonObject =>
   typeof value === 'object' &&
@@ -980,6 +1035,9 @@ export const toCardDetail = (
   attachments,
   analysis: analysisOf(card),
   origin: card.originCard ?? null,
+  ...(card.kind === 'task'
+    ? { checklistItems: checklistItemsOf(card.checklist) }
+    : {}),
 });
 
 /**

@@ -91,7 +91,12 @@ import {
   BoardDependencies,
   type StackedBase,
 } from './board-dependencies.service';
-import { autoRunFailureOf, BoardFailure, boardError } from './board-error';
+import {
+  assertNotTask,
+  autoRunFailureOf,
+  BoardFailure,
+  boardError,
+} from './board-error';
 import { BoardFixWaits } from './board-fix-waits';
 import type { CardWithRounds } from './board-mapper';
 import { toSettingsView } from './board-mapper';
@@ -433,6 +438,7 @@ export class BoardRoundsService {
     autoRunAfter: number | null = null,
   ): Promise<BoardCardDetail> {
     const card = await this.work.card(projectId, number);
+    assertNotTask(card, 'worker to run');
     if (card.column === 'completed') {
       throw boardError(
         409,
@@ -500,6 +506,7 @@ export class BoardRoundsService {
     actor: BoardActor,
   ): Promise<BoardCardDetail> {
     const card = await this.work.card(projectId, number);
+    assertNotTask(card, 'worker to take feedback');
     if (isActiveRoundPhase(card.rounds[0]?.phase)) {
       throw this.running();
     }
@@ -885,6 +892,7 @@ export class BoardRoundsService {
     /** #854: the branch a session-gone taken card was worked on. */
     taken: string | null = null,
   ): Promise<void> {
+    assertNotTask(card, 'worker');
     const project = await this.work.project(card.projectId);
     if (isActiveRoundPhase(card.rounds[0]?.phase)) throw this.running();
     // #359: the runner pushes during the round and opens a draft PR (D1).

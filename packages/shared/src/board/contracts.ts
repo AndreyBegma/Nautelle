@@ -391,6 +391,31 @@ export interface BoardCardView {
    * `costUsd`. Null for any other round. Absent reads as null.
    */
   warmupSavedUsd?: string | null;
+  // C-509 (ADR-0127) task cards — optional so no route must fill them yet;
+  // absent reads as none. Every other kind leaves them out.
+  /** A task's assignee; `null` while unassigned (an Inbox candidate, or one who left). */
+  assignee?: TaskAssigneeView | null;
+  /** A task's checklist progress — the face's `2/5`; `null` without items. */
+  checklist?: { done: number; total: number } | null;
+  /** The note the person left on Done. */
+  taskNote?: string | null;
+  /** C-511: the card a worker raised this task for. */
+  raisedFor?: CardDependencyRef | null;
+}
+
+/** C-509: a task's assignee. */
+export interface TaskAssigneeView {
+  id: string;
+  name: string;
+}
+
+/** C-509: one item of a task's checklist, in position order. */
+export interface TaskChecklistItemView {
+  id: string;
+  text: string;
+  position: number;
+  doneAt: string | null;
+  doneBy: { id: string; name: string } | null;
 }
 
 /**
@@ -423,6 +448,10 @@ export interface CardDependencyRef {
   label: string;
   /** Open while not `finished` or `completed` (#638). */
   column: BoardColumn;
+  /** C-509: `task` for a task, so a dependant can say "waits for Anna"; absent for a code card. */
+  kind?: BoardCardKind;
+  /** C-509: a task's assignee's name, `null` while unassigned; absent for a code card. */
+  assigneeName?: string | null;
 }
 
 /**
@@ -749,6 +778,8 @@ export interface BoardCardDetail extends BoardCardView {
   analysis: CardAnalysisView | null;
   /** C-503: the analysis card this card was created from; else `null`. */
   origin: { number: number; title: string } | null;
+  /** C-509: a task's checklist items in position order; empty for every other kind. */
+  checklistItems?: TaskChecklistItemView[];
 }
 
 /** C-506: the cards Create selected made, and the links it left out. */
@@ -827,6 +858,15 @@ export interface CreateBoardCardRequest {
    * `LABELS_PER_CARD_MAX`. With any, the model suggests none.
    */
   labelIds?: string[];
+  /**
+   * C-509 (ADR-0127): a task's assignee — a member of the project or an
+   * active admin, else 422 `assignee_not_member`. Required for a task — a
+   * created card lands in To Do, and only an Inbox candidate may wait
+   * unassigned (D7). Any other kind refuses it `task_field`.
+   */
+  assigneeId?: string;
+  /** C-509: a task's checklist, at most `TASK_CHECKLIST_MAX` items. */
+  checklist?: string[];
 }
 
 /**
@@ -853,6 +893,28 @@ export interface UpdateBoardCardRequest {
   autoCollect?: boolean;
   /** #443: Auto-run when ready; a card that is not in To Do is refused `wrong_column`. */
   autoRunWhenReady?: boolean;
+  /** C-509: a task's assignee (operator+); a task outside the Inbox always has one. */
+  assigneeId?: string;
+}
+
+/** C-509: `POST /board/cards/:number/checklist` — appended at the end. */
+export interface AddTaskChecklistItemRequest {
+  text: string;
+}
+
+/** C-509: `PATCH /board/cards/:number/checklist/:itemId`. */
+export interface UpdateTaskChecklistItemRequest {
+  /** Edit the text — operators and above. */
+  text?: string;
+  /** Tick or untick — the assignee, or operators and above. */
+  done?: boolean;
+  /** Reorder: the item's new sort key, between its neighbours' — operators and above. */
+  position?: number;
+}
+
+/** C-509: `POST /board/cards/:number/done`. */
+export interface TaskDoneRequest {
+  note?: string;
 }
 
 /** `POST /board/cards/:number/move` (D7). `index` is the drop index in `column`. */
@@ -1122,6 +1184,17 @@ export const BOARD_ERROR = {
   labelLimit: 'label_limit',
   /** 422 (C-497): a path rule's pattern is refused (`labelPatternProblem`). */
   patternInvalid: 'pattern_invalid',
+  /**
+   * 409 (C-509, ADR-0127): runner work — Run, feedback, a message, collect,
+   * stop, finish, design, assess, review, demo, take, track — on a task card.
+   */
+  cardIsTask: 'card_is_task',
+  /** 409 (C-509): Done, Reopen or a checklist change on a card that is not a task. */
+  notATask: 'not_a_task',
+  /** 422 (C-509): a code-card field on a task, or a task field on a code card. */
+  taskField: 'task_field',
+  /** 422 (C-509 D7): the assignee is neither a member of the project nor an active admin. */
+  assigneeNotMember: 'assignee_not_member',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 

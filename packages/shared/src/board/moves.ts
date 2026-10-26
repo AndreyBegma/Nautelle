@@ -1,4 +1,5 @@
 import {
+  type BoardCardKind,
   type BoardCardSource,
   type BoardColumn,
   type CardRoundPhase,
@@ -49,7 +50,9 @@ export type BoardMoveEffect =
  * - `invalid_move` — into or out of Inbox other than a person's Inbox → To Do
  *   (#244 D9): a suggestion enters To Do only by Accept, and nothing else
  *   enters the Inbox; a merge moving a card anywhere but from In progress or
- *   Finished to Completed;
+ *   Finished to Completed; a `task` card into Finished (C-509 D3, ADR-0127):
+ *   a task has no work to collect or review, so Done takes it straight to
+ *   Completed;
  * - `plan_task_derived` — the item is a plan task projected onto the board
  *   (#270 D5, ADR-0028): its column follows its plan and its issue, so no
  *   move, reorder or column change of it is ever allowed.
@@ -88,6 +91,8 @@ export interface BoardMoveInput {
    * gone, Run is offered again. Default `false`.
    */
   trackingAlive?: boolean;
+  /** C-509: the card's kind. Default `feature`. */
+  kind?: BoardCardKind;
 }
 
 export type BoardMoveDecision =
@@ -140,6 +145,8 @@ export const boardMoveRule = (move: BoardMoveInput): BoardMoveDecision => {
     return refuse('invalid_move');
   }
   if (from === to) return { allowed: true, effects: [], offerRun: false };
+  const task = move.kind === 'task';
+  if (task && to === 'finished') return refuse('invalid_move');
   const cardSource = move.cardSource ?? 'manual';
   if (from === 'inbox' || to === 'inbox') {
     return from === 'inbox' && to === 'todo' && source === 'person'
@@ -162,6 +169,7 @@ export const boardMoveRule = (move: BoardMoveInput): BoardMoveDecision => {
   if (from === 'completed') effects.push('reopen');
 
   const offerRun =
+    !task &&
     source === 'person' &&
     cardSource !== 'fleet' &&
     move.trackingAlive !== true &&

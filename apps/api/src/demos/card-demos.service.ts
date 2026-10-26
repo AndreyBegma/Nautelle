@@ -41,7 +41,7 @@ import { AttachmentsService } from '../attachments/attachments.service';
 import { receiveUpload, UploadOverLimit } from '../attachments/upload-storage';
 import { AuditService } from '../audit/audit.service';
 import { type AuditContext, SYSTEM_ACTOR } from '../audit/audit.types';
-import { cardNotFound } from '../board/board-error';
+import { assertNotTask, cardNotFound } from '../board/board-error';
 import { hiddenFrom } from '../board/inbox-access';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
@@ -222,6 +222,7 @@ export class CardDemosService {
     ctx: AuditContext,
   ): Promise<CardDemoView> {
     const card = await this.card(projectId, number, role);
+    assertNotTask(card, 'demo to record');
     if (!(await this.settings.view(projectId)).enabled) {
       throw demoError(
         409,

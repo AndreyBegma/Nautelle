@@ -206,7 +206,8 @@ export class BoardReview {
     card: CardWithRounds,
     headSha: string,
   ): Promise<ReviewGate> {
-    if (card.prNumber === null) return 'pass';
+    // C-509: a task has no pull request to review.
+    if (card.prNumber === null || card.kind === 'task') return 'pass';
     const steps = await this.enabledSteps(project.id);
     if (steps.length === 0) return 'pass';
     const pass = card.reviewFixAttempts;

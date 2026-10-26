@@ -286,6 +286,7 @@ const MOVE_REFUSED: Record<
 
 const refusalOf = (
   decision: Extract<BoardMoveDecision, { allowed: false }>,
+  card: Pick<CardWithRounds, 'kind'>,
 ): BoardFailure =>
   decision.error === 'card_running'
     ? boardError(
@@ -297,7 +298,10 @@ const refusalOf = (
       ? boardError(
           409,
           BOARD_ERROR.invalidMove,
-          'A suggestion leaves Suggestions only for To Do, and nothing else enters it',
+          // C-509 (ADR-0127): a task skips Finished — Done completes it.
+          card.kind === 'task'
+            ? 'A task has no Finished: Done moves it to Completed'
+            : 'A suggestion leaves Suggestions only for To Do, and nothing else enters it',
         )
       : boardError(409, BOARD_ERROR.moveRefused, MOVE_REFUSED[decision.error], {
           reason: decision.error,
@@ -436,7 +440,7 @@ export class BoardWork implements OnModuleInit {
       return;
     }
     const before = this.decide(card, request);
-    if (!before.allowed) throw refusalOf(before);
+    if (!before.allowed) throw refusalOf(before, card);
     let stopped: boolean | null = null;
     if (before.effects.includes('stop')) {
       stopped = await this.stopOnRunner(project, card, actor);
@@ -446,7 +450,7 @@ export class BoardWork implements OnModuleInit {
     const outcome = await this.prisma.$transaction(async (tx) => {
       const fresh = await this.lock(tx, card.id);
       const decision = this.decide(fresh, request);
-      if (!decision.allowed) throw refusalOf(decision);
+      if (!decision.allowed) throw refusalOf(decision, fresh);
       if (request.within) await request.within(tx, fresh);
       const round = fresh.rounds[0] ?? null;
       const ended: { runId: string; status: RunStatus }[] = [];
@@ -495,6 +499,14 @@ export class BoardWork implements OnModuleInit {
           ...(accept ? { completedAt: now, completedById: actor.userId } : {}),
           ...(reopen ? { completedAt: null, completedById: null } : {}),
           ...(suggestion ? { evidence: Prisma.DbNull } : {}),
+          // C-509 D7 (ADR-0127): outside the Inbox a task always has someone;
+          // a candidate accepted without one is the accepter's.
+          ...(suggestion &&
+          fresh.kind === 'task' &&
+          fresh.assigneeId === null &&
+          actor.userId !== null
+            ? { assigneeId: actor.userId }
+            : {}),
         },
       });
       return { fresh, decision, ended };
@@ -626,6 +638,7 @@ export class BoardWork implements OnModuleInit {
       // with Automatic work on. C-397: a person moves a fleet card freely.
       cardSource: card.source,
       autoCollect: card.autoCollect,
+      kind: card.kind,
     });
   }
 

@@ -330,6 +330,42 @@ describe('boardMoveRule', () => {
     });
   });
 
+  describe('task cards (C-509, ADR-0127)', () => {
+    it('refuses moving a task to Finished, from any column', () => {
+      for (const from of ['todo', 'in_progress', 'completed'] as const) {
+        for (const source of ['person', 'automatic'] as const) {
+          const decision = boardMoveRule(
+            move({ kind: 'task', from, to: 'finished', source }),
+          );
+          expect(decision.allowed).toBe(false);
+        }
+      }
+      expect(
+        boardMoveRule(move({ kind: 'task', from: 'todo', to: 'finished' })),
+      ).toEqual({ allowed: false, error: 'invalid_move' });
+    });
+
+    it('completes a task a person moves to Completed', () => {
+      expect(
+        boardMoveRule(
+          move({ kind: 'task', from: 'in_progress', to: 'completed' }),
+        ),
+      ).toEqual({ allowed: true, effects: ['accept'], offerRun: false });
+    });
+
+    it('never offers Run for a task dropped on In progress', () => {
+      expect(
+        boardMoveRule(move({ kind: 'task', from: 'todo', to: 'in_progress' })),
+      ).toEqual({ allowed: true, effects: [], offerRun: false });
+    });
+
+    it('reopens a Completed task a person moves back to To Do', () => {
+      expect(
+        boardMoveRule(move({ kind: 'task', from: 'completed', to: 'todo' })),
+      ).toEqual({ allowed: true, effects: ['reopen'], offerRun: false });
+    });
+  });
+
   it('allows reordering inside a column', () => {
     for (const column of BOARD_COLUMNS) {
       expect(

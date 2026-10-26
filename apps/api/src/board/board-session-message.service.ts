@@ -10,6 +10,7 @@ import {
   SessionMessageService,
   sessionMessageError,
 } from '../session-message/session-message.service';
+import { assertNotTask } from './board-error';
 import { type BoardActor, BoardWork } from './board-work';
 
 /**
@@ -33,6 +34,7 @@ export class BoardSessionMessages {
     via: SessionMessageVia = 'web',
   ): Promise<SessionMessageView> {
     const card = await this.work.card(projectId, number);
+    assertNotTask(card, 'session to message');
     const round = card.rounds[0];
     if (!round || !isActiveRoundPhase(round.phase)) {
       throw sessionMessageError(

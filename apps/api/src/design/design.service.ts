@@ -26,7 +26,11 @@ import type {
 import { z } from 'zod';
 import { CardAssessor } from '../assess/card-assessor';
 import { AuditService } from '../audit/audit.service';
-import { autoRunFailureOf, cardNotFound } from '../board/board-error';
+import {
+  assertNotTask,
+  autoRunFailureOf,
+  cardNotFound,
+} from '../board/board-error';
 import { BoardRoundsService } from '../board/board-rounds.service';
 import { BoardStacks } from '../board/board-stacks';
 import { hiddenFrom } from '../board/inbox-access';
@@ -1097,6 +1101,8 @@ export class DesignService implements OnModuleInit {
     onAutoRun: (run: CardAutoRun) => void = () => {},
   ): Promise<DesignOwner> {
     const card = await this.card(projectId, number);
+    // C-509 (ADR-0127): a person does a task; it has nothing to design.
+    assertNotTask(card, 'design');
     const rounds = await this.prisma.boardCardRound.count({
       where: { cardId: card.id },
     });

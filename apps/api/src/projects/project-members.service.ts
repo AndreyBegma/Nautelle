@@ -122,9 +122,30 @@ export class ProjectMembersService {
     const where = { projectId_userId: { projectId, userId } };
     const before = await this.prisma.projectMember.findUnique({ where });
     if (!before) throw memberNotFound();
-    await this.prisma.projectMember.deleteMany({
-      where: { projectId, userId },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, status: true },
     });
+    // C-509 (ADR-0127): a task is assigned only to someone on the project. An
+    // active admin still sees it; anyone else leaves their open tasks
+    // Unassigned for an operator to reassign. Done tasks keep their assignee.
+    const keepsTasks = user?.role === 'admin' && user.status === 'active';
+    await this.prisma.$transaction([
+      this.prisma.projectMember.deleteMany({ where: { projectId, userId } }),
+      ...(keepsTasks
+        ? []
+        : [
+            this.prisma.boardCard.updateMany({
+              where: {
+                projectId,
+                kind: 'task',
+                assigneeId: userId,
+                column: { not: 'completed' },
+              },
+              data: { assigneeId: null },
+            }),
+          ]),
+    ]);
     await this.audit.record({
       ...ctx,
       action: 'project.member_remove',
