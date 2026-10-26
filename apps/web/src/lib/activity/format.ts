@@ -7,7 +7,6 @@ import {
   type ActivityItem,
   type ActivityQuery,
   type ActivitySeverity,
-  MAX_LIVE_SUBSCRIPTIONS,
   STEWARD_ACTIVITY_TYPES,
 } from '@nautelle/shared';
 import { ApiError } from '../api';
@@ -15,9 +14,6 @@ import type { ChipDef, FilterCodec } from '../filters/url-filters';
 import { isSlotName } from '../fleet/workspace-url';
 import { internalHref } from '../url';
 
-/** Projects the global feed follows live; past it the page polls (the socket is shared, cap 50). */
-export const LIVE_PROJECT_BUDGET = 10;
-export const POLL_MS = 15_000;
 export const PAGE_SIZE = 50;
 /** A feed scrolled further than this keeps new items behind the "N new" pill. */
 export const SCROLLED_PX = 80;
@@ -338,33 +334,6 @@ export function parseLiveItem(data: unknown): ActivityItem | null {
     return null;
   }
   return item as ActivityItem;
-}
-
-export interface LivePlan {
-  topics: (`project:${string}` | 'admin')[];
-  /** True when the feed cannot follow everything live and must poll instead. */
-  poll: boolean;
-}
-
-/**
- * Which topics the feed follows. One project (fixed or filtered) is always
- * live. The global feed follows up to `budget` projects, plus `admin` for an
- * admin (project-less items); past the budget it polls and subscribes to
- * nothing, so the shared socket never nears `MAX_LIVE_SUBSCRIPTIONS`.
- */
-export function planLive(
-  scope: { projectId?: string; projectIds: string[]; isAdmin: boolean },
-  budget = Math.min(LIVE_PROJECT_BUDGET, MAX_LIVE_SUBSCRIPTIONS - 1),
-): LivePlan {
-  if (scope.projectId) {
-    return { topics: [`project:${scope.projectId}`], poll: false };
-  }
-  if (scope.projectIds.length > budget) return { topics: [], poll: true };
-  const topics: LivePlan['topics'] = scope.projectIds.map(
-    (id) => `project:${id}` as const,
-  );
-  if (scope.isAdmin) topics.push('admin');
-  return { topics, poll: false };
 }
 
 /** Who caused an item, by name; a runner by its name when `runnerNames` knows it (R2). */

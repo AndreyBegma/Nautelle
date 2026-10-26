@@ -1,6 +1,7 @@
 import type {
   FleetGraph,
   FleetView,
+  FleetWorkingView,
   RoundView,
   SlotConversation,
   SlotDetail,
@@ -11,6 +12,7 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { AuditCtx } from '../audit';
 import type { AuditContext } from '../audit/audit.types';
 import { RunnerReadThrottle } from '../auth';
+import { BoardService } from '../board';
 import {
   ProjectAccess,
   ProjectAccessGuard,
@@ -30,11 +32,20 @@ export class FleetController {
   constructor(
     private readonly fleet: FleetQueryService,
     private readonly workspace: FleetWorkspaceService,
+    private readonly board: BoardService,
   ) {}
 
   @Get('fleet')
   overview(@ProjectAccess() access: ResolvedProjectAccess): Promise<FleetView> {
     return this.fleet.fleet(access.projectId);
+  }
+
+  /** C-473 (ADR-0122): the cards at work — Fleet's Working now. */
+  @Get('fleet/working')
+  working(
+    @ProjectAccess() access: ResolvedProjectAccess,
+  ): Promise<FleetWorkingView> {
+    return this.board.working(access.projectId);
   }
 
   @Get('slots')

@@ -32,6 +32,24 @@ A runner refuses plain HTTP to any host but localhost, because the pairing
 token would travel in clear text. Use a tunnel or a domain with HTTPS; on a
 trusted network only, `pair --insecure` accepts an `http://` server.
 
+## Build from source
+
+If there is no prebuilt runner for your machine, build it with
+[Bun](https://bun.sh):
+
+```sh
+git clone https://github.com/AndreyBegma/Nautelle && cd Nautelle
+bun install && bun run build
+apps/runner/dist/nautelle-runner version
+```
+
+The last command prints the runner's version and target. Then pair it as above,
+running `apps/runner/dist/nautelle-runner` in place of `nautelle-runner`:
+
+```sh
+apps/runner/dist/nautelle-runner pair --server <NAUTELLE_URL>/api --code XXXX-XXXX --allow-root ~/dev
+```
+
 ## 3. Keep it online
 
 ```sh

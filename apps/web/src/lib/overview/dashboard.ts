@@ -1,6 +1,5 @@
 import type {
   ActivityItem,
-  ApprovalsView,
   FleetView,
   OrchestratorStatus,
   ProjectSummary,
@@ -9,7 +8,6 @@ import type {
   UsageTimeseriesResponse,
 } from '@nautelle/shared';
 import { ORCHESTRATOR_STATUS_LABEL } from '../fleet/format';
-import { approvalsHref as approvalsTab } from '../queue/tabs';
 import { costOrBlank } from '../usage/format';
 
 /**
@@ -90,19 +88,6 @@ export function liveSessions(
 }
 
 /**
- * `ApprovalsView.waiting` holds a PR's *current* row, which is `approved` once
- * somebody decided and the merge has not happened; only `waiting` asks a person.
- */
-const awaiting = (view: ApprovalsView) =>
-  view.waiting.filter((row) => row.status === 'waiting');
-
-export function waitingApprovals(views: Iterable<ApprovalsView>): number {
-  let count = 0;
-  for (const view of views) count += awaiting(view).length;
-  return count;
-}
-
-/**
  * Where each Overview figure is explained (#213). Running slots go to
  * Sessions: Fleet is per project, and Sessions lists every live one.
  */
@@ -119,21 +104,6 @@ export function mergedTodayHref(now: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const day = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   return `/activity?type=pr.merged&from=${day}`;
-}
-
-/**
- * Approvals has no cross-project page: the tile opens the first project, in
- * the list's order, with a pull request waiting — else Projects.
- */
-export function approvalsHref(
-  projects: readonly Pick<ProjectSummary, 'id'>[],
-  approvals: ReadonlyMap<string, ApprovalsView>,
-): string {
-  const first = projects.find((project) => {
-    const view = approvals.get(project.id);
-    return view !== undefined && awaiting(view).length > 0;
-  });
-  return first ? approvalsTab(first.id) : '/projects';
 }
 
 /**

@@ -1,5 +1,6 @@
 import type {
   AdminUser,
+  AdminUsersPage,
   PasswordResetLinkResponse,
   RegistrationState,
   TwoFactorPolicy,
@@ -41,8 +42,8 @@ export class AdminUsersController {
   ) {}
 
   @Get()
-  list(@Query() query: ListUsersQuery): Promise<AdminUser[]> {
-    return this.users.list(query.status);
+  list(@Query() query: ListUsersQuery): Promise<AdminUsersPage> {
+    return this.users.list(query);
   }
 
   @Post(':id/approve')
