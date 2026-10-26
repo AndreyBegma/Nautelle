@@ -32,6 +32,7 @@ export const card = (
   title: `Card ${number}`,
   kind: 'feature',
   kindSource: 'person',
+  labels: [],
   column,
   position: number,
   source: 'manual',

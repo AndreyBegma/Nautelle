@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 import type { CardMergeOutcome, CardPullRequestView } from '@nautelle/shared';
+import { ApiError } from '../api';
 import {
   acceptChoice,
   acceptDescription,
   acceptedMessage,
   acceptPrimaryLabel,
+  isHeadMoved,
   mergeMethodText,
+  movedHeadNotice,
 } from './accept';
 
 const SHA = 'a'.repeat(40);
@@ -121,5 +124,41 @@ describe('the selected path (#969)', () => {
     expect(acceptDescription(merge, 'merge')).toContain('Merges');
     expect(acceptDescription(merge, 'no_merge')).not.toContain('Merges');
     expect(acceptDescription(only, 'no_merge')).not.toContain('Merges');
+  });
+});
+
+/** C-415: a refusal for a moved head becomes a banner and an Accept bound to the new head. */
+describe('Accept after the head moved (C-415)', () => {
+  const NEW = 'c'.repeat(40);
+  const moved = (reason: string) =>
+    new ApiError(409, 'merge_failed' as never, 'refused', undefined, {
+      reason,
+      headSha: NEW,
+    });
+
+  test('only a head_changed refusal of a merge is a moved head', () => {
+    expect(isHeadMoved(moved('head_changed'))).toBe(true);
+    expect(isHeadMoved(moved('not_mergeable'))).toBe(false);
+    expect(isHeadMoved(new Error('offline'))).toBe(false);
+  });
+
+  test('the banner names the short head and the diff at it', () => {
+    expect(movedHeadNotice(pr({ headSha: NEW }))).toEqual({
+      shortSha: 'ccccccc',
+      diffUrl: `https://github.com/o/r/pull/7/files/${NEW}`,
+    });
+  });
+
+  test('the button names the new head until it is busy', () => {
+    const choice = { kind: 'merge', headSha: NEW } as const;
+    expect(acceptPrimaryLabel(choice, 'merge', false, false, true)).toBe(
+      'Accept ccccccc',
+    );
+    expect(acceptPrimaryLabel(choice, 'merge', false, true, true)).toBe(
+      'Merging…',
+    );
+    expect(acceptPrimaryLabel(choice, 'no_merge', false, false, true)).toBe(
+      'Accept',
+    );
   });
 });

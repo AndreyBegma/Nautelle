@@ -66,6 +66,8 @@ export const LLM_FEATURES = [
   'assistant_summary',
   'review_instructions',
   'quick_card',
+  /** C-497 (ADR-0125): the model's labels for a new card (C-500). */
+  'card_labels',
 ] as const;
 export type LlmFeature = (typeof LLM_FEATURES)[number];
 

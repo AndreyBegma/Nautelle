@@ -10,6 +10,7 @@ import {
   CARD_DECIDING_SIGNALS,
   CARD_HOOKS_GRACE_MS,
   CARD_MERGE_POLICY_DEFAULT,
+  type CardAnalysisView,
   type CardDecidingSignal,
   type CardDemoBrief,
   type CardDependencyRef,
@@ -17,6 +18,7 @@ import {
   type CardEvidenceView,
   type CardFleetView,
   type CardHooksCause,
+  type CardLabelView,
   type CardPrTarget,
   type CardPullRequestRef,
   type CardQueueView,
@@ -66,6 +68,7 @@ import {
 } from '@nautelle/shared/protocol';
 import {
   type BoardCard,
+  type BoardCardProposal,
   type BoardCardPullRequest,
   type BoardCardReviewRun,
   type BoardCardRound,
@@ -181,6 +184,48 @@ export type CardWithPeople = CardWithRounds & {
   rounds: (BoardCardRound & { author: BoardUserRef | null })[];
   /** #359 D8: the card's PRs, where the read included them; absent is none. */
   pullRequests?: BoardCardPullRequest[];
+  /** C-503: an analysis card's proposals, where the read included them. */
+  proposals?: CardProposalRow[];
+  /** C-503: the analysis card this one was created from, where read. */
+  originCard?: { number: number; title: string } | null;
+};
+
+/** C-503: a proposal with the card Create selected made of it. */
+export type CardProposalRow = BoardCardProposal & {
+  createdCard: { number: number; title: string } | null;
+};
+
+/**
+ * C-503 (ADR-0126): an analysis card's report — the latest round that has
+ * one — and its proposals, the newest round's first, each round's by
+ * position. `null` for every other kind.
+ */
+export const analysisOf = (
+  card: Pick<CardWithPeople, 'kind' | 'rounds' | 'proposals'>,
+): CardAnalysisView | null => {
+  if (card.kind !== 'analysis') return null;
+  const rounds = [...card.rounds].sort((a, b) => b.round - a.round);
+  const reported = rounds.find((r) => r.report !== null) ?? null;
+  const order = new Map(rounds.map((r) => [r.id, r.round]));
+  const proposals = [...(card.proposals ?? [])].sort(
+    (a, b) =>
+      (order.get(b.roundId) ?? 0) - (order.get(a.roundId) ?? 0) ||
+      a.position - b.position,
+  );
+  return {
+    report: reported?.report ?? null,
+    roundId: reported?.id ?? null,
+    proposals: proposals.map((p) => ({
+      position: p.position,
+      title: p.title,
+      body: p.body,
+      kind: p.kind,
+      labels: p.labels,
+      dependsOn: p.dependsOn,
+      status: p.status,
+      createdCard: p.createdCard,
+    })),
+  };
 };
 
 /** #359 D8: the card's PRs, oldest first. */
@@ -287,6 +332,8 @@ export interface CardFacts {
   demos?: ReadonlyMap<string, CardDemoBrief>;
   /** C-398: each queued card's place in the run queue, by card id; absent is none. */
   queue?: ReadonlyMap<string, CardQueueView>;
+  /** C-497: each card's labels in label position order, by card id; absent is none. */
+  labels?: ReadonlyMap<string, readonly CardLabelView[]>;
   now: Date;
 }
 
@@ -624,6 +671,7 @@ export const toCardView = (
   title: card.title,
   kind: card.kind,
   kindSource: card.kindSource,
+  labels: [...(facts.labels?.get(card.id) ?? [])],
   designTemplate: card.designTemplate,
   designTemplateSource: card.designTemplateSource,
   column: card.column,
@@ -930,6 +978,8 @@ export const toCardDetail = (
   pullRequests: pullRequestsOf(card.pullRequests),
   evidence: evidenceOf(card.evidence),
   attachments,
+  analysis: analysisOf(card),
+  origin: card.originCard ?? null,
 });
 
 /**

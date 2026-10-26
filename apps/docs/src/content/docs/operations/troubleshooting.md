@@ -40,8 +40,25 @@ with two-factor sign-in, and hands the one-time link over in a way they trust.
 It expires in 24 hours and works once; using it ends the person's other
 sessions, and a 2FA reset has them set two-factor sign-in up again. With
 `SMTP_URL` and `APP_URL` set, people can also use **Forgot password** on the
-sign-in page to get a link by email. The only admin who is locked out needs
-the database.
+sign-in page to get a link by email.
+
+**Locked out as the only admin.** Nobody is left to make a link in the
+browser, so make one on the server, from the directory with your
+`docker-compose.yml`:
+
+```sh
+docker compose exec api node dist/src/cli/admin-recover.js --email you@example.com
+```
+
+It prints one link, which opens with your `APP_URL` in front (without
+`APP_URL` it prints the path; put your address before it). It resets two-factor
+sign-in, which is what an admin usually loses: open it, choose a new password,
+and set two-factor sign-in up again. For a forgotten password with two-factor
+sign-in still working, add `--kind password`. The link works once and expires in
+24 hours. The command accepts active admin accounts only (use **Admin › Users**
+for anyone else), and every link is recorded in the audit log as made by the
+system through the command line. Whoever can run commands in the API container
+can run it.
 
 ## Exposure modes
 

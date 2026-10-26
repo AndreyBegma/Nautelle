@@ -1,7 +1,7 @@
 import {
-  BOARD_CARD_KINDS,
   type BoardCardKind,
   TRIAGE_PRIORITIES,
+  WORK_CARD_KINDS,
 } from '@nautelle/shared';
 import { z } from 'zod';
 
@@ -27,7 +27,7 @@ const answerSchema = z.object({
     )
     .catch([]),
   kind: z
-    .object({ value: z.enum(BOARD_CARD_KINDS), reason })
+    .object({ value: z.enum(WORK_CARD_KINDS), reason })
     .nullable()
     .catch(null),
   priority: z

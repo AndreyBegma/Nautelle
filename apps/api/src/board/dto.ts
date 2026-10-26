@@ -27,12 +27,21 @@ import {
   type CardMergePolicy,
   type CreateBoardCardRequest,
   type CreateBoardStackRequest,
+  type CreateProjectLabelRequest,
   DESIGN_TEMPLATE_KEY_MAX,
   DESIGN_TEMPLATE_KEY_PATTERN,
   INTAKE_SPLIT_MAX,
+  LABEL_HUE_MAX,
+  LABEL_HUE_MIN,
+  LABEL_NAME_PATTERN,
+  LABEL_PATTERN_MAX,
+  LABEL_RULES_PER_PROJECT_MAX,
+  LABELS_PER_PROJECT_MAX,
   MANUAL_STACK_CARDS_MIN,
   type MoveBoardCardRequest,
+  type ReplaceLabelRulesRequest,
   type RunBoardCardRequest,
+  type SetCardLabelsRequest,
   STACK_BODY_MAX,
   STACK_STAGE_TITLE_MAX,
   STACK_TITLE_MAX,
@@ -40,6 +49,7 @@ import {
   type UpdateBoardCardRequest,
   type UpdateBoardSettingsRequest,
   type UpdateBoardStackRequest,
+  type UpdateProjectLabelRequest,
 } from '@nautelle/shared';
 import {
   type OrchestratorPermissionMode,
@@ -120,6 +130,14 @@ export class CreateBoardCardDto implements CreateBoardCardRequest {
   @IsOptional()
   @AttachmentIds()
   attachmentIds?: string[];
+
+  /** C-497: the person's labels; more than five answer `label_limit`. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(LABELS_PER_PROJECT_MAX)
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  labelIds?: string[];
 }
 
 /** `PATCH /board/cards/:number`. `model: null` clears the override. */
@@ -411,6 +429,92 @@ export class UpdateBoardSettingsDto implements UpdateBoardSettingsRequest {
   @IsOptional()
   @IsIn(CARD_MERGE_POLICIES)
   cardMergePolicy?: CardMergePolicy;
+
+  /** C-497: the model suggests a new card's labels. */
+  @IsOptional()
+  @IsBoolean()
+  labelSuggest?: boolean;
+
+  /** C-497: path rules label a card from the files it changed. */
+  @IsOptional()
+  @IsBoolean()
+  labelPaths?: boolean;
+}
+
+/** `POST /labels` (C-497). */
+export class CreateProjectLabelDto implements CreateProjectLabelRequest {
+  @IsString()
+  @Matches(LABEL_NAME_PATTERN, {
+    message: 'name must be lower-case letters, digits and dashes',
+  })
+  name!: string;
+
+  @IsInt()
+  @Min(LABEL_HUE_MIN)
+  @Max(LABEL_HUE_MAX)
+  hue!: number;
+}
+
+/** `PATCH /labels/:labelId` (C-497). */
+export class UpdateProjectLabelDto implements UpdateProjectLabelRequest {
+  @IsOptional()
+  @IsString()
+  @Matches(LABEL_NAME_PATTERN, {
+    message: 'name must be lower-case letters, digits and dashes',
+  })
+  name?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(LABEL_HUE_MIN)
+  @Max(LABEL_HUE_MAX)
+  hue?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  position?: number;
+
+  /** Label ids of the project; the service refuses an unknown one. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(LABELS_PER_PROJECT_MAX)
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  combines?: string[];
+}
+
+export class LabelPathRuleDto {
+  /** Checked by `labelPatternProblem` in the service (`pattern_invalid`). */
+  @IsString()
+  @MaxLength(LABEL_PATTERN_MAX * 4)
+  pattern!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  labelId!: string;
+}
+
+/** `PUT /labels/rules` (C-497): the whole ordered list. */
+export class ReplaceLabelRulesDto implements ReplaceLabelRulesRequest {
+  /** Over `LABEL_RULES_PER_PROJECT_MAX` reaches the service as `label_limit`. */
+  @IsArray()
+  @ArrayMaxSize(LABEL_RULES_PER_PROJECT_MAX * 2)
+  @ValidateNested({ each: true })
+  @Type(() => LabelPathRuleDto)
+  rules!: LabelPathRuleDto[];
+}
+
+/**
+ * `PUT /board/cards/:number/labels` (C-497). More than `LABELS_PER_CARD_MAX`
+ * reaches the service, which answers `label_limit`.
+ */
+export class SetCardLabelsDto implements SetCardLabelsRequest {
+  @IsArray()
+  @ArrayMaxSize(LABELS_PER_PROJECT_MAX)
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  labelIds!: string[];
 }
 
 /** #273 D13: the head the person saw in the accept dialog. */

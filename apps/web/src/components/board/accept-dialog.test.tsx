@@ -1,7 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 import type { BoardCardView, CardPullRequestView } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { defaultAcceptOptions } from '../../lib/board/accept';
+import { ApiError } from '../../lib/api';
+import {
+  acceptChoice,
+  acceptPrimaryLabel,
+  defaultAcceptOptions,
+  isHeadMoved,
+  mergeRequest,
+  movedHeadNotice,
+} from '../../lib/board/accept';
 import { AcceptBody, UnlandedBanner } from './accept-dialog';
 
 describe('Accept dialog, work not in the base (#709)', () => {
@@ -147,5 +155,73 @@ describe('Accept dialog body (#969)', () => {
     expect(html).toContain('feat/ship-it');
     expect(html).toContain('→');
     expect(body()).toContain('Into');
+  });
+});
+
+describe('Accept after the PR head moved (C-415)', () => {
+  const OLD = 'a'.repeat(40);
+  const NEW = 'b'.repeat(40);
+  const refusal = new ApiError(
+    409,
+    'merge_failed' as never,
+    'refused',
+    undefined,
+    {
+      reason: 'head_changed',
+      headSha: NEW,
+    },
+  );
+
+  // The web test setup has no DOM, so the flow use-card-actions and the dialog
+  // run is replayed through the same pure pieces they call, in the same order.
+  test('the refusal shows the banner and Accept <sha7> sends the refetched head', () => {
+    // use-card-actions: the refused accept sets headMoved…
+    expect(isHeadMoved(refusal)).toBe(true);
+    // …the dialog refetches the PR (now at NEW) and derives the notice from it.
+    const refetched = pr({ headSha: NEW });
+    const choice = acceptChoice(77, refetched, { fleet: false });
+    expect(choice).toEqual({ kind: 'merge', headSha: NEW });
+    if (choice?.kind !== 'merge') throw new Error('expected a merge choice');
+    const moved = movedHeadNotice(refetched);
+
+    const html = renderToStaticMarkup(
+      <AcceptBody
+        card={card()}
+        pr={refetched}
+        choice={choice}
+        path="merge"
+        options={defaultAcceptOptions(card())}
+        gate="ok"
+        canClose
+        closing={false}
+        busy={false}
+        moved={moved}
+        onPath={() => {}}
+        onOptions={() => {}}
+      />,
+    );
+    expect(html).toContain('The branch moved');
+    expect(html).toContain(NEW.slice(0, 7));
+    expect(html).toContain('nothing was merged');
+    expect(html).toContain(
+      `Accept ${NEW.slice(0, 7)} merges exactly this head`,
+    );
+
+    // The primary button is bound to the refetched head, not the old one.
+    expect(acceptPrimaryLabel(choice, 'merge', false, false, true)).toBe(
+      `Accept ${NEW.slice(0, 7)}`,
+    );
+    const request = mergeRequest(
+      card(),
+      choice.headSha,
+      defaultAcceptOptions(card()),
+      'ok',
+    );
+    expect(request.merge?.headSha).toBe(NEW);
+    expect(request.merge?.headSha).not.toBe(OLD);
+  });
+
+  test('without a refusal there is no banner', () => {
+    expect(body()).not.toContain('The branch moved');
   });
 });

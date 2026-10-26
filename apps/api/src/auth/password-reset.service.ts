@@ -16,6 +16,7 @@ import {
   ANONYMOUS_ACTOR,
   type AuditContext,
   type RequestOrigin,
+  SYSTEM_ACTOR,
   userActor,
 } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
@@ -101,6 +102,49 @@ export class PasswordResetService {
     }
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw authError(404, AUTH_ERROR.notFound, 'User not found');
+    return this.issueAdminLink(user, kind, adminId, ctx);
+  }
+
+  /**
+   * C-484: a link for an active admin, asked for by the operator of the
+   * server through `admin:recover` — the way back in for the only admin, who
+   * has no other admin to ask. Anyone else is refused, so it is no back door
+   * into ordinary accounts. Access to the API container is the authority; the
+   * record's actor is the system.
+   */
+  async issueByCli(
+    email: string,
+    kind: PasswordResetKind,
+  ): Promise<PasswordResetLinkResponse> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.trim().toLowerCase() },
+    });
+    if (!user) throw authError(404, AUTH_ERROR.notFound, 'User not found');
+    if (user.role !== 'admin') {
+      throw authError(
+        403,
+        AUTH_ERROR.forbidden,
+        'Not an admin account; use Admin › Users for other accounts',
+      );
+    }
+    return this.issueAdminLink(
+      user,
+      kind,
+      null,
+      { actor: SYSTEM_ACTOR },
+      {
+        via: 'cli',
+      },
+    );
+  }
+
+  private async issueAdminLink(
+    user: User,
+    kind: PasswordResetKind,
+    createdById: string | null,
+    ctx: AuditContext,
+    meta: object = {},
+  ): Promise<PasswordResetLinkResponse> {
     if (user.status !== 'active') {
       throw authError(
         409,
@@ -121,7 +165,7 @@ export class PasswordResetService {
         userId: user.id,
         kind,
         via: 'admin',
-        createdById: adminId,
+        createdById,
         ttlMs: ADMIN_RESET_LINK_TTL_MS,
       }),
     );
@@ -131,7 +175,7 @@ export class PasswordResetService {
       target: { type: 'user', id: user.id },
       after: { kind, expiresAt: link.expiresAt },
       result: 'ok',
-      meta: { linkId: link.id },
+      meta: { linkId: link.id, ...meta },
     });
     return {
       kind,

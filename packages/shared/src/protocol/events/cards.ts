@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { pendingQuestionSchema } from '../../session-message/contracts';
-import { protectedPathsSchema } from '../branch-policy';
+import { changedPathsSchema, protectedPathsSchema } from '../branch-policy';
 import { headShaSchema } from '../commands/approvals';
 import { cardIdSchema, cardTmuxSessionSchema } from '../commands/cards';
 import { gitRefSchema, skillRunIdSchema } from '../commands/skills';
@@ -120,6 +120,8 @@ export const cardRunPushedDataSchema = z
     prState: z.enum(['open', 'draft']).optional(),
     /** C-148 (D-12): as `card.collect`'s — the protected paths the branch changes. */
     protectedPaths: protectedPathsSchema.optional(),
+    /** C-501: as `card.collect`'s — every path the branch changes, sorted. */
+    changedPaths: changedPathsSchema.optional(),
     /**
      * #837: commits on `branch` ahead of `origin/<base>` at this push — the
      * API counts a round's commits from it. Absent from a runner older than

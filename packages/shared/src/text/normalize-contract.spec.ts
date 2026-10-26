@@ -88,6 +88,21 @@ describe('parseNormalizeOutput', () => {
     ).toBe('invalid_shape');
   });
 
+  it('refuses the analysis kind: the model never picks it (C-503 D5)', () => {
+    expect(
+      reasonOf(
+        block({
+          fields: [
+            { id: 'title', alreadyEnglish: true },
+            { id: 'body', alreadyEnglish: true },
+          ],
+          kind: 'analysis',
+        }),
+        card,
+      ),
+    ).toBe('invalid_shape');
+  });
+
   it('refuses a missing, an extra or a repeated id', () => {
     expect(
       reasonOf(

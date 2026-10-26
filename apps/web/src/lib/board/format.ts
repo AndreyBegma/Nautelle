@@ -371,7 +371,7 @@ export function describeMergeFailure(
 ): string {
   switch (reason) {
     case 'head_changed':
-      return 'The branch changed since you opened this — review it again.';
+      return 'The branch changed since you opened this — review the new head before accepting it.';
     case 'not_mergeable':
       return 'GitHub refuses the merge: checks or branch protection.';
     case 'closed':
