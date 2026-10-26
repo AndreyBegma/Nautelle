@@ -10,6 +10,7 @@ import type {
   LocalResponseMessage,
   SessionMessageArgs,
 } from '@nautelle/shared/protocol';
+import type { Prisma } from '@prisma/client';
 import { LocalRequestRouter } from '../local/local-request-router';
 import {
   type CommandSendResult,
@@ -18,7 +19,13 @@ import {
 import { capabilities } from '../runners/testing/runner-e2e';
 import { SessionMessageService } from '../session-message/session-message.service';
 import { BOARD_WAIT_TICK_MS } from './board-wait.service';
-import { BoardWorld, ROOT_A } from './testing/board-e2e';
+import {
+  BoardWorld,
+  HEAD_SHA,
+  ok,
+  prInspection,
+  ROOT_A,
+} from './testing/board-e2e';
 
 /** A person's own Claude Code sessions (ids are uuids, as Claude's are). */
 const MANUAL = '6f1c2b3a-4d5e-4f60-8a71-b2c3d4e5f601';
@@ -27,6 +34,8 @@ const OTHER_MANUAL = '6f1c2b3a-4d5e-4f60-8a71-b2c3d4e5f602';
 const CARD_SESSION = '0b7e7c1e-5d0f-4c1a-9a51-2f3c4d5e6f70';
 
 const PR_URL = 'https://github.com/acme/widget/pull/77';
+/** C-416: the PR's head after a push the approver never saw. */
+const MOVED = 'b'.repeat(40);
 
 const QUESTION: PendingQuestion = {
   key: '0123456789abcdef',
@@ -938,14 +947,15 @@ describe('the Board from a session (#845, e2e)', () => {
           title: 'Add login',
           prNumber: 77,
           prUrl: PR_URL,
+          headSha: HEAD_SHA,
         },
       });
       const notification = await w.ctx.prisma.notification.findFirstOrThrow({
         where: { kind: 'action.requested', projectId: w.a },
       });
       expect(notification.title).toBe('Accept C-1 Add login');
-      expect(notification.body).toContain(PR_URL);
-      expect(notification.body).toContain('and merge #77');
+      expect(notification.body).toContain(`${PR_URL}/files/${HEAD_SHA}`);
+      expect(notification.body).toContain('and merge #77 at aaaaaaa');
 
       const approved = await decide(request.id, 'approve');
       expect(approved.status).toBe(200);
@@ -953,8 +963,118 @@ describe('the Board from a session (#845, e2e)', () => {
         status: 'executed',
         result: { card: 1, column: 'completed', merged: true },
       });
-      expect(w.sent('card.merge')).toHaveLength(1);
+      // C-416: the head the request was created at, and only that one.
+      expect(w.sent('card.merge')).toEqual([
+        expect.objectContaining({ pr: 77, headSha: HEAD_SHA }),
+      ]);
       expect((await w.card(1)).column).toBe('completed');
+    });
+
+    it('C-416: binds the card’s CI head when it has one, without reading the PR', async () => {
+      await manualSession();
+      await w.createCard();
+      await finishedWithPr(1);
+      await w.ctx.prisma.boardCard.update({
+        where: { projectId_number: { projectId: w.a, number: 1 } },
+        data: { ciHeadSha: MOVED },
+      });
+      const request = await data<{ args: object }>(
+        ask('action.request', {
+          kind: 'card_accept',
+          args: { card: 1, merge: true },
+          summary: 'C-1 is green.',
+        }),
+      );
+      expect(request.args).toMatchObject({ headSha: MOVED });
+      expect(w.commands.inspectPr).not.toHaveBeenCalled();
+    });
+
+    it('C-416: approved after the PR moved from A to B, merges nothing and fails head_moved with B', async () => {
+      await manualSession();
+      await w.createCard();
+      await finishedWithPr(1);
+      const request = await data<{ id: string }>(
+        ask('action.request', {
+          kind: 'card_accept',
+          args: { card: 1, merge: true },
+          summary: 'C-1 is green and reviewed.',
+        }),
+      );
+      w.handlers['pr.inspect'] = () => ok(prInspection({ headSha: MOVED }));
+
+      const approved = await decide(request.id, 'approve');
+      expect(approved.status).toBe(200);
+      expect(approved.body).toMatchObject({
+        status: 'failed',
+        result: { error: 'head_moved', headSha: MOVED },
+      });
+      expect(w.sent('card.merge')).toHaveLength(0);
+      expect((await w.card(1)).column).toBe('finished');
+      // The session reads why, and the head to ask again at.
+      expect(
+        await data(ask('action.status', { id: request.id })),
+      ).toMatchObject({
+        status: 'failed',
+        result: { error: 'head_moved', headSha: MOVED },
+      });
+    });
+
+    it('C-416: fails head_moved when the merge itself finds the head changed', async () => {
+      await manualSession();
+      await w.createCard();
+      await finishedWithPr(1);
+      const request = await data<{ id: string }>(
+        ask('action.request', {
+          kind: 'card_accept',
+          args: { card: 1, merge: true },
+          summary: 'C-1 is green and reviewed.',
+        }),
+      );
+      let reads = 0;
+      w.handlers['pr.inspect'] = () => {
+        reads += 1;
+        return ok(prInspection(reads > 1 ? { headSha: MOVED } : {}));
+      };
+      w.handlers['card.merge'] = () =>
+        ok({ merged: false, error: 'head_changed', message: 'moved' });
+
+      const approved = await decide(request.id, 'approve');
+      expect(approved.body).toMatchObject({
+        status: 'failed',
+        result: { error: 'head_moved', headSha: MOVED },
+      });
+      expect((await w.card(1)).column).toBe('finished');
+    });
+
+    it('C-416: a request stored without a head merges the head the PR has at the decision, as before', async () => {
+      await manualSession();
+      await w.createCard();
+      await finishedWithPr(1);
+      const request = await data<{ id: string }>(
+        ask('action.request', {
+          kind: 'card_accept',
+          args: { card: 1, merge: true },
+          summary: 'C-1 is green and reviewed.',
+        }),
+      );
+      const row = await w.ctx.prisma.actionRequest.findUniqueOrThrow({
+        where: { id: request.id },
+      });
+      const { headSha: _, ...old } = row.args as Record<string, unknown>;
+      await w.ctx.prisma.actionRequest.update({
+        where: { id: request.id },
+        data: { args: old as Prisma.InputJsonObject },
+      });
+      w.handlers['pr.inspect'] = () => ok(prInspection({ headSha: MOVED }));
+
+      const approved = await decide(request.id, 'approve');
+      expect(approved.body).toMatchObject({
+        status: 'executed',
+        result: { merged: true },
+      });
+      expect(w.sent('card.merge')).toEqual([
+        expect.objectContaining({ headSha: MOVED }),
+      ]);
     });
 
     it('leaves the card in Finished when the request is denied, and refuses a card not in Finished', async () => {
