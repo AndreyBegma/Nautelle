@@ -31,13 +31,11 @@ import {
   statusLabel,
 } from '../../../lib/runners/format';
 import { ADD_RUNNER_PARAM, INSTALL_PATH } from '../../../lib/runners/install';
+import { useRunnersLive } from '../../../lib/runners/use-runners-live';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
 import { PairingDialog } from './pairing-dialog';
 import { RunnerSheet } from './runner-sheet';
-
-/** The page polls; live updates over WebSocket come with M1.8 (spec). */
-const POLL_MS = 10_000;
 
 function AddRunnerDialog({
   open,
@@ -285,10 +283,8 @@ function RunnersTable() {
 
   const details = useRunnerDetails(section.data);
   const load = section.retry;
-  useEffect(() => {
-    const timer = setInterval(load, POLL_MS);
-    return () => clearInterval(timer);
-  }, [load]);
+  // C-479: refetched on `runner.updated`, with a slow safety poll.
+  useRunnersLive(load);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -299,7 +295,7 @@ function RunnersTable() {
     router.replace(rest ? `${pathname}?${rest}` : pathname);
   }, [pathname, router]);
 
-  // The pairing dialog follows its runner through this page's poll.
+  // The pairing dialog follows its runner through this page's live list.
   const pairingRunner = pairing
     ? section.data?.find((runner) => runner.id === pairing.runner.id)
     : undefined;

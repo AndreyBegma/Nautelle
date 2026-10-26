@@ -38,10 +38,9 @@ import {
   statusLabel,
 } from '../../../lib/runners/format';
 import { PROFILES_DETECT_COMMAND } from '../../../lib/runners/install';
+import { useRunnersLive } from '../../../lib/runners/use-runners-live';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { LocalSettings } from './local-settings';
-
-const POLL_MS = 10_000;
 
 type Dialog = 'rename' | 'revoke' | undefined;
 
@@ -93,9 +92,9 @@ export function RunnerSheet({
     setDetail(undefined);
     if (!runnerId) return;
     load();
-    const timer = setInterval(load, POLL_MS);
-    return () => clearInterval(timer);
   }, [runnerId, load]);
+  // C-479: any runner's change refetches; the safety poll keeps the load fresh.
+  useRunnersLive(load, runnerId !== undefined);
 
   const act = async <T,>(task: () => Promise<T>): Promise<T | undefined> => {
     setBusy(true);
