@@ -69,7 +69,7 @@ export const KIND_EXAMPLE: Record<NotificationKind, string> = {
   'budget.exceeded': 'luna-watch spent its whole monthly budget',
   'budget.threshold': 'luna-watch reached 80 % of its monthly budget',
   'schedule.disabled': 'The nightly review schedule was turned off',
-  'action.requested': 'A session asks to start the orchestrator',
+  'action.requested': 'A session asks to run `npm test` (Bash)',
   'card.finished': 'Card C-12 · luna-watch is finished, PR #160 opened',
   'card.waiting': 'The worker of card C-12 waits for your answer',
   'card.background_stalled':

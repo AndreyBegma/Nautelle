@@ -1,6 +1,8 @@
 import type { ActionRequest } from '@prisma/client';
 import {
   actionRequestBody,
+  actionRequestIdOfLink,
+  actionRequestLink,
   actionRequestTitle,
   toActionRequestView,
 } from './action-request-mapper';
@@ -121,5 +123,34 @@ describe('action-request mapper (#845 card_accept)', () => {
     expect(actionRequestTitle('card_accept', { card: 42 })).toBe(
       'A session asks to accept a card',
     );
+  });
+});
+
+describe('action-request notification link (C-469)', () => {
+  it('links to the Inbox filtered to permissions', () => {
+    expect(actionRequestLink('p1', 'ar_1')).toBe(
+      '/inbox?kind=permission&actionRequest=ar_1',
+    );
+  });
+
+  it('reads the id back from the new form and both stored old forms', () => {
+    for (const link of [
+      '/inbox?kind=permission&actionRequest=ar_1',
+      '/projects/p1/queue?tab=approvals&actionRequest=ar_1',
+      '/projects/p1/approvals?actionRequest=ar_1',
+    ]) {
+      expect(actionRequestIdOfLink(link)).toBe('ar_1');
+    }
+  });
+
+  it('reads nothing from any other link', () => {
+    for (const link of [
+      '/inbox?kind=merge&actionRequest=ar_1',
+      '/inbox?kind=permission',
+      '/projects/p1/fleet',
+      null,
+    ]) {
+      expect(actionRequestIdOfLink(link)).toBeNull();
+    }
   });
 });

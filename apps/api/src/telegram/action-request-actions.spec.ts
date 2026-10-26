@@ -113,9 +113,7 @@ describe('action-request buttons (spec 201 D18)', () => {
 
   it("carries the request id in the notification's link", () => {
     const link = actionRequestLink('prj_1', ID);
-    expect(link).toBe(
-      `/projects/prj_1/queue?tab=approvals&actionRequest=${ID}`,
-    );
+    expect(link).toBe(`/inbox?kind=permission&actionRequest=${ID}`);
     expect(actionRequestIdOfLink(link)).toBe(ID);
     // A notification written before C-284 still names its request.
     expect(

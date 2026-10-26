@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "name": "An action request in the bell opens the Inbox, filtered to permissions",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "The bell shows a session asking to use a tool"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Notifications",
+        "exact": false
+      }
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "A session asks to use Bash"
+      },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "screenshot",
+      "name": "bell-action-request"
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "marker",
+      "title": "The item opens the Inbox, where the request is decided"
+    },
+    {
+      "action": "click",
+      "target": {
+        "text": "A session asks to use Bash"
+      }
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "heading",
+        "name": "Inbox",
+        "exact": true
+      },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "screenshot",
+      "name": "inbox-permissions"
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    }
+  ]
+}
