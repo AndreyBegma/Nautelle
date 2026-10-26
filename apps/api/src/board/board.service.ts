@@ -47,6 +47,7 @@ import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
 import { TokenEconomyService } from '../token-economy/token-economy.service';
 import { tokenSaverFactsOf } from '../token-saver/token-saver-facts';
+import { CardAnalysisExpected } from './board-analysis';
 import { BoardCommands, boardOutput } from './board-commands';
 import { demoFactsFor } from './board-demo-facts';
 import { BoardDependencies } from './board-dependencies.service';
@@ -297,6 +298,11 @@ export class BoardService implements OnModuleInit {
         design: cardDesignSelect,
         // #359 D8: every PR the card opened.
         pullRequests: true,
+        // C-503: an analysis card's proposals and a card's origin.
+        proposals: {
+          include: { createdCard: { select: { number: true, title: true } } },
+        },
+        originCard: { select: { number: true, title: true } },
       },
     });
     if (!card || hiddenFrom(card, role)) {
@@ -1472,6 +1478,8 @@ export class BoardService implements OnModuleInit {
    * `card.finish` (D6): the worker's `finish_card`. The card is the one whose
    * Claude session asks — `session.id` — in the asking runner's project; any
    * other session is `null`. A round already finished stays finished.
+   * C-503: an analysis card finishes with `finish_analysis` instead
+   * (`CardAnalysisExpected`).
    */
   async finishByWorker(
     project: { id: string; runnerId: string },
@@ -1488,6 +1496,7 @@ export class BoardService implements OnModuleInit {
       include: { rounds: { orderBy: { round: 'desc' } } },
     });
     if (!card) return null;
+    if (card.kind === 'analysis') throw new CardAnalysisExpected();
     const round = card.rounds[0];
     if (round && isActiveRoundPhase(round.phase)) {
       const target = await this.work.project(project.id);

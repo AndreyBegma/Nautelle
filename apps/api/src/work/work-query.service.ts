@@ -224,6 +224,8 @@ export class WorkQueryService {
     if (query.source && query.source !== 'plan') return NONE;
     // Plan tasks never enter the Inbox (D2).
     if (query.status === 'inbox') return NONE;
+    // C-503: a plan task is never an analysis.
+    if (query.kind === 'analysis') return NONE;
     const tasks: Prisma.PlanTaskWhereInput[] = [];
     if (query.kind) tasks.push({ kind: query.kind });
     if (search) {

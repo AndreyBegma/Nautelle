@@ -262,6 +262,14 @@ export interface MoveRequest {
    * ran while the card stayed In progress.
    */
   collect?: false;
+  /**
+   * C-503: writes that go with the move — inside its transaction, after the
+   * card's lock and the decision, before the round ends — so they commit or
+   * roll back with it. Gets the locked card, its rounds newest first.
+   */
+  within?: (tx: Tx, fresh: CardWithRounds) => Promise<void>;
+  /** C-503: more fields for the `card.finished` audit record. */
+  finishedAudit?: Record<string, unknown>;
 }
 
 /** The message of each `move_refused` reason. */
@@ -436,6 +444,7 @@ export class BoardWork implements OnModuleInit {
       const fresh = await this.lock(tx, card.id);
       const decision = this.decide(fresh, request);
       if (!decision.allowed) throw refusalOf(decision);
+      if (request.within) await request.within(tx, fresh);
       const round = fresh.rounds[0] ?? null;
       const ended: { runId: string; status: RunStatus }[] = [];
       if (round && decision.effects.includes('stop')) {
@@ -529,6 +538,7 @@ export class BoardWork implements OnModuleInit {
           number: fresh.number,
           round: round?.round,
           finishedBy: request.finishedBy ?? 'person',
+          ...(request.finishedAudit ?? {}),
         },
         result: 'ok',
       });

@@ -488,6 +488,20 @@ describe('LocalService — card rounds after a restart (#482)', () => {
     expect(relayed[0]?.args).toEqual({ summary: 'Done. Tested.' });
   });
 
+  it('drops a readOnlyViolation the caller sets on finish_analysis (C-503)', async () => {
+    const { service, relayed } = setup(false, true, { liveRound });
+    await service.handle(
+      'request',
+      {
+        ...finish,
+        method: 'card.finishAnalysis',
+        args: { report: 'Found it.', proposals: [], readOnlyViolation: true },
+      },
+      as(SESSION, WORKTREE),
+    );
+    expect(relayed[0]?.args).toEqual({ report: 'Found it.', proposals: [] });
+  });
+
   describe('the artifact guard on the daemon’s side (#445 D8, DR-10)', () => {
     const COMPLETE = [
       'Closes #12',

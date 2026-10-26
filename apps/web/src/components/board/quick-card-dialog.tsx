@@ -7,11 +7,11 @@ import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   type AttachmentView,
-  BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
   type BoardCardKind,
   cardLabel,
   type QuickCardDraft,
+  WORK_CARD_KINDS,
 } from '@nautelle/shared';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../lib/api';
@@ -36,6 +36,7 @@ import { AttachmentList } from '../attachments/attachment-list';
 const KIND_LABEL: Record<BoardCardKind, string> = {
   feature: 'Feature',
   bug: 'Bug',
+  analysis: 'Analysis',
 };
 
 /** What the toast says once the card is saved and Run now was or was not asked. */
@@ -270,7 +271,7 @@ export function QuickCardDialog({
                   setKind(e.target.value as BoardCardKind);
                 }}
               >
-                {BOARD_CARD_KINDS.map((k) => (
+                {WORK_CARD_KINDS.map((k) => (
                   <option key={k} value={k}>
                     {KIND_LABEL[k]}
                   </option>
