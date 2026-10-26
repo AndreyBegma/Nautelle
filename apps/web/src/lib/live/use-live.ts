@@ -39,6 +39,32 @@ export function useLive(
   }, [topic, wantsErrors]);
 }
 
+/**
+ * `useLive` for several topics at once (a workspace page follows one per
+ * project). Receives the `event` frames of every topic in `topics`.
+ */
+export function useLiveTopics(
+  topics: readonly LiveTopic[],
+  onMessage: (message: LiveEventMessage) => void,
+): void {
+  const latest = useRef(onMessage);
+  useEffect(() => {
+    latest.current = onMessage;
+  });
+  const key = topics.join(',');
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the key stands for the array.
+  useEffect(() => {
+    if (topics.length === 0) return;
+    const stops = topics.map((topic) =>
+      getLiveClient().subscribe(topic, (message) => latest.current(message)),
+    );
+    return () => {
+      for (const stop of stops) stop();
+    };
+  }, [key]);
+}
+
 const SERVER_SNAPSHOT: LiveSnapshot = {
   status: 'reconnecting',
   closeCode: null,

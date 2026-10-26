@@ -1,15 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import type {
   ActivityItem,
-  ApprovalItemView,
-  ApprovalsView,
   FleetView,
   ProjectSummary,
   SlotSummary,
 } from '@nautelle/shared';
 import { formatUsd } from '../usage/format';
 import {
-  approvalsHref,
   costByProject,
   lastSevenDays,
   liveSessions,
@@ -22,7 +19,6 @@ import {
   slotTitle,
   spendDays,
   startOfToday,
-  waitingApprovals,
 } from './dashboard';
 
 const project = (id: string): ProjectSummary => ({
@@ -71,34 +67,6 @@ const fleet = (projectId: string, slots: SlotSummary[]): FleetView => ({
   latestRound: null,
   boardError: null,
   slots,
-});
-
-const approval = (over: Partial<ApprovalItemView>): ApprovalItemView => ({
-  id: 'a',
-  pr: 7,
-  title: null,
-  url: null,
-  slot: null,
-  issue: null,
-  checks: null,
-  mergeable: null,
-  summary: null,
-  source: 'orchestrator',
-  status: 'waiting',
-  headSha: null,
-  waitingSince: '2026-10-13T07:00:00.000Z',
-  decidedBy: null,
-  decidedAt: null,
-  note: null,
-  updatedAt: '2026-10-13T07:00:00.000Z',
-  ...over,
-});
-
-const approvals = (waiting: ApprovalItemView[]): ApprovalsView => ({
-  mergeApproval: { agentdock: true, config: true },
-  configMismatch: false,
-  waiting,
-  recent: [],
 });
 
 const activity = (over: Partial<ActivityItem>): ActivityItem => ({
@@ -174,15 +142,6 @@ describe('figures', () => {
     expect(sessions[0]?.project.id).toBe('p2');
   });
 
-  test('approvals waiting leave out the approved-but-unmerged row', () => {
-    expect(
-      waitingApprovals([
-        approvals([approval({}), approval({ id: 'b', status: 'approved' })]),
-        approvals([approval({ id: 'c' })]),
-      ]),
-    ).toBe(2);
-  });
-
   test('a merge reported twice counts once', () => {
     expect(
       mergedPullRequests([
@@ -201,23 +160,6 @@ describe('tile links (#213)', () => {
     expect(OVERVIEW_TILE_HREF.cost).toBe('/usage?range=today');
     expect(mergedTodayHref(new Date(2026, 9, 4, 23, 30))).toBe(
       '/activity?type=pr.merged&from=2026-10-04',
-    );
-  });
-
-  test('approvals open the first project with one waiting, else Projects', () => {
-    const waiting = approvals([approval({})]);
-    const decided = approvals([approval({ status: 'approved' })]);
-    expect(
-      approvalsHref(
-        [project('p1'), project('p2')],
-        new Map([
-          ['p1', decided],
-          ['p2', waiting],
-        ]),
-      ),
-    ).toBe('/projects/p2/queue?tab=approvals');
-    expect(approvalsHref([project('p1')], new Map([['p1', decided]]))).toBe(
-      '/projects',
     );
   });
 });

@@ -98,6 +98,22 @@ export const cardAcceptMergeText = (
   return card.prNumber === null ? 'and merge' : `and merge #${card.prNumber}`;
 };
 
+/**
+ * C-416: the head a merging `card_accept` request was created at — the only
+ * one its approval merges — shortened, and its diff. Null when it merges
+ * nothing, has no PR link, or was stored before heads were bound.
+ */
+export const cardAcceptHead = (
+  request: Pick<ActionRequestSummary, 'kind' | 'args'>,
+): { shortHead: string; diffUrl: string } | null => {
+  const card = cardAcceptArgs(request);
+  if (!card?.merge || !card.headSha || !card.prUrl) return null;
+  return {
+    shortHead: shortHeadSha(card.headSha),
+    diffUrl: prDiffUrl({ url: card.prUrl, headSha: card.headSha }),
+  };
+};
+
 /** What the request asks for, as a short title. */
 export const requestTitle = (request: ActionRequestSummary): string => {
   switch (request.kind) {

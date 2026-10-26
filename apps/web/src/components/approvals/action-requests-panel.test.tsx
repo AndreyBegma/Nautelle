@@ -6,6 +6,7 @@ import {
   stepFor,
   toolUseConfirmable,
 } from '../../lib/approvals/tool-use-review';
+import { RecentRequests, RequestCell } from './action-requests';
 import { ToolUseDialogBody } from './tool-use-review';
 
 const tool = (args: Record<string, unknown>): ActionRequestSummary =>
@@ -85,5 +86,79 @@ describe('the approve dialog of a tool_use request', () => {
     expect(html).toContain('tool-use-confirm-name');
     expect(toolUseConfirmable(review, 'bash')).toBe(false);
     expect(toolUseConfirmable(review, 'Bash')).toBe(true);
+  });
+});
+
+describe('the row of a card_accept request (C-416)', () => {
+  const HEAD = '0b6445a1'.padEnd(40, 'c');
+  const accept = (args: Record<string, unknown>) =>
+    renderToStaticMarkup(
+      <RequestCell
+        request={
+          {
+            kind: 'card_accept',
+            summary: '',
+            args: {
+              card: 12,
+              title: 'Add the thing',
+              merge: true,
+              prNumber: 34,
+              prUrl: 'https://github.com/o/r/pull/34',
+              ...args,
+            },
+          } as unknown as ActionRequestSummary
+        }
+      />,
+    );
+
+  test('shows the head the approval merges and links its diff', () => {
+    const html = accept({ headSha: HEAD });
+    expect(html).toContain('and merge #34');
+    expect(html).toContain('<code class="font-mono">0b6445a</code>');
+    expect(html).toContain(
+      `href="https://github.com/o/r/pull/34/files/${HEAD}"`,
+    );
+  });
+
+  test('a row stored without a head shows none, as before', () => {
+    const html = accept({});
+    expect(html).toContain('and merge #34');
+    expect(html).not.toContain('/files/');
+  });
+});
+
+describe('a recent card_accept that failed head_moved (C-416)', () => {
+  test('shows the bound head and why nothing was merged', () => {
+    const html = renderToStaticMarkup(
+      <RecentRequests
+        rows={[
+          {
+            id: 'ar_1',
+            kind: 'card_accept',
+            status: 'failed',
+            summary: '',
+            note: null,
+            createdAt: '2026-10-26T10:00:00.000Z',
+            decidedAt: '2026-10-26T10:05:00.000Z',
+            expiresAt: '2026-10-27T10:00:00.000Z',
+            args: {
+              card: 12,
+              title: 'Add the thing',
+              merge: true,
+              prNumber: 34,
+              prUrl: 'https://github.com/o/r/pull/34',
+              headSha: '0b6445a1'.padEnd(40, 'c'),
+            },
+            result: {
+              error: 'head_moved',
+              message: 'The head of #34 moved to 9a1b3c5',
+              headSha: '9a1b3c5d'.padEnd(40, 'd'),
+            },
+          } as unknown as ActionRequestSummary,
+        ]}
+      />,
+    );
+    expect(html).toContain('<code class="font-mono">0b6445a</code>');
+    expect(html).toContain('The head of #34 moved to 9a1b3c5');
   });
 });

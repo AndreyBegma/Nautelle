@@ -30,15 +30,18 @@ import {
   matchesQuery,
   mergeItems,
   PAGE_SIZE,
-  POLL_MS,
   PROJECT_ACTIVITY_FILTER_CODEC,
-  planLive,
   queryString,
   SCROLLED_PX,
   toActivityQuery,
 } from '../../../lib/activity/format';
 import { api, describeError, describeErrorHint } from '../../../lib/api';
 import { useUrlFilters } from '../../../lib/filters/use-url-filters';
+import {
+  planLive,
+  WORKSPACE_POLL_MS,
+  WORKSPACE_POLL_NOTE,
+} from '../../../lib/live/plan';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { type Names, TopicListener, toEntries } from './feed-entries';
 import { FeedToolbar } from './feed-toolbar';
@@ -193,7 +196,10 @@ function Feed({ projectId, isAdmin }: FeedProps) {
 
   useEffect(() => {
     if (!plan.poll) return;
-    const timer = setInterval(() => loadFirst(applied, false), POLL_MS);
+    const timer = setInterval(
+      () => loadFirst(applied, false),
+      WORKSPACE_POLL_MS,
+    );
     return () => clearInterval(timer);
   }, [plan.poll, applied, loadFirst]);
 
@@ -258,6 +264,10 @@ function Feed({ projectId, isAdmin }: FeedProps) {
       {plan.topics.map((topic) => (
         <TopicListener key={topic} topic={topic} onItem={(i) => receive([i])} />
       ))}
+
+      {plan.poll ? (
+        <p className="mb-4 text-xs text-ink-3">{WORKSPACE_POLL_NOTE}</p>
+      ) : null}
 
       <div className="mb-4">
         <FeedToolbar
