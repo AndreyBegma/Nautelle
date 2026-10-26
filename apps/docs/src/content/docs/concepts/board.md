@@ -140,6 +140,16 @@ the path given as `next`:
 }
 ```
 
+A demo is paced so you can follow it. The card's worker puts a `marker` before
+each user-visible step, gives the step that shows the change a `caption`, and
+ends the scenario on an `assertVisible` of the end result with a caption, so
+the result is the last thing on screen. From the DemoFlow release that adds
+pacing defaults, the engine also dwells after every step, types more slowly and
+holds on the final state before the recording ends; the runner picks that up
+when its pinned DemoFlow version moves to it. A scenario is never padded with
+`wait` steps to slow it down. To override the pacing for one step, set that
+step's own timing in the scenario, as the DemoFlow documentation describes.
+
 A feature card records as soon as its pull request's head turns green, before
 its review steps run, so a card the review holds or hands to you has its video
 too; each new head records its own. A fix round the review asks for waits for
