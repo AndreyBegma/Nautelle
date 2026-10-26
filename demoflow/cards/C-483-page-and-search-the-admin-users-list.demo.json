@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "name": "Page and search the Admin › Users list",
+  "description": "Admin › Users loads one page of 50 accounts per tab, adds the next page with Load more, and finds an account by email or name; the tab counts follow the search.",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": { "next": "/admin/users?tab=active" }
+    }
+  ],
+  "steps": [
+    {
+      "action": "waitFor",
+      "target": { "role": "heading", "name": "Users", "exact": true },
+      "timeoutMs": 60000
+    },
+    {
+      "action": "waitFor",
+      "target": { "role": "button", "name": "Load more" },
+      "timeoutMs": 60000
+    },
+    { "action": "marker", "title": "One page of 50 at a time" },
+    {
+      "action": "assertVisible",
+      "target": { "role": "button", "name": "Load more" },
+      "caption": "The Active tab shows the first 50 accounts; the rest wait behind Load more",
+      "zoom": true
+    },
+    { "action": "wait", "ms": 1500 },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Load more" },
+      "caption": "Load more adds the next page"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "text": "member60@acme.example" },
+      "timeoutMs": 30000,
+      "caption": "The last account is now in the list"
+    },
+    { "action": "wait", "ms": 1500 },
+    { "action": "marker", "title": "Search by email or name" },
+    {
+      "action": "fill",
+      "target": { "label": "Search accounts" },
+      "value": "member07",
+      "caption": "Type part of an email or a name"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "text": "member07@acme.example" },
+      "timeoutMs": 30000,
+      "caption": "One call returns the match; the paging starts over"
+    },
+    { "action": "wait", "ms": 1500 },
+    { "action": "marker", "title": "The tab counts follow the search" },
+    {
+      "action": "fill",
+      "target": { "label": "Search accounts" },
+      "value": "waiting",
+      "caption": "Search for the registrations waiting for approval"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "text": "No matching accounts" },
+      "timeoutMs": 30000,
+      "caption": "No active account matches, and the tabs say where the matches are"
+    },
+    { "action": "wait", "ms": 1500 },
+    {
+      "action": "click",
+      "target": { "role": "tab", "name": "Pending" }
+    },
+    {
+      "action": "assertVisible",
+      "target": { "text": "waiting2@acme.example" },
+      "timeoutMs": 30000,
+      "caption": "Pending lists the three matching registrations"
+    },
+    { "action": "wait", "ms": 2000 }
+  ]
+}

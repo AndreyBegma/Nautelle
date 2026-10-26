@@ -208,6 +208,36 @@ export const DEMO_TEAMMATE = {
 } as const;
 
 /**
+ * C-483: enough further accounts that Admin › Users has a second page: active
+ * ones, a few registrations waiting for approval and one disabled account.
+ */
+export const DEMO_EXTRA_USERS: ReadonlyArray<{
+  id: string;
+  email: string;
+  name: string;
+  status: 'active' | 'pending' | 'disabled';
+}> = [
+  ...Array.from({ length: 60 }, (_, i) => ({
+    id: `demo-user-member-${String(i + 1).padStart(2, '0')}`,
+    email: `member${String(i + 1).padStart(2, '0')}@acme.example`,
+    name: `Member ${String(i + 1).padStart(2, '0')}`,
+    status: 'active' as const,
+  })),
+  ...[1, 2, 3].map((n) => ({
+    id: `demo-user-waiting-${n}`,
+    email: `waiting${n}@acme.example`,
+    name: `Waiting ${n}`,
+    status: 'pending' as const,
+  })),
+  {
+    id: 'demo-user-gone',
+    email: 'gone@acme.example',
+    name: 'Gone Fishing',
+    status: 'disabled',
+  },
+];
+
+/**
  * Seeds the demo project and its cards for the admin `adminEmail`, who must
  * exist (`bun run admin:create`). Every row has a fixed key, so running it
  * again changes nothing.
@@ -249,7 +279,23 @@ export const seedDemo = async (
       status: 'active',
       approvedById: admin.id,
       approvedAt: now,
+      // Before the accounts below, so the teammate stays on the first page.
+      createdAt: new Date(now.getTime() - 3_600_000),
     },
+  });
+  const extraHash = await hashPassword(generateToken());
+  await prisma.user.createMany({
+    data: DEMO_EXTRA_USERS.map((user, i) => ({
+      ...user,
+      passwordHash: extraHash,
+      role: 'viewer' as const,
+      // Oldest first: the order the Users page lists them in.
+      createdAt: new Date(now.getTime() - (DEMO_EXTRA_USERS.length - i) * 1000),
+      ...(user.status === 'pending'
+        ? {}
+        : { approvedById: admin.id, approvedAt: now }),
+    })),
+    skipDuplicates: true,
   });
   await prisma.runner.upsert({
     where: { id: DEMO_RUNNER_ID },
