@@ -27,7 +27,12 @@ import { api } from '../../../lib/api';
 import { useUrlFilters } from '../../../lib/filters/use-url-filters';
 import { formatNumber } from '../../../lib/format';
 import { Time } from '../../../lib/format/time';
-import { useLive } from '../../../lib/live/use-live';
+import {
+  planLive,
+  WORKSPACE_POLL_MS,
+  WORKSPACE_POLL_NOTE,
+} from '../../../lib/live/plan';
+import { useLiveTopics } from '../../../lib/live/use-live';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
 import {
@@ -42,7 +47,6 @@ import {
   formatDuration,
   formatTokens,
   hasSessionFilters,
-  liveTopicFor,
   queryString,
   sessionName,
   toQuery,
@@ -51,7 +55,6 @@ import { SessionsFilters } from './sessions-filters';
 
 const PAGE_SIZE = 50;
 /** Without a project filter there is no single topic to follow, so poll (like /projects). */
-const POLL_MS = 15_000;
 
 const figure = (text: string) => <span className="num">{text}</span>;
 
@@ -203,18 +206,28 @@ function SessionsView() {
       });
   }, []);
 
-  const topic = liveTopicFor(applied);
-  useLive(topic, (message) => {
+  // Every project the person can see (and `admin` for an admin) when no
+  // filter narrows it; past the socket's budget the list polls, slowly.
+  const plan = useMemo(
+    () =>
+      planLive({
+        projectId: applied.projectId,
+        unassigned: applied.unassigned,
+        projectIds: projects.map((p) => p.id),
+        isAdmin,
+      }),
+    [applied.projectId, applied.unassigned, projects, isAdmin],
+  );
+  useLiveTopics(plan.topics, (message) => {
     if (message.event === 'sessions.changed') section.retry();
   });
 
-  // No topic to follow → poll the first page, like /projects does.
   const { retry } = section;
   useEffect(() => {
-    if (topic) return;
-    const timer = setInterval(retry, POLL_MS);
+    if (!plan.poll) return;
+    const timer = setInterval(retry, WORKSPACE_POLL_MS);
     return () => clearInterval(timer);
-  }, [topic, retry]);
+  }, [plan.poll, retry]);
 
   const nextCursor = section.data?.nextCursor ?? null;
   const loadMore = async () => {
@@ -253,6 +266,10 @@ function SessionsView() {
         title="Sessions"
         description="Every agent session your runners have reported, with its tokens and cost."
       />
+
+      {plan.poll ? (
+        <p className="mb-4 text-xs text-ink-3">{WORKSPACE_POLL_NOTE}</p>
+      ) : null}
 
       <div className="mb-6">
         <SessionsFilters url={url} projects={projects} isAdmin={isAdmin} />
