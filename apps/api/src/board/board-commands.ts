@@ -2,6 +2,8 @@ import { BOARD_ERROR } from '@nautelle/shared';
 import {
   type CardChecksArgs,
   type CardChecksResult,
+  type CardCiRerunArgs,
+  type CardCiRerunResult,
   type CardCiRetriggerArgs,
   type CardCiRetriggerResult,
   type CardCommandName,
@@ -19,6 +21,7 @@ import {
   type CardReviewStopResult,
   type CommandErrorCode,
   cardChecksResultSchema,
+  cardCiRerunResultSchema,
   cardCiRetriggerResultSchema,
   cardCommands,
   cardPrCloseResultSchema,
@@ -86,6 +89,7 @@ export class BoardCommands {
       | CardCommandName
       | 'card.checks'
       | 'card.ciRetrigger'
+      | 'card.ciRerun'
       | 'card.prClose'
       | 'card.prRetarget'
       | 'card.prOpen'
@@ -233,6 +237,41 @@ export class BoardCommands {
     );
     if (result.status !== 'ok') return result;
     const output = cardCiRetriggerResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
+  }
+
+  /**
+   * C-414 (ADR-0114): whether the connected runner advertises `card.ciRerun`.
+   * Its release also takes `card.ciRetrigger`'s `reason`; an older runner
+   * re-runs no red head.
+   */
+  servesCiRerun(runnerId: string): boolean {
+    if (!this.presence.isConnected(runnerId)) return false;
+    return (
+      this.presence.commandSupport(runnerId, 'card.ciRerun') === 'supported'
+    );
+  }
+
+  /** C-414: re-runs the failed jobs of a red card PR's GitHub Actions runs. */
+  async ciRerun(
+    runnerId: string,
+    args: CardCiRerunArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<CardCiRerunResult>> {
+    this.assertReady(runnerId, 'card.ciRerun');
+    const result = await this.commands.send(
+      runnerId,
+      'card.ciRerun',
+      args,
+      options,
+    );
+    if (result.status !== 'ok') return result;
+    const output = cardCiRerunResultSchema.safeParse(result.output);
     return output.success
       ? { status: 'ok', output: output.data }
       : {

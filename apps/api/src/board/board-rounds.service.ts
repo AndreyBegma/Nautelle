@@ -1406,6 +1406,7 @@ export class BoardRoundsService {
                 reviewFixAttempts: 0,
                 ciNoneSince: null,
                 ciRetriggeredSha: null,
+                ciRerunSha: null,
               }
             : {}),
         },

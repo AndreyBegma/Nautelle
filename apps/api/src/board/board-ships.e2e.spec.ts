@@ -757,6 +757,192 @@ describe('a card ships itself (e2e, #359)', () => {
       expect(card.rounds).toHaveLength(1);
     });
 
+    describe('C-414: a red head is re-run once before its fix round', () => {
+      const ACTIONS_RED = {
+        checks: [
+          {
+            name: 'test',
+            bucket: 'fail',
+            link: 'https://github.com/acme/widget/actions/runs/123/job/9',
+          },
+          {
+            name: 'e2e',
+            bucket: 'fail',
+            link: 'https://github.com/acme/widget/actions/runs/123/job/10',
+          },
+          { name: 'lint', bucket: 'pass', link: null },
+        ],
+      };
+
+      beforeEach(() => {
+        w.ciRerunServed = true;
+      });
+
+      const pollSettled = async () => {
+        await shipping.poll();
+        await w.work.settled();
+      };
+
+      it('re-runs failed GitHub Actions runs once, then a second red starts the fix round', async () => {
+        checksAnswer(ACTIONS_RED);
+        await started();
+        await ended();
+        let card = await w.card(1);
+        expect(card).toMatchObject({
+          column: 'in_progress',
+          ciState: 'red',
+          ciRerunSha: HEAD_SHA,
+          ciFixAttempts: 0,
+        });
+        expect(card.rounds).toHaveLength(1);
+        expect(w.ciReruns()).toEqual([
+          expect.objectContaining({
+            cardId: card.id,
+            root: ROOT_A,
+            pr: 77,
+            headSha: HEAD_SHA,
+            runIds: [123],
+          }),
+        ]);
+        expect(w.ciRetriggers()).toEqual([]);
+        const [record] = await w.audit('card.ci_rerun');
+        expect(record).toMatchObject({ actorType: 'system', result: 'ok' });
+        expect(record.after).toMatchObject({
+          number: 1,
+          pr: 77,
+          headSha: HEAD_SHA,
+          provider: 'github_actions',
+          runIds: [123],
+        });
+
+        // The same head red again: the fix round, and no second re-run.
+        await pollSettled();
+        card = await w.card(1);
+        expect(card.ciFixAttempts).toBe(1);
+        expect(card.rounds.map((r) => r.trigger)).toEqual(['run', 'ci_fix']);
+        expect(w.ciReruns()).toHaveLength(1);
+      });
+
+      it('sends any other CI the PR event again once, then the fix round', async () => {
+        checksAnswer(RED);
+        await started();
+        await ended();
+        expect((await w.card(1)).rounds).toHaveLength(1);
+        expect(w.ciReruns()).toEqual([]);
+        expect(w.ciRetriggers()).toEqual([
+          expect.objectContaining({ pr: 77, headSha: HEAD_SHA, reason: 'red' }),
+        ]);
+        const [record] = await w.audit('card.ci_rerun');
+        expect(record.after).toMatchObject({ provider: 'pr_event' });
+        // Not the #484 retrigger: its once-per-head mark is untouched.
+        expect((await w.card(1)).ciRetriggeredSha).toBeNull();
+
+        await pollSettled();
+        const card = await w.card(1);
+        expect(card.ciFixAttempts).toBe(1);
+        expect(card.rounds[1].trigger).toBe('ci_fix');
+        expect(w.ciRetriggers()).toHaveLength(1);
+      });
+
+      it('a green re-run ships the card with ciFixAttempts 0', async () => {
+        checksAnswer(ACTIONS_RED);
+        await started();
+        await ended();
+        expect(w.ciReruns()).toHaveLength(1);
+        checksAnswer({});
+        await pollSettled();
+        const card = await w.card(1);
+        expect(card).toMatchObject({ column: 'completed', ciFixAttempts: 0 });
+        expect(card.rounds).toHaveLength(1);
+      });
+
+      it('waits for checks still running before it re-runs', async () => {
+        checksAnswer({
+          checks: [
+            ...ACTIONS_RED.checks,
+            { name: 'slow', bucket: 'pending', link: null },
+          ],
+        });
+        await started();
+        await ended();
+        let card = await w.card(1);
+        expect(card).toMatchObject({ ciState: 'red', ciRerunSha: null });
+        expect(card.rounds).toHaveLength(1);
+        expect(w.ciReruns()).toEqual([]);
+
+        checksAnswer(ACTIONS_RED);
+        await pollSettled();
+        card = await w.card(1);
+        expect(card.ciRerunSha).toBe(HEAD_SHA);
+        expect(card.rounds).toHaveLength(1);
+        expect(w.ciReruns()).toHaveLength(1);
+      });
+
+      it('a re-run the runner refused is audited, and the next poll starts the fix round', async () => {
+        w.handlers['card.ciRerun'] = () =>
+          ok({
+            rerun: false,
+            error: 'gh_failed',
+            message: 'run 123: HTTP 403',
+          });
+        checksAnswer(ACTIONS_RED);
+        await started();
+        await ended();
+        expect((await w.card(1)).rounds).toHaveLength(1);
+        const [record] = await w.audit('card.ci_rerun');
+        expect(record).toMatchObject({ result: 'error' });
+        expect(record.after).toMatchObject({
+          error: 'gh_failed',
+          message: 'run 123: HTTP 403',
+        });
+
+        await pollSettled();
+        expect((await w.card(1)).rounds[1]?.trigger).toBe('ci_fix');
+        expect(w.ciReruns()).toHaveLength(1);
+      });
+
+      it('a new red head after a fix round is re-run once too', async () => {
+        const FIX_HEAD = 'c'.repeat(40);
+        checksAnswer(ACTIONS_RED);
+        await started();
+        await ended();
+        await pollSettled();
+        expect((await w.card(1)).rounds).toHaveLength(2);
+        await pushed({ headSha: FIX_HEAD });
+        checksAnswer({ ...ACTIONS_RED, headSha: FIX_HEAD });
+        await ended();
+        const card = await w.card(1);
+        expect(card).toMatchObject({ ciRerunSha: FIX_HEAD, ciFixAttempts: 1 });
+        expect(card.rounds).toHaveLength(2);
+        expect(w.ciReruns().map((a) => a.headSha)).toEqual([
+          HEAD_SHA,
+          FIX_HEAD,
+        ]);
+      });
+
+      it('a conflict is never re-run', async () => {
+        checksAnswer({ ...ACTIONS_RED, mergeable: 'CONFLICTING' });
+        await started();
+        await ended();
+        const card = await w.card(1);
+        expect(card).toMatchObject({ ciFixAttempts: 1, ciRerunSha: null });
+        expect(w.ciReruns()).toEqual([]);
+        expect(w.ciRetriggers()).toEqual([]);
+      });
+
+      it('a runner without card.ciRerun goes straight to the fix round', async () => {
+        w.ciRerunServed = false;
+        checksAnswer(ACTIONS_RED);
+        await started();
+        await ended();
+        const card = await w.card(1);
+        expect(card).toMatchObject({ ciFixAttempts: 1, ciRerunSha: null });
+        expect(card.rounds[1].trigger).toBe('ci_fix');
+        expect(w.ciReruns()).toEqual([]);
+        expect(w.ciRetriggers()).toEqual([]);
+      });
+    });
+
     /** C-181 (D-09, D-10): a ci_fix round runs as the round's starter. */
     describe('runs as the person who started the round (C-181)', () => {
       const bypassByDefault = () =>
