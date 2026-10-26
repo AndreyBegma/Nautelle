@@ -70,10 +70,10 @@ export default function OverviewPage() {
           }
         />
       ) : null}
-      {setup && !setup.complete && runners.state === 'ready' ? (
+      {setup && !setup.complete ? (
         <GettingStarted
           state={setup}
-          runners={runners.value}
+          runners={runners.state === 'ready' ? runners.value : undefined}
           onChange={reload}
         />
       ) : null}

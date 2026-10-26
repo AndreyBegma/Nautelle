@@ -38,11 +38,13 @@ import type {
   TokenSavedView,
   TokenSaverFilterSavings,
 } from '../token-saver/contracts';
+import type { CardAnalysisView } from './analysis';
 import type {
   CaptureModel,
   CaptureSkipReason,
   CaptureStatus,
 } from './capture-limits';
+import type { CardLabelView } from './labels';
 import type { BoardMoveRefusal } from './moves';
 import type { CardCiCheck } from './shipping';
 import type { BoardStackView, CardStackRef } from './stacks';
@@ -209,6 +211,11 @@ export interface BoardCardView {
   kind: BoardCardKind;
   /** #271 D9: `auto` while the model may still set kind ("Auto" badge). */
   kindSource: CardKindSource;
+  /**
+   * C-497 (ADR-0125): the card's labels in label position order; a label a
+   * person removed is left out. `label` above is `C-<n>`.
+   */
+  labels: CardLabelView[];
   /** #833 D8: the design template key; `null` until the normalizer chose (`page` applies). */
   designTemplate?: string | null;
   /** #833 D8: `auto` while the normalizer may still choose it. */
@@ -735,6 +742,21 @@ export interface BoardCardDetail extends BoardCardView {
    * own carry its `roundId`.
    */
   attachments: AttachmentView[];
+  /**
+   * C-503 (ADR-0126): an analysis card's report and proposed cards; `null`
+   * for every other kind.
+   */
+  analysis: CardAnalysisView | null;
+  /** C-503: the analysis card this card was created from; else `null`. */
+  origin: { number: number; title: string } | null;
+}
+
+/** C-506: the cards Create selected made, and the links it left out. */
+export interface CreateCardProposalsResponse {
+  created: { number: number; title: string }[];
+  /** `[position, dependsOn]` pairs whose other end was not selected. */
+  droppedLinks: [number, number][];
+  card: BoardCardDetail;
 }
 
 /** #359 D8: one PR of a card, as the card sheet lists it. */
@@ -800,6 +822,11 @@ export interface CreateBoardCardRequest {
    * 422 `attachment_error` `not_claimable`.
    */
   attachmentIds?: string[];
+  /**
+   * C-497: labels of the project, written as the person's; at most
+   * `LABELS_PER_CARD_MAX`. With any, the model suggests none.
+   */
+  labelIds?: string[];
 }
 
 /**
@@ -939,6 +966,10 @@ export interface UpdateBoardSettingsRequest {
   backgroundStallMinutes?: number;
   /** #845 D4. Absent keeps the stored value. */
   cardMergePolicy?: CardMergePolicy;
+  /** C-497: the model suggests labels for a new card. Absent keeps the stored value. */
+  labelSuggest?: boolean;
+  /** C-497: path rules label a card from its changed files. Absent keeps the stored value. */
+  labelPaths?: boolean;
 }
 
 /**
@@ -1083,6 +1114,14 @@ export const BOARD_ERROR = {
   stackDesignNotApproved: 'stack_design_not_approved',
   /** 409 (#480): the stack change is not allowed — `message` says why. */
   stackRefused: 'stack_refused',
+  /** 409 (C-497): another label of the project has the name. */
+  labelNameTaken: 'label_name_taken',
+  /** 422 (C-497): a label id that is no label of this project. */
+  labelUnknown: 'label_unknown',
+  /** 422 (C-497): a limit of `labels.ts` — labels per project or card, rules per project. */
+  labelLimit: 'label_limit',
+  /** 422 (C-497): a path rule's pattern is refused (`labelPatternProblem`). */
+  patternInvalid: 'pattern_invalid',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 
@@ -1113,6 +1152,12 @@ export interface BoardErrorBody {
   dependencies?: CardDependencyRef[];
   /** `stack_refused` of a grouping (#588): the cards that cannot join, by number. */
   cards?: number[];
+  /**
+   * `merge_failed` with reason `head_changed` (C-415): the PR's head now,
+   * and its diff at that head — what the person reviews before accepting it.
+   */
+  headSha?: string;
+  diffUrl?: string;
 }
 
 /**

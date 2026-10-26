@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LiveModule } from '../live/live.module';
 import { PairingService } from './pairing.service';
 import { RunnerGateway } from './runner.gateway';
 import { RunnerCommandService } from './runner-command.service';
@@ -6,6 +7,7 @@ import { RunnerConnectHooks } from './runner-connect-hooks';
 import { RunnerConnections } from './runner-connections';
 import { RunnerEventSinks } from './runner-event-sinks';
 import { RunnerIngestService } from './runner-ingest.service';
+import { RunnerLive } from './runner-live';
 import { RunnerLocalRequests } from './runner-local-requests';
 import { defaultRunnerOptions, RUNNER_OPTIONS } from './runner-options';
 import { RunnerPresence } from './runner-presence';
@@ -26,6 +28,8 @@ import {
 import { RunnersService } from './runners.service';
 
 @Module({
+  // C-479: runner changes are published on the `admin` live topic.
+  imports: [LiveModule],
   controllers: [
     AdminRunnersController,
     RunnerSettingsController,
@@ -39,6 +43,7 @@ import { RunnersService } from './runners.service';
     },
     RunnerReleaseService,
     RunnerConnections,
+    RunnerLive,
     RunnerConnectHooks,
     RunnerReplacements,
     RunnerEventSinks,

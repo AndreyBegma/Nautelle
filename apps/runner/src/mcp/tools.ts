@@ -31,6 +31,7 @@ import {
   LOCAL_STACK_STAGE_TITLE_MAX,
   LOCAL_STACK_STAGES_MAX,
   LOCAL_STACK_TITLE_MAX,
+  LOCAL_WORK_CARD_KINDS,
   type LocalMethodName,
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
@@ -410,7 +411,7 @@ export const MCP_TOOLS = [
         .optional()
         .describe('What is being done and why; markdown.'),
       kind: z
-        .enum(LOCAL_CARD_KINDS)
+        .enum(LOCAL_WORK_CARD_KINDS)
         .optional()
         .describe('feature or bug, only when it is obvious.'),
     },

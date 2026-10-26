@@ -73,6 +73,8 @@ const detail = (): BoardCardDetail => ({
   profileKey: null,
   designModel: null,
   recommendation: { work: null, design: null, assessedAt: null },
+  analysis: null,
+  origin: null,
   branch: 'feat/7',
   worktree: null,
   specPath: null,

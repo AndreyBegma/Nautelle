@@ -930,6 +930,7 @@ describe.skipIf(!tmuxInstalled)(
           prUrl: 'https://github.com/acme/widget/pull/7',
           prState: 'draft',
           protectedPaths: [],
+          changedPaths: ['docs/specs/card-12-export-csv.md'],
           ahead: 1,
         },
       ]);

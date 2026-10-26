@@ -53,6 +53,7 @@ export const WORK_SOURCE_LABEL: Record<WorkSource, string> = {
 export const WORK_KIND_LABEL: Record<BoardCardKind, string> = {
   feature: 'Feature',
   bug: 'Bug',
+  analysis: 'Analysis',
 };
 
 export const WORK_STATUS_LABEL: Record<WorkStatus, string> = {

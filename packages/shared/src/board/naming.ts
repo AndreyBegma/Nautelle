@@ -56,11 +56,12 @@ export interface CardBranchInput {
 /**
  * D5. With an issue: `feat|fix/<issue>-<slug>`, so #201 D14 links the branch
  * to it. Without: `card/c<number>-<slug>` — the `c` keeps `issueFromBranch`
- * (`^[a-z]+/(\d+)-`) from reading the card number as an issue.
+ * (`^[a-z]+/(\d+)-`) from reading the card number as an issue. C-503: an
+ * analysis card is always `card/` — it pushes nothing and closes no issue.
  */
 export const cardBranch = (card: CardBranchInput): string => {
   const slug = cardSlug(card.title);
-  if (card.issueNumber !== null) {
+  if (card.issueNumber !== null && card.kind !== 'analysis') {
     const prefix = card.kind === 'bug' ? 'fix' : 'feat';
     return `${prefix}/${card.issueNumber}-${slug}`;
   }

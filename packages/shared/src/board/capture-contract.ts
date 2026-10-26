@@ -12,7 +12,7 @@ import {
   CAPTURE_TITLE_MAX,
   CAPTURE_WHY_MAX,
 } from './capture-limits';
-import { BOARD_CARD_KINDS, type BoardCardKind } from './types';
+import { WORK_CARD_KINDS, type WorkCardKind } from './types';
 
 /**
  * D5 (issue #244): the output contract of an extraction. The model answers
@@ -68,7 +68,7 @@ export const captureCardSchema = z.strictObject({
       message: 'must contain a word',
     }),
   body: z.string().max(CAPTURE_BODY_MAX).default(''),
-  kind: z.enum(BOARD_CARD_KINDS),
+  kind: z.enum(WORK_CARD_KINDS),
   why: z.string().trim().min(1).max(CAPTURE_WHY_MAX),
   confidence: z.number().min(0).max(1),
   evidence: z
@@ -86,7 +86,7 @@ export const captureOutputSchema = z.strictObject({
 export interface CaptureSuggestion {
   title: string;
   body: string;
-  kind: BoardCardKind;
+  kind: WorkCardKind;
   why: string;
   confidence: number;
   /** `session_contents.id`s, decimal strings, distinct. */

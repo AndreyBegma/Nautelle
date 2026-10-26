@@ -5,6 +5,8 @@ import {
   type CardMergeOutcome,
   type CardPrCloseOutcome,
   type CardPullRequestView,
+  prDiffUrl,
+  shortHeadSha,
 } from '@nautelle/shared';
 import type { RunnerCommands } from '@nautelle/shared/protocol';
 import { ApiError } from '../api';
@@ -88,9 +90,14 @@ export function acceptPrimaryLabel(
   path: AcceptPath,
   closing: boolean,
   busy: boolean,
+  headMoved = false,
 ): string {
   if (choice?.kind === 'merge' && path === 'merge') {
-    return busy ? 'Merging…' : 'Merge pull request';
+    if (busy) return 'Merging…';
+    // C-415: the head the person was just shown, named on the button.
+    return headMoved
+      ? `Accept ${shortHeadSha(choice.headSha)}`
+      : 'Merge pull request';
   }
   if (closing) return busy ? 'Closing…' : 'Close pull request and accept';
   return busy ? 'Accepting…' : 'Accept';
@@ -286,3 +293,26 @@ export function notLandedReason(error: unknown): string | null {
 export const confirmUnlanded = (
   request: AcceptBoardCardRequest,
 ): AcceptBoardCardRequest => ({ ...request, confirmUnlanded: true });
+
+/** C-415: the merge was refused because the PR's head is not the one the person saw. */
+export function isHeadMoved(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false;
+  const code: string | undefined = error.code;
+  return (
+    code === BOARD_ERROR.mergeFailed && error.body?.reason === 'head_changed'
+  );
+}
+
+/**
+ * C-415: what the warn banner shows after a refusal for a moved head — the
+ * head the dialog now binds Accept to (read again from the pull request) and
+ * its diff.
+ */
+export function movedHeadNotice(
+  pr: Pick<CardPullRequestView, 'url' | 'headSha'>,
+): { shortSha: string; diffUrl: string } {
+  return {
+    shortSha: shortHeadSha(pr.headSha),
+    diffUrl: prDiffUrl({ url: pr.url, headSha: pr.headSha }),
+  };
+}

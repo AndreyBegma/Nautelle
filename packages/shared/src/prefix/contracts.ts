@@ -26,13 +26,22 @@ export const cardTypeSchema = z.enum(CARD_TYPES);
 export const isCardType = (value: string): value is CardType =>
   (CARD_TYPES as readonly string[]).includes(value);
 
-/** B4: deterministic, from fields the card already has. */
+/**
+ * B4: deterministic, from fields the card already has. C-503: an analysis
+ * card takes the `feature` prefix — it has no card type of its own.
+ */
 export const cardTypeOf = (card: {
   ciFix: boolean;
   approvedDesign: boolean;
-  kind: 'bug' | 'feature';
+  kind: 'bug' | 'feature' | 'analysis';
 }): CardType =>
-  card.ciFix ? 'ci_fix' : card.approvedDesign ? 'ui' : card.kind;
+  card.ciFix
+    ? 'ci_fix'
+    : card.approvedDesign
+      ? 'ui'
+      : card.kind === 'analysis'
+        ? 'feature'
+        : card.kind;
 
 // The measurement (B1)
 

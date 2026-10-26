@@ -12,16 +12,18 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
-import type {
-  InboundTriggerView,
-  InboundTriggerWithSecret,
-  ProjectSummary,
+import {
+  type InboundTriggerView,
+  type InboundTriggerWithSecret,
+  type ProjectSummary,
+  WEBHOOK_LIVE_EVENTS,
 } from '@nautelle/shared';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { PageHeader } from '../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';
 import { api } from '../../../../lib/api';
 import { Time } from '../../../../lib/format/time';
+import { useLiveRefresh } from '../../../../lib/live/use-live-refresh';
 import { useSection } from '../../../../lib/section/use-section';
 import { triggerUrl } from '../../../../lib/webhooks/events';
 import {
@@ -38,8 +40,6 @@ import {
 } from '../../../../lib/webhooks/secret-dialog';
 import { TriggerDialog } from './trigger-dialog';
 import { TriggerSheet } from './trigger-sheet';
-
-const POLL_MS = 15_000;
 
 const hookUrl = (path: string): string =>
   triggerUrl(window.location.origin, path);
@@ -83,10 +83,9 @@ export default function AdminTriggersPage() {
   const reload = triggers.retry;
   const projectList = projects.data ?? [];
 
-  useEffect(() => {
-    const timer = setInterval(reload, POLL_MS);
-    return () => clearInterval(timer);
-  }, [reload]);
+  useLiveRefresh([], [WEBHOOK_LIVE_EVENTS.inboundDeliveryCreated], reload, {
+    extraTopics: ['admin'],
+  });
 
   const selectedTrigger = triggers.data?.find((t) => t.id === selected);
 
