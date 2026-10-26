@@ -25,6 +25,7 @@ import {
   CARD_CONTINUE_PROMPT,
   CARD_DATA_LINE,
   CARD_DESIGN_COMMENTS_MAX_BYTES,
+  CARD_ENV_PORT,
   CARD_PR_DESCRIPTION_FILE,
   CARD_WORKER_PROMPT_VERSION,
   type CardText,
@@ -389,8 +390,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 23', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(24);
+  it('is version 25', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(25);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
@@ -812,6 +813,44 @@ describe('worker prompt v24 — demo video (C-369)', () => {
     });
     expect(prompt).toContain('The project has no demo secrets');
     expect(prompt).not.toContain('using these names');
+  });
+});
+
+describe('worker prompt v25 — off-camera sign-in, a recorded demo (C-410)', () => {
+  const prompt = cardWorkerPrompt({
+    ...card,
+    design: null,
+    demo: {
+      scenarioPath: 'demoflow/cards/C-12-login.demo.json',
+      env: ['DEMO_LOGIN_EMAIL', 'DEMO_LOGIN_PASSWORD'],
+    },
+  });
+  const start = prompt.indexOf('## Demo video');
+  const demo = prompt.slice(start, prompt.indexOf('\n## ', start + 1));
+
+  it('signs in off camera through a fragment in setup', () => {
+    expect(demo).toContain("scenario's `setup`");
+    expect(demo).toContain('off camera');
+    expect(demo).toContain('`demoflow/fragments/`');
+    expect(demo).toContain('"fragment": "sign-in"');
+    expect(demo).toContain('start `steps` at the first step that matters');
+  });
+
+  it('asks for locators that match exactly one element', () => {
+    expect(demo).toContain('match exactly one element');
+    expect(demo).toContain('Scope to a region');
+  });
+
+  it('merges the base branch, then records before finishing', () => {
+    const merge = demo.indexOf('merge the latest base branch');
+    const record = demo.indexOf('record the scenario, not only validate it');
+    expect(merge).toBeGreaterThan(-1);
+    expect(record).toBeGreaterThan(merge);
+    expect(demo).toContain(`--port $${CARD_ENV_PORT} --fresh-app`);
+  });
+
+  it('keeps the skip rule last', () => {
+    expect(demo.trimEnd().endsWith('skip the scenario.')).toBe(true);
   });
 });
 

@@ -1,44 +1,16 @@
 {
   "schemaVersion": 1,
   "name": "⌘K actions and card lookup, and the Board's keyboard",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
   "steps": [
-    {
-      "action": "marker",
-      "title": "Sign in"
-    },
-    {
-      "action": "navigate",
-      "path": "/login?next=/projects/demo-project"
-    },
-    {
-      "action": "wait",
-      "ms": 3000
-    },
-    {
-      "action": "fill",
-      "target": {
-        "label": "Email"
-      },
-      "valueFrom": {
-        "env": "DEMO_LOGIN_EMAIL"
-      }
-    },
-    {
-      "action": "fill",
-      "target": {
-        "label": "Password"
-      },
-      "valueFrom": {
-        "env": "DEMO_LOGIN_PASSWORD"
-      }
-    },
-    {
-      "action": "click",
-      "target": {
-        "role": "button",
-        "name": "Sign in"
-      }
-    },
     {
       "action": "marker",
       "title": "Open the Board"

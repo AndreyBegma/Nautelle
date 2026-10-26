@@ -6,44 +6,16 @@
     "width": 1440,
     "height": 900
   },
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
   "steps": [
-    {
-      "action": "marker",
-      "title": "Sign in"
-    },
-    {
-      "action": "navigate",
-      "path": "/login?next=/projects/demo-project"
-    },
-    {
-      "action": "wait",
-      "ms": 3000
-    },
-    {
-      "action": "fill",
-      "target": {
-        "label": "Email"
-      },
-      "valueFrom": {
-        "env": "DEMO_LOGIN_EMAIL"
-      }
-    },
-    {
-      "action": "fill",
-      "target": {
-        "label": "Password"
-      },
-      "valueFrom": {
-        "env": "DEMO_LOGIN_PASSWORD"
-      }
-    },
-    {
-      "action": "click",
-      "target": {
-        "role": "button",
-        "name": "Sign in"
-      }
-    },
     {
       "action": "wait",
       "ms": 3000

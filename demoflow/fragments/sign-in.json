@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "description": "Signs in as the demo admin (DEMO_LOGIN_EMAIL / DEMO_LOGIN_PASSWORD) and waits until the app has left the sign-in page for `next`. Include it in a scenario's `setup`, so the video opens on `next` already signed in.",
+  "params": {
+    "next": {
+      "description": "The path the app opens after the sign-in, such as /projects/demo-project."
+    }
+  },
+  "steps": [
+    { "action": "navigate", "path": "/login?next={{params.next}}" },
+    {
+      "action": "waitFor",
+      "target": { "role": "button", "name": "Sign in" },
+      "timeoutMs": 60000
+    },
+    { "action": "wait", "ms": 3000 },
+    {
+      "action": "fill",
+      "target": { "label": "Email" },
+      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+    },
+    {
+      "action": "fill",
+      "target": { "label": "Password" },
+      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
+    },
+    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
+    {
+      "action": "waitFor",
+      "target": { "role": "heading", "name": "Sign in", "exact": true },
+      "state": "hidden",
+      "timeoutMs": 30000
+    }
+  ]
+}

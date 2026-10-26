@@ -1,30 +1,36 @@
 {
   "schemaVersion": 1,
   "name": "Approve a design from the card sheet",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
   "steps": [
-    { "action": "marker", "title": "Sign in" },
-    { "action": "navigate", "path": "/login?next=/projects/demo-project" },
-    { "action": "wait", "ms": 3000 },
     {
-      "action": "fill",
-      "target": { "label": "Email" },
-      "valueFrom": { "env": "DEMO_LOGIN_EMAIL" }
+      "action": "marker",
+      "title": "Open the Board"
     },
-    {
-      "action": "fill",
-      "target": { "label": "Password" },
-      "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" }
-    },
-    { "action": "click", "target": { "role": "button", "name": "Sign in" } },
-    { "action": "marker", "title": "Open the Board" },
     {
       "action": "click",
-      "target": { "role": "link", "name": "Board", "exact": true },
+      "target": {
+        "role": "link",
+        "name": "Board",
+        "exact": true
+      },
       "timeoutMs": 30000
     },
     {
       "action": "assertText",
-      "target": { "role": "heading", "name": "Board", "exact": true },
+      "target": {
+        "role": "heading",
+        "name": "Board",
+        "exact": true
+      },
       "text": "Board",
       "match": "exact",
       "timeoutMs": 30000
@@ -35,24 +41,40 @@
     },
     {
       "action": "click",
-      "target": { "text": "Redesign the order summary" },
+      "target": {
+        "text": "Redesign the order summary"
+      },
       "timeoutMs": 15000
     },
     {
       "action": "waitFor",
-      "target": { "role": "button", "name": "Back with comment" },
+      "target": {
+        "role": "button",
+        "name": "Back with comment"
+      },
       "timeoutMs": 30000
     },
-    { "action": "wait", "ms": 3000 },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
     {
       "action": "fill",
-      "target": { "label": "Comment" },
+      "target": {
+        "label": "Comment"
+      },
       "value": "Make the header smaller."
     },
     {
       "action": "click",
-      "target": { "role": "button", "name": "Approve & run" }
+      "target": {
+        "role": "button",
+        "name": "Approve & run"
+      }
     },
-    { "action": "wait", "ms": 3000 }
+    {
+      "action": "wait",
+      "ms": 3000
+    }
   ]
 }

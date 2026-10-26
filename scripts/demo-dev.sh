@@ -19,7 +19,7 @@
 # once the API answers its health check, so DemoFlow's readyUrl answers only
 # when the whole app is up. The API listens on DEMO_API_PORT (default PORT +
 # 1000), so it does not clash with the dev API on 8180. Each recording gets a
-# port of its own (DemoFlow 0.6 --port), so cards record in parallel.
+# port of its own (DemoFlow --port, since 0.6), so cards record in parallel.
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
