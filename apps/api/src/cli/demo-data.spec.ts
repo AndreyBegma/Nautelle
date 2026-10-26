@@ -1,10 +1,12 @@
 import {
+  cardAcceptArgsOf,
   rememberableToolRules,
   toolUseCallOf,
   toolUseDanger,
 } from '@nautelle/shared';
 import {
   DEMO_AWAY_SESSION_ID,
+  DEMO_CARD_ACCEPTS,
   DEMO_CARDS,
   DEMO_FAILED_RUNS,
   DEMO_PROJECT_ID,
@@ -209,9 +211,9 @@ describe('seedDemo', () => {
     const [project] = db.project.upsert.mock.calls[0];
     expect(project.create.toolUseTimeoutMinutes).toBe(240);
     expect(db.agentSession.upsert).toHaveBeenCalledTimes(1);
-    const requests = db.actionRequest.upsert.mock.calls.map(
-      ([args]) => args.create,
-    );
+    const requests = db.actionRequest.upsert.mock.calls
+      .map(([args]) => args.create)
+      .filter((request) => request.kind === 'tool_use');
     expect(requests).toHaveLength(DEMO_TOOL_CALLS.length);
     for (const request of requests) {
       expect(request).toMatchObject({
@@ -235,6 +237,28 @@ describe('seedDemo', () => {
     expect(secretCall && toolUseDanger(secretCall)?.kind).toBe('secret_read');
     const [rule] = db.toolUseRule.upsert.mock.calls[0];
     expect(rule.create).toMatchObject({ scope: 'project', toolName: 'Bash' });
+  });
+
+  it('seeds a pending accept pinned to a head and one that failed head_moved (C-416)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    const accepts = db.actionRequest.upsert.mock.calls
+      .map(([args]) => args.create)
+      .filter((request) => request.kind === 'card_accept');
+    expect(accepts).toHaveLength(DEMO_CARD_ACCEPTS.length);
+    for (const request of accepts) {
+      expect(cardAcceptArgsOf(request)).toMatchObject({
+        card: 7,
+        merge: true,
+        prNumber: 43,
+      });
+    }
+    const [pending, failed] = accepts;
+    expect(pending.status).toBeUndefined();
+    expect(failed).toMatchObject({
+      status: 'failed',
+      result: { error: 'head_moved', headSha: pending.args.headSha },
+    });
   });
 
   it('seeds a card whose design waits for approval (C-394)', async () => {

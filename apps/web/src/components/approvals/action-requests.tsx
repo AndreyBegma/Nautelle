@@ -143,14 +143,18 @@ export function RequestCell({ request }: { request: ActionRequestSummary }) {
   );
 }
 
-/** " at 0b6445a" after a `pr_approve` request's title: the head it was bound to. */
+/**
+ * " at 0b6445a" after the title of a `pr_approve` request, or of a merging
+ * `card_accept` one (C-416): the head it was bound to.
+ */
 function HeadSuffix({ request }: { request: ActionRequestSummary }) {
-  const pr = prApproveArgs(request);
-  if (!pr) return null;
+  const shortHead =
+    prApproveArgs(request)?.shortHead ?? cardAcceptHead(request)?.shortHead;
+  if (!shortHead) return null;
   return (
     <span className="text-ink-3">
       {' '}
-      at <code className="font-mono">{pr.shortHead}</code>
+      at <code className="font-mono">{shortHead}</code>
     </span>
   );
 }
@@ -402,7 +406,11 @@ export function RecentRequests({
               </TableCell>
               <TableCell>
                 <span className="line-clamp-2 break-words">
-                  {request.note ?? '—'}
+                  {request.note ??
+                    (request.status === 'failed'
+                      ? resultMessage(request.result)
+                      : null) ??
+                    '—'}
                 </span>
               </TableCell>
             </TableRow>
