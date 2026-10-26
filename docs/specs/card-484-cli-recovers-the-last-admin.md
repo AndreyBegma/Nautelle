@@ -18,7 +18,7 @@ An admin can recover any other account with a one-time link (ADR-0113). Without 
 - `bun run admin:recover -- --email <e> [--kind password|two_factor]`, also `node dist/src/cli/admin-recover.js …` in the container. It prints the link once to stdout and nothing else.
 - It reuses `PasswordResetService`'s link creation, with no second implementation. The actor is `system`, recorded as `user.reset_link` (`packages/shared/src/audit/actions.ts:35-36`) with `meta.via: 'cli'` (ADR-0008: everything is audited).
 - It works for any **active admin** account and refuses others ("Use Admin › Users for other accounts"), so it is not a back door into ordinary accounts.
-- Access to the container is the authority (recorded in [ADR-0114](../adr/0114-the-operator-of-the-server-issues-an-admin-a-recovery-link-from-the-command-line.md)). Whoever can run commands in the API container can already read the database.
+- Access to the container is the authority (recorded in [ADR-0128](../adr/0128-the-operator-of-the-server-issues-an-admin-a-recovery-link-from-the-command-line.md)). Whoever can run commands in the API container can already read the database.
 - `--kind two_factor` is the default, since 2FA is what an admin loses (ADR-0081). `password` is for a forgotten password.
 
 ## Acceptance criteria

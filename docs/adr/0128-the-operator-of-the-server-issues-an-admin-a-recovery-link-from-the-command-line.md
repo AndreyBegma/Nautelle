@@ -1,4 +1,4 @@
-# ADR-0114: The operator of the server issues an admin a recovery link from the command line
+# ADR-0128: The operator of the server issues an admin a recovery link from the command line
 
 Status: accepted · Date: 2026-10-26 ·
 Spec: [`docs/specs/card-484-cli-recovers-the-last-admin.md`](../specs/card-484-cli-recovers-the-last-admin.md) ·

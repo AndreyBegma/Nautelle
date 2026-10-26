@@ -1,6 +1,6 @@
 # ADR-0113: Account recovery by a one-time link, from an admin or by email
 
-Status: accepted · Date: 2026-10-26 · Amended by [ADR-0114](0114-the-operator-of-the-server-issues-an-admin-a-recovery-link-from-the-command-line.md) (the only admin recovers with `admin:recover`) ·
+Status: accepted · Date: 2026-10-26 · Amended by [ADR-0128](0128-the-operator-of-the-server-issues-an-admin-a-recovery-link-from-the-command-line.md) (the only admin recovers with `admin:recover`) ·
 Spec: [`docs/specs/card-402-password-and-2fa-reset-an-admin-reset-li.md`](../specs/card-402-password-and-2fa-reset-an-admin-reset-li.md) ·
 Relates to: [ADR-0048](0048-failed-passwords-slow-the-source-never-lock-the-account.md), [ADR-0081](0081-totp-two-factor-sign-in-with-hashed-recovery-codes.md), [ADR-0108](0108-notifications-go-out-on-channels-and-email-is-one-over-smtp-from-the-environment.md) ·
 Amends: [ADR-0081](0081-totp-two-factor-sign-in-with-hashed-recovery-codes.md) §9 (the web's Reset 2FA gives a link) ·
@@ -81,7 +81,7 @@ Constraints:
 
 - A locked-out person gets back in through an admin's link without the CLI or
   the database; the only admin, who has no other admin to ask, runs
-  `admin:recover` in the API container for the same link (ADR-0114).
+  `admin:recover` in the API container for the same link (ADR-0128).
 - With SMTP and `APP_URL` set, a person recovers without an admin, and the form
   reveals nothing about which addresses have accounts.
 - An admin who creates a link can use it themselves. That power already exists
