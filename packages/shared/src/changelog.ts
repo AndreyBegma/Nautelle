@@ -33,6 +33,44 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: '0.18.0',
+    date: '2026-10-26',
+    items: [
+      {
+        kind: 'new',
+        text: 'An admin can give a locked-out person a one-time link to reset their password or two-factor sign-in, and with email set up people reset their own password from the sign-in page.',
+      },
+      {
+        kind: 'new',
+        text: 'Notifications can go out by email, at once or gathered into a digest, and to a Slack channel through an incoming webhook.',
+      },
+      {
+        kind: 'new',
+        text: 'Personal API tokens act with your rights or read-only, can be limited to some projects, expire and can be revoked at any time.',
+      },
+      {
+        kind: 'new',
+        text: 'An Inbox page gathers everything that waits on you across projects with its action at hand, and Away mode can allow similar requests for a whole session or project.',
+      },
+      {
+        kind: 'new',
+        text: 'At the worker limit cards wait and start in To Do order, a hard budget pauses running rounds until you resume them in one click, and a project can move to another runner.',
+      },
+      {
+        kind: 'improved',
+        text: 'The Board loads fast, updates live, moves merged cards to Completed by itself, and the command palette finds cards and runs actions from the keyboard.',
+      },
+      {
+        kind: 'improved',
+        text: 'Onboarding walks you to your first card with a repository picker, a quick card turns one line of text into a To Do card, and project settings can be searched.',
+      },
+      {
+        kind: 'fixed',
+        text: 'Questions with several tabs reach you in full, and card demo videos open already signed in without leaving stray changes in the pull request.',
+      },
+    ],
+  },
+  {
     version: '0.17.1',
     date: '2026-10-25',
     items: [
