@@ -18,14 +18,14 @@ An admin can recover any other account with a one-time link (ADR-0113). Without 
 - `bun run admin:recover -- --email <e> [--kind password|two_factor]`, also `node dist/src/cli/admin-recover.js …` in the container. It prints the link once to stdout and nothing else.
 - It reuses `PasswordResetService`'s link creation, with no second implementation. The actor is `system`, recorded as `user.reset_link` (`packages/shared/src/audit/actions.ts:35-36`) with `meta.via: 'cli'` (ADR-0008: everything is audited).
 - It works for any **active admin** account and refuses others ("Use Admin › Users for other accounts"), so it is not a back door into ordinary accounts.
-- Access to the container is the authority. Whoever can run commands in the API container can already read the database.
+- Access to the container is the authority (recorded in [ADR-0114](../adr/0114-the-operator-of-the-server-issues-an-admin-a-recovery-link-from-the-command-line.md)). Whoever can run commands in the API container can already read the database.
 - `--kind two_factor` is the default, since 2FA is what an admin loses (ADR-0081). `password` is for a forgotten password.
 
 ## Acceptance criteria
-- [ ] `admin-recover.e2e.spec.ts`: for an active admin it prints a link that resets 2FA once and is refused a second time. It writes the audit record.
-- [ ] `admin-recover.e2e.spec.ts`: an operator's email or an unknown email exits non-zero with a message and issues nothing.
-- [ ] `apps/docs/src/content/docs/operations/troubleshooting.md` has a "Locked out as the only admin" entry with the `docker compose exec api node dist/src/cli/admin-recover.js --email …` line.
-- [ ] No web UI, so no demo.
+- [x] `admin-recover.e2e.spec.ts`: for an active admin it prints a link that resets 2FA once and is refused a second time. It writes the audit record.
+- [x] `admin-recover.e2e.spec.ts`: an operator's email or an unknown email exits non-zero with a message and issues nothing.
+- [x] `apps/docs/src/content/docs/operations/troubleshooting.md` has a "Locked out as the only admin" entry with the `docker compose exec api node dist/src/cli/admin-recover.js --email …` line.
+- [x] No web UI, so no demo.
 
 ## Risks
 - The link is in the terminal's scrollback. It is single use and lives 24 h, which is the same exposure as an admin pasting it into a chat.
