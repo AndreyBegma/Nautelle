@@ -28,6 +28,22 @@ export const PAIRING_CODE_TTL_MS = 10 * 60_000;
 
 export const RUNNER_NAME_MAX_LENGTH = 100;
 
+/**
+ * Live event on the `admin` topic (C-479): a runner connected, disconnected,
+ * was created, renamed, revoked or paired. Pages refetch on it; `stale` comes
+ * from time alone, so it never pushes and a slow safety poll covers it.
+ */
+export const RUNNER_UPDATED_EVENT = 'runner.updated';
+
+/** `data` of a `runner.updated` event. */
+export interface RunnerUpdatedEvent {
+  runnerId: string;
+  status: RunnerStatus;
+}
+
+/** How often runner pages refetch anyway, for `stale` and missed events. */
+export const RUNNER_SAFETY_POLL_MS = 60_000;
+
 /** Stable codes in the `error` field of a runners route's error body. */
 export const RUNNER_ERROR = {
   /** Pairing code invalid, expired or already used (protocol `pairingErrorSchema`). */

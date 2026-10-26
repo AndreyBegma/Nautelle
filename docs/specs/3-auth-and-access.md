@@ -19,7 +19,7 @@ authorizes against it.
 ### In scope
 
 - User accounts with status and role; server-side cookie sessions.
-- `admin:create` CLI for the first (and any further) admin.
+- `admin:create` CLI for the first (and any further) admin; `admin:recover` CLI (C-484, [ADR-0128](../adr/0128-the-operator-of-the-server-issues-an-admin-a-recovery-link-from-the-command-line.md)) prints a one-time recovery link for a locked-out active admin.
 - Registration, open/closed by an admin setting (closed by default).
 - Approval queue: approve with a role, reject; disable / re-enable; change role.
 - Login, logout, current user, change own password, list and revoke own sessions.
@@ -46,7 +46,7 @@ taken, with its source.
 | # | Decision | Source |
 |---|---|---|
 | D1 | Roles are global: `admin`, `operator`, `viewer`. Statuses: `pending`, `active`, `rejected`, `disabled`. Only `active` users can hold a session | ADR-0008 |
-| D2 | First admin via `bun run admin:create` (interactive prompt, or `ADMIN_EMAIL` / `ADMIN_PASSWORD` env for non-interactive use). It creates an `active` admin; it refuses an email that already exists. The seed creates **no** users. Amended by ADR-0087 (C-367): while no user exists, the browser's `/setup` page creates the first admin with the one-time token the API logs on boot, and `ADMIN_EMAIL` / `ADMIN_PASSWORD` create it on boot; the CLI stays for recovery | ADR-0008, ADR-0087, security.md |
+| D2 | First admin via `bun run admin:create` (interactive prompt, or `ADMIN_EMAIL` / `ADMIN_PASSWORD` env for non-interactive use). It creates an `active` admin; it refuses an email that already exists. The seed creates **no** users. Amended by ADR-0087 (C-367): while no user exists, the browser's `/setup` page creates the first admin with the one-time token the API logs on boot, and `ADMIN_EMAIL` / `ADMIN_PASSWORD` create it on boot; the CLI stays for recovery, and `bun run admin:recover -- --email <e>` gives a locked-out admin a one-time link (ADR-0128) | ADR-0008, ADR-0087, security.md |
 | D3 | Registration is closed by default. Setting `registration.open` (boolean) in a `settings` key/value table, changed only by admins. Closed → `POST /auth/register` answers 403 `registration_closed` | ADR-0008 |
 | D4 | Approval is one action that sets status `active` **and** the role. Rejection sets `rejected`; a rejected email cannot register again until an admin deletes the account | ADR-0008; Mission Control access-request flow (inspiration) |
 | D5 | Sessions are server-side: a random 32-byte token in an httpOnly, `Secure` (unless `APP_ENV` is `development` or `test`), `SameSite=Lax` cookie `ad_session`; the database stores only its SHA-256. Idle expiry 7 days, absolute 30 days, refreshed `lastSeenAt` at most once a minute | security.md |
