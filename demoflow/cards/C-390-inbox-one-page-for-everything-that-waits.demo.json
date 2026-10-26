@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "name": "The Inbox: everything that waits on you, with the action right there",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Overview's Needs you is a short preview of the Inbox"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "testId": "inbox-preview"
+      },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "Gift cards in the cart"
+      }
+    },
+    {
+      "action": "screenshot",
+      "name": "overview-inbox-preview"
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "marker",
+      "title": "One page for everything that waits, grouped by project, oldest first"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Open Inbox",
+        "exact": true
+      }
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "heading",
+        "name": "Inbox",
+        "exact": true
+      },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Order history pages past 100 orders"
+      },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "screenshot",
+      "name": "inbox-all-kinds"
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "marker",
+      "title": "A pull request ready to merge: Merge or Feedback in the row"
+    },
+    {
+      "action": "navigate",
+      "path": "/inbox?kind=merge"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Pull request #43"
+      },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Feedback",
+        "exact": true
+      }
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "button",
+        "name": "Send feedback"
+      }
+    },
+    {
+      "action": "screenshot",
+      "name": "inbox-merge-feedback"
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Cancel",
+        "exact": true
+      }
+    },
+    {
+      "action": "marker",
+      "title": "A card that needs a person: why, and the way back to it"
+    },
+    {
+      "action": "navigate",
+      "path": "/inbox?kind=failed"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Order history pages past 100 orders"
+      },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "link",
+        "name": "Open",
+        "exact": true
+      }
+    },
+    {
+      "action": "screenshot",
+      "name": "inbox-needs-you"
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "marker",
+      "title": "A setup blocker links to its fix"
+    },
+    {
+      "action": "navigate",
+      "path": "/inbox?kind=setup"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "runner is offline, so this cannot start"
+      },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "link",
+        "name": "Open Runners",
+        "exact": true
+      }
+    },
+    {
+      "action": "screenshot",
+      "name": "inbox-setup"
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    }
+  ]
+}

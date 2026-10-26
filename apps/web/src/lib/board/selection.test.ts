@@ -107,7 +107,13 @@ describe('planBulk', () => {
     card(1, 'finished'),
     card(2, 'finished', {
       source: 'fleet',
-      fleet: { issue: 1, slot: 'i1', stage: null, slotGone: false },
+      fleet: {
+        issue: 1,
+        slot: 'i1',
+        stage: null,
+        slotGone: false,
+        detached: false,
+      },
     }),
     card(3, 'in_progress', { round: round('running') }),
     card(4, 'completed'),
@@ -117,8 +123,9 @@ describe('planBulk', () => {
     expect(planBulk('complete', cards).applies.map((c) => c.number)).toEqual([
       1, 2,
     ]);
+    // A fleet card moves like any card (C-397, ADR-0098).
     expect(planBulk('todo', cards).applies.map((c) => c.number)).toEqual([
-      1, 4,
+      1, 2, 4,
     ]);
     expect(planBulk('finished', cards).applies.map((c) => c.number)).toEqual([
       3,

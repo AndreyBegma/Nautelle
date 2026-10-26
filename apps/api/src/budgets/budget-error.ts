@@ -30,7 +30,7 @@ export class BudgetExceededError extends HttpException {
     const body: BudgetExceededBody = {
       statusCode: 409,
       error: BUDGET_ERROR.exceeded,
-      message: `The ${scope} budget is exceeded: no new spend until ${resetsAt.toISOString()}. Running workers continue.`,
+      message: `The ${scope} budget is exceeded: no new spend until ${resetsAt.toISOString()}. Running card rounds are paused; other running workers continue.`,
       budgetId,
       scope,
       resetsAt: resetsAt.toISOString(),

@@ -1,8 +1,19 @@
 import {
+  API_TOKEN_MAX_PROJECTS,
+  API_TOKEN_NAME_MAX_LENGTH,
+  API_TOKEN_SCOPES,
+  type ApiTokenScope,
   type ChangePasswordRequest,
+  type CreateApiTokenRequest,
+  type CreatePasswordResetLinkRequest,
+  type ForgotPasswordRequest,
   type LoginRequest,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  PASSWORD_RESET_KINDS,
+  type PasswordResetCheckRequest,
+  type PasswordResetKind,
+  type PasswordResetRequest,
   type RegisterRequest,
   type TwoFactorConfirmRequest,
   type TwoFactorEnableRequest,
@@ -11,8 +22,12 @@ import {
 } from '@nautelle/shared';
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEmail,
+  IsIn,
+  IsISO8601,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -110,4 +125,73 @@ export class TwoFactorConfirmDto implements TwoFactorConfirmRequest {
 export class TwoFactorPolicyDto implements TwoFactorPolicy {
   @IsBoolean()
   requiredForAdmins!: boolean;
+}
+
+/** C-403: `POST /auth/api-tokens`. */
+export class CreateApiTokenDto implements CreateApiTokenRequest {
+  @Transform(({ value }) => trim(value))
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(API_TOKEN_NAME_MAX_LENGTH)
+  name!: string;
+
+  @IsIn(API_TOKEN_SCOPES)
+  scope!: ApiTokenScope;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(API_TOKEN_MAX_PROJECTS)
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  projectIds?: string[];
+
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  expiresAt?: string | null;
+}
+
+/** C-402: `POST /auth/password-reset/request`. */
+export class ForgotPasswordDto implements ForgotPasswordRequest {
+  @Transform(({ value }) => normalizeEmail(value))
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(254)
+  email!: string;
+}
+
+/** A reset token: 32 random bytes, base64url — 43 characters. */
+const RESET_TOKEN_MAX_LENGTH = 128;
+
+/** C-402: `POST /auth/password-reset/check`. */
+export class PasswordResetCheckDto implements PasswordResetCheckRequest {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(RESET_TOKEN_MAX_LENGTH)
+  token!: string;
+}
+
+/** C-402: `POST /auth/password-reset`. */
+export class PasswordResetDto implements PasswordResetRequest {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(RESET_TOKEN_MAX_LENGTH)
+  token!: string;
+
+  @IsString()
+  @Length(PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH)
+  newPassword!: string;
+
+  @IsOptional()
+  @Transform(({ value }) => compact(value))
+  @IsString()
+  @MaxLength(CODE_MAX_LENGTH)
+  code?: string;
+}
+
+/** C-402: `POST /admin/users/:id/reset-link`. */
+export class CreatePasswordResetLinkDto
+  implements CreatePasswordResetLinkRequest
+{
+  @IsIn(PASSWORD_RESET_KINDS)
+  kind!: PasswordResetKind;
 }

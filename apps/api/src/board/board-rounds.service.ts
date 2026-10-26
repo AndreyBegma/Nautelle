@@ -345,8 +345,85 @@ export class BoardRoundsService {
    * `POST …/run`: round 1, or a retry after failed / ended / cancelled.
    * #443: Auto-run when ready calls it too, with `autoRunAfter` that
    * dependency's number — C-181: as the person who armed the switch.
+   * C-398 (ADR-0102): a To Do card refused with `max_running` is put in the
+   * run queue instead — Waiting for a slot — and `BoardRunQueue` starts it,
+   * as `actor` with `dto`, when a slot frees. The answer is the card, its
+   * `queue` set.
    */
   async run(
+    projectId: string,
+    number: number,
+    dto: RunBoardCardDto,
+    actor: BoardActor,
+    autoRunAfter: number | null = null,
+  ): Promise<BoardCardDetail> {
+    try {
+      return await this.runNow(projectId, number, dto, actor, autoRunAfter);
+    } catch (error) {
+      if (autoRunFailureOf(error).code !== BOARD_ERROR.maxRunning) throw error;
+      if (!(await this.enqueue(projectId, number, dto, actor, autoRunAfter))) {
+        throw error;
+      }
+      return this.board.detail(projectId, number);
+    }
+  }
+
+  /**
+   * C-398: puts a To Do card in the run queue; `false` for a card in any
+   * other column. A card already in it keeps its place.
+   */
+  private async enqueue(
+    projectId: string,
+    number: number,
+    dto: RunBoardCardDto,
+    actor: BoardActor,
+    autoRunAfter: number | null,
+  ): Promise<boolean> {
+    const card = await this.prisma.boardCard.findUnique({
+      where: { projectId_number: { projectId, number } },
+      select: { id: true, column: true },
+    });
+    if (!card || card.column !== 'todo') return false;
+    const options: Prisma.InputJsonObject = {
+      ...(dto.model !== undefined ? { model: dto.model } : {}),
+      ...(dto.profileKey !== undefined ? { profileKey: dto.profileKey } : {}),
+      ...(dto.effort !== undefined ? { effort: dto.effort } : {}),
+      ...(dto.permissionMode !== undefined
+        ? { permissionMode: dto.permissionMode }
+        : {}),
+    };
+    const { count } = await this.prisma.boardRunQueueCard.createMany({
+      data: [
+        {
+          cardId: card.id,
+          queuedById: actor.userId,
+          queuedByRole: actor.role === 'admin' ? 'admin' : 'operator',
+          options,
+          autoRunAfter,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    if (count > 0) {
+      await this.audit.record({
+        ...actor.ctx,
+        action: 'card.run_queued',
+        target: { type: 'board_card', id: card.id },
+        projectId,
+        after: { number },
+        result: 'ok',
+      });
+    }
+    // `board.changed` nudges the queue: a slot that freed meanwhile starts it.
+    this.work.publish(projectId, card.id);
+    return true;
+  }
+
+  /**
+   * The Run itself: starts the round or refuses — `max_running` too. The run
+   * queue starts its cards through it.
+   */
+  async runNow(
     projectId: string,
     number: number,
     dto: RunBoardCardDto,
@@ -1259,6 +1336,9 @@ export class BoardRoundsService {
           // #449 D3: the session it launches with; a `fresh` start replaces
           // it (`round.restart`), and the earlier rounds keep theirs.
           sessionId,
+          // C-359: what `card.run` launches with, defaults resolved.
+          model,
+          effort,
         },
       });
       await this.attachments.claim(

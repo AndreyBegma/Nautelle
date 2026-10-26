@@ -44,14 +44,32 @@ describe('Approve a pending user (C-166)', () => {
   });
 });
 
-describe("Reset a user's two-factor sign-in (C-189)", () => {
-  test('asks first, names the account and runs only after Turn off', () => {
+describe('Reset links from Admin › Users (C-402)', () => {
+  test('Reset 2FA asks first, names the account and runs only after Create link', () => {
     const pending: Confirmation = { user, action: 'reset_two_factor' };
     const gate = probeGate<Confirmation>(confirmationCopy, pending);
-    expect(gate.dialog.title).toBe('Turn off two-factor sign-in?');
-    expect(gate.dialog.verb).toBe('Turn off');
+    expect(gate.dialog.title).toBe('Create a 2FA reset link?');
+    expect(gate.dialog.verb).toBe('Create link');
     expect(gate.dialog.consequence).toContain('ann@example.com');
+    expect(gate.dialog.consequence).toContain('turns off two-factor sign-in');
     gate.confirm();
     expect(gate.confirmed).toEqual([pending]);
+  });
+
+  test('Reset password says a 2FA account still needs its code', () => {
+    const plain = probeGate<Confirmation>(confirmationCopy, {
+      user,
+      action: 'reset_password',
+    });
+    expect(plain.dialog.title).toBe('Create a password reset link?');
+    expect(plain.dialog.consequence).toContain('24 hours');
+    expect(plain.dialog.consequence).not.toContain('authenticator');
+    const withTwoFactor = probeGate<Confirmation>(confirmationCopy, {
+      user: { ...user, twoFactorEnabled: true },
+      action: 'reset_password',
+    });
+    expect(withTwoFactor.dialog.consequence).toContain(
+      'they still need their authenticator code',
+    );
   });
 });

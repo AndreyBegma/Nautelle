@@ -4,7 +4,8 @@ Status: accepted · Date: 2026-10-24 ·
 Card: C-370 (stack S-12, stage 2) ·
 Spec: [`docs/specs/card-370-demo-videos-record-automatically-when-a.md`](../specs/card-370-demo-videos-record-automatically-when-a.md) ·
 Amends: [ADR-0090](0090-a-finished-card-may-carry-a-demo-video-recorded-by-demoflow-on-the-runner.md) §1 and §8 ·
-Relates to: [ADR-0035](0035-a-card-ships-itself.md), [ADR-0084](0084-a-card-passes-its-review-steps-before-finished.md), [ADR-0001](0001-control-plane-and-per-machine-runner.md)
+Relates to: [ADR-0035](0035-a-card-ships-itself.md), [ADR-0084](0084-a-card-passes-its-review-steps-before-finished.md), [ADR-0001](0001-control-plane-and-per-machine-runner.md) ·
+Amended by [ADR-0099](0099-a-cards-demo-is-recorded-when-its-head-reads-green-before-review.md) (§1: a head is recorded when it reads green, before review; §2: every head without a demo is logged with its reason)
 
 ## Context
 

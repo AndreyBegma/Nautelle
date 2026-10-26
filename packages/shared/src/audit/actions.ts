@@ -12,6 +12,19 @@ export const AUDIT_ACTIONS = [
   'auth.two_factor_enable',
   'auth.two_factor_disable',
   'auth.two_factor_recovery_codes',
+  /** C-403: a personal API token was created or revoked (by its owner or an admin). */
+  'auth.api_token_create',
+  'auth.api_token_revoke',
+  /**
+   * C-402: Forgot password asked for a link — recorded against the email as
+   * typed, never the account, so it says no more than the response did.
+   */
+  'auth.password_reset_request',
+  /**
+   * C-402: a reset link redeemed (`meta: { via, kind, sessionId }`), or a
+   * refused try (`denied`, `meta.reason`).
+   */
+  'auth.password_reset',
   'user.create',
   'user.approve',
   'user.reject',
@@ -19,6 +32,8 @@ export const AUDIT_ACTIONS = [
   'user.delete',
   /** C-189: an admin turned off another account's two-factor sign-in. */
   'user.two_factor_reset',
+  /** C-402: an admin made a one-time reset link (`after: { kind, expiresAt }`). */
+  'user.reset_link',
   'settings.registration',
   /** C-189: an admin changed whether admins must use two-factor sign-in. */
   'settings.two_factor',
@@ -44,6 +59,8 @@ export const AUDIT_ACTIONS = [
   'project.member_remove',
   'project.docs_source_override',
   'project.docs_source_reset',
+  /** C-400: the project moved to another runner and a root there. */
+  'project.move',
   /** A GitHub App delivery found the project's repository under a new name. */
   'project.repo_rename',
   /**
@@ -68,6 +85,8 @@ export const AUDIT_ACTIONS = [
   'approval.void',
   'notification.rules',
   'notification.mute',
+  /** C-404: the caller's digest time or zone changed (`before`/`after: { digestTime, timezone }`). */
+  'notification.email',
   'telegram.configure',
   'telegram.clear',
   'telegram.link',
@@ -82,6 +101,10 @@ export const AUDIT_ACTIONS = [
   'telegram.board',
   /** #578: a card's review action from Telegram (`after: { number, action }`). */
   'telegram.card',
+  /** C-405: a Slack webhook was set or its events changed (`after: { scope, events, urlChanged }`; never the URL). */
+  'slack.configure',
+  /** C-405: a Slack webhook was removed (`after: { scope }`). */
+  'slack.clear',
   'terminal.attached',
   'terminal.detached',
   'skill.installed',
@@ -148,6 +171,13 @@ export const AUDIT_ACTIONS = [
   'action_request.created',
   'action_request.decided',
   'action_request.executed',
+  /**
+   * C-401: a "allow similar" / "always allow" rule stored, a `tool_use`
+   * request it answered (`meta` `{ruleId, actionRequestId}`), and one removed.
+   */
+  'tool_rule.created',
+  'tool_rule.used',
+  'tool_rule.deleted',
   'session_content.purged',
   'card.created',
   'card.updated',
@@ -169,12 +199,20 @@ export const AUDIT_ACTIONS = [
   'card.fleet_removed',
   'card.moved',
   'card.run_started',
+  /** C-398: a Run at `maxRunning` put the card in the run queue (`after: { number }`). */
+  'card.run_queued',
+  /** C-398: Stop took a queued card out of the run queue (`after: { number, stack }`). */
+  'card.run_dequeued',
   'card.feedback',
   'card.finished',
   // #750 D9: the worker's `escalate_card` (reason, model, relaunched).
   'card.escalated',
   'card.accepted',
+  /** C-389 (ADR-0100): the card's pull request merged, so it is Completed. */
+  'card.completed_by_merge',
   'card.stopped',
+  /** C-399 (ADR-0101): a hard budget paused the card's running round. */
+  'card.paused',
   /** #243 D10: the card's Continue after design switch. */
   'card.design_continue_toggled',
   /** #244 D12: a suggestion landed in the Inbox (system actor, `meta.captureId`). */

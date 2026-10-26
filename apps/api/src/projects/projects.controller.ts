@@ -1,10 +1,16 @@
 import type {
   ProjectDetail,
   ProjectMemberView,
+  ProjectMoveCheck,
+  ProjectMoveResult,
   ProjectRuntimeProfile,
   ProjectSummary,
+  PushCheckView,
 } from '@nautelle/shared';
-import type { ProjectInspection } from '@nautelle/shared/protocol';
+import type {
+  ProjectDiscoverResult,
+  ProjectInspection,
+} from '@nautelle/shared/protocol';
 import {
   Body,
   Controller,
@@ -20,12 +26,19 @@ import {
 import type { AuditContext } from '../audit/audit.types';
 import { AuditCtx } from '../audit/audit-context';
 import type { AuthUser } from '../auth/auth-request';
-import { CurrentUser, Roles } from '../auth/decorators';
+import {
+  CurrentUser,
+  ProjectScopedTokenAllowed,
+  Roles,
+} from '../auth/decorators';
 import {
   AddProjectMemberDto,
   ConnectProjectDto,
+  DiscoverProjectsDto,
   DocsSourceOverrideDto,
   InspectProjectDto,
+  MoveProjectDto,
+  PushCheckDto,
   UpdateProjectDto,
   UpdateProjectMemberDto,
 } from './dto';
@@ -36,6 +49,7 @@ import {
 } from './project-access.guard';
 import type { ResolvedProjectAccess } from './project-access.service';
 import { ProjectMembersService } from './project-members.service';
+import { ProjectMoveService } from './project-move.service';
 import { ProjectsService } from './projects.service';
 
 /** D1, D15: connecting and deleting projects is admin only. */
@@ -51,6 +65,26 @@ export class AdminProjectsController {
     @AuditCtx() ctx: AuditContext,
   ): Promise<ProjectInspection> {
     return this.projects.inspect(dto.runnerId, dto.path, ctx);
+  }
+
+  /** C-396: the repository picker of the connect dialog. */
+  @Post('discover')
+  @HttpCode(200)
+  discover(
+    @Body() dto: DiscoverProjectsDto,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<ProjectDiscoverResult> {
+    return this.projects.discover(dto.runnerId, ctx);
+  }
+
+  /** C-396: does origin accept pushes from this checkout? */
+  @Post('push-check')
+  @HttpCode(200)
+  pushCheck(
+    @Body() dto: PushCheckDto,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<PushCheckView> {
+    return this.projects.pushCheck(dto.runnerId, dto.path, ctx);
   }
 
   @Post()
@@ -88,9 +122,12 @@ export class ProjectsController {
   constructor(
     private readonly projects: ProjectsService,
     private readonly members: ProjectMembersService,
+    private readonly mover: ProjectMoveService,
   ) {}
 
+  // C-403: `visibleWhere` narrows the list to a project-limited token's own.
   @Get()
+  @ProjectScopedTokenAllowed()
   list(@CurrentUser() user: AuthUser): Promise<ProjectSummary[]> {
     return this.projects.list(user);
   }
@@ -133,6 +170,29 @@ export class ProjectsController {
     @AuditCtx() ctx: AuditContext,
   ): Promise<ProjectDetail> {
     return this.projects.refresh(access.projectId, access.role, ctx);
+  }
+
+  /** C-400: what a move would meet — running work and the old worktrees. */
+  @Get(':projectId/move')
+  @Roles('admin')
+  @UseGuards(ProjectAccessGuard)
+  moveCheck(
+    @ProjectAccess() access: ResolvedProjectAccess,
+  ): Promise<ProjectMoveCheck> {
+    return this.mover.check(access.projectId);
+  }
+
+  /** C-400 (ADR-0107): the project's new runner and its root there. */
+  @Post(':projectId/move')
+  @HttpCode(200)
+  @Roles('admin')
+  @UseGuards(ProjectAccessGuard)
+  move(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @Body() dto: MoveProjectDto,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<ProjectMoveResult> {
+    return this.mover.move(access.projectId, dto, ctx);
   }
 
   @Put(':projectId/docs-source')

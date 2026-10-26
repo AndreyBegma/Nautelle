@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "name": "Approve a design from the card sheet",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Open the Board"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Board",
+        "exact": true
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Board",
+        "exact": true
+      },
+      "text": "Board",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "marker",
+      "title": "A card with a waiting design opens its sheet with the preview and Approve & run"
+    },
+    {
+      "action": "click",
+      "target": {
+        "text": "Redesign the order summary"
+      },
+      "timeoutMs": 15000
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "button",
+        "name": "Back with comment"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Comment"
+      },
+      "value": "Make the header smaller."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Approve & run"
+      }
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    }
+  ]
+}

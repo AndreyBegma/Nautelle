@@ -46,12 +46,22 @@ export const EMPTY_USAGE: RunUsage = {
  * - a text normalization (issue #271): the Claude session the API assigned
  *   it (`text_normalizations.sessionId`), the same way.
  * Skill runs record no session id, so they have no usage yet.
+ *
+ * C-364: with `runIds`, every branch keeps only those runs before it joins,
+ * so a lookup of a few runs does not scan every round, turn and session of
+ * the install first.
  */
-export const RUN_SESSIONS = Prisma.sql`
+const runSessions = (runIds: readonly string[] | null): Prisma.Sql => {
+  const only = (column: Prisma.Sql) =>
+    runIds === null
+      ? Prisma.sql`TRUE`
+      : Prisma.sql`${column} IN (${Prisma.join(runIds)})`;
+  return Prisma.sql`
   SELECT r2.id AS "runId", se2.id AS "sessionId"
   FROM runs r2
   JOIN slots s ON s.id = r2."slotId"
   JOIN sessions se2 ON se2."projectId" = r2."projectId" AND se2."slotName" = s.name
+  WHERE ${only(Prisma.sql`r2.id`)}
   UNION ALL
   SELECT pt."runId", se2.id
   FROM plan_turns pt
@@ -61,6 +71,7 @@ export const RUN_SESSIONS = Prisma.sql`
   JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
     AND se2.runtime = 'claude'
     AND se2."externalId" = COALESCE(t."sessionId", p."sessionId")::text
+  WHERE ${only(Prisma.sql`pt."runId"`)}
   UNION ALL
   SELECT pt."runId", se2.id
   FROM plan_turns pt
@@ -69,6 +80,7 @@ export const RUN_SESSIONS = Prisma.sql`
   JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
     AND se2.runtime = 'claude'
     AND se2."externalId" = c."designSessionId"::text
+  WHERE ${only(Prisma.sql`pt."runId"`)}
   UNION ALL
   SELECT pt."runId", se2.id
   FROM plan_turns pt
@@ -77,6 +89,7 @@ export const RUN_SESSIONS = Prisma.sql`
   JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
     AND se2.runtime = 'claude'
     AND se2."externalId" = st."designSessionId"::text
+  WHERE ${only(Prisma.sql`pt."runId"`)}
   UNION ALL
   SELECT cr."runId", se2.id
   FROM board_card_rounds cr
@@ -85,6 +98,7 @@ export const RUN_SESSIONS = Prisma.sql`
   JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
     AND se2.runtime = 'claude'
     AND se2."externalId" = c."sessionId"::text
+  WHERE ${only(Prisma.sql`cr."runId"`)}
   UNION ALL
   SELECT cc."runId", se2.id
   FROM card_captures cc
@@ -92,7 +106,7 @@ export const RUN_SESSIONS = Prisma.sql`
   JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
     AND se2.runtime = 'claude'
     AND se2."externalId" = cc."extractSessionId"::text
-  WHERE cc."runId" IS NOT NULL
+  WHERE cc."runId" IS NOT NULL AND ${only(Prisma.sql`cc."runId"`)}
   UNION ALL
   SELECT tn."runId", se2.id
   FROM text_normalizations tn
@@ -100,19 +114,26 @@ export const RUN_SESSIONS = Prisma.sql`
   JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
     AND se2.runtime = 'claude'
     AND se2."externalId" = tn."sessionId"::text
-  WHERE tn."runId" IS NOT NULL`;
+  WHERE tn."runId" IS NOT NULL AND ${only(Prisma.sql`tn."runId"`)}`;
+};
+
+export const RUN_SESSIONS = runSessions(null);
 
 /**
  * The requests of a run (spec 21 D8): of its sessions, the `llm_requests`
  * within the run's window. `usage_rollups` are not needed; when runs get a
  * `runId` on their requests (#13 D14) this join is the one place to change.
+ * With `runIds`, the sessions are looked up for those runs only (C-364).
  */
-export const RUN_REQUESTS = Prisma.sql`
+const runRequests = (runIds: readonly string[] | null): Prisma.Sql =>
+  Prisma.sql`
   FROM runs r
-  JOIN (${RUN_SESSIONS}) rs ON rs."runId" = r.id
+  JOIN (${runSessions(runIds)}) rs ON rs."runId" = r.id
   JOIN sessions se ON se.id = rs."sessionId"
   JOIN llm_requests l ON l."sessionId" = se.id
     AND l.ts >= r."startedAt" AND (r."endedAt" IS NULL OR l.ts <= r."endedAt")`;
+
+export const RUN_REQUESTS = runRequests(null);
 
 const USAGE_COLUMNS = Prisma.sql`
   COUNT(l.id)::int AS requests,
@@ -147,7 +168,7 @@ export const usageByRun = async (
   if (runIds.length === 0) return new Map();
   const rows = await prisma.$queryRaw<UsageRow[]>`
     SELECT r.id AS key, ${USAGE_COLUMNS}
-    ${RUN_REQUESTS}
+    ${runRequests(runIds)}
     WHERE r.id IN (${Prisma.join(runIds)})
     GROUP BY r.id`;
   return new Map(rows.map((row) => [row.key, toUsage(row)]));

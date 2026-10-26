@@ -1,15 +1,10 @@
 import {
-  ALWAYS_ALLOWED_LABELS,
   QUEUE_ERROR,
   QUEUE_STATE_LABELS,
   QUEUE_STATES,
   type QueueItemView,
   type QueuePriority,
   type QueueState,
-  type QueueView,
-  SPEC_GAP_TEXT,
-  type SpecGap,
-  specGap,
 } from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 import { updateRunnerText } from '../control/format';
@@ -204,45 +199,6 @@ export const QUEUE_FILTER_CODEC: FilterCodec<QueueFilters> = {
     return text ? `?${text}` : '';
   },
 };
-
-/**
- * Labels the dialog offers (D7): those seen on the cached issues plus
- * `enhancement`/`bug`, minus the ready label — the toggle owns that one.
- */
-export function allowedLabels(view: QueueView | undefined): string[] {
-  if (!view) return [...ALWAYS_ALLOWED_LABELS];
-  const ready = view.readyLabel.toLowerCase();
-  const seen = new Map<string, string>();
-  const add = (label: string) => {
-    const key = label.toLowerCase();
-    if (key !== ready && !seen.has(key)) seen.set(key, label);
-  };
-  for (const label of ALWAYS_ALLOWED_LABELS) add(label);
-  for (const item of view.items) for (const label of item.labels) add(label);
-  for (const other of view.others ?? []) {
-    for (const label of other.labels) add(label);
-  }
-  return [...seen.values()].sort((a, b) => a.localeCompare(b));
-}
-
-export interface QueueHint {
-  /** Whether "Queue for the orchestrator" can be switched on. */
-  canQueue: boolean;
-  gap: SpecGap | null;
-}
-
-/** The same completeness rule the API applies before it sends anything. */
-export function queueHint(body: string, labels: readonly string[]): QueueHint {
-  const gap = specGap(body, labels);
-  return { canQueue: gap === null, gap };
-}
-
-/** The hint under the toggle: what is missing, and what to add. */
-export function gapSentence(gap: SpecGap): string {
-  const { why, clears } = SPEC_GAP_TEXT[gap];
-  const fix = clears.replace(/\s+—\s+\/code-sentinel:spec$/, '');
-  return `Cannot be queued: ${why}. Add ${fix}.`.replace(/`([^`]*)`/g, '“$1”');
-}
 
 const errorCode = (error: unknown): string | undefined =>
   error instanceof ApiError ? (error.code as string | undefined) : undefined;

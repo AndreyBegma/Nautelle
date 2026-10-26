@@ -1,11 +1,13 @@
 import {
   type AcceptBoardCardResponse,
   armForMode,
+  BOARD_CARD_BODY_MAX,
   BOARD_COLUMNS,
   BOARD_COMPLETED_PAGE_SIZE,
   BOARD_ERROR,
   type BoardCardDetail,
   type BoardCardKind,
+  type BoardCardView,
   type BoardColumnView,
   type BoardSettingsView,
   type BoardView,
@@ -50,14 +52,17 @@ import { demoFactsFor } from './board-demo-facts';
 import { BoardDependencies } from './board-dependencies.service';
 import { boardError, cardNotFound } from './board-error';
 import {
+  type CardFace,
   type CardFacts,
   type CardWithRounds,
   cardDesignSelect,
+  cardFaceArgs,
   prTargetOf,
   toCardDetail,
   toCardView,
   toSettingsView,
 } from './board-mapper';
+import { queuedCount, queueFactsFor } from './board-queue-facts';
 import { reviewFactsFor, reviewFindingsFor } from './board-review-facts';
 import { BoardStacks } from './board-stacks';
 import {
@@ -205,34 +210,38 @@ export class BoardService implements OnModuleInit {
     role?: Role,
   ): Promise<BoardView> {
     const inbox = seesInbox(role);
-    const include = {
-      rounds: { orderBy: { round: 'desc' as const } },
-      design: cardDesignSelect,
-    };
-    const [open, completed, settings, running] = await Promise.all([
-      this.prisma.boardCard.findMany({
-        where: {
-          projectId,
-          column: inbox
-            ? { not: 'completed' }
-            : { notIn: ['completed', 'inbox'] },
-        },
-        include,
-        orderBy: [{ position: 'asc' }, { number: 'asc' }],
-      }),
-      this.prisma.boardCard.findMany({
-        where: {
-          projectId,
-          column: 'completed',
-          ...(completedBefore ? { completedAt: { lt: completedBefore } } : {}),
-        },
-        include,
-        orderBy: [{ completedAt: 'desc' }, { number: 'desc' }],
-        take: BOARD_COMPLETED_PAGE_SIZE + 1,
-      }),
-      this.prisma.boardSettings.findUnique({ where: { projectId } }),
-      this.running(projectId),
-    ]);
+    // C-364: only what a card face reads; the detail loads the rest.
+    const face = cardFaceArgs;
+    const [open, completed, settings, running, project, stacks, queued] =
+      await Promise.all([
+        this.prisma.boardCard.findMany({
+          where: {
+            projectId,
+            column: inbox
+              ? { not: 'completed' }
+              : { notIn: ['completed', 'inbox'] },
+          },
+          ...face,
+          orderBy: [{ position: 'asc' }, { number: 'asc' }],
+        }),
+        this.prisma.boardCard.findMany({
+          where: {
+            projectId,
+            column: 'completed',
+            ...(completedBefore
+              ? { completedAt: { lt: completedBefore } }
+              : {}),
+          },
+          ...face,
+          orderBy: [{ completedAt: 'desc' }, { number: 'desc' }],
+          take: BOARD_COMPLETED_PAGE_SIZE + 1,
+        }),
+        this.prisma.boardSettings.findUnique({ where: { projectId } }),
+        this.running(projectId),
+        this.work.project(projectId),
+        this.stacks.views(projectId),
+        queuedCount(this.prisma, projectId),
+      ]);
     const page = completed.slice(0, BOARD_COMPLETED_PAGE_SIZE);
     const facts = await this.facts([...open, ...page]);
     const shown = BOARD_COLUMNS.filter((column) => inbox || column !== 'inbox');
@@ -251,15 +260,12 @@ export class BoardService implements OnModuleInit {
             hasMore: false,
           },
     );
-    const [project, stacks] = await Promise.all([
-      this.work.project(projectId),
-      this.stacks.views(projectId),
-    ]);
     return {
       projectId,
       columns,
       stacks,
       running,
+      queued,
       settings: toSettingsView(
         projectId,
         settings,
@@ -354,8 +360,18 @@ export class BoardService implements OnModuleInit {
     });
   }
 
+  /**
+   * C-390: cards read with `cardFaceArgs`, as the Board shows them — of any
+   * projects; the Inbox reads them across every project the caller sees.
+   */
+  async cardViews(cards: CardFace[]): Promise<BoardCardView[]> {
+    if (cards.length === 0) return [];
+    const facts = await this.facts(cards);
+    return cards.map((c) => toCardView(c, facts));
+  }
+
   /** Round costs (#21 usage by run) and which card sessions hooks reached. */
-  private async facts(cards: CardWithRounds[]): Promise<CardFacts> {
+  private async facts(cards: CardFace[]): Promise<CardFacts> {
     const runIds = cards.flatMap((c) => c.rounds.map((r) => r.runId));
     const sessionIds = cards
       .map((c) => c.sessionId)
@@ -383,6 +399,12 @@ export class BoardService implements OnModuleInit {
       runs,
       projects,
       stacks,
+      tokenSaver,
+      steward,
+      prTargets,
+      review,
+      demos,
+      queue,
     ] = await Promise.all([
       usageByRun(this.prisma, runIds),
       sessionIds.length === 0
@@ -417,6 +439,21 @@ export class BoardService implements OnModuleInit {
             select: { id: true, runner: { select: { capabilities: true } } },
           }),
       this.stacks.refsOf(cards.map((c) => c.id)),
+      // #445: each round run's savings and artifact-guard flag.
+      // #748 D1: and the figure of each card's tracked session.
+      tokenSaverFactsOf(this.prisma, runIds, trackedIds),
+      // #447 D15: the live Steward incident of each card's latest round.
+      stewardChipsFor(
+        this.prisma,
+        cards.flatMap((c) => (c.rounds[0] ? [c.rounds[0].id] : [])),
+      ),
+      this.prTargets(cards),
+      // #884: the review strip of each card.
+      reviewFactsFor(this.prisma, cards),
+      // C-371: the demo chip of each card.
+      demoFactsFor(this.prisma, cards),
+      // C-398: the run queue chip of each card.
+      queueFactsFor(this.prisma, cards),
     ]);
     const runProfileKeys = new Map<string, string>();
     for (const run of runs) {
@@ -447,19 +484,12 @@ export class BoardService implements OnModuleInit {
       attachmentCounts,
       dependencies: deps,
       stacks,
-      // #445: each round run's savings and artifact-guard flag.
-      // #748 D1: and the figure of each card's tracked session.
-      tokenSaver: await tokenSaverFactsOf(this.prisma, runIds, trackedIds),
-      // #447 D15: the live Steward incident of each card's latest round.
-      steward: await stewardChipsFor(
-        this.prisma,
-        cards.flatMap((c) => (c.rounds[0] ? [c.rounds[0].id] : [])),
-      ),
-      prTargets: await this.prTargets(cards),
-      // #884: the review strip of each card.
-      ...(await reviewFactsFor(this.prisma, cards)),
-      // C-371: the demo chip of each card.
-      ...(await demoFactsFor(this.prisma, cards)),
+      tokenSaver,
+      steward,
+      prTargets,
+      ...review,
+      ...demos,
+      ...queue,
       now: new Date(),
     };
   }
@@ -469,7 +499,7 @@ export class BoardService implements OnModuleInit {
    * on, else its project's base; absent before the card has a branch.
    */
   private async prTargets(
-    cards: readonly CardWithRounds[],
+    cards: readonly CardFace[],
   ): Promise<Map<string, CardPrTarget>> {
     const targets = new Map<string, CardPrTarget>();
     const branched = cards.filter((c) => c.branch !== null);
@@ -532,6 +562,11 @@ export class BoardService implements OnModuleInit {
       attachmentIds,
       actor,
     );
+    // C-397 (ADR-0098): Queue's "Make a card" — refused before the card exists.
+    const issue =
+      dto.issueNumber === undefined
+        ? null
+        : await this.linkedIssue(projectId, dto.issueNumber);
     const card = await this.prisma.$transaction(async (tx) => {
       const next = await this.work.nextCard(tx, projectId);
       const position = await this.work.place(
@@ -546,15 +581,17 @@ export class BoardService implements OnModuleInit {
           ...next,
           title,
           fingerprint: captureFingerprint(title),
-          body: dto.body ?? '',
+          body: dto.body ?? issue?.body ?? '',
           // #271 D9: without a kind the model classifies it.
           kind: dto.kind ?? 'feature',
           kindSource: dto.kind === undefined ? 'auto' : 'person',
           column: 'todo',
           position,
           // #359 D4: a bug gets an issue at Run, a feature none — unless the
-          // person says otherwise.
-          issueOnRun: dto.issueOnRun ?? dto.kind === 'bug',
+          // person says otherwise. A linked card already has its issue (#447 D8).
+          issueOnRun: issue ? false : (dto.issueOnRun ?? dto.kind === 'bug'),
+          issueNumber: issue?.number ?? null,
+          issueUrl: issue?.url ?? null,
           specOnRun: dto.specOnRun ?? settings.specOnRun,
           createdById: actor.userId,
           movedById: actor.userId,
@@ -580,6 +617,7 @@ export class BoardService implements OnModuleInit {
         kind: card.kind,
         issueOnRun: card.issueOnRun,
         specOnRun: card.specOnRun,
+        issueNumber: card.issueNumber,
       },
       result: 'ok',
     });
@@ -596,6 +634,22 @@ export class BoardService implements OnModuleInit {
       actor,
     );
     return this.detail(projectId, card.number);
+  }
+
+  /**
+   * C-397: the issue a new card is made from — open and of the project's
+   * repository (#447 D8) — with its body, which a card made without one takes.
+   */
+  private async linkedIssue(projectId: string, number: number) {
+    const link = await assertIssueLinkable(this.prisma, projectId, number);
+    const cached = await this.prisma.issueCache.findUnique({
+      where: { projectId_number: { projectId, number } },
+      select: { body: true },
+    });
+    return {
+      ...link,
+      body: (cached?.body ?? '').slice(0, BOARD_CARD_BODY_MAX),
+    };
   }
 
   /**
@@ -1313,7 +1367,10 @@ export class BoardService implements OnModuleInit {
     deleteBranch: boolean,
     actor: BoardActor,
   ): Promise<CardMergeOutcome> {
-    return this.work.mergePr(project, card, headSha, deleteBranch, actor);
+    // C-389: Accept moves the card to Completed itself, as the person's Accept.
+    return this.work.mergePr(project, card, headSha, deleteBranch, actor, {
+      complete: false,
+    });
   }
 
   /**
@@ -1365,6 +1422,31 @@ export class BoardService implements OnModuleInit {
   ): Promise<BoardCardDetail> {
     const project = await this.work.project(projectId);
     const card = await this.work.card(projectId, number);
+    if (!isActiveRoundPhase(card.rounds[0]?.phase)) {
+      // C-398 (ADR-0102): Stop on a queued card takes it out of the run queue.
+      const removed = await this.prisma.boardRunQueueCard.deleteMany({
+        where: { cardId: card.id, status: { in: ['queued', 'waiting'] } },
+      });
+      if (removed.count > 0) {
+        await this.audit.record({
+          ...actor.ctx,
+          action: 'card.run_dequeued',
+          target: { type: 'board_card', id: card.id },
+          projectId,
+          after: { number: card.number },
+          result: 'ok',
+        });
+        this.work.publish(projectId, card.id);
+        if (card.stageId !== null) {
+          const stage = await this.prisma.boardStackStage.findUnique({
+            where: { id: card.stageId },
+            select: { stackId: true },
+          });
+          if (stage) this.work.publishStack(projectId, stage.stackId);
+        }
+        return this.detail(projectId, number);
+      }
+    }
     await this.work.stop(project, card, actor);
     return this.detail(projectId, number);
   }

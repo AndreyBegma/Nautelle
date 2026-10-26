@@ -57,6 +57,8 @@ export interface CardSeed {
   column?: BoardColumn;
   updatedAt: Date;
   issueNumber?: number;
+  /** C-393: the card's pull request, found by `#<number>`. */
+  prNumber?: number;
   /** #388: seeds a mirrored `fleet` card of this issue and slot. */
   fleet?: { issue: number; slot: string; stage?: string };
 }
@@ -319,6 +321,7 @@ export class WorkWorld {
         issueUrl: seed.issueNumber
           ? `https://github.com/${REPO}/issues/${seed.issueNumber}`
           : null,
+        prNumber: seed.prNumber ?? null,
         updatedAt: seed.updatedAt,
       },
     });

@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "name": "Work, Projects and Usage open on live data",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/work"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Work follows the Board without a reload"
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Work",
+        "exact": true
+      },
+      "text": "Work",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "marker",
+      "title": "Projects list, one fleet request"
+    },
+    {
+      "action": "navigate",
+      "path": "/projects"
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Projects",
+        "exact": true
+      },
+      "text": "Projects",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "marker",
+      "title": "Usage moves while a round runs"
+    },
+    {
+      "action": "navigate",
+      "path": "/usage"
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Usage",
+        "exact": true
+      },
+      "text": "Usage",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    }
+  ]
+}

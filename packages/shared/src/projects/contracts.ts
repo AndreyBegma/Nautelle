@@ -45,6 +45,12 @@ export const PROJECT_ERROR = {
   /** Only `active` users can be added as members. */
   userNotActive: 'user_not_active',
   alreadyMember: 'already_member',
+  /** C-400: a move to the runner the project is already on. */
+  sameRunner: 'same_runner',
+  /** C-400: the path on the target runner holds another repository. */
+  differentRepository: 'different_repository',
+  /** C-400: a card round or another run of the project is still running. */
+  workRunning: 'work_running',
 } as const;
 export type ProjectErrorCode =
   (typeof PROJECT_ERROR)[keyof typeof PROJECT_ERROR];
@@ -138,6 +144,13 @@ export interface ProjectDetail extends ProjectSummary {
   } | null;
   hasClaudeMd: boolean;
   hasAgentsMd: boolean;
+  /** C-395: `demoflow.config.json` at the repository root; null until a runner reports it. */
+  hasDemoflowConfig: boolean | null;
+  /**
+   * C-395: the newest push check (C-396, `git push --dry-run`) of this
+   * project's checkout on its runner; null until one has run.
+   */
+  pushCheck: PushCheckView | null;
   lastInspectedAt: string;
   createdAt: string;
   updatedAt: string;
@@ -145,6 +158,11 @@ export interface ProjectDetail extends ProjectSummary {
   /** ADR-0021; optional until the API returns them (spec 201). */
   shipSessionContent?: boolean;
   sessionContentRetentionDays?: number;
+  /**
+   * C-401: how long a tool-use request of this project waits for a person,
+   * in minutes; null leaves it to the requester's account (default 5).
+   */
+  toolUseTimeoutMinutes: number | null;
   /** What the project's runner said it serves in its latest hello (#233); null = unknown. Names only, never paths or versions. */
   runnerCommands: RunnerCommands | null;
 }
@@ -188,12 +206,77 @@ export interface InspectProjectRequest {
   path: string;
 }
 
+/**
+ * C-396: `POST /admin/projects/discover`. Answers the runner's
+ * `ProjectDiscoverResult`: the git repositories under its allowed roots.
+ */
+export interface DiscoverProjectsRequest {
+  runnerId: string;
+}
+
+/**
+ * C-396: `POST /admin/projects/push-check` — the same body as Inspect. The
+ * runner runs `git push --dry-run` to origin; the answer is stored per runner
+ * and path, so the onboarding checklist sees it once the project is connected.
+ */
+export type PushCheckRequest = InspectProjectRequest;
+
+/** C-396: what `POST /admin/projects/push-check` answers. */
+export interface PushCheckView {
+  /** origin accepted the dry-run push. */
+  ok: boolean;
+  /** origin's URL without credentials; null when the repository has none. */
+  remote: string | null;
+  /** What git said, or why the check could not run. */
+  message: string;
+  checkedAt: string;
+}
+
 /** `POST /admin/projects`. Answers a `ProjectDetail` (201). */
 export interface ConnectProjectRequest {
   runnerId: string;
   path: string;
   /** Defaults to the repository name. */
   displayName?: string;
+}
+
+/**
+ * `POST /projects/:id/move` (admin, C-400): the project's new runner and its
+ * main checkout there, validated by that runner. `defaultProfileId` is a
+ * profile of the new runner; absent or `null` leaves the project without one.
+ */
+export interface MoveProjectRequest {
+  runnerId: string;
+  path: string;
+  defaultProfileId?: string | null;
+}
+
+/** A worktree a move leaves on the old runner's machine, for cleanup. */
+export interface ProjectMoveWorktree {
+  /** The absolute path on the old machine. */
+  path: string;
+  /** A board card's worktree, or an orchestrator slot's. */
+  source: 'card' | 'slot';
+  /** `C-<number> <title>` for a card, the slot name for a slot. */
+  label: string;
+  branch: string | null;
+}
+
+/** `GET /projects/:id/move` (admin): what a move would meet right now. */
+export interface ProjectMoveCheck {
+  /** What still runs (`C-12 Fix login`, `skill: review`); a move is refused until it is empty. */
+  running: string[];
+  /** The worktrees a move would leave on the current runner's machine. */
+  worktrees: ProjectMoveWorktree[];
+}
+
+/** `POST /projects/:id/move`. */
+export interface ProjectMoveResult {
+  project: ProjectDetail;
+  /** Where the project was. */
+  from: { runnerId: string; runnerName: string; rootPath: string };
+  /** Left on the old machine; nothing there was touched. */
+  worktrees: ProjectMoveWorktree[];
 }
 
 /** `PATCH /projects/:id` (admin). `null` clears an optional field. */
@@ -207,6 +290,8 @@ export interface UpdateProjectRequest {
   shipSessionContent?: boolean;
   /** 1–365 (`SESSION_CONTENT_RETENTION_DAYS`). */
   sessionContentRetentionDays?: number;
+  /** C-401: 1–720 (`TOOL_USE_TIMEOUT_*_MINUTES`); null clears it. */
+  toolUseTimeoutMinutes?: number | null;
 }
 
 /**

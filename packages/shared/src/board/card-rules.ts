@@ -4,6 +4,7 @@ import {
   BOARD_ERROR,
   type BoardCardView,
   type BoardErrorCode,
+  type CardRoundBrief,
 } from './contracts';
 import type { BoardMoveRefusal } from './moves';
 import {
@@ -20,8 +21,12 @@ import {
 
 type RuleCard = Pick<
   BoardCardView,
-  'source' | 'tracking' | 'column' | 'round' | 'design'
+  'source' | 'tracking' | 'column' | 'round' | 'design' | 'queue'
 >;
+
+/** C-398: the card waits in the run queue for a slot (or a dependency). */
+export const isQueued = (card: RuleCard): boolean =>
+  card.queue !== undefined && card.queue !== null;
 
 export const isRoundActive = (round: RuleCard['round']): boolean =>
   isActiveRoundPhase(round?.phase);
@@ -51,6 +56,7 @@ export const canRun = (card: RuleCard): boolean =>
   ownsWorker(card) &&
   (card.column === 'todo' || card.column === 'finished') &&
   !isRoundActive(card.round) &&
+  !isQueued(card) &&
   !designBlocksRun(card);
 
 /** A retry after a failed, ended or stopped round resumes the same session. */
@@ -61,8 +67,28 @@ export const canRetry = (card: RuleCard): boolean =>
   !isRoundActive(card.round) &&
   !designBlocksRun(card);
 
+/** C-398: Stop on a card in the run queue takes it out of the queue. */
 export const canStop = (card: RuleCard): boolean =>
-  ownsWorker(card) && isRoundActive(card.round);
+  ownsWorker(card) && (isRoundActive(card.round) || isQueued(card));
+
+/**
+ * C-399 (ADR-0101): a hard budget paused the card's latest round. The retry
+ * is its Resume: it continues the same session once the budget allows.
+ */
+export const isPausedForBudget = (card: RuleCard): boolean =>
+  card.round?.phase === 'cancelled' && card.round.pausedFor === 'budget';
+
+/** What the Run action reads for a card that can run or retry. */
+export const runActionLabel = (card: RuleCard): string =>
+  isPausedForBudget(card) ? 'Resume' : canRetry(card) ? 'Run again' : 'Run';
+
+/** C-399: a round's state as a person reads it — a paused one says why. */
+export const roundStateLabel = (
+  round: Pick<CardRoundBrief, 'phase' | 'pausedFor'>,
+): string =>
+  round.phase === 'cancelled' && round.pausedFor === 'budget'
+    ? 'Paused: budget'
+    : ROUND_PHASE_LABEL[round.phase];
 
 export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
   card_running:
@@ -71,7 +97,6 @@ export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
   card_completed: 'This card is already completed.',
   invalid_move: 'A suggestion leaves the Inbox only by Accept, into To Do.',
   plan_task_derived: PLAN_TASK_MOVE_REFUSAL_TEXT,
-  fleet_slot: 'A fleet card follows its slot. Accept it once it is finished.',
 };
 
 /** A round's phase as a person reads it. */

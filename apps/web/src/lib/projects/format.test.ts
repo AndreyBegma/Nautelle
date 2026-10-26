@@ -7,11 +7,14 @@ import {
   describeProjectError,
   docsKindLabel,
   docsOverrideRequest,
+  filterRepositories,
   githubAppState,
+  moveBlocker,
   noOnlineRunnerCopy,
   specFolderError,
   specFolderOf,
   suggestedPathOf,
+  worktreeRemoveCommand,
 } from './format';
 
 describe('githubAppState', () => {
@@ -77,6 +80,75 @@ describe('connectBlocker', () => {
       }),
     );
     expect(blocked).toContain('GitHub');
+  });
+});
+
+describe('moveBlocker (C-400)', () => {
+  test('a main checkout of the same repository is a place to move to', () => {
+    expect(moveBlocker(inspection(), 'O/App')).toBeNull();
+  });
+
+  test('a checkout of another repository is refused', () => {
+    expect(moveBlocker(inspection(), 'o/other')).toBe(
+      'This is a checkout of o/app, not o/other.',
+    );
+  });
+
+  test('the connect refusals come first', () => {
+    expect(
+      moveBlocker(inspection({ isMainCheckout: false }), 'o/app'),
+    ).toContain('not the main checkout');
+  });
+});
+
+describe('worktreeRemoveCommand (C-400)', () => {
+  test('a plain path stays bare; one with a space or a quote is quoted', () => {
+    expect(worktreeRemoveCommand('/w/app', '/w/app-wt/c-4')).toBe(
+      'git -C /w/app worktree remove /w/app-wt/c-4',
+    );
+    expect(worktreeRemoveCommand('/w/my app', "/w/it's")).toBe(
+      `git -C '/w/my app' worktree remove '/w/it'\\''s'`,
+    );
+  });
+});
+
+describe('filterRepositories (C-396)', () => {
+  const repos = [
+    { path: '/srv/dev/notes', name: 'notes', repo: null, root: '/srv/dev' },
+    {
+      path: '/srv/dev/widget',
+      name: 'widget',
+      repo: 'acme/widget',
+      root: '/srv/dev',
+    },
+    {
+      path: '/srv/work/api',
+      name: 'api',
+      repo: 'Acme/API',
+      root: '/srv/work',
+    },
+  ];
+
+  test('an empty query keeps them all, GitHub repositories first', () => {
+    expect(filterRepositories(repos, '  ').map((r) => r.name)).toEqual([
+      'widget',
+      'api',
+      'notes',
+    ]);
+  });
+
+  test('every word must match owner/name or the path, ignoring case', () => {
+    expect(filterRepositories(repos, 'acme').map((r) => r.name)).toEqual([
+      'widget',
+      'api',
+    ]);
+    expect(filterRepositories(repos, 'ACME work').map((r) => r.name)).toEqual([
+      'api',
+    ]);
+    expect(filterRepositories(repos, 'notes').map((r) => r.name)).toEqual([
+      'notes',
+    ]);
+    expect(filterRepositories(repos, 'nothing')).toEqual([]);
   });
 });
 
@@ -154,6 +226,17 @@ describe('errors', () => {
     ).toContain("not registered this path as the project's root");
     expect(describeProjectError(refused('outside the allowed roots'))).toBe(
       'The runner does not allow that path: outside the allowed roots',
+    );
+  });
+
+  test('work running lists what runs and says to stop it (C-400)', () => {
+    const refused = new ApiError(
+      409,
+      PROJECT_ERROR.workRunning as never,
+      'Stop what runs first: C-4 Fix login, slot w1',
+    );
+    expect(describeProjectError(refused)).toBe(
+      'Stop what runs first: C-4 Fix login, slot w1, then move the project.',
     );
   });
 

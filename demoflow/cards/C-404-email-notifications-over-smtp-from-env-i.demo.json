@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "name": "Email notifications over SMTP from the environment",
+  "description": "Admin › Integrations lists Email, whose page shows the SMTP server from SMTP_URL and the test send; Account › Notifications gets an Email card. The demo server has no SMTP_URL, so both show how email is turned on.",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/admin/integrations"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "heading",
+        "name": "Integrations",
+        "exact": true
+      },
+      "timeoutMs": 60000
+    },
+    {
+      "action": "marker",
+      "title": "Email among the integrations"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "Notifications by email, at once or as a daily digest"
+      },
+      "timeoutMs": 30000,
+      "zoom": true
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "marker",
+      "title": "The Email integration page"
+    },
+    {
+      "action": "navigate",
+      "path": "/admin/integrations/email"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "heading",
+        "name": "Email",
+        "exact": true
+      },
+      "timeoutMs": 60000
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "No SMTP_URL on the server"
+      },
+      "timeoutMs": 30000,
+      "zoom": true
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "heading",
+        "name": "Status",
+        "exact": true
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "marker",
+      "title": "Email in Account › Notifications"
+    },
+    {
+      "action": "navigate",
+      "path": "/account/notifications"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "css": "h1:has-text(\"Notifications\")"
+      },
+      "timeoutMs": 60000
+    },
+    {
+      "action": "scroll",
+      "target": {
+        "text": "Email is not set up on this server."
+      }
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "Email is not set up on this server."
+      },
+      "timeoutMs": 30000,
+      "zoom": true
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    }
+  ]
+}

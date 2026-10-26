@@ -19,6 +19,7 @@ import {
   type CardHooksCause,
   type CardPrTarget,
   type CardPullRequestRef,
+  type CardQueueView,
   type CardRecommendationView,
   type CardReviewState,
   type CardReviewStepView,
@@ -97,6 +98,71 @@ type CardDesignRow = Prisma.TaskDesignGetPayload<typeof cardDesignSelect>;
  */
 export type CardWithRounds = BoardCard & {
   rounds: BoardCardRound[];
+  design?: CardDesignRow | null;
+};
+
+/**
+ * C-364: the card columns `GET /board` leaves out — the body, the capture
+ * evidence, the session prefix and the escalation note. No card face reads
+ * them; the detail (`GET /board/cards/:number`) still does.
+ */
+export const cardFaceOmit = {
+  body: true,
+  evidence: true,
+  sessionPrefix: true,
+  escalationNote: true,
+} as const satisfies Prisma.BoardCardOmit;
+
+/**
+ * C-364: the round columns a card face reads — `toCardView` and the board's
+ * facts. The prompt snapshot (`cardBody`, `cardAttachments`), the feedback,
+ * the summary and the restart estimate stay on the detail.
+ */
+export const cardFaceRoundSelect = {
+  id: true,
+  round: true,
+  runId: true,
+  trigger: true,
+  phase: true,
+  finishedBy: true,
+  startedAt: true,
+  waitingAt: true,
+  backgroundAt: true,
+  backgroundCommand: true,
+  wiring: true,
+  wiringReason: true,
+  autoRunAfter: true,
+  pendingQuestion: true,
+  finishRefusedCode: true,
+  blockingDialog: true,
+  quotaLimit: true,
+  quotaResetsAt: true,
+  restartMode: true,
+  pausedFor: true,
+} as const satisfies Prisma.BoardCardRoundSelect;
+
+export type CardFaceRound = Prisma.BoardCardRoundGetPayload<{
+  select: typeof cardFaceRoundSelect;
+}>;
+
+/**
+ * C-364: the `findMany` arguments that read a card face — the Board's and
+ * the Inbox's (C-390) read.
+ */
+export const cardFaceArgs = {
+  omit: cardFaceOmit,
+  include: {
+    rounds: {
+      orderBy: { round: 'desc' as const },
+      select: cardFaceRoundSelect,
+    },
+    design: cardDesignSelect,
+  },
+} satisfies Prisma.BoardCardFindManyArgs;
+
+/** C-364: a card as its face reads it; every `CardWithRounds` is one. */
+export type CardFace = Omit<BoardCard, keyof typeof cardFaceOmit> & {
+  rounds: CardFaceRound[];
   design?: CardDesignRow | null;
 };
 
@@ -219,6 +285,8 @@ export interface CardFacts {
   messagesRefused?: ReadonlyMap<string, string>;
   /** C-371: each card's newest demo recording, by card id; absent is none. */
   demos?: ReadonlyMap<string, CardDemoBrief>;
+  /** C-398: each queued card's place in the run queue, by card id; absent is none. */
+  queue?: ReadonlyMap<string, CardQueueView>;
   now: Date;
 }
 
@@ -227,7 +295,7 @@ export interface CardFacts {
  * and, after a `fresh` start, what it saved.
  */
 export const restartOf = (
-  card: CardWithRounds,
+  card: CardFace,
   facts: Pick<CardFacts, 'restartSavings'>,
 ): Pick<BoardCardView, 'restartMode' | 'warmupSavedUsd'> => {
   const latest = card.rounds[0];
@@ -250,7 +318,7 @@ const restartEstimateOf = (
 
 /** #447 D15: the chip of the card's latest round's live incident. */
 export const stewardChipOf = (
-  card: CardWithRounds,
+  card: CardFace,
   facts: Pick<CardFacts, 'steward'>,
 ): StewardCardChip | null => {
   const latest = card.rounds[0];
@@ -259,7 +327,7 @@ export const stewardChipOf = (
 
 /** #282 D1: a `terminal` card's session; `null` once the session row is gone. */
 const trackingOf = (
-  card: BoardCard,
+  card: CardFace,
   facts: CardFacts,
 ): CardTrackingView | null =>
   card.source === 'terminal' && card.trackedSessionId !== null
@@ -275,7 +343,7 @@ const trackingOf = (
  * `alive` is false.
  */
 export const takenOf = (
-  card: BoardCard,
+  card: Pick<BoardCard, 'source' | 'trackedSessionId' | 'takenBranch'>,
   facts: Pick<CardFacts, 'alive'>,
 ): CardTakenView | null =>
   card.source !== 'terminal' && card.trackedSessionId !== null
@@ -290,7 +358,7 @@ const isFleetStage = (value: string): value is FleetStage =>
   (FLEET_STAGES as readonly string[]).includes(value);
 
 /** #282 D4: a `fleet` card's slot, as the fleet projector wrote it. */
-const fleetOf = (card: BoardCard): CardFleetView | null =>
+const fleetOf = (card: CardFace): CardFleetView | null =>
   card.source === 'fleet' && card.fleetIssue !== null
     ? {
         issue: card.fleetIssue,
@@ -300,6 +368,7 @@ const fleetOf = (card: BoardCard): CardFleetView | null =>
             ? card.fleetStage
             : null,
         slotGone: card.fleetSlotGone,
+        detached: card.fleetDetached,
       }
     : null;
 
@@ -310,8 +379,8 @@ const iso = (date: Date | null): string | null => date?.toISOString() ?? null;
  * reached — the plugin's hooks are not installed where the worker runs.
  */
 const hooksMissing = (
-  card: BoardCard,
-  round: BoardCardRound,
+  card: Pick<BoardCard, 'sessionId'>,
+  round: CardFaceRound,
   facts: CardFacts,
 ): boolean =>
   isActiveRoundPhase(round.phase) &&
@@ -324,8 +393,8 @@ const hooksMissing = (
  * reports no such profile, or the profile has no `agentdock` field.
  */
 export const hooksCauseOf = (
-  card: BoardCard,
-  round: BoardCardRound,
+  card: Pick<BoardCard, 'sessionId' | 'projectId'>,
+  round: CardFaceRound,
   facts: CardFacts,
 ): {
   hooksCause: CardHooksCause | null;
@@ -394,8 +463,8 @@ export const quotaWaitOf = (
 };
 
 const brief = (
-  card: BoardCard,
-  round: BoardCardRound | undefined,
+  card: CardFace,
+  round: CardFaceRound | undefined,
   facts: CardFacts,
 ): CardRoundBrief | null =>
   round
@@ -414,12 +483,13 @@ const brief = (
         finishRefused: finishRefusedOf(round),
         blockingDialog: blockingDialogOf(round),
         quotaWait: quotaWaitOf(round),
+        pausedFor: round.pausedFor,
       }
     : null;
 
 /** #489 M4: an active round's question screen, as the runner reported it. */
 export const pendingQuestionOf = (
-  round: BoardCardRound,
+  round: Pick<BoardCardRound, 'phase' | 'pendingQuestion'>,
 ): PendingQuestion | null => {
   if (!isActiveRoundPhase(round.phase) || round.pendingQuestion === null) {
     return null;
@@ -441,7 +511,7 @@ const REVIEW_NEEDS_PERSON: ReadonlySet<string> = new Set([
  * `passed` only while that pass reviewed the head CI last checked.
  */
 export const reviewOf = (
-  card: CardWithRounds,
+  card: CardFace,
   steps: readonly CardReviewStepFact[] | undefined,
   runs: readonly CardReviewRunFact[],
 ): CardReviewView | null => {
@@ -508,7 +578,7 @@ export const reviewOf = (
 
 /** The sum of the rounds' priced costs; `null` when none is priced. */
 const cardCost = (
-  rounds: readonly BoardCardRound[],
+  rounds: readonly Pick<BoardCardRound, 'runId'>[],
   costs: ReadonlyMap<string, string>,
 ): string | null => {
   let total: Prisma.Decimal | null = null;
@@ -526,7 +596,7 @@ const cardCost = (
  * rounds.
  */
 const cardTokenSaved = (
-  card: CardWithRounds,
+  card: CardFace,
   facts: TokenSaverCardFacts,
 ): TokenSavedView | null => {
   const session =
@@ -545,7 +615,7 @@ const cardTokenSaved = (
 };
 
 export const toCardView = (
-  card: CardWithRounds,
+  card: CardFace,
   facts: CardFacts,
 ): BoardCardView => ({
   id: card.id,
@@ -612,6 +682,7 @@ export const toCardView = (
   autoRunWhenReady: card.autoRunWhenReady,
   readiness: cardReadiness(card.column, facts.dependencies.get(card.id) ?? []),
   stack: facts.stacks?.get(card.id) ?? null,
+  queue: facts.queue?.get(card.id) ?? null,
   tracking: trackingOf(card, facts),
   taken: takenOf(card, facts),
   queuedForSessionId: card.queuedForSessionId,
@@ -745,6 +816,8 @@ const toRoundView = (
   ...wiringOf(round),
   autoRunAfter: round.autoRunAfter,
   escalation: round.escalation,
+  model: round.model,
+  effort: round.effort,
   finishRefused: finishRefusedOf(round),
   blockingDialog: blockingDialogOf(round),
   costUsd: facts.costs.get(round.runId) ?? null,
@@ -758,6 +831,7 @@ const toRoundView = (
   finishedAt: iso(round.finishedAt),
   endedAt: iso(round.endedAt),
   restartMode: round.restartMode,
+  pausedFor: round.pausedFor,
   restartEstimate: restartEstimateOf(round.restartEstimate),
   warmupTokens: round.warmupTokens,
   warmupMs: round.warmupMs,

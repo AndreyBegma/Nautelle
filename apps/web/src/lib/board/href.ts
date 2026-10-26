@@ -28,3 +28,17 @@ export const boardNewPlanHref = boardNewWorkHref;
 /** #480: one stack on its own page. */
 export const boardStackPageHref = (projectId: string, number: number): string =>
   `${boardHref(projectId)}/stacks/${number}`;
+
+/** C-393: the board with a new card started (⌘K's New card). */
+export const boardQuickCardHref = (projectId: string): string =>
+  `${boardHref(projectId)}?quickCard=1`;
+
+/** C-393: the card's sheet with its Accept dialog open (⌘K's Accept). */
+export const boardCardAcceptHref = (
+  projectId: string,
+  number: number,
+): string => `${boardCardHref(projectId, number)}&accept=1`;
+
+/** C-393: the card's sheet with the Stop worker question open (⌘K's Stop). */
+export const boardCardStopHref = (projectId: string, number: number): string =>
+  `${boardCardHref(projectId, number)}&stop=1`;

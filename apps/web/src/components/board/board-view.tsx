@@ -18,6 +18,7 @@ import {
   type DropMove,
   decideDrop,
 } from '../../lib/board/board-state';
+import { stopLeavesQueue } from '../../lib/board/card-confirm';
 import { runWaitsFor } from '../../lib/board/dependencies';
 import {
   type BoardFilter,
@@ -38,6 +39,7 @@ import {
   canStop,
   columnsOf,
   isSuggestion,
+  runActionLabel,
 } from '../../lib/board/format';
 import { boardStackPageHref } from '../../lib/board/href';
 import { boardItems, isPlanItem } from '../../lib/board/plan-tasks';
@@ -52,6 +54,7 @@ import {
   withAll,
   withRange,
 } from '../../lib/board/selection';
+import { cardsInOrder } from '../../lib/board/shortcuts';
 import {
   type ColumnItem,
   foldStacks,
@@ -66,7 +69,9 @@ import { CardFace } from './card-face';
 import { GroupStackDialog } from './group-stack-dialog';
 import { MovePicker } from './move-picker';
 import { PlanTaskFace } from './plan-task-face';
+import { ShortcutHelp } from './shortcut-help';
 import { StackFace } from './stack-face';
+import { useBoardShortcuts } from './use-board-shortcuts';
 import { useBulkActions } from './use-bulk-actions';
 import type { CardActions } from './use-card-actions';
 import { useCardMove } from './use-card-move';
@@ -101,6 +106,7 @@ export function BoardColumns({
   onOpen,
   onOpenPlanTask,
   onOpenTerminal,
+  onNewCard,
   onReload,
 }: {
   projectId: string;
@@ -120,6 +126,8 @@ export function BoardColumns({
   onOpen: (card: BoardCardView) => void;
   onOpenPlanTask: (task: BoardPlanTaskView) => void;
   onOpenTerminal: (card: BoardCardView) => void;
+  /** C-393: the `n` key. */
+  onNewCard: () => void;
   onReload: () => void;
 }) {
   const router = useRouter();
@@ -305,6 +313,15 @@ export function BoardColumns({
   const columns = visibleColumns(allColumns, phone);
   const folded = columns.filter((c) => collapsed.includes(c.id)).length;
 
+  // C-393: the keyboard walks the cards of the columns that are open.
+  const keyboard = useBoardShortcuts({
+    cards: cardsInOrder(columns.filter((c) => !collapsed.includes(c.id))),
+    canOperate,
+    actions,
+    onOpen,
+    onNewCard,
+  });
+
   /**
    * Under a filter — or beside a folded stack (#480) — the board reports an
    * index among the visible items; a stack stands for its first folded card.
@@ -390,6 +407,7 @@ export function BoardColumns({
                 card={item.card}
                 canOperate={canOperate}
                 hints={hints?.get(item.card.number)}
+                focused={keyboard.cursor === item.card.number}
                 menu={menu}
                 selection={
                   canOperate
@@ -513,7 +531,9 @@ export function BoardColumns({
                     tone="danger"
                     onSelect={() => actions.askStop(card)}
                   >
-                    Stop worker
+                    {stopLeavesQueue(card)
+                      ? 'Remove from queue'
+                      : 'Stop worker'}
                   </MenuItem>
                 ) : null}
                 {canOperate && canDelete(card) ? (
@@ -530,6 +550,10 @@ export function BoardColumns({
         />
       </div>
 
+      <ShortcutHelp
+        open={keyboard.helpOpen}
+        onOpenChange={keyboard.setHelpOpen}
+      />
       {bulk.dialogs}
       {canOperate ? (
         <BulkActionBar
@@ -629,7 +653,7 @@ function RunMenuItem({
   const hold = card.stack?.gate ?? runWaitsFor(card.dependsOn);
   return (
     <MenuItem disabled={disabled || hold !== null} onSelect={onRun}>
-      {canRetry(card) ? 'Run again' : 'Run'}
+      {runActionLabel(card)}
       {hold ? ` — ${hold.charAt(0).toLowerCase()}${hold.slice(1)}` : ''}
     </MenuItem>
   );

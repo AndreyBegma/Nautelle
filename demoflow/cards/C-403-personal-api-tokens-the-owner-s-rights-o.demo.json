@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "name": "Personal API tokens: create, show once, revoke, and the admin list",
+  "description": "C-403: Account › API tokens creates a named token with your rights or read-only access and an expiry, shows it once with a curl line, lists it with its last use and revokes it. Admin › Users lists every user's tokens and revokes any of them; the audit log records both.",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/account"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Create a token under Account"
+    },
+    {
+      "action": "scroll",
+      "target": {
+        "role": "button",
+        "name": "Create token"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Name",
+        "exact": true
+      },
+      "value": "CI deploy",
+      "caption": "A token is named after what uses it.",
+      "zoom": true
+    },
+    {
+      "action": "select",
+      "target": {
+        "label": "Expires"
+      },
+      "option": "30 days",
+      "caption": "Your rights, never more than your current role; it expires in 30 days."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Create token"
+      }
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Copy “CI deploy” now"
+      },
+      "caption": "The token is shown once, with a curl line to try it; only its hash is stored.",
+      "timeoutMs": 15000,
+      "zoom": true
+    },
+    {
+      "action": "screenshot",
+      "name": "token-shown-once"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "I have copied it"
+      }
+    },
+    {
+      "action": "marker",
+      "title": "A read-only token"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Name",
+        "exact": true
+      },
+      "value": "Nightly report"
+    },
+    {
+      "action": "select",
+      "target": {
+        "label": "Access"
+      },
+      "option": "Read-only",
+      "caption": "A read-only token is refused every write.",
+      "zoom": true
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Create token"
+      }
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Copy “Nightly report” now"
+      },
+      "timeoutMs": 15000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "I have copied it"
+      }
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Nightly report",
+        "exact": true
+      },
+      "caption": "The list shows each token's access, projects, expiry and last use.",
+      "timeoutMs": 15000,
+      "zoom": true
+    },
+    {
+      "action": "screenshot",
+      "name": "token-list"
+    },
+    {
+      "action": "marker",
+      "title": "Revoke a token"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Revoke Nightly report",
+        "exact": true
+      },
+      "caption": "Revoke refuses the token from its next request."
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Revoke “Nightly report”?"
+      },
+      "timeoutMs": 10000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Revoke",
+        "exact": true
+      }
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Revoked",
+        "exact": true
+      },
+      "caption": "The revoked token stays in the list, marked Revoked.",
+      "timeoutMs": 15000,
+      "zoom": true
+    },
+    {
+      "action": "screenshot",
+      "name": "token-revoked"
+    },
+    {
+      "action": "marker",
+      "title": "An admin sees every user's tokens"
+    },
+    {
+      "action": "navigate",
+      "path": "/admin/users"
+    },
+    {
+      "action": "scroll",
+      "target": {
+        "text": "Personal API tokens of every user"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "CI deploy",
+        "exact": true
+      },
+      "caption": "Admin › Users lists each token with its owner, status and last use.",
+      "timeoutMs": 15000,
+      "zoom": true
+    },
+    {
+      "action": "screenshot",
+      "name": "admin-token-list"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Revoke CI deploy",
+        "exact": true
+      },
+      "caption": "An admin can revoke any user's token."
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "text": "Revoke “CI deploy” of"
+      },
+      "timeoutMs": 10000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Revoke",
+        "exact": true
+      }
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "button",
+        "name": "Revoke CI deploy",
+        "exact": true
+      },
+      "state": "hidden",
+      "timeoutMs": 15000,
+      "caption": "The admin revoke is recorded with the owner in the audit log."
+    },
+    {
+      "action": "marker",
+      "title": "The audit log"
+    },
+    {
+      "action": "navigate",
+      "path": "/admin/audit"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "css": ":nth-match(tbody span[title=\"auth.api_token_revoke\"], 1)"
+      },
+      "caption": "Creating and revoking tokens are in the audit log.",
+      "timeoutMs": 30000,
+      "zoom": true
+    },
+    {
+      "action": "screenshot",
+      "name": "audit-token-actions"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    }
+  ]
+}

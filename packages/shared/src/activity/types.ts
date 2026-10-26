@@ -1,7 +1,13 @@
 import { AI_DIGEST_EVENT_RULES } from '../ai/activity-rules';
 import type { AuditActorType, AuditResult } from '../audit/actions';
-import { CARD_BACKGROUND_STALLED_EVENT } from '../board/contracts';
-import { cardBackgroundStalledTitle } from '../board/naming';
+import {
+  CARD_BACKGROUND_STALLED_EVENT,
+  CARD_PAUSED_EVENT,
+} from '../board/contracts';
+import {
+  cardBackgroundStalledTitle,
+  cardPausedForBudgetTitle,
+} from '../board/naming';
 import { DEMO_EVENT_RULES } from '../demos/activity-rules';
 import { API_EVENT_SOURCE } from '../protocol/envelope';
 import { STEWARD_EVENT_RULES } from '../steward/activity-rules';
@@ -352,6 +358,26 @@ const EVENT_RULES: Record<string, EventRule> = {
         : null;
     },
   },
+  // C-399 (ADR-0101): a hard budget paused a running card round.
+  [CARD_PAUSED_EVENT]: {
+    category: 'fleet',
+    severity: fixed('warn'),
+    title: (ctx) => {
+      const number = int(ctx.data, 'number');
+      return number !== null
+        ? cardPausedForBudgetTitle(number)
+        : 'A card was paused: a hard budget was reached';
+    },
+    keep: ['cardId', 'number', 'round', 'reason', 'budget'],
+    bySystem: true,
+    sources: [API_EVENT_SOURCE],
+    link: (ctx) => {
+      const number = int(ctx.data, 'number');
+      return ctx.projectId
+        ? `/projects/${ctx.projectId}/board${number !== null ? `?card=${number}` : ''}`
+        : null;
+    },
+  },
   // C-370: a card's demo video ready or failed.
   ...DEMO_EVENT_RULES,
   ...STEWARD_EVENT_RULES,
@@ -443,6 +469,8 @@ const AUDIT_TITLES: Record<string, string> = {
   'user.update': 'User updated',
   'user.delete': 'User deleted',
   'user.two_factor_reset': 'User two-factor sign-in reset',
+  'user.reset_link': 'User reset link made',
+  'auth.password_reset': 'Password reset with a link',
   'settings.registration': 'Registration settings changed',
   'settings.two_factor': 'Two-factor requirement changed',
   'runner.create': 'Runner created',
@@ -460,6 +488,7 @@ const AUDIT_TITLES: Record<string, string> = {
   'project.member_remove': 'Member removed',
   'project.docs_source_override': 'Docs source overridden',
   'project.docs_source_reset': 'Docs source reset',
+  'project.move': 'Project moved to another runner',
   'project.repo_rename': 'Project repository renamed on GitHub',
   'issue.create': 'Issue created',
   'issue.queue': 'Issue queued for the fleet',

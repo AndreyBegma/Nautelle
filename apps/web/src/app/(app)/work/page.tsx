@@ -4,8 +4,11 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
+  BOARD_CHANGED_EVENT,
+  PLANNER_LIVE_EVENT,
   type ProjectSummary,
   projectRoleAtLeast,
+  QUEUE_LIVE_EVENT,
   type WorkPage,
   workCardHref,
 } from '@nautelle/shared';
@@ -20,6 +23,7 @@ import { WorkHeader } from '../../../components/work/work-header';
 import { WorkTable } from '../../../components/work/work-table';
 import { api } from '../../../lib/api';
 import { useUrlFilters } from '../../../lib/filters/use-url-filters';
+import { useLiveRefresh } from '../../../lib/live/use-live-refresh';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
 import { describePlannerError } from '../../../lib/tasks/format';
@@ -42,17 +46,8 @@ const NextLink: NonNullable<ComponentProps<typeof EmptyState>['link']> = ({
   </Link>
 );
 
-/** Work spans projects, so there is no single live topic to follow: poll. */
-const POLL_MS = 15_000;
-
-function usePoll(ms: number): number {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setTick((n) => n + 1), ms);
-    return () => clearInterval(timer);
-  }, [ms]);
-  return tick;
-}
+/** What moves a Work row: a card (Board), a plan task (Planner) or an issue (Queue). */
+const WORK_EVENTS = [BOARD_CHANGED_EVENT, PLANNER_LIVE_EVENT, QUEUE_LIVE_EVENT];
 
 function WorkView() {
   // The URL holds the filters: reload, back and a shared link all keep them.
@@ -64,7 +59,7 @@ function WorkView() {
   const [pickProject, setPickProject] = useState(false);
   const [newCardOpen, setNewCardOpen] = useState(false);
   const showError = useErrorToast();
-  const tick = usePoll(POLL_MS);
+  const [tick, setTick] = useState(0);
   const query = workQuery(filters);
 
   // `tick` reloads the first page.
@@ -82,6 +77,13 @@ function WorkView() {
         // The project filter stays empty; the list still works.
       });
   }, []);
+
+  // Work spans projects: follow the topic of each one it can show.
+  useLiveRefresh(
+    projects.map((p) => p.id),
+    WORK_EVENTS,
+    () => setTick((n) => n + 1),
+  );
 
   const nextCursor = section.data?.nextCursor ?? null;
   const loadMore = async () => {

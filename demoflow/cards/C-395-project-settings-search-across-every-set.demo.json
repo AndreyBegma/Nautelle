@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "name": "Search every project setting and see what keeps cards from running",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project/settings"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "heading",
+        "name": "Ready to run",
+        "exact": true
+      },
+      "timeoutMs": 60000
+    },
+    {
+      "action": "marker",
+      "title": "Ready to run says why cards cannot run"
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "text": "Cards cannot run here yet"
+      },
+      "text": "runner online",
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "The demo runner is offline, so the block names it at the top"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "link",
+        "name": "Open Runners"
+      },
+      "caption": "Each gap links to its fix"
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "marker",
+      "title": "Search finds a setting in any section"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Search settings"
+      },
+      "value": "budget",
+      "caption": "Type budget"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Budgets"
+      },
+      "caption": "The result jumps to the Budget block under Cost"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "button",
+        "name": "New budget"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "marker",
+      "title": "The same search from the command palette"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Open command palette"
+      }
+    },
+    {
+      "action": "fill",
+      "target": {
+        "placeholder": "Create, find a card (C-12, #41), go to a page — or ask the Board"
+      },
+      "value": "orchestrator profile",
+      "caption": "Settings of the current project are listed in the palette"
+    },
+    {
+      "action": "click",
+      "target": {
+        "text": "Orchestrator runtime profile"
+      }
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "label": "Permission mode"
+      },
+      "timeoutMs": 30000,
+      "caption": "It opens the Orchestrator block, where the setting is edited"
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    }
+  ]
+}

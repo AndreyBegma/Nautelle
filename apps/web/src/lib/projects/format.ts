@@ -5,6 +5,7 @@ import {
 } from '@nautelle/shared';
 import type {
   BaseSource,
+  DiscoveredRepository,
   DocsRule,
   DocsSourceKind,
   ProjectInspection,
@@ -44,6 +45,7 @@ export const DOCS_RULE_LABEL: Record<DocsRule, string> = {
 
 export const BASE_SOURCE_LABEL: Record<BaseSource, string> = {
   config: 'orchestrator.base in the config',
+  develop: 'develop is in use',
   origin_head: 'origin/HEAD',
   gh: 'GitHub default branch',
   default: 'fallback default',
@@ -102,6 +104,13 @@ export function describeProjectError(error: unknown): string {
         return 'That repository is already connected on this runner.';
       case PROJECT_ERROR.profileNotOnRunner:
         return "That profile does not belong to this project's runner.";
+      case PROJECT_ERROR.sameRunner:
+        return 'The project is already on this runner.';
+      case PROJECT_ERROR.differentRepository:
+        return `That path holds another repository: ${error.message}.`;
+      // The API lists what runs: "Stop what runs first: C-4 Fix login, …".
+      case PROJECT_ERROR.workRunning:
+        return `${error.message}, then move the project.`;
       case PROJECT_ERROR.invalidDocsSource:
         return 'Those fields do not fit that kind of docs source.';
       case PROJECT_ERROR.userNotFound:
@@ -164,6 +173,26 @@ export const suggestedPathOf = (error: unknown): string | undefined =>
     : undefined;
 
 /**
+ * C-396: the repository picker's search. Every word of the query must appear
+ * in the repository's `owner/name` or its path, ignoring case; GitHub
+ * repositories first, since only those can be connected.
+ */
+export function filterRepositories(
+  repositories: readonly DiscoveredRepository[],
+  query: string,
+): DiscoveredRepository[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = repositories.filter((repository) => {
+    const text = `${repository.repo ?? ''} ${repository.path}`.toLowerCase();
+    return words.every((word) => text.includes(word));
+  });
+  return [
+    ...matches.filter((repository) => repository.repo !== null),
+    ...matches.filter((repository) => repository.repo === null),
+  ];
+}
+
+/**
  * Why the preview cannot be connected, or null when it can. The API refuses
  * the same cases (409 / 422); this saves the round trip.
  */
@@ -176,6 +205,33 @@ export function connectBlocker(inspection: ProjectInspection): string | null {
   }
   return null;
 }
+
+/**
+ * C-400: why the preview is not a place the project can move to, or null.
+ * The API refuses the same cases; this saves the round trip.
+ */
+export function moveBlocker(
+  inspection: ProjectInspection,
+  repo: string,
+): string | null {
+  const blocked = connectBlocker(inspection);
+  if (blocked) return blocked;
+  const found = inspection.remote.repo;
+  if (found !== null && found.toLowerCase() !== repo.toLowerCase()) {
+    return `This is a checkout of ${found}, not ${repo}.`;
+  }
+  return null;
+}
+
+/** A path as one shell word: quoted only when it needs to be. */
+const shellWord = (path: string): string =>
+  /^[A-Za-z0-9_./~@%+=:,-]+$/.test(path)
+    ? path
+    : `'${path.replace(/'/g, `'\\''`)}'`;
+
+/** C-400: the command that removes a worktree the move left on the old machine. */
+export const worktreeRemoveCommand = (oldRoot: string, path: string): string =>
+  `git -C ${shellWord(oldRoot)} worktree remove ${shellWord(path)}`;
 
 export interface DocsOverrideForm {
   kind: DocsSourceKind;

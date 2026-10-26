@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type CardDemoArgs,
@@ -11,6 +11,7 @@ import {
 import { cardWorktreePath } from '../cards/launch';
 import { systemClock } from '../clock';
 import { CommandFailure } from '../commands/failure';
+import { createExec, type Exec } from '../detect/exec';
 import { fakeExec, memoryLogger, TOKEN, tempDir } from '../testing/fixtures';
 import { DEMOFLOW_PACKAGE } from './pin';
 import type { DemoflowExit, DemoflowSpawn } from './process';
@@ -123,7 +124,7 @@ const api = (
     return answer ? answer(req) : new Response(null, { status: 201 });
   }) as typeof fetch;
 
-const ready: DemoflowStatus = { version: '0.6.0', ready: true };
+const ready: DemoflowStatus = { version: '0.7.0', ready: true };
 
 const setup = (
   options: {
@@ -135,6 +136,7 @@ const setup = (
     provisioned?: DemoflowStatus;
     scenario?: boolean;
     config?: unknown;
+    exec?: Exec;
   } = {},
 ) => {
   const { dir, cleanup } = tempDir();
@@ -165,7 +167,7 @@ const setup = (
   const logger = memoryLogger();
   const sleeps: number[] = [];
   const deps: DemoRecorderDeps = {
-    exec: fakeExec({}),
+    exec: options.exec ?? fakeExec({}),
     log: logger.log,
     clock: systemClock,
     emit: (event) => events.push(event),
@@ -327,6 +329,62 @@ describe('DemoRecorder', () => {
     ]);
   });
 
+  it('restores the tracked files the app rewrote before it uploads (#949)', async () => {
+    const exec = createExec(process.env, 10_000);
+    const git = async (wt: string, ...argv: string[]) => {
+      const result = await exec('git', [
+        '-C',
+        wt,
+        '-c',
+        'user.name=Test',
+        '-c',
+        'user.email=test@example.com',
+        ...argv,
+      ]);
+      expect(result?.code).toBe(0);
+      return result?.stdout ?? '';
+    };
+    const calls: Call[] = [];
+    const render = rendering(calls);
+    let wt = '';
+    const DEV_TYPES = 'import "./.next/dev/types/routes.d.ts";\n';
+    const BUILD_TYPES = 'import "./.next/types/routes.d.ts";\n';
+    const atUpload: string[] = [];
+    const { recorder, args, events, worktree } = setup({
+      exec,
+      // `next dev` rewrites next-env.d.ts; the worker's own change and an
+      // untracked file the app writes stay.
+      spawn: async (binary, argv, options) => {
+        writeFileSync(join(wt, 'next-env.d.ts'), DEV_TYPES);
+        writeFileSync(join(wt, 'notes.md'), 'worker and app\n');
+        writeFileSync(join(wt, 'app.log'), 'log\n');
+        return render(binary, argv, options);
+      },
+      answers: [
+        () => {
+          atUpload.push(readFileSync(join(wt, 'next-env.d.ts'), 'utf8'));
+          return new Response(null, { status: 201 });
+        },
+      ],
+    });
+    wt = worktree;
+    writeFileSync(join(wt, 'next-env.d.ts'), BUILD_TYPES);
+    writeFileSync(join(wt, 'notes.md'), 'committed\n');
+    await git(wt, 'init', '--quiet');
+    await git(wt, 'add', '-A');
+    await git(wt, 'commit', '--quiet', '-m', 'initial');
+    writeFileSync(join(wt, 'notes.md'), 'worker\n');
+
+    recorder.command(args());
+    await recorder.idle();
+
+    expect(statuses(events)).toEqual(['recording']);
+    expect(atUpload).toEqual([BUILD_TYPES]);
+    expect(await git(wt, 'status', '--porcelain')).toBe(
+      ' M notes.md\n?? app.log\n',
+    );
+  });
+
   it('fails a recording that passed the time limit', async () => {
     const calls: Call[] = [];
     const { recorder, args, events } = setup({
@@ -358,7 +416,7 @@ describe('DemoRecorder', () => {
 
   it('skips when DemoFlow is not ready (C-370)', async () => {
     const { recorder, args, events, calls } = setup({
-      provisioned: { version: '0.6.0', ready: false, reason: 'no Chromium' },
+      provisioned: { version: '0.7.0', ready: false, reason: 'no Chromium' },
     });
     recorder.command(args());
     await recorder.idle();

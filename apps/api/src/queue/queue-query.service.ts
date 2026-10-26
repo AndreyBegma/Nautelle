@@ -86,11 +86,21 @@ export class QueueQueryService {
       this.prisma.queueStateRow.findMany({ where: { projectId } }),
       latestRound(this.prisma, projectId),
     ]);
-    const issues = await this.issues(projectId, states);
+    const [issues, cards] = await Promise.all([
+      this.issues(projectId, states),
+      this.cards(projectId),
+    ]);
     const items = states
       .flatMap((row) => {
         const issue = issues.get(row.issueNumber);
-        return issue ? [this.item(project.repo, row, issue, issues)] : [];
+        return issue
+          ? [
+              {
+                ...this.item(project.repo, row, issue, issues),
+                cardNumber: cards.get(row.issueNumber) ?? null,
+              },
+            ]
+          : [];
       })
       .filter((item) => !options.state || item.state === options.state)
       .sort(comparePriority);
@@ -116,7 +126,10 @@ export class QueueQueryService {
       heldForLead: round ? heldForLead(decisionsOf(round.decisions)) : [],
     };
     if (options.includeOpen) {
-      view.others = await this.others(projectId, states);
+      view.others = (await this.others(projectId, states)).map((issue) => ({
+        ...issue,
+        cardNumber: cards.get(issue.number) ?? null,
+      }));
     }
     return view;
   }
@@ -186,6 +199,32 @@ export class QueueQueryService {
       where: { projectId, number: { in: [...numbers] } },
     });
     return new Map(rows.map((r) => [r.number, r]));
+  }
+
+  /**
+   * C-397 (ADR-0098): the card that works each issue, by issue number — a
+   * card linked to it or a fleet card mirroring it; Inbox cards are not yet
+   * work. The lowest card number wins when several do.
+   */
+  private async cards(projectId: string): Promise<Map<number, number>> {
+    const rows = await this.prisma.boardCard.findMany({
+      where: {
+        projectId,
+        column: { not: 'inbox' },
+        OR: [{ issueNumber: { not: null } }, { fleetIssue: { not: null } }],
+      },
+      select: { number: true, issueNumber: true, fleetIssue: true },
+      orderBy: { number: 'asc' },
+    });
+    const byIssue = new Map<number, number>();
+    for (const row of rows) {
+      for (const issue of [row.issueNumber, row.fleetIssue]) {
+        if (issue !== null && !byIssue.has(issue)) {
+          byIssue.set(issue, row.number);
+        }
+      }
+    }
+    return byIssue;
   }
 
   private async others(

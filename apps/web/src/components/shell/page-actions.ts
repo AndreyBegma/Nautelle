@@ -22,15 +22,17 @@ export type CapsuleAction =
  * The `+` for the page on screen. The page's own actions win; a page inside a
  * project that registers none gets `fallback` (New work on the Board);
  * outside a project there is none. A viewer never sees an operator-only
- * action, and with nothing left there is no `+`.
+ * action, and with nothing left there is no `+`. `always` rows (Quick card,
+ * C-391) follow the page's own on every page of a project.
  */
 export function capsuleAction(
   registered: readonly PageAction[],
   role: Role,
   fallback: PageAction | null,
+  always: readonly PageAction[] = [],
 ): CapsuleAction {
-  const offered =
-    registered.length > 0 ? registered : fallback ? [fallback] : [];
+  const own = registered.length > 0 ? registered : fallback ? [fallback] : [];
+  const offered = [...own, ...always];
   const actions = offered.filter(
     (action) => !action.operatorOnly || projectRoleAtLeast(role, 'operator'),
   );

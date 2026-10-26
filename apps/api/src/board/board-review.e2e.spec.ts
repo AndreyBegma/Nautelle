@@ -153,7 +153,7 @@ describe('a card passes its review steps before Finished (e2e, #884)', () => {
       expect(w.reviews()).toEqual([]);
       expect(w.sent('card.merge')).toHaveLength(1);
       const card = await detail();
-      expect(card).toMatchObject({ column: 'finished', prState: 'merged' });
+      expect(card).toMatchObject({ column: 'completed', prState: 'merged' });
       expect(card.review).toBeNull();
       expect(card.reviewFindings).toBeUndefined();
     });
@@ -163,7 +163,7 @@ describe('a card passes its review steps before Finished (e2e, #884)', () => {
       await step(0, 'Security', { enabled: false });
       await greenPr();
       expect(w.reviews()).toEqual([]);
-      expect((await w.card(1)).column).toBe('finished');
+      expect((await w.card(1)).column).toBe('completed');
       expect(w.sent('card.merge')).toHaveLength(1);
       expect((await detail()).review).toBeNull();
     });
@@ -255,7 +255,7 @@ describe('a card passes its review steps before Finished (e2e, #884)', () => {
       await reported([NIT]);
       expect(w.reviews()).toHaveLength(2);
       const card = await detail();
-      expect(card).toMatchObject({ column: 'finished', prState: 'merged' });
+      expect(card).toMatchObject({ column: 'completed', prState: 'merged' });
       expect(card.review).toMatchObject({
         state: 'passed',
         stepCount: 2,
@@ -328,7 +328,7 @@ describe('a card passes its review steps before Finished (e2e, #884)', () => {
 
       await reported([]);
       const view = await detail();
-      expect(view).toMatchObject({ column: 'finished', prState: 'merged' });
+      expect(view).toMatchObject({ column: 'completed', prState: 'merged' });
       expect(view.review).toMatchObject({ state: 'passed', fixRound: 1 });
       expect(w.sent('card.merge')).toEqual([
         expect.objectContaining({ headSha: NEW_HEAD }),
@@ -495,7 +495,7 @@ describe('a card passes its review steps before Finished (e2e, #884)', () => {
       await greenPr();
       await reported([NIT]);
       expect(w.reviewPublishes()).toHaveLength(1);
-      expect((await w.card(1)).column).toBe('finished');
+      expect((await w.card(1)).column).toBe('completed');
       expect(w.sent('card.merge')).toHaveLength(1);
       const run = await w.ctx.prisma.boardCardReviewRun.findFirstOrThrow();
       expect(run.publishedAt).toBeNull();

@@ -35,7 +35,10 @@ describe('/me/settings (e2e)', () => {
   };
 
   it('answers the default, sonnet, for a person without a row', async () => {
-    expect(await settingsOf(ann)).toEqual({ planningModel: 'sonnet' });
+    expect(await settingsOf(ann)).toEqual({
+      planningModel: 'sonnet',
+      toolUseTimeoutMinutes: null,
+    });
     expect(await ctx.prisma.userSettings.count()).toBe(0);
   });
 
@@ -44,17 +47,32 @@ describe('/me/settings (e2e)', () => {
       planningModel: 'opus',
     });
     expect(put.status).toBe(200);
-    expect(put.body).toEqual({ planningModel: 'opus' });
-    expect(await settingsOf(ann)).toEqual({ planningModel: 'opus' });
+    expect(put.body).toEqual({
+      planningModel: 'opus',
+      toolUseTimeoutMinutes: null,
+    });
+    expect(await settingsOf(ann)).toEqual({
+      planningModel: 'opus',
+      toolUseTimeoutMinutes: null,
+    });
     // Bob, any role, keeps his own default.
-    expect(await settingsOf(bob)).toEqual({ planningModel: 'sonnet' });
+    expect(await settingsOf(bob)).toEqual({
+      planningModel: 'sonnet',
+      toolUseTimeoutMinutes: null,
+    });
     expect(
       await ctx.prisma.userSettings.findMany({ select: { userId: true } }),
     ).toEqual([{ userId: annId }]);
 
     await bob.send('put', '/me/settings', { planningModel: 'fable' });
-    expect(await settingsOf(ann)).toEqual({ planningModel: 'opus' });
-    expect(await settingsOf(bob)).toEqual({ planningModel: 'fable' });
+    expect(await settingsOf(ann)).toEqual({
+      planningModel: 'opus',
+      toolUseTimeoutMinutes: null,
+    });
+    expect(await settingsOf(bob)).toEqual({
+      planningModel: 'fable',
+      toolUseTimeoutMinutes: null,
+    });
     expect(
       (
         await ctx.prisma.userSettings.findUniqueOrThrow({
@@ -66,7 +84,10 @@ describe('/me/settings (e2e)', () => {
     const cleared = await ann.send('put', '/me/settings', {
       planningModel: null,
     });
-    expect(cleared.body).toEqual({ planningModel: 'sonnet' });
+    expect(cleared.body).toEqual({
+      planningModel: 'sonnet',
+      toolUseTimeoutMinutes: null,
+    });
   });
 
   it('refuses a model outside the catalog, a missing field, and extra fields', async () => {
@@ -77,6 +98,47 @@ describe('/me/settings (e2e)', () => {
       { planningModel: 'opus', userId: bobId },
     ]) {
       const response = await ann.send('put', '/me/settings', body);
+      expect(response.status).toBe(400);
+    }
+    expect(await ctx.prisma.userSettings.count()).toBe(0);
+  });
+
+  it('keeps the tool-use timeout beside the model, and null clears it (C-401)', async () => {
+    const put = await ann.send('put', '/me/settings', {
+      toolUseTimeoutMinutes: 120,
+    });
+    expect(put.status).toBe(200);
+    expect(put.body).toEqual({
+      planningModel: 'sonnet',
+      toolUseTimeoutMinutes: 120,
+    });
+    await ann.send('put', '/me/settings', { planningModel: 'opus' });
+    expect(await settingsOf(ann)).toEqual({
+      planningModel: 'opus',
+      toolUseTimeoutMinutes: 120,
+    });
+    const cleared = await ann.send('put', '/me/settings', {
+      toolUseTimeoutMinutes: null,
+    });
+    expect(cleared.body).toEqual({
+      planningModel: 'opus',
+      toolUseTimeoutMinutes: null,
+    });
+    const [audit] = await ctx.prisma.auditRecord.findMany({
+      where: { action: 'user.update', actorUserId: annId },
+      orderBy: { seq: 'asc' },
+    });
+    expect(audit).toMatchObject({
+      before: { toolUseTimeoutMinutes: null },
+      after: { toolUseTimeoutMinutes: 120 },
+    });
+  });
+
+  it('refuses a timeout under a minute, over 12 hours, or not whole', async () => {
+    for (const toolUseTimeoutMinutes of [0, 721, 2.5, '60']) {
+      const response = await ann.send('put', '/me/settings', {
+        toolUseTimeoutMinutes,
+      });
       expect(response.status).toBe(400);
     }
     expect(await ctx.prisma.userSettings.count()).toBe(0);

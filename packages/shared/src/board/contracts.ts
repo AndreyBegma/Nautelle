@@ -7,6 +7,7 @@ import type {
   CardWorkClass,
 } from '../assess/limits';
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
+import type { BudgetScope } from '../budgets/contracts';
 import type { CardDemoBrief } from '../demos/contracts';
 import type { TaskDesignSummary, TaskDesignView } from '../design';
 import type { DesignTemplateChoice } from '../design/templates';
@@ -54,6 +55,7 @@ import type {
   CardFinishedBy,
   CardMergePolicy,
   CardNeedsPersonReason,
+  CardPauseReason,
   CardPrState,
   CardRoundPhase,
   CardRoundTrigger,
@@ -137,6 +139,12 @@ export interface CardRoundBrief {
    * so older fixtures stay valid.
    */
   quotaWait?: { limit: QuotaLimit; resetsAt: string | null } | null;
+  /**
+   * C-399 (ADR-0101): why Nautelle paused this `cancelled` round — the card
+   * shows "Paused: budget" and Run reads Resume; `null` for any other round.
+   * Optional so older fixtures stay valid.
+   */
+  pausedFor?: CardPauseReason | null;
 }
 
 /**
@@ -170,6 +178,11 @@ export interface CardFleetView {
   stage: FleetStage | null;
   /** The slot left the projection: the card keeps its last column ("Slot gone"). */
   slotGone: boolean;
+  /**
+   * C-397 (ADR-0098): a person moved the card, so the mirror no longer moves
+   * or deletes it; it still copies the slot's stage and pull request.
+   */
+  detached: boolean;
 }
 
 /**
@@ -309,6 +322,11 @@ export interface BoardCardView {
    * its stack's design sets. Optional like `readiness`; absent reads as null.
    */
   stack?: CardStackRef | null;
+  /**
+   * C-398 (ADR-0102): the card's place in the run queue — "Waiting for a
+   * slot". Optional like `stack`; absent or `null` when it is not queued.
+   */
+  queue?: CardQueueView | null;
   /** #282 D1: set for a `terminal` card, `null` for any other source. */
   tracking: CardTrackingView | null;
   /** #282 D4: set for a `fleet` card, `null` for any other source. */
@@ -367,6 +385,29 @@ export interface BoardCardView {
    */
   warmupSavedUsd?: string | null;
 }
+
+/**
+ * C-398 (ADR-0102): a To Do card in the run queue. Run at `maxRunning`, or
+ * Run stack, puts it there; when a slot frees, the topmost queued card in To
+ * Do order starts. Stop takes it out.
+ */
+export interface CardQueueView {
+  /** `queued` waits for a free slot; `waiting` for a dependency first. */
+  state: 'queued' | 'waiting';
+  /**
+   * 1-based place among the project's `queued` cards, in To Do order — the
+   * card that starts next is 1. `null` while `waiting`.
+   */
+  place: number | null;
+  /** The stack whose Run stack queued it; `null` when Run did. */
+  stack: number | null;
+}
+
+/** C-398: what a queued card's face says — "Waiting for a slot · #2". */
+export const cardQueueText = (queue: CardQueueView): string =>
+  queue.state === 'waiting'
+    ? 'Queued · waiting for a dependency'
+    : `Waiting for a slot${queue.place !== null ? ` · #${queue.place}` : ''}`;
 
 /** #337 D8: a card another one depends on, as the face and Run's warning name it. */
 export interface CardDependencyRef {
@@ -438,6 +479,11 @@ export interface BoardView {
   columns: BoardColumnView[];
   /** Active rounds now, against `settings.maxRunning`. */
   running: number;
+  /**
+   * C-398 (ADR-0102): To Do cards in the run queue — the header's "3 waiting
+   * for a slot". Optional so older fixtures stay valid; absent reads as 0.
+   */
+  queued?: number;
   settings: BoardSettingsView;
   /**
    * #480 (ADR-0044): the project's stacks, each with the column its collapsed
@@ -465,6 +511,8 @@ export interface CardRoundView {
   finishRefused?: LocalErrorCode | null;
   /** #624: as on `CardRoundBrief`. Optional so older fixtures stay valid. */
   blockingDialog?: PaneDialog | null;
+  /** C-399: as on `CardRoundBrief`. Optional so older fixtures stay valid. */
+  pausedFor?: CardPauseReason | null;
   /** The person's text, for a `feedback` round. */
   feedback: string | null;
   author: BoardUserRef | null;
@@ -740,6 +788,12 @@ export interface CreateBoardCardRequest {
   kind?: BoardCardKind;
   issueOnRun?: boolean;
   specOnRun?: boolean;
+  /**
+   * C-397 (ADR-0098): the open GitHub issue the card works — Queue's "Make a
+   * card". Its pull request closes the issue; an issue that is not open in the
+   * project's repository is refused `issue_not_linkable`.
+   */
+  issueNumber?: number;
   /**
    * #309 D3: pending uploads to claim, at most `ATTACHMENTS_PER_CARD_MAX`.
    * Each must be pending, in this project and uploaded by the caller, else
@@ -1094,6 +1148,8 @@ export const isCardAutoRunCode = (
 /** #273 D8: what Continue after design did when the design was approved. */
 export type CardAutoRun =
   | { status: 'started'; round: number }
+  /** C-398: the Board was full — the card waits in the run queue for a slot. */
+  | { status: 'queued' }
   | {
       status: 'run_failed';
       code: CardAutoRunFailure['code'];
@@ -1311,6 +1367,56 @@ export interface CardBackgroundStalledEventData {
   title: string;
   round: number;
   minutes: number;
+}
+
+/**
+ * C-399 (ADR-0101): Nautelle paused a running round — it stopped the
+ * session and kept the worktree and the Claude session, so Resume continues
+ * it. With `reason: 'budget'`, the hard budget that was reached and when its
+ * period resets (ISO-8601).
+ */
+export const CARD_PAUSED_EVENT = 'card.paused';
+
+export interface CardPausedEventData {
+  cardId: string;
+  number: number;
+  title: string;
+  round: number;
+  reason: CardPauseReason;
+  budget: {
+    id: string;
+    scope: BudgetScope;
+    limitUsd: string;
+    resetsAt: string;
+  };
+}
+
+/**
+ * C-405: a card's round failed — its worker could not start, or a feedback
+ * round died at once. It never carries the error text: it can quote the
+ * pane.
+ */
+export const CARD_FAILED_EVENT = 'card.failed';
+
+export interface CardFailedEventData {
+  cardId: string;
+  number: number;
+  title: string;
+  round: number;
+}
+
+/**
+ * C-405: a card's pull request merged, whoever merged it — once per card,
+ * when Nautelle first sees the merge.
+ */
+export const CARD_MERGED_EVENT = 'card.merged';
+
+export interface CardMergedEventData {
+  cardId: string;
+  number: number;
+  title: string;
+  prNumber: number;
+  prUrl: string | null;
 }
 
 /**

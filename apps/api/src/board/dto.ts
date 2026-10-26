@@ -107,6 +107,15 @@ export class CreateBoardCardDto implements CreateBoardCardRequest {
   @IsBoolean()
   specOnRun?: boolean;
 
+  /**
+   * C-397 (ADR-0098): Queue's "Make a card" — the open issue the card works;
+   * checked against the project's issue mirror by the service.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  issueNumber?: number;
+
   /** #309 D3: pending uploads claimed onto the new card. */
   @IsOptional()
   @AttachmentIds()

@@ -85,7 +85,7 @@ services:
   api:
     image: ghcr.io/andreybegma/nautelle-api:${NAUTELLE_VERSION:-latest}
     restart: unless-stopped
-    # Anything else of apps/api/.env.example (DeepL, Telegram, speech to text…)
+    # Anything else of apps/api/.env.example (DeepL, SMTP, Telegram, speech…)
     # goes into api.env beside this file. The keys below win over it.
     env_file:
       - path: ./api.env

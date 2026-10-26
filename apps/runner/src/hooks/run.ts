@@ -1,5 +1,10 @@
 import { readFileSync, statSync } from 'node:fs';
-import { CARD_BACKGROUND_COMMAND_MAX, CARD_ENV_ID } from '@nautelle/shared';
+import {
+  CARD_BACKGROUND_COMMAND_MAX,
+  CARD_ENV_ID,
+  TOOL_USE_SUGGESTIONS_MAX,
+  toolRulesOfSuggestions,
+} from '@nautelle/shared';
 import {
   type HookCliName,
   hookCliNameSchema,
@@ -306,6 +311,9 @@ const handle = async (
       toolName: request.data.tool_name.slice(0, 200),
       // Clipped to head and tail by the hook; the daemon redacts, then cuts.
       toolInput: stringify(request.data.tool_input),
+      suggestions: toolRulesOfSuggestions(
+        request.data.permission_suggestions,
+      ).slice(0, TOOL_USE_SUGGESTIONS_MAX),
       sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
       now: deps.now ?? Date.now,
     });

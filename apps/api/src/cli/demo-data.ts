@@ -1,5 +1,10 @@
-import { captureFingerprint } from '@nautelle/shared';
-import type { BoardColumn, PrismaClient } from '@prisma/client';
+import {
+  type CardNeedsPersonReason,
+  captureFingerprint,
+} from '@nautelle/shared';
+import type { BoardColumn, CardEffort, PrismaClient } from '@prisma/client';
+import { hashPassword } from '../auth/password';
+import { generateToken } from '../auth/tokens';
 
 /**
  * The database a demo recording runs on (C-383, ADR-0090): `agentdock_demo`,
@@ -34,14 +39,53 @@ export const maintenanceUrl = (url: string): string => {
 export const DEMO_RUNNER_ID = 'demo-runner';
 export const DEMO_PROJECT_ID = 'demo-project';
 
+/**
+ * C-398 (ADR-0102): the demo Board runs one card worker at a time, so the
+ * running card fills it and the queued cards wait for a slot.
+ */
+export const DEMO_MAX_RUNNING = 1;
+
 /** The cards of the demo Board: a few in each working column. */
 export const DEMO_CARDS: ReadonlyArray<{
   title: string;
   column: BoardColumn;
   kind: 'feature' | 'bug';
+  /**
+   * C-359: round 1 launched with this model and effort. It finished, or
+   * (C-399) a hard budget paused it, or (C-398) a worker is still at it.
+   */
+  round?: {
+    model: string;
+    effort: CardEffort;
+    paused?: true;
+    running?: true;
+  };
+  /** C-398: Run was pressed on a full Board; the card waits for a slot. */
+  queued?: true;
+  /**
+   * C-389: a PR recorded as merged into the project base while the card sat
+   * in Finished — the API's sweep moves it to Completed by itself.
+   */
+  mergedPr?: number;
+  /** C-390: an open PR on `branch`, so the card waits in the Inbox to merge. */
+  openPr?: { number: number; branch: string };
+  /** C-390: the card needs a person, so the Inbox lists it with Retry. */
+  needsPerson?: CardNeedsPersonReason;
+  /** C-394: a design drawn and waiting for approval, with one frame. */
+  design?: true;
 }> = [
-  { title: 'Export the activity feed as CSV', column: 'todo', kind: 'feature' },
-  { title: 'Dark mode for the settings page', column: 'todo', kind: 'feature' },
+  {
+    title: 'Export the activity feed as CSV',
+    column: 'todo',
+    kind: 'feature',
+    queued: true,
+  },
+  {
+    title: 'Dark mode for the settings page',
+    column: 'todo',
+    kind: 'feature',
+    queued: true,
+  },
   {
     title: 'Board search misses cards with emoji',
     column: 'todo',
@@ -51,13 +95,117 @@ export const DEMO_CARDS: ReadonlyArray<{
     title: 'Show the runner version in the header',
     column: 'in_progress',
     kind: 'feature',
+    round: { model: 'claude-sonnet-5-5', effort: 'medium', running: true },
   },
   {
     title: 'Retry a failed collect from the card',
     column: 'finished',
     kind: 'feature',
+    round: { model: 'claude-opus-5-5', effort: 'high' },
+  },
+  {
+    title: 'Coupon codes at checkout',
+    column: 'finished',
+    kind: 'feature',
+    mergedPr: 42,
+  },
+  {
+    title: 'Gift cards in the cart',
+    column: 'finished',
+    kind: 'feature',
+    openPr: { number: 43, branch: 'card/c7-gift-cards' },
+  },
+  {
+    title: 'Order history pages past 100 orders',
+    column: 'finished',
+    kind: 'bug',
+    openPr: { number: 44, branch: 'card/c8-order-history' },
+    needsPerson: 'ci_still_failing',
+  },
+  {
+    title: 'Import products from a CSV file',
+    column: 'in_progress',
+    kind: 'feature',
+    round: { model: 'claude-sonnet-5-5', effort: 'medium', paused: true },
+  },
+  {
+    title: 'Redesign the order summary',
+    column: 'todo',
+    kind: 'feature',
+    design: true,
   },
 ];
+
+const DEMO_DESIGN_FRAME_HTML =
+  '<!doctype html><html><body style="margin:0;font-family:sans-serif;background:#f4f4f5">' +
+  '<header style="padding:16px 24px;background:#18181b;color:#fff"><b>Order summary</b></header>' +
+  '<main style="padding:24px"><div style="background:#fff;border-radius:12px;padding:16px">' +
+  '<p>2 items</p><p><b>Total: $48.00</b></p></div></main></body></html>';
+
+/**
+ * C-389: runs that failed an hour ago. Needs you lists the card's; the
+ * Steward's is a service failure, so it stays in the project's history only.
+ */
+export const DEMO_FAILED_RUNS: ReadonlyArray<{
+  id: string;
+  kind: 'card' | 'steward';
+  title: string;
+  trigger: 'user' | 'schedule';
+}> = [
+  {
+    id: 'demo-run-failed-card',
+    kind: 'card',
+    title: 'C-2 Dark mode for the settings page',
+    trigger: 'user',
+  },
+  {
+    id: 'demo-run-failed-steward',
+    kind: 'steward',
+    title: 'Steward digest',
+    trigger: 'schedule',
+  },
+];
+
+/** C-401: the away session that asks for the tool calls below. */
+export const DEMO_AWAY_SESSION_ID = 'demo-session-away';
+
+/**
+ * C-401: tool calls the away session waits on, the soonest to expire first.
+ * The test run comes with Claude Code's rule suggestion, so it can be
+ * allowed for similar calls; reading the project's `.env` always asks.
+ */
+export const DEMO_TOOL_CALLS: ReadonlyArray<{
+  id: string;
+  toolName: string;
+  input: Record<string, string>;
+  suggestions?: ReadonlyArray<{ toolName: string; ruleContent: string }>;
+  expiresInMinutes: number;
+}> = [
+  {
+    id: 'demo-action-test',
+    toolName: 'Bash',
+    input: { command: 'bun run test --filter web' },
+    suggestions: [{ toolName: 'Bash', ruleContent: 'bun run test:*' }],
+    expiresInMinutes: 235,
+  },
+  {
+    id: 'demo-action-env',
+    toolName: 'Read',
+    input: { file_path: '/srv/demo/acme-shop/.env' },
+    expiresInMinutes: 240,
+  },
+];
+
+/**
+ * C-402: an active operator besides the admin, so Admin › Users has someone
+ * to give a reset link. Their password is random and never shown: they can
+ * get in only through such a link.
+ */
+export const DEMO_TEAMMATE = {
+  id: 'demo-user-teammate',
+  email: 'sam@acme.example',
+  name: 'Sam Rivera',
+} as const;
 
 /**
  * Seeds the demo project and its cards for the admin `adminEmail`, who must
@@ -65,7 +213,25 @@ export const DEMO_CARDS: ReadonlyArray<{
  * again changes nothing.
  */
 export const seedDemo = async (
-  prisma: Pick<PrismaClient, 'user' | 'runner' | 'project' | 'boardCard'>,
+  prisma: Pick<
+    PrismaClient,
+    | 'user'
+    | 'runner'
+    | 'project'
+    | 'boardSettings'
+    | 'repositoryPushCheck'
+    | 'boardCard'
+    | 'run'
+    | 'boardCardRound'
+    | 'agentSession'
+    | 'actionRequest'
+    | 'toolUseRule'
+    | 'boardRunQueueCard'
+    | 'taskDesign'
+    | 'planTurn'
+    | 'designRevision'
+    | 'designFrame'
+  >,
   adminEmail: string,
 ): Promise<{ projectId: string; cards: number }> => {
   const email = adminEmail.trim().toLowerCase();
@@ -73,6 +239,18 @@ export const seedDemo = async (
   if (!admin) throw new DemoDataError(`No user with email ${email}`);
 
   const now = new Date();
+  await prisma.user.upsert({
+    where: { id: DEMO_TEAMMATE.id },
+    update: {},
+    create: {
+      ...DEMO_TEAMMATE,
+      passwordHash: await hashPassword(generateToken()),
+      role: 'operator',
+      status: 'active',
+      approvedById: admin.id,
+      approvedAt: now,
+    },
+  });
   await prisma.runner.upsert({
     where: { id: DEMO_RUNNER_ID },
     update: {},
@@ -97,15 +275,42 @@ export const seedDemo = async (
       defaultBranch: 'main',
       hasClaudeMd: true,
       hasAgentsMd: false,
+      // C-395: what the Ready to run block reads; the runner stays offline.
+      hasDemoflowConfig: true,
       lastInspectedAt: now,
+      // C-401: away mode requests wait four hours for a person.
+      toolUseTimeoutMinutes: 240,
       createdById: admin.id,
       members: { create: { userId: admin.id, addedById: admin.id } },
     },
   });
+  // C-395: the push check Ready to run reads (C-396 keeps it per runner and path).
+  await prisma.repositoryPushCheck.upsert({
+    where: {
+      runnerId_rootPath: {
+        runnerId: DEMO_RUNNER_ID,
+        rootPath: '/srv/demo/acme-shop',
+      },
+    },
+    update: {},
+    create: {
+      runnerId: DEMO_RUNNER_ID,
+      rootPath: '/srv/demo/acme-shop',
+      ok: true,
+      remote: 'git@github.com:acme/shop.git',
+      message: 'origin accepts pushes from this checkout.',
+      checkedAt: now,
+    },
+  });
+  await prisma.boardSettings.upsert({
+    where: { projectId: DEMO_PROJECT_ID },
+    update: {},
+    create: { projectId: DEMO_PROJECT_ID, maxRunning: DEMO_MAX_RUNNING },
+  });
 
   for (const [index, card] of DEMO_CARDS.entries()) {
     const number = index + 1;
-    await prisma.boardCard.upsert({
+    const created = await prisma.boardCard.upsert({
       where: { projectId_number: { projectId: DEMO_PROJECT_ID, number } },
       update: {},
       create: {
@@ -123,8 +328,256 @@ export const seedDemo = async (
         createdById: admin.id,
         movedById: admin.id,
         movedAt: now,
+        // C-399: a paused card keeps its worktree branch and its session.
+        ...(card.round?.paused
+          ? {
+              branch: `card/c${number}-import-products-from-a-csv-file`,
+              sessionId: '0000c399-0000-4000-8000-000000000007',
+            }
+          : {}),
+        ...(card.mergedPr === undefined
+          ? {}
+          : {
+              branch: `card/c${number}-coupon-codes`,
+              prNumber: card.mergedPr,
+              prUrl: `https://github.com/acme/shop/pull/${card.mergedPr}`,
+              prState: 'merged' as const,
+              mergedAt: new Date(now.getTime() - 10 * 60_000),
+            }),
+        ...(card.openPr === undefined
+          ? {}
+          : {
+              branch: card.openPr.branch,
+              prNumber: card.openPr.number,
+              prUrl: `https://github.com/acme/shop/pull/${card.openPr.number}`,
+              prState: 'open' as const,
+            }),
+        ...(card.needsPerson === undefined
+          ? {}
+          : { needsPerson: true, needsPersonReason: card.needsPerson }),
+      },
+    });
+    if (card.design) {
+      const runId = `demo-run-design-${number}`;
+      const drawnAt = new Date(now.getTime() - 10 * 60_000);
+      await prisma.run.upsert({
+        where: { id: runId },
+        update: {},
+        create: {
+          id: runId,
+          kind: 'plan',
+          projectId: DEMO_PROJECT_ID,
+          title: `C-${number} design`,
+          runtime: 'claude',
+          status: 'succeeded',
+          triggeredByType: 'user',
+          triggeredById: admin.id,
+          startedAt: new Date(drawnAt.getTime() - 3 * 60_000),
+          endedAt: drawnAt,
+          updatedAt: drawnAt,
+        },
+      });
+      const design = await prisma.taskDesign.upsert({
+        where: { cardId: created.id },
+        update: {},
+        create: {
+          cardId: created.id,
+          needed: true,
+          status: 'reviewing',
+        },
+      });
+      const turn = await prisma.planTurn.upsert({
+        where: { runId },
+        update: {},
+        create: {
+          cardId: created.id,
+          runId,
+          action: 'design',
+          authorId: admin.id,
+          input: {},
+          phase: 'succeeded',
+          finishedAt: drawnAt,
+        },
+      });
+      const revision = await prisma.designRevision.upsert({
+        where: {
+          designId_variant_revision: {
+            designId: design.id,
+            variant: 1,
+            revision: 1,
+          },
+        },
+        update: {},
+        create: {
+          designId: design.id,
+          variant: 1,
+          revision: 1,
+          title: 'Order summary',
+          rationale: 'A compact card with the total on its own line.',
+          turnId: turn.id,
+        },
+      });
+      await prisma.designFrame.upsert({
+        where: {
+          revisionId_position: { revisionId: revision.id, position: 0 },
+        },
+        update: {},
+        create: {
+          revisionId: revision.id,
+          position: 0,
+          name: 'Screen',
+          slug: 'screen',
+          html: DEMO_DESIGN_FRAME_HTML,
+          kind: 'screen',
+        },
+      });
+    }
+    if (card.queued) {
+      await prisma.boardRunQueueCard.upsert({
+        where: { cardId: created.id },
+        update: {},
+        create: {
+          cardId: created.id,
+          status: 'queued',
+          queuedById: admin.id,
+          queuedByRole: 'admin',
+        },
+      });
+    }
+    if (card.round) {
+      const running = card.round.running === true;
+      const paused = card.round.paused === true;
+      const runId = `demo-run-${number}`;
+      const startedAt = new Date(now.getTime() - 20 * 60_000);
+      await prisma.run.upsert({
+        where: { id: runId },
+        update: {},
+        create: {
+          id: runId,
+          kind: 'card',
+          projectId: DEMO_PROJECT_ID,
+          title: `C-${number} ${card.title}`,
+          runtime: 'claude',
+          model: card.round.model,
+          args: { card: number, round: 1, trigger: 'run' },
+          status: running ? 'running' : paused ? 'abandoned' : 'succeeded',
+          ...(paused ? { outcome: 'Paused: a hard budget was reached' } : {}),
+          triggeredByType: 'user',
+          triggeredById: admin.id,
+          startedAt,
+          endedAt: running ? null : now,
+          updatedAt: now,
+        },
+      });
+      await prisma.boardCardRound.upsert({
+        where: { runId },
+        update: {},
+        create: {
+          cardId: created.id,
+          round: 1,
+          runId,
+          trigger: 'run',
+          cardTitle: card.title,
+          cardBody: '',
+          cardKind: card.kind,
+          authorId: admin.id,
+          ...(running
+            ? { phase: 'running' }
+            : paused
+              ? { phase: 'cancelled', pausedFor: 'budget' }
+              : {
+                  phase: 'finished',
+                  finishedBy: 'worker',
+                  summary: 'Added a Retry collect button to the card.',
+                  finishedAt: now,
+                  endedAt: now,
+                }),
+          model: card.round.model,
+          effort: card.round.effort,
+          startedAt,
+        },
+      });
+    }
+  }
+  const failedAt = new Date(now.getTime() - 60 * 60_000);
+  for (const run of DEMO_FAILED_RUNS) {
+    await prisma.run.upsert({
+      where: { id: run.id },
+      update: {},
+      create: {
+        id: run.id,
+        kind: run.kind,
+        projectId: DEMO_PROJECT_ID,
+        title: run.title,
+        runtime: 'claude',
+        status: 'failed',
+        triggeredByType: run.trigger,
+        triggeredById: run.trigger === 'user' ? admin.id : null,
+        startedAt: new Date(failedAt.getTime() - 5 * 60_000),
+        endedAt: failedAt,
+        updatedAt: failedAt,
       },
     });
   }
+
+  // C-401: an unattended session waiting on two tool calls, and a project
+  // rule an earlier "Always allow" stored.
+  await prisma.agentSession.upsert({
+    where: { id: DEMO_AWAY_SESSION_ID },
+    update: {},
+    create: {
+      id: DEMO_AWAY_SESSION_ID,
+      runnerId: DEMO_RUNNER_ID,
+      runtime: 'claude',
+      externalId: '0000c401-0000-4000-8000-000000000001',
+      projectId: DEMO_PROJECT_ID,
+      cwd: '/srv/demo/acme-shop',
+      gitBranch: 'card/c4-show-the-runner-version-in-the-header',
+      title: 'Show the runner version in the header',
+      origin: 'manual',
+      ownerId: admin.id,
+      startedAt: new Date(now.getTime() - 30 * 60_000),
+      lastEventAt: now,
+    },
+  });
+  for (const call of DEMO_TOOL_CALLS) {
+    const input = JSON.stringify(call.input);
+    await prisma.actionRequest.upsert({
+      where: { id: call.id },
+      update: {},
+      create: {
+        id: call.id,
+        projectId: DEMO_PROJECT_ID,
+        runnerId: DEMO_RUNNER_ID,
+        sessionId: DEMO_AWAY_SESSION_ID,
+        requestedById: admin.id,
+        kind: 'tool_use',
+        summary: `Allow ${call.toolName} in an unattended Claude Code session`,
+        args: {
+          toolName: call.toolName,
+          input,
+          truncated: false,
+          fullLength: input.length,
+          ...(call.suggestions ? { suggestions: [...call.suggestions] } : {}),
+        },
+        expiresAt: new Date(now.getTime() + call.expiresInMinutes * 60_000),
+      },
+    });
+  }
+  await prisma.toolUseRule.upsert({
+    where: { id: 'demo-rule-lint' },
+    update: {},
+    create: {
+      id: 'demo-rule-lint',
+      projectId: DEMO_PROJECT_ID,
+      scope: 'project',
+      toolName: 'Bash',
+      ruleContent: 'bun run lint:*',
+      createdById: admin.id,
+      useCount: 3,
+      lastUsedAt: new Date(now.getTime() - 15 * 60_000),
+      createdAt: new Date(now.getTime() - 2 * 24 * 60 * 60_000),
+    },
+  });
   return { projectId: DEMO_PROJECT_ID, cards: DEMO_CARDS.length };
 };

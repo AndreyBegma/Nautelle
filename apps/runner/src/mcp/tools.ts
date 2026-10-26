@@ -323,7 +323,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'card_run',
-    description: `Start a Board Run of a card: a dedicated worktree and card session. The Board’s refusals come back unchanged — dependency_open, design_not_approved, stack_design_not_approved, budget_exceeded, max_running — obey them, never work around them. ${MANUAL_ONLY}`,
+    description: `Start a Board Run of a card: a dedicated worktree and card session. When every slot is taken, a To Do card is queued instead — the answer is {number, round: null, queued: true, place} with place the card’s 1-based place in the queue (1 starts next; null while it waits for a dependency), not an error. It starts by itself when a slot frees; card_stop takes it out of the queue. The Board’s other refusals come back unchanged — dependency_open, design_not_approved, stack_design_not_approved, budget_exceeded — obey them, never work around them. ${MANUAL_ONLY}`,
     method: 'card.run',
     input: {
       card: cardNumber,
@@ -343,7 +343,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'card_feedback',
-    description: `Send feedback on a Finished card (red CI, review findings): starts a feedback round of its session. ${MANUAL_ONLY}`,
+    description: `Send feedback on a Finished card (red CI, review findings): starts a feedback round of its session. A feedback round does not queue: with every slot taken it is refused max_running — retry when a card finishes. ${MANUAL_ONLY}`,
     method: 'card.feedback',
     input: {
       card: cardNumber,
@@ -373,7 +373,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'card_stop',
-    description: `Stop a card’s running round. ${MANUAL_ONLY}`,
+    description: `Stop a card’s running round, or take a queued card out of the run queue. ${MANUAL_ONLY}`,
     method: 'card.stop',
     input: { card: cardNumber },
   },
@@ -485,7 +485,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'stack_run',
-    description: `Run a stack: its cards start stage by stage as the Board allows. The Board’s refusals come back unchanged — stack_design_not_approved, budget_exceeded, max_running — obey them, never work around them. ${MANUAL_ONLY}`,
+    description: `Run a stack: its cards start stage by stage as the Board allows; with every slot taken the rest wait in the run queue, so a full Board is not a refusal. The Board’s refusals come back unchanged — stack_design_not_approved, budget_exceeded — obey them, never work around them. ${MANUAL_ONLY}`,
     method: 'stack.run',
     untrusted: true,
     input: { stack: stackNumber },

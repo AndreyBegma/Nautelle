@@ -43,14 +43,19 @@ model User {
 
   approvedBy                  User?                         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
   recoveryCodes               UserRecoveryCode[]
+  passwordResetLinks          PasswordResetLink[]           @relation("PasswordResetLinkUser")
+  passwordResetLinksCreated   PasswordResetLink[]           @relation("PasswordResetLinkCreatedBy")
   approvedUsers               User[]                        @relation("UserApprovals")
   sessions                    UserSession[]
+  apiTokens                   ApiToken[]                    @relation("ApiTokenOwner")
+  apiTokensRevoked            ApiToken[]                    @relation("ApiTokenRevokedBy")
   settingsUpdated             Setting[]
   runnersCreated              Runner[]                      @relation("RunnerCreatedBy")
   runnersLocal                Runner[]                      @relation("RunnerLocalUser")
   sessionsOwned               AgentSession[]                @relation("SessionOwner")
   actionRequestsRequested     ActionRequest[]               @relation("ActionRequestRequestedBy")
   actionRequestsDecided       ActionRequest[]               @relation("ActionRequestDecidedBy")
+  toolUseRulesCreated         ToolUseRule[]
   projectsCreated             Project[]
   memberships                 ProjectMember[]               @relation("ProjectMembership")
   membersAdded                ProjectMember[]               @relation("ProjectMemberAddedBy")
@@ -65,6 +70,7 @@ model User {
   notifications               Notification[]
   notificationRules           NotificationRule[]
   notificationMutes           NotificationMute[]
+  notificationEmailSettings   NotificationEmailSettings?
   telegramLink                TelegramLink?
   telegramLinkCodes           TelegramLinkCode[]
   telegramPendingLink         TelegramPendingLink?
@@ -91,6 +97,7 @@ model User {
   boardCardsCreated           BoardCard[]                   @relation("BoardCardCreatedBy")
   boardStacksCreated          BoardStack[]                  @relation("BoardStackCreatedBy")
   boardStackRunsStarted       BoardStackRun[]               @relation("BoardStackRunStartedBy")
+  boardRunQueueCards          BoardRunQueueCard[]           @relation("BoardRunQueueCardQueuedBy")
   boardCardsMoved             BoardCard[]                   @relation("BoardCardMovedBy")
   boardCardsCompleted         BoardCard[]                   @relation("BoardCardCompletedBy")
   boardCardsAutoRunArmed      BoardCard[]                   @relation("BoardCardAutoRunArmedBy")
@@ -108,6 +115,7 @@ model User {
   tokenEconomyTechniquesSet   TokenEconomyTechnique[]
   stewardSettingsUpdated      StewardSettings[]
   aiDigestSettingsUpdated     AiDigestSettings[]
+  slackWebhooksUpdated        SlackWebhook[]
   settings                    UserSettings?
   planCandidatesDecided       PlanCandidate[]               @relation("PlanCandidateDecidedBy")
 
@@ -117,13 +125,16 @@ model User {
 /// #337 D9: a person's own settings. No row: the defaults (shared
 /// `USER_SETTINGS_DEFAULTS`).
 model UserSettings {
-  userId        String   @id
+  userId                String   @id
   /// The model New Card and New Plan preselect; null: `PLANNING_MODEL_DEFAULT`.
-  planningModel String?
+  planningModel         String?
   /// C-294: the last `APP_VERSION` this person opened What's new on; null:
   /// never. The shell shows an unread dot while it differs.
-  seenVersion   String?
-  updatedAt     DateTime @updatedAt
+  seenVersion           String?
+  /// C-401: minutes a tool-use request of this person's sessions waits for
+  /// a decision where the project sets none; null: 5 (1–720, by the API).
+  toolUseTimeoutMinutes Int?
+  updatedAt             DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -162,6 +173,40 @@ model UserRecoveryCode {
   @@map("user_recovery_codes")
 }
 
+enum PasswordResetKind {
+  password
+  two_factor
+}
+
+enum PasswordResetVia {
+  admin
+  email
+}
+
+/// C-402 (ADR-0113): a one-time link that sets a new password — from an admin
+/// in Admin › Users, or emailed by Forgot password. Only the SHA-256 of its
+/// 256-bit token is stored. It works once and before `expiresAt`; a new link
+/// for the same person replaces their unused ones.
+model PasswordResetLink {
+  id          String            @id @default(cuid())
+  userId      String
+  tokenHash   String            @unique
+  kind        PasswordResetKind
+  via         PasswordResetVia
+  /// The admin who made it; null for an emailed link or a deleted admin.
+  createdById String?
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime          @default(now())
+
+  user      User  @relation("PasswordResetLinkUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("PasswordResetLinkCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_links")
+}
+
 /// A login session. Named `UserSession` because `Session` is reserved for agent
 /// runtime sessions (docs/architecture/data-model.md).
 model UserSession {
@@ -178,6 +223,40 @@ model UserSession {
 
   @@index([userId])
   @@map("user_sessions")
+}
+
+enum ApiTokenScope {
+  owner
+  read_only
+}
+
+/// C-403: a personal API token — `Authorization: Bearer` on the REST API. It
+/// acts as its owner with the owner's current role; `read_only` refuses every
+/// write. Only the SHA-256 of the token is stored.
+model ApiToken {
+  id          String        @id @default(cuid())
+  userId      String
+  name        String
+  tokenHash   String        @unique
+  /// The token's first characters, shown so two tokens can be told apart.
+  hint        String
+  scope       ApiTokenScope
+  /// Empty: every project the owner can see. Otherwise only these; a deleted
+  /// project's id stays and matches nothing.
+  projectIds  String[]
+  /// Null: never expires.
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  lastUsedIp  String?
+  revokedAt   DateTime?
+  revokedById String?
+  createdAt   DateTime      @default(now())
+
+  user      User  @relation("ApiTokenOwner", fields: [userId], references: [id], onDelete: Cascade)
+  revokedBy User? @relation("ApiTokenRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("api_tokens")
 }
 
 model Setting {
@@ -242,8 +321,30 @@ model Runner {
   installedSkills      InstalledSkill[]
   skillInstallPreviews SkillInstallPreview[]
   actionRequests       ActionRequest[]
+  pushChecks           RepositoryPushCheck[]
 
   @@map("runners")
+}
+
+/// C-396 (ADR-0101): the latest `git push --dry-run` a runner ran for a
+/// checkout — from the connect dialog before the project exists, or from
+/// Getting started after. Keyed by runner and path, not by project, so the
+/// check made in the preview counts once the project is connected.
+model RepositoryPushCheck {
+  id        String   @id @default(cuid())
+  runnerId  String
+  /// The path the check ran on: the inspection's `root`, as a project stores it.
+  rootPath  String
+  ok        Boolean
+  /// origin's URL without credentials; null when the repository has none.
+  remote    String?
+  message   String
+  checkedAt DateTime
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@unique([runnerId, rootPath])
+  @@map("repository_push_checks")
 }
 
 model RunnerPairingCode {
@@ -404,6 +505,8 @@ enum BaseSource {
   origin_head
   gh
   default
+  /// C-396: `origin/develop` exists and had a commit lately.
+  develop
 }
 
 enum DocsSourceKind {
@@ -452,10 +555,16 @@ model Project {
   shipSessionContent          Boolean    @default(false)
   /// 1–365, validated by the DTO.
   sessionContentRetentionDays Int        @default(30)
+  /// C-401: minutes a tool-use request waits for a decision; null: the
+  /// requester's own setting, else 5. 1–720, validated by the DTO.
+  toolUseTimeoutMinutes       Int?
   /// The `orchestrator` block of `.code-analyzer-config.json` and/or its parse error.
   codeSentinelConfig          Json?
   hasClaudeMd                 Boolean
   hasAgentsMd                 Boolean
+  /// C-395: the repository has a `demoflow.config.json` at its root; null
+  /// until a runner that reports it inspects the project.
+  hasDemoflowConfig           Boolean?
   lastInspectedAt             DateTime
   /// #691: why the runner's local policy refuses to watch this project, as the
   /// runner worded it in its latest `runner.watch_refused` (ADR-0047). Null
@@ -497,6 +606,7 @@ model Project {
   plans                  Plan[]
   sessionContents        SessionContent[]
   actionRequests         ActionRequest[]
+  toolUseRules           ToolUseRule[]
   uiProfiles             UiProfile[]
   designSettings         DesignSettings?
   designTemplates        DesignTemplate[]
@@ -528,6 +638,8 @@ model Project {
   demoSecrets            ProjectDemoSecret[]
   telegramLinks          TelegramLink[]
   telegramIntakes        TelegramIntake[]
+  slackWebhook           SlackWebhook?
+  slackDeliveries        SlackDelivery[]
 
   @@unique([runnerId, rootPath])
   @@index([githubRepoId])
@@ -823,6 +935,7 @@ model AgentSession {
   spawnedBy            ToolCall[]            @relation("ToolCallChild")
   compactions          SessionCompaction[]
   errors               SessionError[]
+  toolUseRules         ToolUseRule[]
   workflow             SessionWorkflow?
   workflowMark         SessionWorkflowMark?
   contents             SessionContent[]
@@ -1104,6 +1217,9 @@ model ActionRequest {
   decidedAt     DateTime?
   note          String?
   result        Json?
+  /// C-401: the stored rule that approved this `tool_use` request without a
+  /// person. Null for a person's decision, or once the rule is removed.
+  ruleId        String?
   expiresAt     DateTime
   createdAt     DateTime            @default(now())
 
@@ -1112,10 +1228,49 @@ model ActionRequest {
   session     AgentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   requestedBy User?         @relation("ActionRequestRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
   decidedBy   User?         @relation("ActionRequestDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  rule        ToolUseRule?  @relation("ToolUseRuleAnswered", fields: [ruleId], references: [id], onDelete: SetNull)
+  rulesMade   ToolUseRule[] @relation("ToolUseRuleSource")
 
   @@index([projectId, status, createdAt])
   @@index([status, expiresAt])
   @@map("action_requests")
+}
+
+enum ToolUseRuleScope {
+  session
+  project
+}
+
+/// C-401: "allow similar in this session" or "always allow in this project"
+/// — a Claude Code permission rule (`Bash(npm test:*)`) the API answers later
+/// `tool_use` requests with. Never for a dangerous call (shared
+/// `toolUseDanger`); every use is audited (`tool_rule.used`).
+model ToolUseRule {
+  id              String           @id @default(cuid())
+  projectId       String
+  scope           ToolUseRuleScope
+  /// `session` rules only: the session they hold for.
+  sessionId       String?
+  toolName        String
+  /// The part in parentheses; null: the whole tool.
+  ruleContent     String?
+  /// Nullable so deleting the person keeps the rule.
+  createdById     String?
+  /// The request whose decision stored it.
+  sourceRequestId String?
+  useCount        Int              @default(0)
+  lastUsedAt      DateTime?
+  createdAt       DateTime         @default(now())
+
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session       AgentSession?   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdBy     User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  sourceRequest ActionRequest?  @relation("ToolUseRuleSource", fields: [sourceRequestId], references: [id], onDelete: SetNull)
+  answered      ActionRequest[] @relation("ToolUseRuleAnswered")
+
+  @@index([projectId, scope, createdAt])
+  @@index([sessionId])
+  @@map("tool_use_rules")
 }
 
 // ─── Tokens and API-equivalent cost (docs/specs/13) ─────────────────────────
@@ -1456,6 +1611,9 @@ model NotificationRule {
   kind      String
   inApp     Boolean
   telegram  Boolean
+  /// C-404: shared `EmailMode`; null: never chosen — the card's creator gets
+  /// the kind's `ownerEmail`, everyone else no email.
+  email     String?
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1480,6 +1638,22 @@ model NotificationMute {
 
 enum NotificationDeliveryChannel {
   telegram
+  email
+}
+
+/// C-404: when a user's daily email digest goes out. No row: 09:00 UTC.
+/// `lastDigestAt`: the digest time whose digest went out (or had nothing in
+/// it) — a digest is sent once per occurrence, however often the job runs.
+model NotificationEmailSettings {
+  userId       String    @id
+  digestTime   String    @default("09:00")
+  timezone     String    @default("UTC")
+  lastDigestAt DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_email_settings")
 }
 
 enum NotificationDeliveryStatus {
@@ -1492,8 +1666,10 @@ enum NotificationDeliveryStatus {
 
 /// One notification's delivery on an outside channel (D6). `digested`: over
 /// the rate limit, sent inside the digest `digestId` once its window ends
-/// (`nextAttemptAt`); `sentAt` is set when that digest went out. `skipped`:
-/// never sent — `lastError` says why (shared `DeliverySkipReason`).
+/// (`nextAttemptAt`); `sentAt` is set when that digest went out. An email in
+/// the daily digest (C-404) is `digested` from the start, `digestId` null
+/// until a digest claims it. `skipped`: never sent — `lastError` says why
+/// (shared `DeliverySkipReason`).
 model NotificationDelivery {
   id             String                      @id @default(cuid())
   notificationId BigInt
@@ -1821,8 +1997,8 @@ model Run {
   /// #751 B4: the card type of a card session's round; null elsewhere.
   cardType           String?
 
-  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  slot              Slot?              @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  project           Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot              Slot?               @relation(fields: [slotId], references: [id], onDelete: Cascade)
   skillRun          SkillRun?
   planTurn          PlanTurn?
   uiProfiles        UiProfile[]
@@ -2144,6 +2320,65 @@ model WebhookDelivery {
   @@index([webhookId, createdAt])
   @@index([createdAt])
   @@map("webhook_deliveries")
+}
+
+/// C-405 (ADR-0109): a Slack incoming webhook. `projectId` null is the one
+/// workspace-wide webhook (a partial unique index keeps it single); a
+/// project's own webhook replaces it for that project. The URL is the secret
+/// and is stored sealed with `APP_ENCRYPTION_KEY` only.
+model SlackWebhook {
+  id            String   @id @default(cuid())
+  projectId     String?  @unique
+  /// The webhook URL sealed with `SecretCipher` (v1 format).
+  urlCiphertext String
+  /// The last four characters of the URL, for the masked hint.
+  urlHint       String
+  /// Shared `SLACK_EVENTS` that are posted.
+  events        String[]
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project    Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy  User?           @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  deliveries SlackDelivery[]
+
+  @@map("slack_webhooks")
+}
+
+/// Mirrors `SLACK_DELIVERY_STATUSES` of the shared contract.
+enum SlackDeliveryStatus {
+  pending
+  sent
+  failed
+}
+
+/// One Slack message for one notification (C-405). `(webhookId, eventId,
+/// kind)` keeps a replayed event from posting twice; a budget notification
+/// has no event. `message` is the shared `SlackMessageParts`; links into the
+/// app are paths, made absolute with `APP_URL` when it is sent.
+model SlackDelivery {
+  id            String              @id @default(cuid())
+  webhookId     String
+  projectId     String
+  kind          String
+  eventId       BigInt?
+  message       Json
+  status        SlackDeliveryStatus @default(pending)
+  attempts      Int                 @default(0)
+  nextAttemptAt DateTime            @default(now())
+  lastAttemptAt DateTime?
+  responseCode  Int?
+  error         String?
+  createdAt     DateTime            @default(now())
+
+  webhook SlackWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([webhookId, eventId, kind])
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+  @@map("slack_deliveries")
 }
 
 /// Where the outbound dispatcher stopped (D11): one row, id `webhooks`.
@@ -3101,6 +3336,12 @@ enum CardRoundPhase {
   cancelled
 }
 
+/// Shared `CARD_PAUSE_REASONS` (C-399, ADR-0101): why Nautelle paused a round.
+enum CardPauseReason {
+  /// A hard (`stop`) budget in the round's scope was reached.
+  budget
+}
+
 /// Shared `CARD_FINISHED_BY` (D6).
 enum CardFinishedBy {
   worker
@@ -3369,6 +3610,9 @@ model BoardCard {
   fleetStage              String?
   /// The slot left the projection; the card keeps its last column.
   fleetSlotGone           Boolean               @default(false)
+  /// C-397 (ADR-0098): a person moved the card; the mirror no longer moves or
+  /// deletes it, and still copies the slot's stage and pull request.
+  fleetDetached           Boolean               @default(false)
   /// #337 D6, D7: the plan the card came from — a New Card intake or a New
   /// Plan's Create cards; kept as its origin.
   planId                  String?
@@ -3416,8 +3660,8 @@ model BoardCard {
   candidate            PlanCandidate?
   /// #660: the triage hints written when the card was made.
   triage               BoardCardTriage?
-  /// #652: the card's place in its stack's run queue.
-  stackRunEntry        BoardStackRunCard?
+  /// #652, C-398: the card's place in the run queue.
+  queueEntry           BoardRunQueueCard?
   /// #652: the stack runs this card paused.
   stackRunsPaused      BoardStackRun[]        @relation("BoardStackRunPausedCard")
   /// #746: the card's A/B arm per technique, drawn at its first launch.
@@ -3563,36 +3807,51 @@ model BoardStackRun {
   stack      BoardStack          @relation(fields: [stackId], references: [id], onDelete: Cascade)
   startedBy  User?               @relation("BoardStackRunStartedBy", fields: [startedById], references: [id], onDelete: SetNull)
   pausedCard BoardCard?          @relation("BoardStackRunPausedCard", fields: [pausedCardId], references: [id], onDelete: SetNull)
-  cards      BoardStackRunCard[]
+  cards      BoardRunQueueCard[]
 
   @@index([pausedCardId])
   @@map("board_stack_runs")
 }
 
-/// #652: a card's place in a stack run — `queued` and ready to start,
-/// `waiting` for a dependency, or `started` by the run (`roundId`).
-enum BoardStackRunCardStatus {
+/// #652: a card's place in the run queue — `queued` and ready to start when
+/// a slot frees, `waiting` for a dependency, or `started` by a stack run
+/// (`roundId`). C-398: a card queued on its own is never `started`; its entry
+/// goes once its round starts.
+enum BoardRunQueueStatus {
   queued
   waiting
   started
 }
 
-/// #652: one card of a stack run's queue. A card is in one stack, so in one run.
-model BoardStackRunCard {
-  id        String                  @id @default(cuid())
-  runId     String
-  cardId    String                  @unique
-  status    BoardStackRunCardStatus @default(queued)
-  /// The round the run started; `null` until it starts one.
-  roundId   String?
-  createdAt DateTime                @default(now())
-  updatedAt DateTime                @updatedAt
+/// #652, C-398 (ADR-0102): one card of the Board's run queue — a card of a
+/// stack run (`runId`), or a To Do card a Run at `maxRunning` left waiting
+/// for a slot (`runId` null). Queued cards start in To Do order.
+model BoardRunQueueCard {
+  id           String              @id @default(cuid())
+  /// The stack run that queued it; `null` for a card queued on its own.
+  runId        String?
+  cardId       String              @unique
+  status       BoardRunQueueStatus @default(queued)
+  /// The round the stack run started; `null` until it starts one.
+  roundId      String?
+  /// C-398: who pressed Run — the card starts as them. `null` in a stack run (its `startedById`) or for AgentDock.
+  queuedById   String?
+  /// C-398: their project role then (`operator` or `admin`); `null` in a stack run.
+  queuedByRole String?
+  /// C-398: the Run's launch choices (`RunBoardCardRequest`); `null` in a stack run.
+  options      Json?
+  /// C-398: the dependency an Auto-run when ready Run started after.
+  autoRunAfter Int?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 
-  run  BoardStackRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  card BoardCard     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  run      BoardStackRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
+  card     BoardCard      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  queuedBy User?          @relation("BoardRunQueueCardQueuedBy", fields: [queuedById], references: [id], onDelete: SetNull)
 
   @@index([runId])
-  @@map("board_stack_run_cards")
+  @@index([queuedById])
+  @@map("board_run_queue")
 }
 
 /// #480: one stage of a stack. Its cards may run in parallel; they wait on
@@ -3730,6 +3989,16 @@ model BoardCardRound {
   ciState             CardCiState?
   ciPassed            Int?
   ciTotal             Int?
+  /// C-359: the model the round launched with — the `card.run` command's
+  /// resolved value, defaults included; `null` for a round recorded before.
+  model               String?
+  /// C-359: the effort the round launched with; `null` for a round recorded
+  /// before, or when the runner takes no effort (the CLI's default).
+  effort              CardEffort?
+  /// C-399 (ADR-0101): set on a `cancelled` round Nautelle stopped because a
+  /// hard budget in its scope was reached; the card shows "Paused: budget"
+  /// until a later round supersedes it.
+  pausedFor           CardPauseReason?
 
   card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
@@ -4497,7 +4766,7 @@ model ProjectReviewStep {
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project  Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// #884: the runs of this step on cards; kept when the step is deleted.
   cardRuns BoardCardReviewRun[]
 
@@ -4655,6 +4924,7 @@ enum LlmFeature {
   title
   assistant_summary
   review_instructions
+  quick_card
 }
 
 enum LlmCallOutcome {

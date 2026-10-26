@@ -10,7 +10,8 @@ import type { Role } from '../auth';
  * and goes to project admins and active admins only. `card.finished` and
  * `card.waiting` come from board card workers (issue #242 D15);
  * `card.background_stalled` from a card round waiting on its own background
- * task too long (#390).
+ * task too long (#390); `card.paused` from Nautelle pausing a running round
+ * because a hard budget in its scope was reached (C-399, ADR-0101).
  * `cards.suggested` comes from card capture (issue #244 D11): suggestions are
  * content-derived, so it goes to operators and admins only, and never quotes
  * content.
@@ -29,6 +30,8 @@ import type { Role } from '../auth';
  * the project's `demoTelegram` is on (C-372, ADR-0096): the video itself, with
  * Merge and Feedback buttons, so it is Telegram only and goes to operators and
  * admins only — the people who can act on it.
+ * `card.failed` comes from a card's round failing, and `card.merged` from its
+ * pull request merging (C-405); they name the card only, never error text.
  */
 export const NOTIFICATION_KINDS = [
   'person.needed',
@@ -47,7 +50,10 @@ export const NOTIFICATION_KINDS = [
   'card.finished',
   'card.waiting',
   'card.background_stalled',
+  'card.paused',
   'card.demo',
+  'card.failed',
+  'card.merged',
   'cards.suggested',
   'steward.incident',
   'account.throttled',
@@ -60,6 +66,16 @@ export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 
 /** Whether a kind is delivered on each channel. */
 export type ChannelSwitches = Record<NotificationChannel, boolean>;
+
+/**
+ * Email (C-404, ADR-0108) is not a switch but a mode: each message on its
+ * own as it happens, gathered into the person's daily digest, or not at all.
+ */
+export const EMAIL_MODES = ['off', 'immediate', 'digest'] as const;
+export type EmailMode = (typeof EMAIL_MODES)[number];
+
+export const isEmailMode = (value: string): value is EmailMode =>
+  (EMAIL_MODES as readonly string[]).includes(value);
 
 /**
  * - `project`: goes to every member of the project, admins included (D2);
@@ -88,6 +104,13 @@ export interface NotificationKindSpec {
   operatorsOnly?: true;
   /** Declared, never emitted yet. */
   reserved?: true;
+  /** Never emailed (C-404): a Telegram-only or an in-app-only kind. */
+  noEmail?: true;
+  /**
+   * C-404: the email a card's creator gets for their own card when they never
+   * chose one. Everyone else, and every kind without it, defaults to `off`.
+   */
+  ownerEmail?: EmailMode;
 }
 
 const BOTH: readonly NotificationChannel[] = NOTIFICATION_CHANNELS;
@@ -146,6 +169,7 @@ export const NOTIFICATION_KIND_SPECS: Record<
     source: 'runner status',
     channels: ['inApp'],
     defaults: ON_OFF,
+    noEmail: true,
   },
   'runner.connection_replaced': {
     scope: 'admin',
@@ -185,18 +209,26 @@ export const NOTIFICATION_KIND_SPECS: Record<
     channels: BOTH,
     defaults: ON_ON,
     viewerDefaults: { inApp: false, telegram: false },
+    ownerEmail: 'digest',
   },
   'card.waiting': {
     scope: 'project',
     source: 'card.waiting (issue #242 D15)',
     channels: BOTH,
     defaults: ON_OFF,
+    ownerEmail: 'immediate',
   },
   'card.background_stalled': {
     scope: 'project',
     source: 'card.background_stalled (#390)',
     channels: BOTH,
     defaults: ON_OFF,
+  },
+  'card.paused': {
+    scope: 'project',
+    source: 'card.paused (C-399)',
+    channels: BOTH,
+    defaults: ON_ON,
   },
   'card.demo': {
     scope: 'project',
@@ -205,6 +237,21 @@ export const NOTIFICATION_KIND_SPECS: Record<
     defaults: { inApp: false, telegram: true },
     viewerDefaults: { inApp: false, telegram: false },
     operatorsOnly: true,
+    noEmail: true,
+  },
+  'card.failed': {
+    scope: 'project',
+    source: 'card.failed (C-405)',
+    channels: BOTH,
+    defaults: ON_ON,
+    viewerDefaults: { inApp: false, telegram: false },
+  },
+  'card.merged': {
+    scope: 'project',
+    source: 'card.merged (C-405)',
+    channels: BOTH,
+    defaults: ON_OFF,
+    viewerDefaults: { inApp: false, telegram: false },
   },
   'cards.suggested': {
     scope: 'project',
@@ -233,6 +280,7 @@ export const NOTIFICATION_KIND_SPECS: Record<
     source: 'Telegram link code redeemed (C-147)',
     channels: ['inApp'],
     defaults: ON_OFF,
+    noEmail: true,
   },
 };
 
@@ -258,6 +306,27 @@ export const defaultChannels = (
   return role === 'viewer' && spec.viewerDefaults
     ? { ...spec.viewerDefaults }
     : { ...spec.defaults };
+};
+
+/** Whether `kind` can be emailed at all (C-404). */
+export const kindAllowsEmail = (kind: NotificationKind): boolean =>
+  NOTIFICATION_KIND_SPECS[kind].noEmail !== true;
+
+/**
+ * The email a user gets for `kind` (C-404). `stored`: their rule's mode, null
+ * or undefined when they never chose one — then the creator of the card it is
+ * about (`owner`) gets the kind's `ownerEmail`, and everyone else nothing. A
+ * chosen mode applies to every card, the user's own or not.
+ */
+export const emailModeFor = (
+  kind: NotificationKind,
+  stored: EmailMode | null | undefined,
+  owner: boolean,
+): EmailMode => {
+  if (!kindAllowsEmail(kind)) return 'off';
+  if (stored) return stored;
+  const spec = NOTIFICATION_KIND_SPECS[kind];
+  return owner && spec.ownerEmail ? spec.ownerEmail : 'off';
 };
 
 /** Kinds a user with global `role` can receive at all. */

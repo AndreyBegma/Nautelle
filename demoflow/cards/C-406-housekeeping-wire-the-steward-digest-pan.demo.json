@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "name": "The Steward digest in Activity",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/activity"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "heading",
+        "name": "Activity",
+        "exact": true
+      },
+      "timeoutMs": 60000
+    },
+    {
+      "action": "marker",
+      "title": "The latest Steward digest"
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Steward digest",
+        "exact": true
+      },
+      "text": "Steward digest",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    }
+  ]
+}

@@ -14,6 +14,8 @@ import {
 import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import {
   type AdminUser,
+  type CreatePasswordResetLinkRequest,
+  type PasswordResetLinkResponse,
   type RegistrationState,
   ROLES,
   type Role,
@@ -39,8 +41,10 @@ import {
   ROLE_LABEL,
   roleChangeNeedsConfirm,
 } from '../../../lib/users/format';
+import { AdminApiTokensCard } from './api-tokens-card';
 import { type Confirmation, confirmationCopy } from './confirmation';
 import { RegistrationCard } from './registration-card';
+import { type IssuedResetLink, ResetLinkDialog } from './reset-link-dialog';
 import { TwoFactorPolicyCard } from './two-factor-policy-card';
 
 const TABS: { status: UserStatus; label: string }[] = [
@@ -103,6 +107,8 @@ function UsersTable({ viewer }: { viewer: string }) {
   const [roles, setRoles] = useState<Record<string, Role>>({});
   const [confirm, setConfirm] = useState<Confirmation>();
   const [confirming, setConfirming] = useState(false);
+  // C-402: the reset link just created, shown once.
+  const [issued, setIssued] = useState<IssuedResetLink | null>(null);
   // `?tab=` carries the tab; without it the page opens on Active, or on the
   // first tab that has accounts.
   const picked = USER_STATUSES.find((status) => status === params.get('tab'));
@@ -175,14 +181,20 @@ function UsersTable({ viewer }: { viewer: string }) {
         return;
       }
       const { user, action } = confirm;
-      await run(() => {
+      await run(async () => {
         if (action === 'reject') {
           return api(`/admin/users/${user.id}/reject`, { method: 'POST' });
         }
-        if (action === 'reset_two_factor') {
-          return api(`/admin/users/${user.id}/two-factor`, {
-            method: 'DELETE',
-          });
+        if (action === 'reset_password' || action === 'reset_two_factor') {
+          const body: CreatePasswordResetLinkRequest = {
+            kind: action === 'reset_password' ? 'password' : 'two_factor',
+          };
+          const link = await api<PasswordResetLinkResponse>(
+            `/admin/users/${user.id}/reset-link`,
+            { method: 'POST', body },
+          );
+          setIssued({ email: user.email, link });
+          return;
         }
         if (action === 'disable') {
           return api(`/admin/users/${user.id}`, {
@@ -292,7 +304,20 @@ function UsersTable({ viewer }: { viewer: string }) {
                       {own ? (
                         <DisabledReason>{OWN_ROW_REASON}</DisabledReason>
                       ) : null}
-                      {user.twoFactorEnabled && !own ? (
+                      {user.status === 'active' && !own ? (
+                        <Button
+                          variant="glass"
+                          size="sm"
+                          onClick={() =>
+                            setConfirm({ user, action: 'reset_password' })
+                          }
+                        >
+                          Reset password
+                        </Button>
+                      ) : null}
+                      {user.status === 'active' &&
+                      user.twoFactorEnabled &&
+                      !own ? (
                         <Button
                           variant="glass"
                           size="sm"
@@ -403,6 +428,7 @@ function UsersTable({ viewer }: { viewer: string }) {
         onConfirm={() => void execute()}
         onCancel={() => setConfirm(undefined)}
       />
+      <ResetLinkDialog issued={issued} onClose={() => setIssued(null)} />
     </>
   );
 }
@@ -413,11 +439,12 @@ export default function AdminUsersPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Users"
-        description="Approve registrations, pick each person’s role, and disable or delete accounts. Operators and viewers see only the projects they are added to, under each project’s Settings › Members."
+        description="Approve registrations, pick each person’s role, disable or delete accounts, give a one-time password or 2FA reset link, and revoke their API tokens. Operators and viewers see only the projects they are added to, under each project’s Settings › Members."
       />
       <Suspense fallback={<Skeleton className="h-48 w-full" />}>
         <UsersTable viewer={viewer} />
       </Suspense>
+      <AdminApiTokensCard />
     </div>
   );
 }

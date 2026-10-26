@@ -4,15 +4,11 @@ import type {
   FleetView,
   OrchestratorStatus,
   ProjectSummary,
-  RunSummary,
   SlotStatus,
   SlotSummary,
   UsageTimeseriesResponse,
 } from '@nautelle/shared';
-import { orchestratorSettingsHref } from '../control/reasons';
 import { ORCHESTRATOR_STATUS_LABEL } from '../fleet/format';
-import { slotHref } from '../fleet/workspace-url';
-import { RUN_KIND_LABEL, runHref } from '../history/format';
 import { approvalsHref as approvalsTab } from '../queue/tabs';
 import { costOrBlank } from '../usage/format';
 
@@ -151,129 +147,6 @@ export function mergedPullRequests(items: ActivityItem[]): number {
     seen.add(`${item.projectId ?? ''}#${item.prNumber ?? item.id}`);
   }
   return seen.size;
-}
-
-export type NeedsYouItem = {
-  /** Unique across the list. */
-  key: string;
-  kind: 'profile' | 'failed' | 'blocked' | 'prompt' | 'approval';
-  projectId: string;
-  projectName: string;
-  /** "Slot i42 · #42", "PR #57 · fix the login" */
-  title: string;
-  /** What the person is asked to do. */
-  reason: string;
-  href: string;
-  /**
-   * When it started waiting: the slot's last update, the approval's wait, the
-   * run's end. Null for a missing profile, which has no moment — it is
-   * listed first, since nothing on that project can start until it is set.
-   */
-  since: string | null;
-};
-
-/** How far back a failed run still asks for a look. */
-export const FAILED_RUN_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-/** What `needsYou` knows beyond the fleets and approvals. */
-export interface NeedsYouExtra {
-  /** Each project's failed runs, as `/runs?status=failed` answered. */
-  failedRuns?: ReadonlyMap<string, readonly RunSummary[]>;
-  /** Projects with neither an orchestrator profile nor a default one. */
-  missingProfile?: ReadonlySet<string>;
-  now?: number;
-}
-
-/** "Slot i4 · #4", else the run's title, else its kind ("Skill run"). */
-function runTitle(run: RunSummary): string {
-  if (run.slot !== null) return slotTitle({ name: run.slot, issue: run.issue });
-  return run.title ?? RUN_KIND_LABEL[run.kind];
-}
-
-/**
- * What waits on a person: projects that cannot start an orchestrator for want
- * of a runtime profile, then, oldest first, runs that failed in the last 24
- * hours, slots whose last checkpoint is `blocked`, slots whose pane sits on a
- * permission or launch prompt, and pull requests waiting for a merge approval.
- */
-export function needsYou(
-  projects: ProjectSummary[],
-  fleets: ReadonlyMap<string, FleetView>,
-  approvals: ReadonlyMap<string, ApprovalsView>,
-  { failedRuns, missingProfile, now = Date.now() }: NeedsYouExtra = {},
-): NeedsYouItem[] {
-  const items: NeedsYouItem[] = [];
-  for (const project of projects) {
-    const base = { projectId: project.id, projectName: project.displayName };
-    if (missingProfile?.has(project.id)) {
-      items.push({
-        ...base,
-        key: `profile:${project.id}`,
-        kind: 'profile',
-        title: 'No default runtime profile',
-        reason: 'Choose one so the orchestrator can start',
-        href: orchestratorSettingsHref(project.id),
-        since: null,
-      });
-    }
-    for (const run of failedRuns?.get(project.id) ?? []) {
-      if (run.status !== 'failed') continue;
-      const ended = run.endedAt ?? run.updatedAt;
-      if (now - Date.parse(ended) > FAILED_RUN_WINDOW_MS) continue;
-      items.push({
-        ...base,
-        key: `failed:${run.id}`,
-        kind: 'failed',
-        title: runTitle(run),
-        reason: 'Failed — see what went wrong',
-        href: runHref(project.id, run.id),
-        since: ended,
-      });
-    }
-    for (const slot of fleets.get(project.id)?.slots ?? []) {
-      if (slot.status === 'ended') continue;
-      const title = slotTitle(slot);
-      if (slot.lastCheckpoint === 'blocked') {
-        items.push({
-          ...base,
-          key: `blocked:${slot.id}`,
-          kind: 'blocked',
-          title,
-          reason: 'Blocked — waiting for a decision',
-          href: slotHref(project.id, slot.name),
-          since: slot.updatedAt,
-        });
-      } else if (slot.status === 'prompt') {
-        items.push({
-          ...base,
-          key: `prompt:${slot.id}`,
-          kind: 'prompt',
-          title,
-          reason: 'Waiting on a prompt in its session',
-          href: slotHref(project.id, slot.name),
-          since: slot.updatedAt,
-        });
-      }
-    }
-    const view = approvals.get(project.id);
-    for (const approval of view ? awaiting(view) : []) {
-      items.push({
-        ...base,
-        key: `approval:${approval.id}`,
-        kind: 'approval',
-        title: approval.title
-          ? `PR #${approval.pr} · ${approval.title}`
-          : `PR #${approval.pr}`,
-        reason: 'Waiting for your merge approval',
-        href: approvalsTab(project.id),
-        since: approval.waitingSince,
-      });
-    }
-  }
-  // A stable sort: missing profiles first, in project order; the rest by age.
-  const at = (item: NeedsYouItem) =>
-    item.since === null ? Number.NEGATIVE_INFINITY : Date.parse(item.since);
-  return items.sort((a, b) => at(a) - at(b));
 }
 
 /** "Slot i42 · #42" — the slot's name and, when it has one, its issue. */

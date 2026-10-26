@@ -87,6 +87,7 @@ export class ActionRequestsController {
       id,
       decision,
       dto.note,
+      dto.remember,
     );
   }
 }

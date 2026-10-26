@@ -65,6 +65,37 @@ export function acceptChoice(
   return { kind: 'merge', headSha: pr.headSha };
 }
 
+/** What Accept does when the pull request can be merged: the selector's value. */
+export type AcceptPath = 'merge' | 'no_merge';
+
+/** The one sentence under the title: what the selected path does. */
+export function acceptDescription(
+  choice: AcceptChoice | null,
+  path: AcceptPath,
+): string {
+  if (choice?.kind === 'merge' && path === 'merge') {
+    return 'Merges the pull request through the runner, closes its issue and moves the card to Completed.';
+  }
+  return 'Moves the card to Completed and closes its worker.';
+}
+
+/**
+ * The label of the dialog's one primary button. `closing` is whether the
+ * request will close the pull request; the busy labels follow the action.
+ */
+export function acceptPrimaryLabel(
+  choice: AcceptChoice | null,
+  path: AcceptPath,
+  closing: boolean,
+  busy: boolean,
+): string {
+  if (choice?.kind === 'merge' && path === 'merge') {
+    return busy ? 'Merging…' : 'Merge pull request';
+  }
+  if (closing) return busy ? 'Closing…' : 'Close pull request and accept';
+  return busy ? 'Accepting…' : 'Accept';
+}
+
 export const MERGE_METHOD_LABEL: Record<CardMergeMethod, string> = {
   merge: 'Merge commit',
   squash: 'Squash and merge',

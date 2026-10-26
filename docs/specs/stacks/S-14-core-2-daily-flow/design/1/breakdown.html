@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breakdown · Daily flow</title>
+<style>
+:root{--font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--text-display:28px;--text-display-lh:32px;--text-section:15px;--text-section-lh:22px;--text-body:14px;--text-body-lh:20px;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-row:32px;--size-control:28px;--size-control-sm:32px;--size-field:28px;--size-nav:28px;--focus-width:3px;--focus-offset:4px;--dur-fast:100ms;--dur-base:150ms;--ease-sheet:cubic-bezier(0.32,0.72,0,1);--press-scale:0.97;--glass-blur:26px;--glass-blur-strong:40px}
+:root[data-theme='dark']{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-info-soft:rgb(95 180 240 / 0.16);--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246 / 0.18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148 / 0.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90 / 0.18);--color-hue-3-ink:#ade58f;--color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0 / 0.18);--color-hue-4-ink:#f5c25c;--color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59 / 0.18);--color-hue-5-ink:#f9a77c;--color-hue-6:#f0606e;--color-hue-6-soft:rgb(240 96 110 / 0.18);--color-hue-6-ink:#ff9da5;--color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250 / 0.18);--color-hue-7-ink:#cbbcff;--canvas-glow:18%;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-scrim-strong:rgb(9 9 12 / 0.64);--glass-brightness:0.85;--glass-brightness-strong:0.7;--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--glass-shadow-strong:rgb(0 0 0 / 0.45);--glass-shadow-clear:rgb(0 0 0 / 0.15);--control-spec:rgb(255 255 255 / 0.05)}
+:root[data-theme='light']{color-scheme:light;--color-ground:#ffffff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#ffffff;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-info-soft:rgb(3 98 154 / 0.12);--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214 / 0.12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94 / 0.12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28 / 0.12);--color-hue-3-ink:#2f6617;--color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0 / 0.12);--color-hue-4-ink:#8a5200;--color-hue-5:#c24e00;--color-hue-5-soft:rgb(194 78 0 / 0.12);--color-hue-5-ink:#9c3d00;--color-hue-6:#d02a3e;--color-hue-6-soft:rgb(208 42 62 / 0.12);--color-hue-6-ink:#ad1f31;--color-hue-7:#7244e0;--color-hue-7-soft:rgb(114 68 224 / 0.12);--color-hue-7-ink:#5b30c4;--canvas-glow:10%;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-scrim-strong:rgb(255 255 255 / 0.64);--glass-brightness:1.15;--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--glass-shadow-strong:rgb(0 0 0 / 0.16);--glass-shadow-clear:rgb(0 0 0 / 0.08);--control-spec:rgb(255 255 255 / 0.05)}
+:root{--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);--color-status-blocked:var(--color-hue-5);--color-status-blocked-soft:var(--color-hue-5-soft);--color-status-blocked-ink:var(--color-hue-5-ink);--color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);--color-status-error:var(--color-hue-6);--color-status-error-soft:var(--color-hue-6-soft);--color-status-error-ink:var(--color-hue-6-ink);--glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));--glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong))}
+*,*::before,*::after{box-sizing:border-box}html{background:var(--color-ground);color:var(--color-ink)}body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;color:var(--color-ink);-webkit-font-smoothing:antialiased;overflow-x:hidden}h1,h2,h3,p{margin:0}.mono{font-family:var(--font-mono)}:focus-visible{outline:var(--focus-width) solid var(--color-focus);outline-offset:var(--focus-offset)}.num{font-variant-numeric:tabular-nums}.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 20px 48px var(--glass-shadow-strong)}.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;font-weight:600;height:var(--size-control);padding:0 16px;font-size:14px;border-radius:var(--radius-control);border:1px solid transparent;background:transparent;color:var(--color-ink);cursor:pointer}.btn--solid{background:var(--color-accent);color:var(--color-on-accent)}.btn--glass{background:var(--color-raised);border-color:var(--color-line-strong);box-shadow:inset 0 1px 0 var(--control-spec)}.btn--ghost{color:var(--color-ink-2)}.btn--link{height:auto;padding:0;color:var(--color-accent-ink);font-weight:500}.btn--sm{height:var(--size-control-sm);padding:0 12px;font-size:12px;border-radius:calc(var(--radius-control) - 4px)}
+.field__label{font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-2)}.input,.textarea,.select{width:100%;height:var(--size-field);padding:0 10px;font-family:inherit;font-size:14px;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control)}.input::placeholder,.textarea::placeholder{color:var(--color-ink-3)}.textarea{height:auto;min-height:64px;padding:8px 10px;resize:none}.search{position:relative;display:flex;align-items:center}.search svg{position:absolute;left:8px;color:var(--color-ink-3)}.search .input{padding-left:28px}.toggle{position:relative;display:inline-flex;width:32px;height:18px;border-radius:999px;background:var(--color-line-strong);border:0;flex-shrink:0}.toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:999px;background:#fff}.toggle[aria-checked='true']{background:var(--color-accent)}.toggle[aria-checked='true']::after{transform:translateX(14px)}
+.card{border-radius:var(--radius-surface);padding:16px}[data-hue='1']{--hue:var(--color-hue-1)}[data-hue='2']{--hue:var(--color-hue-2)}[data-hue='4']{--hue:var(--color-hue-4)}[data-hue='7']{--hue:var(--color-hue-7)}.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--hue);flex-shrink:0}
+.badge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:600;line-height:1;border-radius:999px;height:18px;min-width:18px;padding:0 4px;font-size:10px;background:var(--color-hover);color:var(--color-ink-2);font-variant-numeric:tabular-nums}.badge--md{height:20px;padding:0 6px;font-size:12px}.badge--ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}.badge--warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}.badge--count.badge--warn{background:var(--color-warn);color:var(--color-ground)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;white-space:nowrap;font-size:11px;font-weight:500;line-height:1;background:var(--color-hover);color:var(--color-ink-2)}.pill__dot{width:6px;height:6px;border-radius:999px;background:var(--color-ink-3)}.pill[data-status='running']{background:var(--color-status-running-soft);color:var(--color-status-running-ink)}.pill[data-status='running'] .pill__dot{background:var(--color-status-running)}.pill[data-status='waiting']{background:var(--color-status-waiting-soft);color:var(--color-status-waiting-ink)}.pill[data-status='waiting'] .pill__dot{background:var(--color-status-waiting)}.pill[data-status='error']{background:var(--color-status-error-soft);color:var(--color-status-error-ink)}.pill[data-status='error'] .pill__dot{background:var(--color-status-error)}
+.segmented{display:inline-flex;gap:4px;padding:2px;border-radius:999px;height:28px}.segmented button{padding:0 12px;border:0;border-radius:999px;background:transparent;color:var(--color-ink-2);font:inherit;font-size:13px;font-weight:500;white-space:nowrap}.segmented button[aria-checked='true']{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.kbd{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:4px;border:1px solid var(--color-line-strong);font-size:11px;color:var(--color-ink-3)}.progress{height:6px;border-radius:999px;background:var(--color-hover);overflow:hidden}.progress>span{display:block;height:100%;background:var(--color-accent)}
+.nav-item{display:flex;align-items:center;gap:10px;height:28px;padding:0 12px;border-radius:var(--radius-control);color:var(--color-ink-2);font-size:14px;text-decoration:none}.nav-item[aria-current='page']{background:var(--color-accent-soft);color:var(--color-accent-ink);font-weight:500}
+.section-header h2{font-size:16px;line-height:24px;font-weight:600}.section-header p{font-size:13px;color:var(--color-ink-2)}
+
+/* Breakdown */
+.wrap{max-width:80rem;margin:0 auto;padding:24px 16px 48px;display:flex;flex-direction:column;gap:28px}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.h1{font-size:28px;line-height:32px;letter-spacing:-0.02em;font-weight:600}
+.zone{position:relative;outline:2px dashed color-mix(in oklab,var(--color-accent) 60%,transparent);outline-offset:3px;border-radius:var(--radius-surface)}
+.mk{position:absolute;top:-12px;left:-12px;z-index:2;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;background:var(--color-accent);color:var(--color-on-accent);font-size:12px;font-weight:700;box-shadow:0 0 0 3px var(--color-ground)}
+.lmk{position:static;flex-shrink:0;box-shadow:none}
+.mini-shell{display:grid;grid-template-columns:200px minmax(0,1fr);gap:12px}
+.mini-rail{border-radius:var(--radius-surface);padding:10px 8px;display:flex;flex-direction:column;gap:4px}
+.mini-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.mini-top{height:48px;border-radius:var(--radius-surface);display:flex;align-items:center;gap:10px;padding:0 12px}
+.row{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--color-line)}
+.row:last-child{border-bottom:0}.row__t{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.gt{padding:8px 14px;font-size:12px;font-weight:500;color:var(--color-ink-3);border-bottom:1px solid var(--color-line)}
+.pieces{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:28px 20px}
+.piece{display:flex;flex-direction:column;gap:8px}.piece__cap{font-size:12px;font-weight:500;color:var(--color-ink-3);padding-left:16px}
+.cface{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:var(--radius-surface);max-width:280px}
+.icons{display:flex;gap:6px;margin-left:auto;color:var(--color-ink-3)}
+.pal{border-radius:var(--radius-sheet);overflow:hidden}
+.pal__in{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;border-bottom:1px solid var(--color-line);font-size:14px}
+.pal__lbl{padding:8px 12px 2px;font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.pal__it{display:flex;align-items:center;gap:8px;height:32px;margin:0 6px;padding:0 8px;border-radius:var(--radius-control);font-size:13px}
+.pal__it.sel{background:var(--color-hover)}.pal__it .k{margin-left:auto;display:flex;gap:4px}
+.chk{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--color-line);font-size:14px}.chk:last-child{border-bottom:0}
+.chk__s{display:inline-flex;width:18px;height:18px;border-radius:999px;align-items:center;justify-content:center;flex-shrink:0}
+.chk__s.ok{background:color-mix(in oklab,var(--color-ok) 18%,transparent);color:var(--color-ok)}
+.chk__s.todo{border:1.5px solid var(--color-line-strong)}
+.chk__s.warn{background:color-mix(in oklab,var(--color-warn) 18%,transparent);color:var(--color-warn)}
+.chk .act{margin-left:auto}
+.repo{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--color-line);font-size:13px}
+.repo input{accent-color:var(--color-accent)}
+.legend{width:100%;border-collapse:collapse;font-size:13px}
+.legend th{text-align:left;font-size:12px;font-weight:500;color:var(--color-ink-3);padding:10px 12px;border-bottom:1px solid var(--color-line)}
+.legend td{padding:12px;border-bottom:1px solid var(--color-line);vertical-align:top;color:var(--color-ink-2)}
+.legend td b{color:var(--color-ink);font-weight:600}.legend tr:last-child td{border-bottom:0}
+.legend code{font-family:var(--font-mono);font-size:12px;padding:1px 5px;border-radius:4px;background:var(--color-hover);color:var(--color-ink)}
+@media (max-width:639px){
+  .mini-shell{grid-template-columns:1fr}.mini-rail{display:none}
+  .row{grid-template-columns:18px minmax(0,1fr)}.row .acts{grid-column:2}
+  .legend thead{display:none}.legend tr{display:grid;grid-template-columns:28px 1fr;gap:4px 8px;padding:12px;border-bottom:1px solid var(--color-line)}
+  .legend td{padding:0;border:0}.legend td:not(:first-child){grid-column:2}
+  .pieces{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:4px">
+    <span class="eyebrow">S-14 · Core 2 — Daily flow · Breakdown</span>
+    <h1 class="h1">What the stack changes</h1>
+  </header>
+
+  <div class="mini-shell">
+    <aside class="mini-rail glass">
+      <div class="zone" style="padding:4px"><span class="mk">1</span>
+        <a class="nav-item" href="#" aria-current="page">Inbox<span class="badge badge--count badge--warn" style="margin-left:auto">8</span></a>
+      </div>
+      <a class="nav-item" href="#">Overview</a><a class="nav-item" href="#">Projects</a>
+      <div style="height:8px"></div>
+      <a class="nav-item" href="#">Board</a><a class="nav-item" href="#">Fleet</a><a class="nav-item" href="#">Queue</a><a class="nav-item" href="#">Settings</a>
+      <div class="zone" style="margin-top:16px;padding:8px 10px;display:flex;flex-direction:column;gap:6px"><span class="mk">7</span>
+        <span style="display:flex;justify-content:space-between;font-size:12px;font-weight:500"><span>Finish setup · landing</span><span class="ink-3 num">5 / 7</span></span>
+        <span class="progress"><span style="width:71%"></span></span>
+      </div>
+    </aside>
+    <div class="mini-col">
+      <div class="mini-top glass">
+        <span style="flex:1;font-weight:600">Inbox</span>
+        <div class="zone"><span class="mk">5</span><button class="btn btn--glass" style="width:200px;justify-content:flex-start;padding:0 8px"><span class="ink-3" style="flex:1;text-align:left;font-weight:400">Search or run…</span><span class="kbd">⌘K</span></button></div>
+      </div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div><span class="eyebrow">All projects</span><div class="h1">Inbox</div></div>
+        <div class="zone"><span class="mk">6</span><button class="btn btn--glass">Quick card <span class="kbd">C</span></button></div>
+      </div>
+      <div class="zone" style="align-self:flex-start;max-width:100%;overflow:auto"><span class="mk">2</span>
+        <div class="segmented glass" role="radiogroup" aria-label="Kind"><button role="radio" aria-checked="true">All 8</button><button role="radio" aria-checked="false">Designs 2</button><button role="radio" aria-checked="false">Questions 2</button><button role="radio" aria-checked="false">Merges 2</button><button role="radio" aria-checked="false">Failed 1</button></div>
+      </div>
+      <div class="zone"><span class="mk">3</span>
+        <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+          <div class="gt">Designs to approve · 2</div>
+          <div class="row" style="background:color-mix(in oklab,var(--color-accent-soft) 45%,transparent);grid-template-columns:18px minmax(0,1fr)">
+            <span></span>
+            <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+              <div class="row__t"><span class="swatch" data-hue="2"></span><span class="mono ink-3" style="font-size:12px">C-394</span><b style="font-weight:500">Approve a design from the card sheet</b></div>
+              <div class="zone" style="padding:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="mk">4</span>
+                <span style="width:120px;height:68px;border-radius:6px;background:linear-gradient(135deg,var(--color-hue-7-soft),var(--color-hue-1-soft));border:1px solid var(--color-line)"></span>
+                <span class="ink-2" style="font-size:13px;flex:1;min-width:140px">Screen · Breakdown · States</span>
+                <button class="btn btn--glass btn--sm">Back with comment</button><button class="btn btn--solid">Approve and run</button>
+              </div>
+            </div>
+          </div>
+          <div class="gt">Pull requests to merge · 2</div>
+          <div class="row"><span></span><div class="row__t"><span class="swatch" data-hue="2"></span><span class="mono ink-3" style="font-size:12px">C-397</span>One work model<span class="badge badge--md badge--ok">Checks green</span></div><div class="acts"><button class="btn btn--glass btn--sm">Merge</button></div></div>
+          <div class="gt">Failed runs · 1</div>
+          <div class="row"><span></span><div class="row__t"><span class="swatch" data-hue="1"></span><span class="mono ink-3" style="font-size:12px">C-385</span>Upgrade Bun to 1.3<span class="pill" data-status="error"><span class="pill__dot"></span>Error</span></div><div class="acts"><button class="btn btn--glass btn--sm">Retry</button></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <div class="section-header"><h2>Shared pieces of the stack</h2><p>The same parts, drawn where they live.</p></div>
+    <div class="pieces">
+      <div class="piece"><span class="piece__cap">Board · the thin card face</span>
+        <div class="zone" style="align-self:flex-start"><span class="mk">8</span>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div class="cface surface-content">
+              <div style="display:flex;align-items:center;gap:8px"><span class="mono ink-3" style="font-size:12px">C-394</span>
+                <span class="icons"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-label="Design ready" role="img"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-label="Depends on C-392" role="img"><path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 1 1 0 10h-2M8 12h8"/></svg></span></div>
+              <span style="font-weight:500">Approve a design from the card sheet</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill" data-status="waiting"><span class="pill__dot"></span>Design ready</span></div>
+            </div>
+            <div class="cface surface-content">
+              <div style="display:flex;align-items:center;gap:8px"><span class="mono ink-3" style="font-size:12px">C-397</span>
+                <span class="icons"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Demo ready" role="img"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg></span></div>
+              <span style="font-weight:500">One work model: cards everywhere</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill" data-status="running"><span class="pill__dot"></span>In review</span><span class="badge badge--md"><span class="mono">#712</span></span><span class="badge badge--md badge--ok">CI green</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="piece"><span class="piece__cap">⌘K · actions first, then cards</span>
+        <div class="zone"><span class="mk">9</span>
+          <div class="pal glass-strong">
+            <div class="pal__in"><span class="ink-3">⌕</span><span>run c-39</span><span class="kbd" style="margin-left:auto">esc</span></div>
+            <div class="pal__lbl">Actions</div>
+            <div class="pal__it sel">Run C-395 now<span class="k"><span class="kbd">⌘</span><span class="kbd">↵</span></span></div>
+            <div class="pal__it">Quick card<span class="k"><span class="kbd">C</span></span></div>
+            <div class="pal__lbl">Cards</div>
+            <div class="pal__it" style="margin-bottom:6px"><span class="mono ink-3" style="font-size:12px">C-393</span>⌘K with actions and card lookup</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="piece"><span class="piece__cap">New work · quick card next to the interview</span>
+        <div class="zone"><span class="mk">10</span>
+          <div class="glass-strong" style="border-radius:var(--radius-sheet);padding:16px;display:flex;flex-direction:column;gap:10px">
+            <b style="font-size:16px">Quick card</b>
+            <textarea class="textarea" aria-label="What needs doing">Show the runner version on the Fleet slot row</textarea>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:14px">Run now in the next free slot<button class="toggle" role="switch" aria-checked="true" aria-label="Run now"></button></div>
+            <div style="display:flex;justify-content:space-between"><button class="btn btn--ghost">Cancel</button><button class="btn btn--solid">Add and run</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="piece"><span class="piece__cap">Project settings · search and Ready to run</span>
+        <div class="zone"><span class="mk">11</span>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input class="input" placeholder="Search every setting" value="budget" aria-label="Search settings"></div>
+            <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+              <div style="padding:10px 14px;border-bottom:1px solid var(--color-line);display:flex;align-items:center;gap:8px"><b style="font-size:14px">Ready to run</b><span class="badge badge--md badge--warn" style="margin-left:auto">3 of 4</span></div>
+              <div class="chk"><span class="chk__s ok">✓</span>GitHub App connected</div>
+              <div class="chk"><span class="chk__s ok">✓</span>Runner online <span class="mono ink-3" style="font-size:12px">0.17.0</span></div>
+              <div class="chk"><span class="chk__s ok">✓</span>Agent credentials</div>
+              <div class="chk"><span class="chk__s warn">!</span>No monthly budget<button class="btn btn--glass btn--sm act">Set budget</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="piece"><span class="piece__cap">Onboarding · checklist to the first card</span>
+        <div class="zone"><span class="mk">12</span>
+          <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+            <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--color-line)"><div style="display:flex;justify-content:space-between"><b>Set up landing</b><span class="ink-3 num" style="font-size:12px">5 / 7</span></div><span class="progress"><span style="width:71%"></span></span></div>
+            <div class="chk"><span class="chk__s ok">✓</span>Install the runner</div>
+            <div class="chk"><span class="chk__s todo"></span>Pick a repository</div>
+            <div style="padding:0 14px 12px 42px">
+              <div class="search" style="margin-bottom:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input class="input" placeholder="Search repositories" aria-label="Search repositories"></div>
+              <div class="surface-content" style="border-radius:var(--radius-control);overflow:hidden">
+                <label class="repo"><input type="radio" name="rp" checked><span class="mono">acme/landing</span><span class="ink-3" style="margin-left:auto;font-size:12px">main</span></label>
+                <label class="repo" style="border-bottom:0"><input type="radio" name="rp"><span class="mono">acme/docs</span><span class="ink-3" style="margin-left:auto;font-size:12px">main</span></label>
+              </div>
+              <button class="btn btn--solid" style="margin-top:8px">Use repository</button>
+            </div>
+            <div class="chk"><span class="chk__s todo"></span>Create the first card</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <div class="section-header"><h2>Legend</h2></div>
+    <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+      <table class="legend">
+        <thead><tr><th>#</th><th>What</th><th>Components</th><th>Behaviour</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td><span class="mk lmk">1</span></td><td><b>Inbox in the rail</b> · new · C-390</td><td><code>nav-rail</code> item with a count <code>badge</code></td><td>Top of Workspace, across every project; the count is live and matches the page.</td><td>One place to look instead of each project's Approvals.</td></tr>
+          <tr><td><span class="mk lmk">2</span></td><td><b>Kind filter</b> · new</td><td><code>segmented-control</code> sm, project <code>select</code></td><td>Counts per kind; the choice lives in <code>?kind=</code>. Scrolls sideways on a phone.</td><td>Triage by the kind of decision, not by project.</td></tr>
+          <tr><td><span class="mk lmk">3</span></td><td><b>Grouped rows</b> · new</td><td><code>card</code> body, rows with <code>status-pill</code>, <code>badge</code>, glass sm <code>button</code></td><td>One row per waiting thing; its single action sits on the row. It leaves the Inbox once acted on, with an Undo toast.</td><td>The action right there: no trip into the card.</td></tr>
+          <tr><td><span class="mk lmk">4</span></td><td><b>Inline design approval</b> · new · C-394</td><td>preview, frame list, <code>textarea</code>, solid <code>button</code></td><td>Opens in place; the same block appears in the card sheet. Back with comment needs text.</td><td>Approving a design was a page away; now it is one click.</td></tr>
+          <tr><td><span class="mk lmk">5</span></td><td><b>Search or run</b> · changed · C-393</td><td>top-bar search <code>button</code>, <code>key-hint</code></td><td>⌘K opens the palette (9); actions rank above cards.</td><td>Keyboard reach to every action.</td></tr>
+          <tr><td><span class="mk lmk">6</span></td><td><b>Quick card</b> · new · C-391</td><td>glass <code>button</code> plus <code>key-hint</code> C, <code>dialog</code></td><td>Opens (10); on a phone the capsule's <code>+</code> opens it.</td><td>Small asks should not need an interview.</td></tr>
+          <tr><td><span class="mk lmk">7</span></td><td><b>Setup link</b> · new · C-396</td><td>rail footer, <code>progress</code></td><td>Shown while any project is unfinished; opens its checklist (12). Hidden on the icon-only rail.</td><td>The way back to setup is always visible.</td></tr>
+          <tr><td><span class="mk lmk">8</span></td><td><b>Thin card face</b> · changed · C-392, C-397</td><td><code>board</code> tile, <code>status-pill</code>, <code>badge</code>, 14 px icons</td><td>Id, title, one state pill, the PR and CI badge, and icons for demo, design and dependency. The rest lives in the sheet. Fleet shows who works and Queue shows incoming issues; both open the same card.</td><td>Scannable at 30 cards; one work model everywhere.</td></tr>
+          <tr><td><span class="mk lmk">9</span></td><td><b>⌘K palette</b> · changed · C-393</td><td><code>command-palette</code>, <code>key-hint</code></td><td>Arrow keys move, ↵ opens and ⌘↵ runs. Card lookup by id or title. J/K move on the Board.</td><td>Fewer clicks for daily verbs.</td></tr>
+          <tr><td><span class="mk lmk">10</span></td><td><b>Quick card dialog</b> · new · C-391</td><td><code>dialog</code>, <code>textarea</code>, <code>select</code>, switch</td><td>The first line becomes the title; it lands in To Do. With Run now on, the verb is “Add and run”.</td><td>Text to card in one step.</td></tr>
+          <tr><td><span class="mk lmk">11</span></td><td><b>Settings search and Ready to run</b> · new · C-395</td><td><code>input</code> search, <code>section</code> checklist, warn <code>badge</code></td><td>Search filters every tab and jumps to the field; the Ready block sits on top with a fix button per gap.</td><td>Why a project will not run is answered first.</td></tr>
+          <tr><td><span class="mk lmk">12</span></td><td><b>Onboarding checklist and repository picker</b> · new · C-396</td><td><code>section</code>, <code>progress</code>, radio list, solid <code>button</code></td><td>Every step to the first card; the picker lists the GitHub App's repositories.</td><td>Nobody stalls between install and the first card.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+</body>
+</html>

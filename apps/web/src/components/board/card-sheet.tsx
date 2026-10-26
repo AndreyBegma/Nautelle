@@ -39,6 +39,7 @@ import {
 } from '../../lib/attachments/format';
 import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploads';
 import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
+import { stopLeavesQueue } from '../../lib/board/card-confirm';
 import { runWaitsFor } from '../../lib/board/dependencies';
 import {
   escalationAsk,
@@ -60,6 +61,7 @@ import {
   canRetry,
   canRun,
   canStop,
+  DETACHED_HINT,
   describeBoardError,
   FLEET_EDIT_HINT,
   finishRefusedText,
@@ -72,8 +74,9 @@ import {
   isTerminalCard,
   noPrBanner,
   ownsWorker,
-  phaseLabel,
   roundPill,
+  roundStateLabel,
+  runActionLabel,
   SLOT_GONE_TEXT,
   sessionHref,
   TRACKED_TEXT,
@@ -130,6 +133,7 @@ import {
   AutoRunSection,
   CardOptionToggles,
 } from './card-options';
+import { CardSignals } from './card-signals';
 import {
   type CardTab,
   CardTabs,
@@ -220,7 +224,7 @@ function roundItems(
               : round.trigger === 'review_fix'
                 ? 'review fix'
                 : 'run'}{' '}
-            · {phaseLabel(round.phase)}
+            · {roundStateLabel(round)}
           </span>
           {round.autoRunAfter != null ? (
             // #443: Auto-run when ready started it, not a person's Run.
@@ -657,14 +661,17 @@ export function CardPrChip({ card }: { card: BoardCardView }) {
 export function CardHeaderMeta({ card }: { card: BoardCardView }) {
   const pill = roundPill(card.round);
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-      <span className="font-medium">{COLUMN_TITLE[card.column]}</span>
-      {pill ? (
-        <StatusPill size="sm" status={pill.status} label={pill.label} />
-      ) : null}
-      <CardPrChip card={card} />
-      <RunMoney card={card} />
-    </div>
+    <>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <span className="font-medium">{COLUMN_TITLE[card.column]}</span>
+        {pill ? (
+          <StatusPill size="sm" status={pill.status} label={pill.label} />
+        ) : null}
+        <CardPrChip card={card} />
+        <RunMoney card={card} />
+      </div>
+      <CardSignals card={card} />
+    </>
   );
 }
 
@@ -858,7 +865,7 @@ export function CardDetailBody({
           projectId={projectId}
           card={card}
           kind="work"
-          label={canRetry(card) ? 'Run again' : 'Run'}
+          label={runActionLabel(card)}
           variant={card.column === 'todo' ? 'solid' : 'glass'}
           disabled={
             actions.busy ||
@@ -922,7 +929,7 @@ export function CardDetailBody({
           disabled={actions.busy}
           onClick={() => actions.askStop(card)}
         >
-          Stop
+          {stopLeavesQueue(card) ? 'Remove from queue' : 'Stop'}
         </Button>
       ) : null}
       {card.sessionId ? (
@@ -1023,6 +1030,7 @@ export function CardDetailBody({
               </>
             ) : null}
           </p>
+          {card.fleet.detached ? <p>{DETACHED_HINT}</p> : null}
           {card.fleet.slotGone ? (
             <Badge tone="warn" label={SLOT_GONE_TEXT} />
           ) : null}
@@ -1490,14 +1498,19 @@ export function CardDetailBody({
           ) : undefined
         }
         meta={
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
-            <span>{COLUMN_TITLE[card.column]}</span>
-            {card.round ? <span>Round {card.rounds.length}</span> : null}
-            <CardPrChip card={card} />
-            {total ? <span className="tabular-nums">{total} spent</span> : null}
-            <span>
-              Created <Time value={card.createdAt} />
-            </span>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
+              <span>{COLUMN_TITLE[card.column]}</span>
+              {card.round ? <span>Round {card.rounds.length}</span> : null}
+              <CardPrChip card={card} />
+              {total ? (
+                <span className="tabular-nums">{total} spent</span>
+              ) : null}
+              <span>
+                Created <Time value={card.createdAt} />
+              </span>
+            </div>
+            <CardSignals card={card} />
           </div>
         }
         actions={

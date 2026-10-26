@@ -1,8 +1,10 @@
 import {
   type AddProjectMemberRequest,
   type ConnectProjectRequest,
+  type DiscoverProjectsRequest,
   type DocsSourceOverrideRequest,
   type InspectProjectRequest,
+  type MoveProjectRequest,
   PROJECT_BRANCH_MAX_LENGTH,
   PROJECT_DISPLAY_NAME_MAX_LENGTH,
   PROJECT_LABEL_MAX_LENGTH,
@@ -10,6 +12,8 @@ import {
   ROLES,
   type Role,
   SESSION_CONTENT_RETENTION_DAYS,
+  TOOL_USE_TIMEOUT_MAX_MINUTES,
+  TOOL_USE_TIMEOUT_MIN_MINUTES,
   type UpdateProjectMemberRequest,
   type UpdateProjectRequest,
 } from '@nautelle/shared';
@@ -85,6 +89,17 @@ export class InspectProjectDto implements InspectProjectRequest {
   path!: string;
 }
 
+/** C-396: the runner whose allowed roots the repository picker lists. */
+export class DiscoverProjectsDto implements DiscoverProjectsRequest {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  runnerId!: string;
+}
+
+/** C-396: the checkout a push check runs in. */
+export class PushCheckDto extends InspectProjectDto {}
+
 export class ConnectProjectDto
   extends InspectProjectDto
   implements ConnectProjectRequest
@@ -95,6 +110,18 @@ export class ConnectProjectDto
   @IsNotEmpty()
   @MaxLength(PROJECT_DISPLAY_NAME_MAX_LENGTH)
   displayName?: string;
+}
+
+/** C-400: the target runner and path, as connect takes them, plus its profile. */
+export class MoveProjectDto
+  extends InspectProjectDto
+  implements MoveProjectRequest
+{
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  defaultProfileId?: string | null;
 }
 
 /** `null` on an optional field clears it; `undefined` leaves it alone. */
@@ -140,6 +167,13 @@ export class UpdateProjectDto implements UpdateProjectRequest {
   @Min(SESSION_CONTENT_RETENTION_DAYS.min)
   @Max(SESSION_CONTENT_RETENTION_DAYS.max)
   sessionContentRetentionDays?: number;
+
+  /** C-401: minutes a tool-use request waits; null: the requester's own. */
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsInt()
+  @Min(TOOL_USE_TIMEOUT_MIN_MINUTES)
+  @Max(TOOL_USE_TIMEOUT_MAX_MINUTES)
+  toolUseTimeoutMinutes?: number | null;
 }
 
 /** Which fields a kind takes is checked by the service (`invalid_docs_source`). */

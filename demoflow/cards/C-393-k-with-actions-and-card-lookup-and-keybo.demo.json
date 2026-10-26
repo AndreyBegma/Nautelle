@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "name": "⌘K actions and card lookup, and the Board's keyboard",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Open the Board"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Board",
+        "exact": true
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Board",
+        "exact": true
+      },
+      "text": "Board",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "marker",
+      "title": "Arrow keys move a cursor over the cards"
+    },
+    {
+      "action": "press",
+      "key": "ArrowDown"
+    },
+    {
+      "action": "wait",
+      "ms": 800
+    },
+    {
+      "action": "press",
+      "key": "ArrowDown"
+    },
+    {
+      "action": "wait",
+      "ms": 800
+    },
+    {
+      "action": "press",
+      "key": "ArrowUp"
+    },
+    {
+      "action": "wait",
+      "ms": 1200
+    },
+    {
+      "action": "marker",
+      "title": "Enter opens the card under the cursor"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "press",
+      "key": "Escape"
+    },
+    {
+      "action": "marker",
+      "title": "⌘K creates, finds a card and acts on it"
+    },
+    {
+      "action": "press",
+      "key": "Control+k"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "New card"
+      },
+      "timeoutMs": 10000
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "fill",
+      "target": {
+        "placeholder": "Create, find a card (C-12, #41), go to a page — or ask the Board"
+      },
+      "value": "C-1"
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "press",
+      "key": "Escape"
+    }
+  ]
+}

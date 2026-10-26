@@ -1,6 +1,8 @@
 import type {
   CommandErrorCode,
+  ProjectDiscoverResult,
   ProjectInspection,
+  ProjectPushCheckResult,
   ProjectScanRulesResult,
 } from '@nautelle/shared/protocol';
 import { TestRunnerSocket } from '../../runners/testing/runner-e2e';
@@ -43,7 +45,14 @@ export const inspection = (
 });
 
 export type Answer =
-  | { ok: true; output: ProjectInspection | ProjectScanRulesResult }
+  | {
+      ok: true;
+      output:
+        | ProjectInspection
+        | ProjectScanRulesResult
+        | ProjectDiscoverResult
+        | ProjectPushCheckResult;
+    }
   | { ok: false; code: CommandErrorCode; message?: string }
   | 'silence';
 

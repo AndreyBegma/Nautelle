@@ -42,6 +42,16 @@ export const AUTH_ERROR = {
   setupDone: 'setup_done',
   /** C-367: the first admin's email or password breaks the account rules. */
   setupInvalid: 'setup_invalid',
+  /** C-403: a read-only API token on a route that changes something. */
+  apiTokenReadOnly: 'api_token_read_only',
+  /** C-403: a route only a signed-in browser session may use (tokens, password, 2FA). */
+  apiTokenNotAllowed: 'api_token_not_allowed',
+  /** C-403: a token limited to projects on an instance-wide admin route. */
+  apiTokenProjectScoped: 'api_token_project_scoped',
+  /** C-402: the reset link is unknown, expired or already used. */
+  resetLinkInvalid: 'reset_link_invalid',
+  /** C-402: Forgot password without SMTP or `APP_URL`; an admin gives the link. */
+  passwordResetUnavailable: 'password_reset_unavailable',
 } as const;
 export type AuthErrorCode = (typeof AUTH_ERROR)[keyof typeof AUTH_ERROR];
 

@@ -1,0 +1,24 @@
+ ▐▛███▛█   Claude Code v2.1.310
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   /…/131c300a-3e00-4813-89fa-830fd2c16a7c/scratchpad/q
+
+
+❯ Call AskUserQuestion once with two questions: "Which events?" (header
+  "Events", multiSelect true, options Started, Finished) and "Which day?"
+  (header "Day", options Monday, Friday). Do nothing else.
+────────────────────────────────────────────────────────────────────────────────
+←  ☒ Events  ☐ Day  ✔ Submit  →
+
+Which events?
+
+  1. [ ] Started
+         The event that marks the beginning
+  2. [ ] Finished
+         The event that marks the completion
+  3. [✔] Merged
+❯    Next
+────────────────────────────────────────────────────────────────────────────────
+  4. Chat about this
+
+Enter to select · Tab/Arrow keys to navigate · ctrl+g to edit in VS Code · Esc
+to cancel

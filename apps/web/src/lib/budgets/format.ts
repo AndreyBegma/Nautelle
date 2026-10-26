@@ -17,6 +17,7 @@ import {
   normalizeThresholds,
 } from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
+import { settingsItemHref } from '../projects/settings-sections';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -47,7 +48,7 @@ export const ACTION_LABEL: Record<BudgetAction, string> = {
 
 export const ACTION_HINT: Record<BudgetAction, string> = {
   alert: 'Notifies at each threshold. Nothing is refused.',
-  stop: 'After 100 % new orchestrator starts and skill runs are refused until the period resets. Running workers are never stopped.',
+  stop: 'After 100 % new orchestrator starts and skill runs are refused until the period resets. Running card rounds are paused; other running workers are never stopped.',
 };
 
 export const SCOPE_LABEL: Record<BudgetScope, string> = {
@@ -112,6 +113,17 @@ export const refusingBudget = (
   budgets.find(
     (b) => b.enabled && b.action === 'stop' && b.current?.state === 'exceeded',
   );
+
+/**
+ * C-395: where a project budget is edited — its project's Budget block in
+ * Settings; null for a user budget, which only Admin › Budgets edits.
+ */
+export const budgetSettingsHref = (
+  budget: Pick<BudgetView, 'scope' | 'projectId'>,
+): string | null =>
+  budget.scope === 'project' && budget.projectId
+    ? settingsItemHref(budget.projectId, 'budget')
+    : null;
 
 /** The scope a budget covers, in words. */
 export const scopeName = (budget: BudgetView): string =>

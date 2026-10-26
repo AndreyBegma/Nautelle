@@ -5,6 +5,42 @@ what to do on every machine that runs the runner.
 
 ## Unreleased
 
+## 0.18.0
+
+No upgrade steps: `npx` fetches DemoFlow 0.7.0 on the first demo after the
+upgrade.
+
+- **Demos sign in off camera.** The runner pins DemoFlow 0.7.0, which adds a
+  scenario's `setup` steps — run before the recording starts, so the video
+  opens on the page they end on — and reusable fragments under
+  `demoflow/fragments/`, run with an `include` step. A card's demo can sign in
+  through a shared fragment instead of showing the login form.
+- **Connecting a project lists the repositories it can use.** Two typed
+  commands for the connect dialog: `project.discover` lists the git
+  repositories under the policy's `allowedRoots` with their GitHub
+  owner/name, and `project.push_check` reports whether `origin` accepts
+  pushes (`git push --dry-run` to an unused branch).
+- **`develop` becomes the base when it is in use.** `project.inspect` prefers
+  an `origin/develop` with a commit in the last 90 days over `origin/HEAD`.
+- **A demo no longer leaves files behind.** Tracked files the recorded app
+  rewrote (such as Next.js's `next-env.d.ts`) are checked out from `HEAD`
+  after the recording, so they no longer reach the card's pull request
+  (#949).
+- **Away mode remembers similar tool calls.** The permission hook forwards the
+  rules Claude Code suggests (checked and redacted like the tool input) and
+  waits as long as the request lives by the API's clock instead of a fixed 280
+  seconds; a request a stored rule approved is answered at once (C-401). The
+  card wiring's hook timeout is 12 hours and five minutes.
+- **The inspection reports push access and the DemoFlow config.**
+  `project.inspect` says whether the runner's GitHub login can push to the
+  repository and whether it has a `demoflow.config.json`, for the Ready to run
+  block on project Settings (C-395).
+- **Every tab of a question form is relayed.** The question reader reads
+  multi-select tabs and their Next/Submit row and reports the form's tabs and
+  step; an answer counts only once the selector moves on (#967).
+- **`card_run` answers a queued card with its place** in the run queue
+  (C-412).
+
 ## 0.17.0
 
 **Upgrade note — demo configs should use `${PORT}`.** The runner now pins

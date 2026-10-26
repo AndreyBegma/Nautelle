@@ -12,6 +12,7 @@ export const SETTINGS_SECTIONS = [
       { id: 'members', label: 'Members' },
       { id: 'docs', label: 'Docs source' },
       { id: 'rules', label: 'Coding rules' },
+      { id: 'slack', label: 'Slack' },
     ],
   },
   {
@@ -23,6 +24,7 @@ export const SETTINGS_SECTIONS = [
       { id: 'review', label: 'Review' },
       { id: 'demo-videos', label: 'Demo videos' },
       { id: 'sessions', label: 'Sessions' },
+      { id: 'away', label: 'Away mode' },
       { id: 'steward', label: 'Steward' },
     ],
   },
@@ -69,4 +71,15 @@ export function settingsItemOf(tab: string | null): SettingsItemId | undefined {
   return tab !== null && Object.hasOwn(SETTINGS_ITEM_SECTION, tab)
     ? (tab as SettingsItemId)
     : undefined;
+}
+
+/**
+ * C-395: the one place a project setting is edited — the block's anchor on
+ * the Settings page. Every other entry point to the setting links here.
+ */
+export function settingsItemHref(
+  projectId: string,
+  item: SettingsItemId,
+): string {
+  return `/projects/${encodeURIComponent(projectId)}/settings?tab=${item}`;
 }

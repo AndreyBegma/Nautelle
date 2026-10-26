@@ -16,6 +16,9 @@ export interface ResolvedProjectAccess {
  * as admin; anyone else sees a project only through a `project_members` row,
  * with `min(global role, override)`. Used by `ProjectAccessGuard`, by the
  * `project:` live topic, and by #11–#13.
+ *
+ * C-403: a personal API token limited to projects (`projectScope`) sees only
+ * those of them its owner can see.
  */
 @Injectable()
 export class ProjectAccessService {
@@ -23,9 +26,12 @@ export class ProjectAccessService {
 
   /** The caller's access to `projectId`; null when it does not exist or they cannot see it. */
   async resolve(
-    user: Pick<AuthUser, 'id' | 'role'>,
+    user: Pick<AuthUser, 'id' | 'role' | 'projectScope'>,
     projectId: string,
   ): Promise<ResolvedProjectAccess | null> {
+    if (user.projectScope && !user.projectScope.includes(projectId)) {
+      return null;
+    }
     if (user.role === 'admin') {
       const project = await this.prisma.project.findUnique({
         where: { id: projectId },
@@ -45,9 +51,14 @@ export class ProjectAccessService {
   }
 
   /** A `where` on `Project` that keeps only the projects `user` can see. */
-  visibleWhere(user: Pick<AuthUser, 'id' | 'role'>): Prisma.ProjectWhereInput {
-    return user.role === 'admin'
-      ? {}
-      : { members: { some: { userId: user.id } } };
+  visibleWhere(
+    user: Pick<AuthUser, 'id' | 'role' | 'projectScope'>,
+  ): Prisma.ProjectWhereInput {
+    const members: Prisma.ProjectWhereInput =
+      user.role === 'admin' ? {} : { members: { some: { userId: user.id } } };
+    // Under `AND`, so a caller that spreads this next to its own `id` keeps both.
+    return user.projectScope
+      ? { ...members, AND: [{ id: { in: [...user.projectScope] } }] }
+      : members;
   }
 }

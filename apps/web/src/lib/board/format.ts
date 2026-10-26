@@ -54,13 +54,17 @@ import { noPrText } from './pull-request';
 
 // #624: the dialog that blocks a waiting round, as notifications say it too.
 // #578: the review actions' rules, shared with the bot too.
+// C-399: a budget-paused card's Run reads Resume.
 export {
   blockingDialogText,
   canAccept,
   canGiveFeedback,
   canMarkFinished,
+  isPausedForBudget,
   isSuggestion,
   isWorktreeGoneError,
+  roundStateLabel,
+  runActionLabel,
 } from '@nautelle/shared';
 // The rules the Telegram bot offers its buttons by too live in shared.
 export {
@@ -103,6 +107,12 @@ const PHASE_PILL: Record<CardRoundPhase, RoundPill> = {
   cancelled: { status: 'idle', label: 'Stopped' },
 };
 
+/** C-399 (ADR-0101): a round a hard budget paused; Resume continues it. */
+const PAUSED_FOR_BUDGET_PILL: RoundPill = {
+  status: 'blocked',
+  label: 'Paused: budget',
+};
+
 export const phaseLabel = (phase: CardRoundPhase): string =>
   PHASE_PILL[phase].label;
 
@@ -115,6 +125,9 @@ export function roundPill(round: CardRoundBrief | null): RoundPill | null {
   // #482: a refused finish_card leaves the round active, not done.
   if (round.finishRefused && isActiveRoundPhase(round.phase)) {
     return { status: 'error', label: 'Needs attention' };
+  }
+  if (round.phase === 'cancelled' && round.pausedFor === 'budget') {
+    return PAUSED_FOR_BUDGET_PILL;
   }
   return PHASE_PILL[round.phase];
 }
@@ -211,7 +224,7 @@ export const columnsOf = (view: BoardView) =>
       },
   );
 
-/** #282 D4: a `fleet` card follows its slot, so a person cannot delete it. */
+/** #282 D4: a `fleet` card mirrors a slot, so a person cannot delete it. */
 export const canDelete = (card: BoardCardView): boolean => !isFleetCard(card);
 
 /** #282 D1: the card's session page; `null` when it is not a terminal card. */
@@ -256,6 +269,12 @@ export function fleetSummary(
 }
 
 export const SLOT_GONE_TEXT = 'Slot gone';
+
+/** C-397 (ADR-0098): a person moved the card, so its slot no longer moves it. */
+export const DETACHED_TEXT = 'Detached';
+
+export const DETACHED_HINT =
+  'A person moved this card, so its slot no longer moves it. The slot’s stage and pull request still show here.';
 
 export const FLEET_EDIT_HINT =
   'Title and text only. An edit reaches the running slot; the GitHub issue is not changed.';

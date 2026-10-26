@@ -5,10 +5,12 @@ import {
   type ProjectDetail,
   type ProjectRuntimeProfile,
   type ProjectSummary,
+  type PushCheckView,
   type Role,
 } from '@nautelle/shared';
 import {
   hasParentSegment,
+  type ProjectDiscoverResult,
   type ProjectInspection,
   repoRelativeDirSchema,
 } from '@nautelle/shared/protocol';
@@ -34,14 +36,14 @@ import {
   toProjectSummary,
 } from './project-mapper';
 
-const withRelations = {
+export const withRelations = {
   runner: {
     select: { id: true, name: true, revokedAt: true, capabilities: true },
   },
   docsSource: true,
 } as const;
 
-const isUniqueViolation = (error: unknown): boolean =>
+export const isUniqueViolation = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError &&
   error.code === 'P2002';
 
@@ -78,13 +80,15 @@ export const inspectedDefaultBranch = (
       : null;
 
 /** The columns an inspection sets on a project, at connect and on refresh. */
-const inspectionData = (inspection: ProjectInspection) => ({
+export const inspectionData = (inspection: ProjectInspection) => ({
   baseBranch: inspection.baseBranch,
   baseSource: inspection.baseSource,
   defaultBranch: inspectedDefaultBranch(inspection),
   codeSentinelConfig: inspection.codeSentinelConfig as Prisma.InputJsonValue,
   hasClaudeMd: inspection.hasClaudeMd,
   hasAgentsMd: inspection.hasAgentsMd,
+  // C-395: a runner older than the field leaves it unknown.
+  hasDemoflowConfig: inspection.hasDemoflowConfig ?? null,
   lastInspectedAt: new Date(),
 });
 
@@ -110,6 +114,36 @@ export class ProjectsService {
   ): Promise<ProjectInspection> {
     await this.usableRunner(runnerId);
     return this.inspector.inspect(runnerId, path, ctx);
+  }
+
+  /** C-396: the git checkouts under the runner's allowed roots. */
+  async discover(
+    runnerId: string,
+    ctx: AuditContext,
+  ): Promise<ProjectDiscoverResult> {
+    await this.usableRunner(runnerId);
+    return this.inspector.discover(runnerId, ctx);
+  }
+
+  /**
+   * C-396: runs `git push --dry-run` in a checkout and keeps the latest
+   * answer per runner and path, so a check run from the connect dialog
+   * counts for the project connected from it.
+   */
+  async pushCheck(
+    runnerId: string,
+    path: string,
+    ctx: AuditContext,
+  ): Promise<PushCheckView> {
+    await this.usableRunner(runnerId);
+    const result = await this.inspector.pushCheck(runnerId, path, ctx);
+    const checkedAt = new Date();
+    await this.prisma.repositoryPushCheck.upsert({
+      where: { runnerId_rootPath: { runnerId, rootPath: path } },
+      create: { runnerId, rootPath: path, ...result, checkedAt },
+      update: { ...result, checkedAt },
+    });
+    return { ...result, checkedAt: checkedAt.toISOString() };
   }
 
   /** D1–D3, D9, D14: re-inspects, stores, and pushes the watch list. */
@@ -306,6 +340,7 @@ export class ProjectsService {
       'mergeApproval',
       'shipSessionContent',
       'sessionContentRetentionDays',
+      'toolUseTimeoutMinutes',
     ] as const;
     const before: Record<string, unknown> = {};
     const after: Record<string, unknown> = {};
@@ -454,8 +489,26 @@ export class ProjectsService {
     return project;
   }
 
-  private toDetail(project: ProjectWithRelations, role: Role): ProjectDetail {
-    return toProjectDetail(project, this.presence.status(project.runner), role);
+  private async toDetail(
+    project: ProjectWithRelations,
+    role: Role,
+  ): Promise<ProjectDetail> {
+    // C-395: Ready to run reads the push check C-396 keeps per runner and
+    // path — git's own answer, not a second signal stored on the project.
+    const pushCheck = await this.prisma.repositoryPushCheck.findUnique({
+      where: {
+        runnerId_rootPath: {
+          runnerId: project.runnerId,
+          rootPath: project.rootPath,
+        },
+      },
+    });
+    return toProjectDetail(
+      project,
+      this.presence.status(project.runner),
+      role,
+      pushCheck,
+    );
   }
 
   private async usableRunner(runnerId: string): Promise<void> {
@@ -470,7 +523,7 @@ export class ProjectsService {
   }
 }
 
-const docsSummary = (docs: {
+export const docsSummary = (docs: {
   kind: string;
   localPath: string | null;
   repo: string | null;

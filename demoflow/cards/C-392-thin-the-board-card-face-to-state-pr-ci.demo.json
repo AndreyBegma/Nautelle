@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "name": "A thin Board card face: state, PR with CI, and icons",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Open the Board"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Board",
+        "exact": true
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Board",
+        "exact": true
+      },
+      "text": "Board",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "marker",
+      "title": "Each card shows a state, its PR and small icons"
+    },
+    {
+      "action": "wait",
+      "ms": 4000
+    }
+  ]
+}

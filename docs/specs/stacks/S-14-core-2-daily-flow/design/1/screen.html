@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inbox · Nautelle</title>
+<style>
+:root{--font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--text-display:28px;--text-display-lh:32px;--text-heading:20px;--text-heading-lh:28px;--text-section:15px;--text-section-lh:22px;--text-body:14px;--text-body-lh:20px;--text-label:12px;--text-label-lh:16px;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-row:32px;--size-control:28px;--size-control-sm:32px;--size-field:28px;--size-nav:28px;--size-tap:44px;--size-chip:28px;--focus-width:3px;--focus-offset:4px;--dur-fast:100ms;--dur-base:150ms;--dur-sheet:260ms;--ease-sheet:cubic-bezier(0.32,0.72,0,1);--press-scale:0.97;--glass-blur:26px;--glass-blur-strong:40px}
+:root[data-theme='dark']{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-canvas:#0a1022;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-info-soft:rgb(95 180 240 / 0.16);--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246 / 0.18);--color-hue-1-line:rgb(91 156 246 / 0.5);--color-hue-1-ink:#a4c8ff;--color-hue-1-glow:rgb(91 156 246 / 0.45);--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148 / 0.18);--color-hue-2-line:rgb(47 191 148 / 0.5);--color-hue-2-ink:#7ee0c0;--color-hue-2-glow:rgb(47 191 148 / 0.45);--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90 / 0.18);--color-hue-3-line:rgb(124 201 90 / 0.5);--color-hue-3-ink:#ade58f;--color-hue-3-glow:rgb(124 201 90 / 0.45);--color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0 / 0.18);--color-hue-4-line:rgb(230 159 0 / 0.5);--color-hue-4-ink:#f5c25c;--color-hue-4-glow:rgb(230 159 0 / 0.45);--color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59 / 0.18);--color-hue-5-line:rgb(232 116 59 / 0.5);--color-hue-5-ink:#f9a77c;--color-hue-5-glow:rgb(232 116 59 / 0.45);--color-hue-6:#f0606e;--color-hue-6-soft:rgb(240 96 110 / 0.18);--color-hue-6-line:rgb(240 96 110 / 0.5);--color-hue-6-ink:#ff9da5;--color-hue-6-glow:rgb(240 96 110 / 0.45);--color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250 / 0.18);--color-hue-7-line:rgb(166 139 250 / 0.5);--color-hue-7-ink:#cbbcff;--color-hue-7-glow:rgb(166 139 250 / 0.45);--color-hue-8:#cc79a7;--color-hue-8-soft:rgb(204 121 167 / 0.18);--color-hue-8-line:rgb(204 121 167 / 0.5);--color-hue-8-ink:#efabd1;--color-hue-8-glow:rgb(204 121 167 / 0.45);--color-scrim:rgb(10 16 34 / 0.3);--canvas-glow:18%;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-scrim-strong:rgb(9 9 12 / 0.64);--glass-brightness:0.85;--glass-brightness-strong:0.7;--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--glass-shadow-strong:rgb(0 0 0 / 0.45);--glass-shadow-clear:rgb(0 0 0 / 0.15);--control-spec:rgb(255 255 255 / 0.05)}
+:root[data-theme='light']{color-scheme:light;--color-ground:#ffffff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#ffffff;--color-canvas:#e9eef8;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-info-soft:rgb(3 98 154 / 0.12);--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214 / 0.12);--color-hue-1-line:rgb(31 100 214 / 0.45);--color-hue-1-ink:#1550b0;--color-hue-1-glow:rgb(31 100 214 / 0.28);--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94 / 0.12);--color-hue-2-line:rgb(0 128 94 / 0.45);--color-hue-2-ink:#006a4e;--color-hue-2-glow:rgb(0 128 94 / 0.28);--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28 / 0.12);--color-hue-3-line:rgb(58 125 28 / 0.45);--color-hue-3-ink:#2f6617;--color-hue-3-glow:rgb(58 125 28 / 0.28);--color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0 / 0.12);--color-hue-4-line:rgb(179 107 0 / 0.45);--color-hue-4-ink:#8a5200;--color-hue-4-glow:rgb(179 107 0 / 0.28);--color-hue-5:#c24e00;--color-hue-5-soft:rgb(194 78 0 / 0.12);--color-hue-5-line:rgb(194 78 0 / 0.45);--color-hue-5-ink:#9c3d00;--color-hue-5-glow:rgb(194 78 0 / 0.28);--color-hue-6:#d02a3e;--color-hue-6-soft:rgb(208 42 62 / 0.12);--color-hue-6-line:rgb(208 42 62 / 0.45);--color-hue-6-ink:#ad1f31;--color-hue-6-glow:rgb(208 42 62 / 0.28);--color-hue-7:#7244e0;--color-hue-7-soft:rgb(114 68 224 / 0.12);--color-hue-7-line:rgb(114 68 224 / 0.45);--color-hue-7-ink:#5b30c4;--color-hue-7-glow:rgb(114 68 224 / 0.28);--color-hue-8:#b0457f;--color-hue-8-soft:rgb(176 69 127 / 0.12);--color-hue-8-line:rgb(176 69 127 / 0.45);--color-hue-8-ink:#933668;--color-hue-8-glow:rgb(176 69 127 / 0.28);--color-scrim:rgb(10 16 34 / 0.22);--canvas-glow:10%;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-scrim-strong:rgb(255 255 255 / 0.64);--glass-brightness:1.15;--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--glass-shadow-strong:rgb(0 0 0 / 0.16);--glass-shadow-clear:rgb(0 0 0 / 0.08);--control-spec:rgb(255 255 255 / 0.05)}
+:root{--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--color-status-running-glow:var(--color-hue-2-glow);--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);--color-status-waiting-glow:var(--color-hue-1-glow);--color-status-paused:var(--color-hue-4);--color-status-paused-soft:var(--color-hue-4-soft);--color-status-paused-ink:var(--color-hue-4-ink);--color-status-blocked:var(--color-hue-5);--color-status-blocked-soft:var(--color-hue-5-soft);--color-status-blocked-ink:var(--color-hue-5-ink);--color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);--color-status-error:var(--color-hue-6);--color-status-error-soft:var(--color-hue-6-soft);--color-status-error-ink:var(--color-hue-6-ink);--color-series-1:var(--color-accent);--color-series-2:var(--color-hue-4);--color-series-3:var(--color-hue-2);--color-series-4:var(--color-hue-8);--color-series-6:var(--color-hue-5);--glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));--glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong))}
+*,*::before,*::after{box-sizing:border-box}html{font-size:16px;background:var(--color-ground);color:var(--color-ink)}body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:var(--text-body);line-height:var(--text-body-lh);color:var(--color-ink);-webkit-font-smoothing:antialiased;overflow-x:hidden}h1,h2,h3,p{margin:0}code,pre,kbd,.mono{font-family:var(--font-mono)}:focus-visible{outline:var(--focus-width) solid var(--color-focus);outline-offset:var(--focus-offset)}a{color:var(--color-accent-ink);text-decoration:underline;text-underline-offset:4px}.num{font-variant-numeric:tabular-nums}.text-section{font-size:var(--text-section);line-height:var(--text-section-lh);font-weight:600}.text-label{font-size:var(--text-label);line-height:var(--text-label-lh);font-weight:500}.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%),radial-gradient(70vmax 50vmax at 45% 110%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 20px 48px var(--glass-shadow-strong)}.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}.scrim{position:fixed;inset:0;background:var(--color-scrim);backdrop-filter:blur(2px)}
+.shell{display:flex;gap:12px;padding:12px;min-height:100vh}.shell__rail{position:sticky;top:12px;height:calc(100vh - 24px);width:232px;flex-shrink:0;border-radius:var(--radius-surface);padding:12px 8px;display:flex;flex-direction:column;gap:12px}.shell__col{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}.topbar{height:56px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 12px 0 16px;border-radius:var(--radius-surface)}.topbar__title{flex:1;min-width:0;display:flex;align-items:center;gap:8px}.main{margin:0 auto;width:100%;max-width:64rem;padding-bottom:24px;display:flex;flex-direction:column;gap:24px}
+@media (max-width:639px){.shell{padding:8px 16px;gap:8px}.shell__rail{display:none}}@media (min-width:640px) and (max-width:1023px){.shell__rail{width:64px}.nav-item__label,.nav-group__title{display:none}}
+.brand{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;font-weight:600;color:var(--color-ink)}.nav-group{display:flex;flex-direction:column;gap:2px}.nav-group__title{padding:8px 12px 4px;font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-3)}.nav-item{position:relative;display:flex;align-items:center;gap:10px;height:var(--size-nav);padding:0 12px;border-radius:var(--radius-control);color:var(--color-ink-2);font-size:14px;text-decoration:none;transition:background-color var(--dur-fast),color var(--dur-fast)}.nav-item:hover{background:var(--color-hover);color:var(--color-ink)}.nav-item[aria-current='page']{background:var(--color-accent-soft);color:var(--color-accent-ink);font-weight:500}.nav-item--primary{height:38px;border:1px solid color-mix(in oklab,var(--color-accent) 45%,transparent);color:var(--color-ink)}.nav-item--primary .nav-item__glyph{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:var(--color-accent);color:var(--color-on-accent)}.nav-item__badge{margin-left:auto}.nav-item svg{flex-shrink:0}
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;font-weight:600;user-select:none;height:var(--size-control);padding:0 16px;font-size:14px;line-height:20px;border-radius:var(--radius-control);border:1px solid transparent;background:transparent;color:var(--color-ink);cursor:pointer;text-decoration:none;transition:background-color var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast),transform var(--dur-fast) var(--ease-sheet)}.btn:active{transform:scale(var(--press-scale))}.btn--solid{background:var(--color-accent);color:var(--color-on-accent)}.btn--solid:hover{background:color-mix(in oklab,var(--color-accent) 88%,var(--color-on-accent))}.btn--glass{background:var(--color-raised);border-color:var(--color-line-strong);box-shadow:inset 0 1px 0 var(--control-spec);color:var(--color-ink)}.btn--glass:hover{background:linear-gradient(var(--color-hover),var(--color-hover)),var(--color-raised)}.btn--ghost{color:var(--color-ink-2)}.btn--ghost:hover{color:var(--color-ink);background:var(--color-hover)}.btn--danger{background:color-mix(in oklab,var(--color-danger) 12%,transparent);border-color:color-mix(in oklab,var(--color-danger) 30%,transparent);color:var(--color-danger)}.btn--link{height:auto;padding:0;color:var(--color-accent-ink);font-weight:500;border-radius:2px}.btn--link:hover{text-decoration:underline;text-underline-offset:4px}.btn--sm{height:var(--size-control-sm);padding:0 12px;font-size:12px;line-height:16px;border-radius:calc(var(--radius-control) - 4px)}.btn--icon{padding:0;aspect-ratio:1}
+.field{display:flex;flex-direction:column;gap:6px}.field__label{font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-2)}.field__hint{font-size:12px;line-height:16px;color:var(--color-ink-3)}.input,.select,.textarea{width:100%;height:var(--size-field);padding:0 10px;font-family:inherit;font-size:14px;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);transition:border-color var(--dur-fast),box-shadow var(--dur-fast)}.input::placeholder,.textarea::placeholder{color:var(--color-ink-3)}.input:focus,.select:focus,.textarea:focus{outline:none;border-color:color-mix(in oklab,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-ink) 22%,transparent)}.textarea{height:auto;min-height:80px;padding:8px 10px;line-height:20px;resize:vertical}.select{appearance:none;padding-right:28px;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);background-position:calc(100% - 14px) 50%,calc(100% - 10px) 50%;background-size:4px 4px;background-repeat:no-repeat}.search{position:relative;display:flex;align-items:center}.search svg{position:absolute;left:8px;color:var(--color-ink-3);pointer-events:none}.search .input{padding-left:28px}.toggle{position:relative;display:inline-flex;width:32px;height:18px;border-radius:999px;background:var(--color-line-strong);border:0;cursor:pointer;transition:background-color var(--dur-fast);flex-shrink:0}.toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:999px;background:#fff;transition:transform var(--dur-base) var(--ease-sheet)}.toggle[aria-checked='true']{background:var(--color-accent)}.toggle[aria-checked='true']::after{transform:translateX(14px)}
+.card{border-radius:var(--radius-surface);padding:16px}.card--raised{background:var(--color-raised);border:1px solid var(--color-line)}[data-hue='1']{--hue:var(--color-hue-1);--hue-soft:var(--color-hue-1-soft);--hue-ink:var(--color-hue-1-ink)}[data-hue='2']{--hue:var(--color-hue-2);--hue-soft:var(--color-hue-2-soft);--hue-ink:var(--color-hue-2-ink)}[data-hue='4']{--hue:var(--color-hue-4);--hue-soft:var(--color-hue-4-soft);--hue-ink:var(--color-hue-4-ink)}[data-hue='7']{--hue:var(--color-hue-7);--hue-soft:var(--color-hue-7-soft);--hue-ink:var(--color-hue-7-ink)}.section{display:flex;flex-direction:column;gap:12px}.section-header{display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0}.section-header h2{font-size:16px;line-height:24px;font-weight:600;color:var(--color-ink)}.section-header p{font-size:13px;line-height:20px;color:var(--color-ink-2)}.section__body{border-radius:var(--radius-surface);padding:16px}.section__body--flush{padding:0;overflow:hidden}
+.page-header{display:flex;flex-direction:column;gap:12px;min-width:0}@media (min-width:640px){.page-header{flex-direction:row;align-items:flex-end;justify-content:space-between;gap:24px}}.page-header__text{display:flex;flex-direction:column;gap:4px;min-width:0}.page-header__eyebrow{font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-3)}.page-header__title-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}.page-header h1{font-size:var(--text-display);line-height:var(--text-display-lh);letter-spacing:-0.02em;font-weight:600}.page-header__desc{max-width:65ch;font-size:14px;color:var(--color-ink-2)}.page-header__meta{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--color-ink-3)}.page-header__actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex-shrink:0}
+.badge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;border-radius:999px;height:18px;min-width:18px;padding:0 4px;font-size:10px;background:var(--color-hover);color:var(--color-ink-2)}.badge--md{height:20px;min-width:20px;padding:0 6px;font-size:12px}.badge--ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}.badge--warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}.badge--danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}.badge--count.badge--warn{background:var(--color-warn);color:var(--color-ground)}.badge--count.badge--danger{background:var(--color-danger);color:var(--color-ground)}.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--hue);flex-shrink:0}.pill{display:inline-flex;flex-shrink:0;align-items:center;gap:8px;height:24px;padding:0 10px;border-radius:999px;white-space:nowrap;font-size:12px;font-weight:500;line-height:1;background:var(--color-hover);color:var(--color-ink-2)}.pill--sm{height:20px;gap:6px;padding:0 8px;font-size:11px}.pill__dot{position:relative;width:8px;height:8px;border-radius:999px;background:var(--color-ink-3);flex-shrink:0}.pill--sm .pill__dot{width:6px;height:6px}.pill[data-status='running']{background:var(--color-status-running-soft);color:var(--color-status-running-ink)}.pill[data-status='running'] .pill__dot{background:var(--color-status-running)}.pill[data-status='running'] .pill__dot::after{content:'';position:absolute;inset:0;border-radius:inherit;background:inherit;opacity:.6;animation:gu-ping 1s cubic-bezier(0,0,.2,1) infinite}.pill[data-status='waiting']{background:var(--color-status-waiting-soft);color:var(--color-status-waiting-ink)}.pill[data-status='waiting'] .pill__dot{background:var(--color-status-waiting)}.pill[data-status='blocked']{background:var(--color-status-blocked-soft);color:var(--color-status-blocked-ink)}.pill[data-status='blocked'] .pill__dot{background:var(--color-status-blocked)}.pill[data-status='error']{background:var(--color-status-error-soft);color:var(--color-status-error-ink)}.pill[data-status='error'] .pill__dot{background:var(--color-status-error)}@keyframes gu-ping{75%,100%{transform:scale(2);opacity:0}}@media (prefers-reduced-motion:reduce){.pill__dot::after{animation:none!important}.btn:active{transform:none}}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.toolbar__spacer{flex:1}.segmented{display:inline-flex;gap:4px;padding:4px;border-radius:999px}.segmented--sm{height:var(--size-control);padding:2px}.segmented button{position:relative;height:100%;min-height:20px;padding:0 12px;border:0;border-radius:999px;background:transparent;color:var(--color-ink-2);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}.segmented button:hover{color:var(--color-ink)}.segmented button[aria-checked='true']{background:var(--color-accent-soft);color:var(--color-accent-ink)}.tabs{display:flex;gap:4px;border-bottom:1px solid var(--color-line)}.tab{position:relative;height:36px;padding:0 12px;border:0;background:transparent;font:inherit;font-size:14px;font-weight:500;color:var(--color-ink-2);cursor:pointer}.tab[aria-selected='true']{color:var(--color-ink)}.tab[aria-selected='true']::after{content:'';position:absolute;left:8px;right:8px;bottom:-1px;height:2px;border-radius:2px;background:var(--color-accent)}
+.kbd{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:4px;border:1px solid var(--color-line-strong);font-family:var(--font-sans);font-size:11px;color:var(--color-ink-3)}.sep-v{width:1px;height:16px;background:var(--color-line);margin:0 4px}.avatar{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:11px;font-weight:600}.progress{height:6px;border-radius:999px;background:var(--color-hover);overflow:hidden}.progress>span{display:block;height:100%;background:var(--color-accent);border-radius:inherit}.live-dot{width:8px;height:8px;border-radius:999px;background:var(--color-ok)}
+.dialog{width:min(440px,calc(100vw - 32px));border-radius:var(--radius-sheet);padding:20px;display:flex;flex-direction:column;gap:12px}.dialog__title{font-size:16px;line-height:24px;font-weight:600}.dialog__footer{display:flex;justify-content:space-between;gap:8px;margin-top:8px}.capsule-wrap{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;justify-content:center}.capsule{display:flex;gap:2px;padding:4px;border-radius:999px}.capsule__tab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 14px;border-radius:999px;font-size:11px;font-weight:500;color:var(--color-ink-2);text-decoration:none}.capsule__tab[aria-current='page']{background:var(--color-accent-soft);color:var(--color-accent-ink)}.capsule__plus{width:52px;height:52px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;color:var(--color-ink);border:1px solid var(--glass-edge)}
+
+/* Page */
+.crumb{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--color-ink-2);min-width:0}.crumb b{color:var(--color-ink);font-weight:600}
+.searchbtn{width:224px;justify-content:flex-start;gap:8px;padding:0 8px}
+.setup{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:var(--radius-control);border:1px solid var(--color-line);text-decoration:none;color:var(--color-ink)}
+.setup__row{display:flex;justify-content:space-between;font-size:12px;font-weight:500}
+@media (min-width:640px) and (max-width:1023px){.setup{display:none}}
+.group-title{display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:12px;font-weight:500;color:var(--color-ink-3);border-bottom:1px solid var(--color-line);background:color-mix(in oklab,var(--color-hover) 60%,transparent)}
+.irow{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--color-line);transition:background-color var(--dur-fast)}
+.irow:hover{background:var(--color-hover)}.irow--open,.irow--open:hover{background:color-mix(in oklab,var(--color-accent-soft) 45%,transparent)}
+.irow__icon{color:var(--color-ink-2);display:inline-flex}.irow__head{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.irow__title{font-weight:500;color:var(--color-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.irow__proj{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--color-ink-3)}
+.irow__id{font-family:var(--font-mono);font-size:12px;color:var(--color-ink-3)}
+.irow__why{font-size:13px;color:var(--color-ink-2);grid-column:2}
+.irow__actions{display:flex;align-items:center;gap:6px;grid-column:3;grid-row:1 / span 2}
+.irow__age{font-size:12px;color:var(--color-ink-3);margin-right:4px;font-variant-numeric:tabular-nums}
+.approve{grid-column:2 / span 2;margin-top:12px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px}
+.preview{border-radius:var(--radius-surface);border:1px solid var(--color-line);background:var(--color-surface);overflow:hidden}
+.preview__bar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--color-line);font-size:12px;color:var(--color-ink-3)}
+.mini{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:10px;aspect-ratio:16/9}
+.mini__rail{border-radius:4px;background:var(--color-raised)}.mini__col{display:flex;flex-direction:column;gap:6px}
+.mini__bar{height:12px;border-radius:3px;background:var(--color-raised)}.mini__sheet{flex:1;margin-left:40%;border-radius:6px;border:1px solid var(--color-line-strong);background:var(--color-paper);padding:8px;display:flex;flex-direction:column;gap:5px}
+.mini__line{height:6px;border-radius:2px;background:var(--color-line-strong)}.mini__img{flex:1;border-radius:3px;background:linear-gradient(135deg,var(--color-hue-7-soft),var(--color-hue-1-soft))}
+.mini__btns{display:flex;gap:4px;justify-content:flex-end}.mini__btns i{width:28px;height:8px;border-radius:2px;background:var(--color-line-strong)}.mini__btns i:last-child{background:var(--color-accent)}
+.frames{display:flex;flex-direction:column;gap:2px;margin:0;padding:0;list-style:none}
+.frames button{width:100%;display:flex;align-items:center;gap:8px;min-height:var(--size-row);padding:4px 8px;border:0;border-radius:var(--radius-control);background:transparent;color:var(--color-ink);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.frames button[aria-current='true']{background:var(--color-accent-soft)}
+.frames .n{display:inline-flex;width:18px;height:18px;border-radius:999px;align-items:center;justify-content:center;font-size:10px;font-weight:600;background:var(--color-hover);color:var(--color-ink-2)}
+.frames button[aria-current='true'] .n{background:var(--color-accent);color:var(--color-on-accent)}
+.approve__side{display:flex;flex-direction:column;gap:12px}
+.approve__actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.segscroll{overflow-x:auto;max-width:100%;scrollbar-width:none}
+.capsule-wrap{display:none}
+/* overlays */
+.overlay[hidden]{display:none}.palette{position:fixed;left:50%;top:12vh;transform:translateX(-50%);width:min(620px,calc(100vw - 32px));border-radius:var(--radius-sheet);overflow:hidden}
+.palette__in{display:flex;align-items:center;gap:10px;padding:0 16px;height:52px;border-bottom:1px solid var(--color-line)}
+.palette__in input{flex:1;border:0;background:transparent;color:var(--color-ink);font:inherit;font-size:15px;outline:none}
+.palette__group{padding:8px 8px 4px}.palette__label{padding:4px 8px;font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.palette__item{display:flex;align-items:center;gap:10px;height:36px;padding:0 8px;border-radius:var(--radius-control);font-size:14px}
+.palette__item[aria-selected='true']{background:var(--color-hover)}.palette__item .k{margin-left:auto;display:flex;gap:4px}
+.palette__foot{display:flex;gap:16px;padding:8px 16px;border-top:1px solid var(--color-line);font-size:12px;color:var(--color-ink-3)}
+.qc{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(520px,calc(100vw - 32px))}
+@media (max-width:639px){
+  .searchbtn{width:auto}.searchbtn .lbl,.searchbtn .kbd{display:none}
+  .crumb .crumb__pre{display:none}
+  .irow{grid-template-columns:20px minmax(0,1fr)}
+  .irow__actions{grid-column:2;grid-row:auto;margin-top:8px;flex-wrap:wrap}
+  .irow__age{order:-1;width:100%;margin:0}
+  .approve{grid-column:1 / span 2;grid-template-columns:1fr}
+  .capsule-wrap{display:flex}.main{padding-bottom:96px}
+  .page-header__actions .btn--glass .lbl{display:none}
+}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="shell">
+  <aside class="shell__rail glass">
+    <div class="brand"><span class="swatch" data-hue="1" style="width:16px;height:16px;border-radius:5px"></span><span class="nav-item__label">Nautelle</span></div>
+    <nav class="nav-group" aria-label="Workspace">
+      <div class="nav-group__title">Workspace</div>
+      <a class="nav-item" href="#" aria-current="page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span class="nav-item__label">Inbox</span><span class="badge badge--count badge--warn nav-item__badge">8</span></a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span class="nav-item__label">Overview</span></a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span class="nav-item__label">Projects</span></a>
+    </nav>
+    <nav class="nav-group" aria-label="Project">
+      <div class="nav-group__title">nautelle-web</div>
+      <a class="nav-item nav-item--primary" href="#"><span class="nav-item__glyph"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg></span><span class="nav-item__label">Board</span></a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01"/></svg><span class="nav-item__label">Fleet</span></a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h12"/></svg><span class="nav-item__label">Queue</span></a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="nav-item__label">Settings</span></a>
+    </nav>
+    <a class="setup" href="#"><span class="setup__row"><span>Finish setup · landing</span><span class="num ink-3">5 / 7</span></span><span class="progress" role="progressbar" aria-label="Setup progress" aria-valuenow="71" aria-valuemin="0" aria-valuemax="100"><span style="width:71%"></span></span></a>
+  </aside>
+  <div class="shell__col">
+    <header class="topbar glass">
+      <div class="topbar__title crumb"><span class="crumb__pre">Workspace</span><span class="crumb__pre ink-3">/</span><b>Inbox</b><span class="live-dot" aria-label="Live"></span></div>
+      <button class="btn btn--glass searchbtn" data-open="palette" aria-label="Open command palette"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="ink-3 lbl" style="flex:1;text-align:left;font-weight:400">Search or run…</span><kbd class="kbd">⌘K</kbd></button>
+      <button class="btn btn--ghost btn--icon" aria-label="Notifications"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+      <span class="sep-v"></span>
+      <button class="btn btn--ghost" style="padding:0 6px" aria-label="Account"><span class="avatar">AB</span></button>
+    </header>
+    <main id="main-content" class="main">
+      <header class="page-header">
+        <div class="page-header__text">
+          <span class="page-header__eyebrow">All projects</span>
+          <div class="page-header__title-row"><h1>Inbox</h1></div>
+          <p class="page-header__desc">Everything that waits on you, with the action right here.</p>
+          <div class="page-header__meta"><span><b class="num" style="color:var(--color-ink)">8</b> waiting</span><span><b class="num" style="color:var(--color-ink)">4</b> projects</span><span>Oldest <b class="num" style="color:var(--color-ink)">2 h</b></span></div>
+        </div>
+        <div class="page-header__actions">
+          <button class="btn btn--glass" data-open="quick"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Quick card</span><kbd class="kbd">C</kbd></button>
+          <button class="btn btn--ghost btn--icon" aria-label="More actions"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <div class="segscroll"><div class="segmented segmented--sm glass" role="radiogroup" aria-label="Kind">
+          <button role="radio" aria-checked="true">All <span class="num">8</span></button>
+          <button role="radio" aria-checked="false">Designs <span class="num">2</span></button>
+          <button role="radio" aria-checked="false">Questions <span class="num">2</span></button>
+          <button role="radio" aria-checked="false">Merges <span class="num">2</span></button>
+          <button role="radio" aria-checked="false">Failed <span class="num">1</span></button>
+          <button role="radio" aria-checked="false">Permissions <span class="num">1</span></button>
+        </div></div>
+        <span class="toolbar__spacer"></span>
+        <select class="select" style="width:auto" aria-label="Project"><option>Every project</option><option>nautelle-web</option><option>api</option><option>landing</option><option>runner</option></select>
+      </div>
+
+      <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+        <div class="group-title">Designs to approve <span class="badge">2</span></div>
+
+        <div class="irow irow--open">
+          <span class="irow__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg></span>
+          <div class="irow__head"><span class="irow__proj" data-hue="2"><span class="swatch"></span>nautelle-web</span><span class="irow__id">C-394</span><span class="irow__title">Approve a design from the card sheet</span></div>
+          <div class="irow__actions"><span class="irow__age">12 min</span><button class="btn btn--ghost btn--icon btn--sm" aria-label="Collapse" aria-expanded="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button></div>
+          <p class="irow__why">Design v2 is ready: 3 frames, and both comments from v1 are addressed.</p>
+          <div class="approve">
+            <div class="preview">
+              <div class="preview__bar"><span class="mono">v2</span><span>Screen</span><span class="toolbar__spacer"></span><div class="segmented segmented--sm glass" role="radiogroup" aria-label="Device" style="height:24px"><button role="radio" aria-checked="true" style="font-size:12px">Desktop</button><button role="radio" aria-checked="false" style="font-size:12px">Mobile</button></div></div>
+              <div class="mini" aria-label="Preview of the Screen frame" role="img">
+                <div class="mini__rail"></div>
+                <div class="mini__col"><div class="mini__bar"></div><div class="mini__sheet"><div class="mini__line" style="width:60%"></div><div class="mini__img"></div><div class="mini__line" style="width:90%"></div><div class="mini__line" style="width:70%"></div><div class="mini__btns"><i></i><i></i></div></div></div>
+              </div>
+            </div>
+            <div class="approve__side">
+              <div><div class="field__label" style="margin-bottom:6px">Frames</div>
+                <ul class="frames">
+                  <li><button aria-current="true"><span class="n">1</span>Screen</button></li>
+                  <li><button><span class="n">2</span>Breakdown</button></li>
+                  <li><button><span class="n">3</span>States</button></li>
+                </ul>
+              </div>
+              <div class="field"><label class="field__label" for="cmt">Comment</label><textarea class="textarea" id="cmt" style="min-height:64px" placeholder="What should change before it runs?"></textarea></div>
+              <div class="approve__actions"><button class="btn btn--link" style="margin-right:auto;font-size:13px">Open full preview</button><button class="btn btn--glass">Back with comment</button><button class="btn btn--solid">Approve and run</button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="irow">
+          <span class="irow__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg></span>
+          <div class="irow__head"><span class="irow__proj" data-hue="7"><span class="swatch"></span>api</span><span class="irow__id">C-412</span><span class="irow__title">Usage export dialog</span></div>
+          <div class="irow__actions"><span class="irow__age">48 min</span><button class="btn btn--glass btn--sm">Review design</button></div>
+          <p class="irow__why">Design v1 is ready: 2 frames.</p>
+        </div>
+
+        <div class="group-title">Questions from agents <span class="badge">2</span></div>
+        <div class="irow">
+          <span class="irow__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+          <div class="irow__head"><span class="irow__proj" data-hue="7"><span class="swatch"></span>api</span><span class="irow__id">C-401</span><span class="irow__title">Rate limit on public endpoints</span><span class="pill pill--sm" data-status="blocked"><span class="pill__dot"></span>Blocked</span></div>
+          <div class="irow__actions"><span class="irow__age">1 h</span><button class="btn btn--ghost btn--sm">Use default</button><button class="btn btn--glass btn--sm">Reply</button></div>
+          <p class="irow__why">“Limit per token or per IP?” Default: per token, 600 requests a minute.</p>
+        </div>
+        <div class="irow">
+          <span class="irow__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+          <div class="irow__head"><span class="irow__proj" data-hue="4"><span class="swatch"></span>landing</span><span class="irow__id">C-388</span><span class="irow__title">Pricing table copy</span></div>
+          <div class="irow__actions"><span class="irow__age">2 h</span><button class="btn btn--ghost btn--sm">Use default</button><button class="btn btn--glass btn--sm">Reply</button></div>
+          <p class="irow__why">“Which plan gets the highlight?” Default: Team.</p>
+        </div>
+
+        <div class="group-title">Pull requests to merge <span class="badge">2</span></div>
+        <div class="irow">
+          <span class="irow__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg></span>
+          <div class="irow__head"><span class="irow__proj" data-hue="2"><span class="swatch"></span>nautelle-web</span><span class="irow__id">C-397</span><span class="irow__title">One work model: cards everywhere</span><span class="badge badge--md badge--ok">Checks green</span></div>
+          <div class="irow__actions"><span class="irow__age">20 min</span><button class="btn btn--ghost btn--sm">Open PR</button><button class="btn btn--glass btn--sm">Merge</button></div>
+          <p class="irow__why"><span class="mono" style="font-size:12px">#712</span> · 14 files · approved by the reviewer agent</p>
+        </div>
+        <div class="irow">
+          <span class="irow__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg></span>
+          <div class="irow__head"><span class="irow__proj" data-hue="2"><span class="swatch"></span>nautelle-web</span><span class="irow__id">C-392</span><span class="irow__title">Thin the board card face</span><span class="badge badge--md badge--warn">1 comment</span></div>
+          <div class="irow__actions"><span class="irow__age">35 min</span><button class="btn btn--glass btn--sm">Open PR</button></div>
+          <p class="irow__why"><span class="mono" style="font-size:12px">#708</span> · the reviewer left one change request</p>
+        </div>
+
+        <div class="group-title">Failed runs <span class="badge">1</span></div>
+        <div class="irow">
+          <span class="irow__icon" style="color:var(--color-danger)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></span>
+          <div class="irow__head"><span class="irow__proj" data-hue="1"><span class="swatch"></span>runner</span><span class="irow__id">C-385</span><span class="irow__title">Upgrade Bun to 1.3</span><span class="pill pill--sm" data-status="error"><span class="pill__dot"></span>Error</span></div>
+          <div class="irow__actions"><span class="irow__age">4 min</span><button class="btn btn--ghost btn--sm">Logs</button><button class="btn btn--glass btn--sm">Retry</button></div>
+          <p class="irow__why">Stopped at <span class="mono" style="font-size:12px">bun test</span>: 3 failing tests in <span class="mono" style="font-size:12px">src/exec</span></p>
+        </div>
+
+        <div class="group-title">Permission requests <span class="badge">1</span></div>
+        <div class="irow" style="border-bottom:0">
+          <span class="irow__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg></span>
+          <div class="irow__head"><span class="irow__proj" data-hue="2"><span class="swatch"></span>nautelle-web</span><span class="irow__id">slot-4</span><span class="irow__title">Run a shell command</span><span class="pill pill--sm" data-status="waiting"><span class="pill__dot"></span>Waiting</span></div>
+          <div class="irow__actions"><span class="irow__age">1 min</span><button class="btn btn--ghost btn--sm">Deny</button><button class="btn btn--glass btn--sm">Allow once</button></div>
+          <p class="irow__why"><span class="mono" style="font-size:12px">bunx prisma migrate dev --name card_stage</span></p>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="capsule-wrap">
+  <nav class="capsule glass-strong" aria-label="Primary">
+    <a class="capsule__tab" href="#" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Inbox</a>
+    <a class="capsule__tab" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg>Board</a>
+    <a class="capsule__tab" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/></svg>Fleet</a>
+    <a class="capsule__tab" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>More</a>
+  </nav>
+  <button class="capsule__plus glass-strong" data-open="quick" aria-label="Quick card"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+</div>
+
+<div class="overlay" id="palette" hidden>
+  <div class="scrim" data-close></div>
+  <div class="palette glass-strong" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="palette__in"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="color:var(--color-ink-3)"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input aria-label="Search cards and actions" value="ins" ><kbd class="kbd">esc</kbd></div>
+    <div class="palette__group"><div class="palette__label">Actions</div>
+      <div class="palette__item" aria-selected="true">Open Inbox<span class="k"><kbd class="kbd">G</kbd><kbd class="kbd">I</kbd></span></div>
+      <div class="palette__item">Quick card in nautelle-web<span class="k"><kbd class="kbd">C</kbd></span></div>
+      <div class="palette__item">Run every card in To Do</div>
+    </div>
+    <div class="palette__group"><div class="palette__label">Cards</div>
+      <div class="palette__item"><span class="mono ink-3" style="font-size:12px">C-390</span>Inbox: one page for everything that waits on you<span class="k"><span class="pill pill--sm" data-status="running"><span class="pill__dot"></span>Running</span></span></div>
+      <div class="palette__item"><span class="mono ink-3" style="font-size:12px">C-395</span>Project settings: search and Ready to run<span class="k"><span class="badge badge--md">To Do</span></span></div>
+    </div>
+    <div class="palette__foot"><span><kbd class="kbd">↑</kbd> <kbd class="kbd">↓</kbd> move</span><span><kbd class="kbd">↵</kbd> open</span><span><kbd class="kbd">⌘</kbd> <kbd class="kbd">↵</kbd> run</span></div>
+  </div>
+</div>
+
+<div class="overlay" id="quick" hidden>
+  <div class="scrim" data-close></div>
+  <div class="dialog glass-strong qc" role="dialog" aria-modal="true" aria-labelledby="qc-t">
+    <h2 id="qc-t" class="dialog__title">Quick card</h2>
+    <div class="field"><label class="field__label" for="qc-text">What needs doing</label><textarea class="textarea" id="qc-text" placeholder="Fix the empty state on Fleet when no runner is connected">Show the runner version on the Fleet slot row</textarea><span class="field__hint">The first line becomes the title. It lands in To Do with no interview.</span></div>
+    <div class="field"><label class="field__label" for="qc-proj">Project</label><select class="select" id="qc-proj"><option>nautelle-web</option><option>api</option></select></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="font-size:14px">Run now in the next free slot</span><button type="button" class="toggle" role="switch" aria-checked="false" aria-label="Run now"></button></div>
+    <div class="dialog__footer"><button class="btn btn--ghost" data-close>Cancel</button><div style="display:flex;gap:8px"><button class="btn btn--link" style="font-size:13px">Interview instead</button><button class="btn btn--solid">Add to To Do</button></div></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var doc = document;
+  function show(id) { var el = doc.getElementById(id); if (el) el.hidden = false; }
+  function hideAll() { var els = doc.querySelectorAll('.overlay'); for (var i = 0; i < els.length; i++) els[i].hidden = true; }
+  doc.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('[data-open],[data-close],[role="switch"]') : null;
+    if (!t) return;
+    if (t.hasAttribute('data-open')) show(t.getAttribute('data-open'));
+    else if (t.hasAttribute('data-close')) hideAll();
+    else t.setAttribute('aria-checked', t.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
+  });
+  doc.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') hideAll();
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); show('palette'); }
+  });
+})();
+</script>
+</body>
+</html>

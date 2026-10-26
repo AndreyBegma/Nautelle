@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "name": "Accept dialog: pick the action, then see only its options",
+  "description": "C-380: the Accept dialog has one short explanation and a single primary button. The demo stack has no runner, so the pull request is unreadable and the dialog shows its single accept-only path; the selector needs a readable open pull request.",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "%2Fprojects%2Fdemo-project%2Fboard%3Fcard%3D7%26accept%3D1"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Open Accept on a finished card"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "dialog"
+      },
+      "caption": "Accept on 'Gift cards in the cart' opens the redesigned dialog.",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "button",
+        "name": "Cancel"
+      }
+    },
+    {
+      "action": "screenshot",
+      "name": "accept-dialog"
+    }
+  ]
+}
