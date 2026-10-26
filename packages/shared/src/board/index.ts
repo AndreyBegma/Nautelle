@@ -18,6 +18,7 @@ export * from './recommendation';
 export * from './session-board';
 export * from './shipping';
 export * from './stacks';
+export * from './task';
 export * from './types';
 export * from './worker-prompt';
 export * from './working';

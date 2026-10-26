@@ -22,6 +22,7 @@ const KIND_LABEL: Record<BoardCardKind, string> = {
   feature: 'Feature',
   bug: 'Bug',
   analysis: 'Analysis',
+  task: 'Task',
 };
 
 /**

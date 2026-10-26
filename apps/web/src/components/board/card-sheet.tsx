@@ -155,6 +155,7 @@ const KIND_LABEL: Record<BoardCardKind, string> = {
   feature: 'Feature',
   bug: 'Bug',
   analysis: 'Analysis',
+  task: 'Task',
 };
 
 /** The terminal button's state: offered, or disabled with the reason (D11). */
@@ -1335,8 +1336,11 @@ export function CardDetailBody({
             setKind(BOARD_CARD_KINDS.find((k) => k === e.target.value) ?? kind)
           }
         >
-          {/* C-503: an analysis card stays one; a work card never becomes one here. */}
-          {(kind === 'analysis' ? [kind] : WORK_CARD_KINDS).map((k) => (
+          {/* C-503, C-509: an analysis or task card stays one; a work card never becomes one here. */}
+          {(kind === 'analysis' || kind === 'task'
+            ? [kind]
+            : WORK_CARD_KINDS
+          ).map((k) => (
             <option key={k} value={k}>
               {KIND_LABEL[k]}
             </option>

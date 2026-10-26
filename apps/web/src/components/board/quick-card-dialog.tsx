@@ -37,6 +37,7 @@ const KIND_LABEL: Record<BoardCardKind, string> = {
   feature: 'Feature',
   bug: 'Bug',
   analysis: 'Analysis',
+  task: 'Task',
 };
 
 /** What the toast says once the card is saved and Run now was or was not asked. */

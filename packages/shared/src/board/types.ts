@@ -30,14 +30,24 @@ export const isBoardColumn = (value: string): value is BoardColumn =>
 /**
  * Decides the branch prefix (`feat` / `fix` / `card`) and the issue label.
  * C-503 (ADR-0126): an `analysis` card investigates read-only and ends with a
- * report and proposed cards, never a pull request.
+ * report and proposed cards, never a pull request. C-509 (ADR-0127): a `task`
+ * is work a person does — an assignee, a checklist and Done; no session,
+ * runner, pull request or demo. The runner protocol never carries a task, so
+ * `LOCAL_CARD_KINDS` stays without it.
  */
-export const BOARD_CARD_KINDS = LOCAL_CARD_KINDS;
+export const BOARD_CARD_KINDS = [...LOCAL_CARD_KINDS, 'task'] as const;
 export type BoardCardKind = (typeof BOARD_CARD_KINDS)[number];
+
+export const isBoardCardKind = (value: string): value is BoardCardKind =>
+  (BOARD_CARD_KINDS as readonly string[]).includes(value);
+
+/** C-509: the kinds a runner works — every kind but a task. */
+export type RunnableCardKind = Exclude<BoardCardKind, 'task'>;
 
 /**
  * C-503 D5: the kinds a model may pick — the normalizer, capture and every
- * other classifier. `analysis` is only ever a person's choice.
+ * other classifier. They are also the code kinds: the branch prefix and the
+ * issue label. `analysis` and `task` are only ever a person's choice.
  */
 export const WORK_CARD_KINDS = LOCAL_WORK_CARD_KINDS;
 export type WorkCardKind = (typeof WORK_CARD_KINDS)[number];

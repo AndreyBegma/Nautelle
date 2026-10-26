@@ -1,8 +1,12 @@
 import {
+  BOARD_ERROR,
+  type BoardCardKind,
   type BoardErrorBody,
   type BoardErrorCode,
   type CardAutoRunFailure,
+  cardLabel,
   isCardAutoRunCode,
+  type RunnableCardKind,
 } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
@@ -53,6 +57,23 @@ export const boardError = (
 
 export const cardNotFound = (): BoardFailure =>
   boardError(404, 'not_found', 'Card not found');
+
+/**
+ * C-509 (ADR-0127): a task card has no session, runner, pull request or demo,
+ * so every piece of runner work on one is refused `card_is_task`. `what` names
+ * the refused work for the message.
+ */
+export function assertNotTask<T extends { kind: BoardCardKind; number: number }>(
+  card: T,
+  what: string,
+): asserts card is T & { kind: RunnableCardKind } {
+  if (card.kind !== 'task') return;
+  throw boardError(
+    409,
+    BOARD_ERROR.cardIsTask,
+    `${cardLabel(card.number)} is a task: a person does it, so it has no ${what}`,
+  );
+}
 
 /** #273 D8: `CardAutoRunFailure.message` is at most this many characters. */
 const AUTO_RUN_MESSAGE_MAX = 500;

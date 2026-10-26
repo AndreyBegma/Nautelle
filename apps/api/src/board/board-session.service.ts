@@ -1,5 +1,6 @@
 import {
   BOARD_ERROR,
+  type BoardCardKind,
   type BoardCardView,
   type BoardColumn,
   type BoardStackDetail,
@@ -7,7 +8,9 @@ import {
   captureFingerprint,
   cardLabel,
   isActiveRoundPhase,
+  isRunnableCard,
   type Role,
+  type RunnableCardKind,
   type TaskDesignSummary,
 } from '@nautelle/shared';
 import {
@@ -63,7 +66,9 @@ const PULL_REQUEST =
   /^https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\/(\d{1,9})\/?$/;
 
 /** One card as the board tools list it. */
-export const localListCardOf = (card: BoardCardView): LocalBoardListCard => {
+export const localListCardOf = (
+  card: BoardCardView & { kind: RunnableCardKind },
+): LocalBoardListCard => {
   const phase = card.round?.phase ?? null;
   return {
     number: card.number,
@@ -138,7 +143,9 @@ export const localStackOf = (
 });
 
 const takenCardOf = (
-  card: Pick<BoardCard, 'number' | 'title' | 'body' | 'kind' | 'takenBranch'>,
+  card: Pick<BoardCard, 'number' | 'title' | 'body' | 'takenBranch'> & {
+    kind: RunnableCardKind;
+  },
 ): TakenCard => ({
   number: card.number,
   label: cardLabel(card.number),
@@ -147,6 +154,21 @@ const takenCardOf = (
   kind: card.kind,
   branch: card.takenBranch,
 });
+
+/**
+ * C-509 (ADR-0127): the board tools do not show a task card until they learn
+ * the kind (C-513) — a runner that predates it could not read one.
+ */
+function hideTask<T extends { kind: BoardCardKind; number: number }>(
+  card: T,
+): asserts card is T & { kind: RunnableCardKind } {
+  if (isRunnableCard(card)) return;
+  throw boardError(
+    404,
+    BOARD_ERROR.notFound,
+    `${cardLabel(card.number)} is a task card, which the board tools do not show`,
+  );
+}
 
 /**
  * A person's own session works the Board (#845, ADR-0083): the reads of the
@@ -180,6 +202,8 @@ export class BoardSessionService {
           ? c.cards.slice(0, LOCAL_BOARD_LIST_COMPLETED_MAX)
           : c.cards,
       )
+      // C-509: the board tools show no task card until they learn the kind (C-513).
+      .filter(isRunnableCard)
       .map(localListCardOf);
     // C-377: the stacks, with a column those whose collapsed face sits in it.
     const stacks = (view.stacks ?? [])
@@ -203,6 +227,7 @@ export class BoardSessionService {
     role: Role,
   ): Promise<LocalMethodResult<'board.card'>> {
     const detail = await this.board.detail(projectId, number, role);
+    hideTask(detail);
     return {
       ...localListCardOf(detail),
       body: detail.body,
@@ -316,6 +341,7 @@ export class BoardSessionService {
     const decided = await this.prisma.$transaction(async (tx) => {
       await this.lock(tx, project.id);
       const card = await this.work.card(project.id, number, tx);
+      hideTask(card);
       const label = cardLabel(card.number);
       if (card.trackedSessionId === session.id) {
         return { state: 'held' as const, card };
