@@ -238,6 +238,7 @@ export const ACTION_GROUP_LABEL: Record<string, string> = {
   'stack.': 'Card stacks',
   'attachment.': 'Attachments',
   'board.': 'Board',
+  'label.': 'Labels',
   'text.': 'Text',
   'demo.': 'Demo videos',
 };
