@@ -1,6 +1,6 @@
 # ADR-0081: TOTP two-factor sign-in with hashed recovery codes, optionally required of admins
 
-Status: accepted · Date: 2026-10-22 ·
+Status: accepted; §9 amended by [ADR-0113](0113-account-recovery-by-a-one-time-link-from-an-admin-or-by-email.md) (the web's Reset 2FA gives a one-time link) · Date: 2026-10-22 ·
 Card: C-189 (security audit decision D-05) ·
 Spec: [`docs/specs/card-189-security-medium-add-totp-two-factor-auth.md`](../specs/card-189-security-medium-add-totp-two-factor-auth.md) ·
 Amends: [ADR-0008](0008-local-accounts-with-admin-approved-registration.md) (2FA was deferred)

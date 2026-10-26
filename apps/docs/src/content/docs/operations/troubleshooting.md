@@ -34,6 +34,15 @@ was printed; take the current one from the log
 `install.sh --url http://…` writes it. For anything beyond a trusted network,
 use HTTPS instead.
 
+**Someone forgot their password or lost their authenticator.** An admin opens
+**Admin › Users** and picks **Reset password**, or **Reset 2FA** for an account
+with two-factor sign-in, and hands the one-time link over in a way they trust.
+It expires in 24 hours and works once; using it ends the person's other
+sessions, and a 2FA reset has them set two-factor sign-in up again. With
+`SMTP_URL` and `APP_URL` set, people can also use **Forgot password** on the
+sign-in page to get a link by email. The only admin who is locked out needs
+the database.
+
 ## Exposure modes
 
 **Domain mode has no certificate.** `docker compose logs proxy-tls` shows

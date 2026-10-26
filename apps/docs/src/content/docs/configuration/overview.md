@@ -65,6 +65,8 @@ the database cannot be read without it.
   the kinds they get by email — at once or in one daily digest at their own
   time — under **Account › Notifications**; the creator of a card is emailed
   when its worker waits for them. The credentials are never shown or logged.
+  With `APP_URL` set too, the sign-in page offers **Forgot password**, which
+  emails a one-time reset link.
 - **Translation with DeepL**: `DEEPL_API_KEY` in `api.env`.
 - **Voice input in Telegram**: `SPEECH_TO_TEXT_URL`, `SPEECH_TO_TEXT_API_KEY`.
 - **AI providers** for the assistant features: **Admin › AI providers**.
