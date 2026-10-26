@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "name": "Getting started: an AI provider and notifications for admins, three steps for operators",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Two new optional steps"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "heading",
+        "name": "Getting started"
+      },
+      "caption": "An admin's checklist still counts its seven required steps.",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "heading",
+        "name": "Optional"
+      }
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "Add an AI provider"
+      },
+      "caption": "Add an AI provider is done once a provider is enabled with a key."
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "Turn on notifications"
+      },
+      "caption": "Turn on notifications is done once Telegram is linked, email is on, or a Slack webhook is set."
+    },
+    {
+      "action": "screenshot",
+      "name": "optional-steps"
+    },
+    {
+      "action": "marker",
+      "title": "Turn on notifications"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Open notifications"
+      },
+      "caption": "The step opens the caller's own notification settings."
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "heading",
+        "name": "Notifications",
+        "exact": true
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "screenshot",
+      "name": "notifications"
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    }
+  ]
+}
