@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "name": "Labels in project Settings",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project/settings?tab=labels"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "The project's labels"
+    },
+    {
+      "action": "assertVisible",
+      "target": { "label": "Name of frontend" },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "marker",
+      "title": "Add a label"
+    },
+    {
+      "action": "fill",
+      "target": { "label": "New label name" },
+      "value": "design-system"
+    },
+    {
+      "action": "click",
+      "target": { "role": "button", "name": "Add label", "exact": true }
+    },
+    {
+      "action": "assertVisible",
+      "target": { "label": "Name of design-system" },
+      "timeoutMs": 15000
+    },
+    {
+      "action": "marker",
+      "title": "Pick its colour"
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "fieldset:has(legend:text-is('Colour of design-system')) button[aria-label='Red']"
+      }
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "marker",
+      "title": "Add a path rule"
+    },
+    {
+      "action": "fill",
+      "target": { "label": "New path glob" },
+      "value": "packages/shared/**"
+    },
+    {
+      "action": "select",
+      "target": { "label": "Label for the new rule" },
+      "option": "design-system"
+    },
+    {
+      "action": "click",
+      "target": { "css": "#labels button:text-is('Add rule')" }
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": { "css": "#labels button:text-is('Save rules')" }
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "marker",
+      "title": "Switch on the automatic labels"
+    },
+    {
+      "action": "click",
+      "target": { "role": "switch", "name": "Suggest labels on create" }
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": { "role": "switch", "name": "Refine from pull request files" }
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    }
+  ]
+}
