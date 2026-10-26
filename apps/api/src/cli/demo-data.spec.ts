@@ -1,10 +1,12 @@
 import {
+  cardAcceptArgsOf,
   rememberableToolRules,
   toolUseCallOf,
   toolUseDanger,
 } from '@nautelle/shared';
 import {
   DEMO_AWAY_SESSION_ID,
+  DEMO_CARD_ACCEPTS,
   DEMO_CARDS,
   DEMO_FAILED_RUNS,
   DEMO_PROJECT_ID,
@@ -58,6 +60,7 @@ describe('seedDemo', () => {
     user: {
       findUnique: jest.fn().mockResolvedValue({ id: 'u1' }),
       upsert: jest.fn(),
+      createMany: jest.fn(),
     },
     runner: { upsert: jest.fn() },
     project: { upsert: jest.fn() },
@@ -111,6 +114,16 @@ describe('seedDemo', () => {
     again.projectLabel.count.mockResolvedValue(6);
     await seedDemo(again as never, 'demo@example.com');
     expect(again.projectLabel.createManyAndReturn).not.toHaveBeenCalled();
+  });
+
+  it('seeds enough accounts for a second page of Admin › Users (C-483)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    const call = db.user.createMany.mock.calls[0][0];
+    expect(call.skipDuplicates).toBe(true);
+    expect(
+      call.data.filter((u: { status: string }) => u.status === 'active').length,
+    ).toBeGreaterThan(50);
   });
 
   it("seeds the finished card's round with its model and effort (C-359)", async () => {
@@ -229,9 +242,9 @@ describe('seedDemo', () => {
     const [project] = db.project.upsert.mock.calls[0];
     expect(project.create.toolUseTimeoutMinutes).toBe(240);
     expect(db.agentSession.upsert).toHaveBeenCalledTimes(1);
-    const requests = db.actionRequest.upsert.mock.calls.map(
-      ([args]) => args.create,
-    );
+    const requests = db.actionRequest.upsert.mock.calls
+      .map(([args]) => args.create)
+      .filter((request) => request.kind === 'tool_use');
     expect(requests).toHaveLength(DEMO_TOOL_CALLS.length);
     for (const request of requests) {
       expect(request).toMatchObject({
@@ -255,6 +268,28 @@ describe('seedDemo', () => {
     expect(secretCall && toolUseDanger(secretCall)?.kind).toBe('secret_read');
     const [rule] = db.toolUseRule.upsert.mock.calls[0];
     expect(rule.create).toMatchObject({ scope: 'project', toolName: 'Bash' });
+  });
+
+  it('seeds a pending accept pinned to a head and one that failed head_moved (C-416)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    const accepts = db.actionRequest.upsert.mock.calls
+      .map(([args]) => args.create)
+      .filter((request) => request.kind === 'card_accept');
+    expect(accepts).toHaveLength(DEMO_CARD_ACCEPTS.length);
+    for (const request of accepts) {
+      expect(cardAcceptArgsOf(request)).toMatchObject({
+        card: 7,
+        merge: true,
+        prNumber: 43,
+      });
+    }
+    const [pending, failed] = accepts;
+    expect(pending.status).toBeUndefined();
+    expect(failed).toMatchObject({
+      status: 'failed',
+      result: { error: 'head_moved', headSha: pending.args.headSha },
+    });
   });
 
   it('seeds a card whose design waits for approval (C-394)', async () => {

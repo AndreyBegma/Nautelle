@@ -198,6 +198,32 @@ export const DEMO_TOOL_CALLS: ReadonlyArray<{
 ];
 
 /**
+ * C-416: a session asks to accept the card with PR #43 and merge it, pinned
+ * to the head it had then; an earlier request for it failed because the PR
+ * moved before it was approved.
+ */
+export const DEMO_CARD_ACCEPTS: ReadonlyArray<{
+  id: string;
+  /** Its head when the request was filed; the failed one's is older. */
+  headSha: string;
+  /** The approval found the PR at this head instead and merged nothing. */
+  movedTo?: string;
+  minutesAgo: number;
+}> = [
+  {
+    id: 'demo-action-accept',
+    headSha: '4f2c9e1b7a3d5e8f0c6b2a9d1e4f7c3b5a8d0e2f',
+    minutesAgo: 2,
+  },
+  {
+    id: 'demo-action-accept-moved',
+    headSha: '9a1b3c5d7e9f1a2b4c6d8e0f2a4b6c8d0e2f4a6b',
+    movedTo: '4f2c9e1b7a3d5e8f0c6b2a9d1e4f7c3b5a8d0e2f',
+    minutesAgo: 25,
+  },
+];
+
+/**
  * C-402: an active operator besides the admin, so Admin › Users has someone
  * to give a reset link. Their password is random and never shown: they can
  * get in only through such a link.
@@ -207,6 +233,36 @@ export const DEMO_TEAMMATE = {
   email: 'sam@acme.example',
   name: 'Sam Rivera',
 } as const;
+
+/**
+ * C-483: enough further accounts that Admin › Users has a second page: active
+ * ones, a few registrations waiting for approval and one disabled account.
+ */
+export const DEMO_EXTRA_USERS: ReadonlyArray<{
+  id: string;
+  email: string;
+  name: string;
+  status: 'active' | 'pending' | 'disabled';
+}> = [
+  ...Array.from({ length: 60 }, (_, i) => ({
+    id: `demo-user-member-${String(i + 1).padStart(2, '0')}`,
+    email: `member${String(i + 1).padStart(2, '0')}@acme.example`,
+    name: `Member ${String(i + 1).padStart(2, '0')}`,
+    status: 'active' as const,
+  })),
+  ...[1, 2, 3].map((n) => ({
+    id: `demo-user-waiting-${n}`,
+    email: `waiting${n}@acme.example`,
+    name: `Waiting ${n}`,
+    status: 'pending' as const,
+  })),
+  {
+    id: 'demo-user-gone',
+    email: 'gone@acme.example',
+    name: 'Gone Fishing',
+    status: 'disabled',
+  },
+];
 
 /**
  * Seeds the demo project and its cards for the admin `adminEmail`, who must
@@ -253,6 +309,20 @@ export const seedDemo = async (
       approvedById: admin.id,
       approvedAt: now,
     },
+  });
+  const extraHash = await hashPassword(generateToken());
+  await prisma.user.createMany({
+    data: DEMO_EXTRA_USERS.map((user, i) => ({
+      ...user,
+      passwordHash: extraHash,
+      role: 'viewer' as const,
+      // Older than the teammate, so Sam stays on the first page (newest first).
+      createdAt: new Date(now.getTime() - (DEMO_EXTRA_USERS.length - i) * 1000),
+      ...(user.status === 'pending'
+        ? {}
+        : { approvedById: admin.id, approvedAt: now }),
+    })),
+    skipDuplicates: true,
   });
   await prisma.runner.upsert({
     where: { id: DEMO_RUNNER_ID },
@@ -572,6 +642,47 @@ export const seedDemo = async (
           ...(call.suggestions ? { suggestions: [...call.suggestions] } : {}),
         },
         expiresAt: new Date(now.getTime() + call.expiresInMinutes * 60_000),
+      },
+    });
+  }
+  // C-416: the card with PR #43, accepted and merged at a pinned head.
+  const accepted = DEMO_CARDS.findIndex((card) => card.openPr?.number === 43);
+  const acceptCard = DEMO_CARDS[accepted];
+  for (const request of DEMO_CARD_ACCEPTS) {
+    const at = new Date(now.getTime() - request.minutesAgo * 60_000);
+    await prisma.actionRequest.upsert({
+      where: { id: request.id },
+      update: {},
+      create: {
+        id: request.id,
+        projectId: DEMO_PROJECT_ID,
+        runnerId: DEMO_RUNNER_ID,
+        sessionId: DEMO_AWAY_SESSION_ID,
+        requestedById: admin.id,
+        kind: 'card_accept',
+        summary: `C-${accepted + 1} is green and reviewed; accept it and merge the pull request.`,
+        args: {
+          card: accepted + 1,
+          merge: true,
+          title: acceptCard.title,
+          prNumber: 43,
+          prUrl: 'https://github.com/acme/shop/pull/43',
+          headSha: request.headSha,
+        },
+        createdAt: at,
+        expiresAt: new Date(at.getTime() + 24 * 60 * 60_000),
+        ...(request.movedTo
+          ? {
+              status: 'failed' as const,
+              decidedById: admin.id,
+              decidedAt: new Date(at.getTime() + 5 * 60_000),
+              result: {
+                error: 'head_moved',
+                message: `The head of #43 moved to ${request.movedTo.slice(0, 7)} after the request; nothing was merged — ask again`,
+                headSha: request.movedTo,
+              },
+            }
+          : {}),
       },
     });
   }

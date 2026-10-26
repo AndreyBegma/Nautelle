@@ -26,7 +26,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
 import { Time } from '../../../../lib/format/time';
-import { useLive } from '../../../../lib/live/use-live';
+import { useLiveRefresh } from '../../../../lib/live/use-live-refresh';
 import { useErrorToast } from '../../../../lib/section/use-error-toast';
 import { triggerUrl } from '../../../../lib/webhooks/events';
 import {
@@ -38,8 +38,6 @@ import {
   INBOUND_STATUS_TONE,
 } from '../../../../lib/webhooks/format';
 import { MaskedUrl } from '../../../../lib/webhooks/masked-url';
-
-const POLL_MS = 15_000;
 
 type Confirm = 'rotate' | 'delete';
 
@@ -90,14 +88,10 @@ export function TriggerSheet({
     setLoadError(undefined);
     if (!triggerId) return;
     void load();
-    const timer = setInterval(load, POLL_MS);
-    return () => clearInterval(timer);
   }, [triggerId, load]);
 
-  useLive(triggerId ? 'admin' : null, (message) => {
-    if (message.event === WEBHOOK_LIVE_EVENTS.inboundDeliveryCreated) {
-      void load();
-    }
+  useLiveRefresh([], [WEBHOOK_LIVE_EVENTS.inboundDeliveryCreated], load, {
+    extraTopics: triggerId ? ['admin'] : [],
   });
 
   const act = async (action: () => Promise<void>) => {

@@ -102,6 +102,19 @@ describe('action-request mapper (#845 card_accept)', () => {
     ).toBe('https://github.com/acme/widget/pull/77 · and merge #77 · Green.');
   });
 
+  it('C-416: names the bound head and links its diff', () => {
+    const head = '0b6445a'.padEnd(40, 'f');
+    expect(
+      actionRequestBody(
+        'card_accept',
+        { ...CARD_ARGS, merge: true, headSha: head },
+        'Green.',
+      ),
+    ).toBe(
+      `https://github.com/acme/widget/pull/77/files/${head} · and merge #77 at 0b6445a · Green.`,
+    );
+  });
+
   it('says nothing of a PR the card has not, and falls back on unbound args', () => {
     const noPr = { ...CARD_ARGS, merge: true, prNumber: null, prUrl: null };
     expect(actionRequestBody('card_accept', noPr, 'Done.')).toBe('Done.');

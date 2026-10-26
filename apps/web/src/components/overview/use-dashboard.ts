@@ -2,8 +2,6 @@
 
 import {
   type ActivityPage,
-  APPROVALS_LIVE_EVENT,
-  type ApprovalsView,
   BOARD_CHANGED_EVENT,
   FLEET_LIVE_EVENT,
   type FleetsView,
@@ -25,8 +23,8 @@ import {
 import { type Section, useSection } from '../../lib/section/use-section';
 import { browserZone } from '../../lib/usage/format';
 
-/** What moves the project facts: fleets and approvals. */
-const FACTS_EVENTS = [FLEET_LIVE_EVENT, APPROVALS_LIVE_EVENT];
+/** What moves the project facts: fleets. */
+const FACTS_EVENTS = [FLEET_LIVE_EVENT];
 /** Today's cost moves when a session's usage lands. */
 const COST_EVENTS = [SESSIONS_CHANGED_LIVE_EVENT];
 /** Merges and recent activity follow the Board and the runs. */
@@ -40,53 +38,28 @@ const COST_PROJECTS_LIMIT = 200;
 
 export interface ProjectFacts {
   fleets: Map<string, FleetView>;
-  approvals: Map<string, ApprovalsView>;
-  /** Projects where any of these did not answer — never shown as zero. */
+  /** Projects where its fleet did not answer — never shown as zero. */
   failed: ProjectSummary[];
 }
 
 /**
- * Every project's fleet and approvals. What waits on the person is the
- * Inbox's (C-390), not these. The fleets come from one `GET /fleet`; the
- * approvals are still per project. One project
- * failing does not fail the rest: its id goes in `failed` and the page says so
- * beside the figures.
+ * Every project's fleet, from one `GET /fleet`. What waits on the person is
+ * the Inbox's (C-390), not this. A project the call has no fleet for, or the
+ * call failing, puts the project in `failed` and the page says so beside the
+ * figures.
  */
 async function loadProjectFacts(
   projects: ProjectSummary[],
 ): Promise<ProjectFacts> {
-  const fleetsCall = api<FleetsView>('/fleet').then(
+  const facts: ProjectFacts = { fleets: new Map(), failed: [] };
+  const byProject = await api<FleetsView>('/fleet').then(
     ({ items }) => new Map(items.map((f) => [f.projectId, f])),
+    () => undefined,
   );
-  // A rejected call is handled per project below; keep it from going unhandled.
-  fleetsCall.catch(() => undefined);
-  const results = await Promise.all(
-    projects.map(async (project) => {
-      const base = `/projects/${project.id}`;
-      const [fleet, approvals] = await Promise.allSettled([
-        fleetsCall.then((byProject) => {
-          const view = byProject.get(project.id);
-          if (!view) throw new Error('no fleet');
-          return view;
-        }),
-        api<ApprovalsView>(`${base}/approvals`),
-      ]);
-      return { project, fleet, approvals };
-    }),
-  );
-  const facts: ProjectFacts = {
-    fleets: new Map(),
-    approvals: new Map(),
-    failed: [],
-  };
-  for (const { project, fleet, approvals } of results) {
-    if (fleet.status === 'fulfilled') facts.fleets.set(project.id, fleet.value);
-    if (approvals.status === 'fulfilled') {
-      facts.approvals.set(project.id, approvals.value);
-    }
-    if (fleet.status === 'rejected' || approvals.status === 'rejected') {
-      facts.failed.push(project);
-    }
+  for (const project of projects) {
+    const fleet = byProject?.get(project.id);
+    if (fleet) facts.fleets.set(project.id, fleet);
+    else facts.failed.push(project);
   }
   return facts;
 }

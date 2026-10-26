@@ -37,6 +37,10 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Using Nautelle',
+          items: [{ autogenerate: { directory: 'using' } }],
+        },
+        {
           label: 'Configuration',
           items: ['configuration/overview', 'configuration/environment'],
         },

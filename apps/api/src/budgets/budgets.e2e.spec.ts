@@ -3,12 +3,14 @@ import type {
   BudgetRecomputeResult,
   BudgetView,
 } from '@nautelle/shared';
+import { BUDGET_UPDATED_LIVE_EVENT } from '@nautelle/shared';
 import type { CommandName } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { ControlService } from '../control/control.service';
 import { seedProject } from '../fleet/testing/fleet-e2e';
+import { LiveService } from '../live/live.service';
 import { seedPrices } from '../prices/seed-prices';
 import { RunnerCommandService } from '../runners/runner-command.service';
 import { RunnerPresence } from '../runners/runner-presence';
@@ -303,6 +305,17 @@ describe('budgets (e2e)', () => {
       expect(row.spentUsd.toFixed(6)).toBe('13.500000');
       expect(row.firedThresholds).toEqual([50, 80, 100]);
       expect(row.exceededAt).not.toBeNull();
+    });
+
+    it('publishes budget.updated on the budget’s own topic and on admin', async () => {
+      const publish = jest.spyOn(ctx.app.get(LiveService), 'publish');
+      await createProjectBudget({ thresholds: [50] });
+      await spendOnA(1, 0);
+      const topics = publish.mock.calls
+        .filter(([, event]) => event === BUDGET_UPDATED_LIVE_EVENT)
+        .map(([topic]) => topic);
+      expect(topics).toContain(`project:${a}`);
+      expect(topics).toContain('admin');
     });
 
     it('counts an unpriced request as zero and as unpriced (D2)', async () => {

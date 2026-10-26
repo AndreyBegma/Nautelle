@@ -6,6 +6,7 @@ import {
   type ActionRequestKind,
   type ActionRequestStatus,
   type ActionRequestSummary,
+  APPROVALS_ERROR,
   actionRequestArgsSchemas,
   BOARD_ERROR,
   cardAcceptBoundArgsSchema,
@@ -13,6 +14,7 @@ import {
   mayDecideActionRequest,
   prApproveBoundArgsSchema,
   type Role,
+  shortHeadSha,
   type ToolRuleScope,
 } from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
@@ -22,7 +24,7 @@ import { type ApprovalsCaller, ApprovalsService } from '../approvals';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
 import { BoardService } from '../board/board.service';
-import { boardError, cardNotFound } from '../board/board-error';
+import { BoardFailure, boardError, cardNotFound } from '../board/board-error';
 import { ControlService } from '../control/control.service';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
@@ -117,7 +119,29 @@ export type ActionRequestDecision = 'approve' | 'deny';
 
 type Outcome =
   | { ok: true; result: Prisma.InputJsonObject }
-  | { ok: false; result: { error: string; message: string } };
+  | {
+      ok: false;
+      result: { error: string; message: string; headSha?: string };
+    };
+
+/**
+ * C-416: a `card_accept` whose PR moved past the bound head — `headSha` is
+ * the head now, for the session to file a new request at.
+ */
+const headMoved = (pr: number | null, headSha: string): Outcome => ({
+  ok: false,
+  result: {
+    error: APPROVALS_ERROR.headMoved,
+    message: `The head of #${pr} moved to ${shortHeadSha(headSha)} after the request; nothing was merged — ask again`,
+    headSha,
+  },
+});
+
+/** The Board's `merge_failed` for a head that changed before the merge. */
+const isHeadChanged = (error: unknown): boolean =>
+  error instanceof BoardFailure &&
+  error.code === BOARD_ERROR.mergeFailed &&
+  (error.getResponse() as { reason?: unknown }).reason === 'head_changed';
 
 const DECIDED_STATUS: Record<ActionRequestDecision, ActionRequestStatus> = {
   approve: 'approved',
@@ -167,6 +191,7 @@ export class ActionRequestsService {
           ? await this.bindCard(
               input,
               parsed.data as ActionRequestArgs<'card_accept'>,
+              auditor,
             )
           : (parsed.data as Record<string, unknown>);
     const now = new Date();
@@ -299,11 +324,14 @@ export class ActionRequestsService {
   /**
    * #845 D5 (ADR-0083 §10): a `card_accept` binds the card as the API reads
    * it now — its title and pull request are what the approver is shown,
-   * never the session's words. Only a card in Finished is accepted.
+   * never the session's words. Only a card in Finished is accepted. C-416:
+   * a merging accept also binds the head — the card's `ciHeadSha`, or the PR
+   * as `pr.inspect` reads it — and the approval merges only that head.
    */
   private async bindCard(
     input: NewActionRequest,
     { card: number, merge }: ActionRequestArgs<'card_accept'>,
+    auditor: ActionRequestAuditor,
   ): Promise<Record<string, unknown>> {
     const card = await this.prisma.boardCard.findUnique({
       where: { projectId_number: { projectId: input.projectId, number } },
@@ -313,6 +341,7 @@ export class ActionRequestsService {
         column: true,
         prNumber: true,
         prUrl: true,
+        ciHeadSha: true,
       },
     });
     if (!card) throw cardNotFound();
@@ -323,12 +352,25 @@ export class ActionRequestsService {
         `Only a card in Finished is accepted; ${cardLabel(number)} is in ${card.column}`,
       );
     }
+    const pr = card.prNumber;
+    const headSha =
+      merge === true && pr !== null
+        ? (card.ciHeadSha ??
+          (
+            await this.board.pullRequest(input.projectId, number, {
+              userId: input.requestedById,
+              role: input.requesterRole,
+              ctx: auditor.ctx,
+            })
+          ).headSha)
+        : null;
     return cardAcceptBoundArgsSchema.parse({
       card: card.number,
       ...(merge !== undefined ? { merge } : {}),
       title: card.title.slice(0, ACTION_REQUEST_CARD_TITLE_MAX),
-      prNumber: card.prNumber,
+      prNumber: pr,
       prUrl: card.prUrl && /^https?:\/\//.test(card.prUrl) ? card.prUrl : null,
+      headSha,
     });
   }
 
@@ -675,12 +717,34 @@ export class ActionRequestsService {
             bound.merge === true && bound.prNumber !== null
               ? await this.board.pullRequest(row.projectId, bound.card, actor)
               : null;
-          const accepted = await this.board.accept(
-            row.projectId,
-            bound.card,
-            pr?.state === 'open' ? { merge: { headSha: pr.headSha } } : {},
-            actor,
-          );
+          // C-416: a bound head is the only one merged; a moved one fails
+          // the request with the head the PR has now, and merges nothing.
+          const pinned = bound.headSha ?? null;
+          if (pr?.state === 'open' && pinned && pr.headSha !== pinned) {
+            return headMoved(bound.prNumber, pr.headSha);
+          }
+          let accepted: Awaited<ReturnType<BoardService['accept']>>;
+          try {
+            accepted = await this.board.accept(
+              row.projectId,
+              bound.card,
+              pr?.state === 'open'
+                ? { merge: { headSha: pinned ?? pr.headSha } }
+                : {},
+              actor,
+            );
+          } catch (error) {
+            // The head moved between the read and the merge.
+            if (pinned && isHeadChanged(error)) {
+              const now = await this.board.pullRequest(
+                row.projectId,
+                bound.card,
+                actor,
+              );
+              return headMoved(bound.prNumber, now.headSha);
+            }
+            throw error;
+          }
           return {
             ok: true,
             result: {
