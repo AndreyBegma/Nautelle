@@ -44,7 +44,7 @@ describe('terminalSetup', () => {
     const view = terminalSetup(ready);
     expect(view.complete).toBe(true);
     expect(view.todo).toBe(0);
-    expect(view.closing).toContain("Board's Inbox");
+    expect(view.closing).toContain("Board's Suggestions");
     expect(view.items.map((entry) => entry.id)).toEqual([
       'runner_online',
       'plugin',

@@ -287,7 +287,7 @@ export const MCP_TOOLS = [
         .max(LOCAL_BOARD_WAIT_CARDS_MAX)
         .optional()
         .describe(
-          'Only these cards; default every card outside Inbox and Completed.',
+          'Only these cards; default every card outside Suggestions and Completed.',
         ),
       timeoutSec: z
         .number()
@@ -302,7 +302,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'card_create',
-    description: `Create a board card. On the person’s explicit request it goes to the top of To Do; with candidate: true (a card you propose on your own) it goes to the Inbox. ${MANUAL_ONLY}`,
+    description: `Create a board card. On the person’s explicit request it goes to the top of To Do; with candidate: true (a card you propose on your own) it goes to Suggestions. ${MANUAL_ONLY}`,
     method: 'card.create',
     input: {
       title: z
@@ -320,7 +320,7 @@ export const MCP_TOOLS = [
       candidate: z
         .boolean()
         .optional()
-        .describe('True to put the card in the Inbox as a proposal.'),
+        .describe('True to put the card in Suggestions as a proposal.'),
     },
   },
   {
@@ -418,7 +418,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'stack_create',
-    description: `Group board cards into a new stack with its stages, in one call: every card of a stage runs after every card of the stage before. A card in the Inbox, in a stack already or not of this project is refused stack_refused, a stage order that closes a dependency cycle dependency_cycle — and nothing is made. With design: true no card of the stack runs until its shared design is approved (stack_design). ${MANUAL_ONLY}`,
+    description: `Group board cards into a new stack with its stages, in one call: every card of a stage runs after every card of the stage before. A card in Suggestions, in a stack already or not of this project is refused stack_refused, a stage order that closes a dependency cycle dependency_cycle — and nothing is made. With design: true no card of the stack runs until its shared design is approved (stack_design). ${MANUAL_ONLY}`,
     method: 'stack.create',
     untrusted: true,
     input: {
@@ -517,7 +517,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'card_depend',
-    description: `Make a card run after another (dependsOn). A link that closes a cycle is refused dependency_cycle; an Inbox card or a number that is no card invalid_dependency. ${MANUAL_ONLY}`,
+    description: `Make a card run after another (dependsOn). A link that closes a cycle is refused dependency_cycle; a card in Suggestions or a number that is no card invalid_dependency. ${MANUAL_ONLY}`,
     method: 'card.depend',
     input: { card: cardNumber, dependsOn: cardNumber },
   },
