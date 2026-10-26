@@ -279,8 +279,6 @@ export const seedDemo = async (
       status: 'active',
       approvedById: admin.id,
       approvedAt: now,
-      // Before the accounts below, so the teammate stays on the first page.
-      createdAt: new Date(now.getTime() - 3_600_000),
     },
   });
   const extraHash = await hashPassword(generateToken());
@@ -289,7 +287,7 @@ export const seedDemo = async (
       ...user,
       passwordHash: extraHash,
       role: 'viewer' as const,
-      // Oldest first: the order the Users page lists them in.
+      // Older than the teammate, so Sam stays on the first page (newest first).
       createdAt: new Date(now.getTime() - (DEMO_EXTRA_USERS.length - i) * 1000),
       ...(user.status === 'pending'
         ? {}

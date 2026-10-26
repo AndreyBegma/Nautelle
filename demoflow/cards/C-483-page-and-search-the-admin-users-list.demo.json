@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "Page and search the Admin › Users list",
-  "description": "Admin › Users loads one page of 50 accounts per tab, adds the next page with Load more, and finds an account by email or name; the tab counts follow the search.",
+  "description": "Admin › Users loads one page of 50 accounts per tab, adds the next page with Load more, and finds an account by email or name; the tab counts stay the totals.",
   "setup": [
     {
       "action": "include",
@@ -35,9 +35,9 @@
     },
     {
       "action": "assertVisible",
-      "target": { "text": "member60@acme.example" },
+      "target": { "text": "member01@acme.example" },
       "timeoutMs": 30000,
-      "caption": "The last account is now in the list"
+      "caption": "The oldest account is now in the list"
     },
     { "action": "wait", "ms": 1500 },
     { "action": "marker", "title": "Search by email or name" },
@@ -54,7 +54,7 @@
       "caption": "One call returns the match; the paging starts over"
     },
     { "action": "wait", "ms": 1500 },
-    { "action": "marker", "title": "The tab counts follow the search" },
+    { "action": "marker", "title": "The tab counts stay the totals" },
     {
       "action": "fill",
       "target": { "label": "Search accounts" },
@@ -65,7 +65,7 @@
       "action": "assertVisible",
       "target": { "text": "No matching accounts" },
       "timeoutMs": 30000,
-      "caption": "No active account matches, and the tabs say where the matches are"
+      "caption": "No active account matches; the tab badges still show every total"
     },
     { "action": "wait", "ms": 1500 },
     {

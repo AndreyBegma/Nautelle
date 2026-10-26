@@ -35,42 +35,45 @@ export class AdminUsersService {
   ) {}
 
   /**
-   * Oldest first, `ADMIN_USERS_PAGE_SIZE` a page. The cursor is the last row's
-   * `createdAt` and id, so a row deleted between two pages cannot end the list.
+   * `ADMIN_USERS_PAGE_SIZE` a page: pending oldest first (who waited longest),
+   * every other status newest first. The cursor is the last row's `createdAt`
+   * and id, so a row deleted between two pages cannot end the list. `counts`
+   * ignores `q`, so the tabs always show totals.
    */
   async list(
     filters: { status?: UserStatus; q?: string; cursor?: string } = {},
   ): Promise<AdminUsersPage> {
     const q = filters.q?.trim();
-    const search: Prisma.UserWhereInput = q
-      ? {
-          OR: [
-            { email: { contains: q, mode: 'insensitive' } },
-            { name: { contains: q, mode: 'insensitive' } },
-          ],
-        }
-      : {};
+    const oldestFirst = filters.status === 'pending';
+    const dir = oldestFirst ? 'asc' : 'desc';
+    const beyond = oldestFirst ? 'gt' : 'lt';
     const after = filters.cursor ? parseCursor(filters.cursor) : undefined;
+    const clauses: Prisma.UserWhereInput[] = [];
+    if (filters.status) clauses.push({ status: filters.status });
+    if (q) {
+      clauses.push({
+        OR: [
+          { email: { contains: q, mode: 'insensitive' } },
+          { name: { contains: q, mode: 'insensitive' } },
+        ],
+      });
+    }
+    if (after) {
+      clauses.push({
+        OR: [
+          { createdAt: { [beyond]: after.createdAt } },
+          { createdAt: after.createdAt, id: { [beyond]: after.id } },
+        ],
+      });
+    }
     const [rows, grouped] = await Promise.all([
       this.prisma.user.findMany({
-        where: {
-          ...search,
-          ...(filters.status ? { status: filters.status } : {}),
-          ...(after
-            ? {
-                OR: [
-                  { createdAt: { gt: after.createdAt } },
-                  { createdAt: after.createdAt, id: { gt: after.id } },
-                ],
-              }
-            : {}),
-        },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        where: { AND: clauses },
+        orderBy: [{ createdAt: dir }, { id: dir }],
         take: ADMIN_USERS_PAGE_SIZE + 1,
       }),
       this.prisma.user.groupBy({
         by: ['status'],
-        where: search,
         _count: { _all: true },
       }),
     ]);

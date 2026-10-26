@@ -52,9 +52,9 @@ export const ADMIN_USERS_PAGE_SIZE = 50;
 export const ADMIN_USERS_SEARCH_MAX = 200;
 
 /**
- * `GET /admin/users?status=&q=&cursor=`: one page of accounts, oldest first.
- * `counts` covers every status for the same `q`, so the tabs stay accurate
- * while a search narrows the list.
+ * `GET /admin/users?status=&q=&cursor=`: one page of accounts, pending oldest
+ * first and every other status newest first. `counts` covers every status and
+ * ignores `q`, so the tabs always show totals.
  */
 export interface AdminUsersPage {
   items: AdminUser[];

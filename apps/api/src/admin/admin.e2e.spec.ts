@@ -105,7 +105,7 @@ describe('admin and authorization (e2e)', () => {
       });
     };
 
-    it('pages 50 at a time, oldest first, without gaps or repeats', async () => {
+    it('pages 50 at a time, pending oldest first, without gaps or repeats', async () => {
       await createUser(ctx.prisma, 'admin@example.com', 'admin');
       await seed(120, 'pending');
       const admin = await login(ctx, 'admin@example.com');
@@ -131,6 +131,40 @@ describe('admin and authorization (e2e)', () => {
       expect(new Set(emails).size).toBe(120);
     });
 
+    it('pages other statuses newest first', async () => {
+      await createUser(ctx.prisma, 'admin@example.com', 'admin');
+      await seed(120, 'active');
+      const admin = await login(ctx, 'admin@example.com');
+      const first = await admin.get('/admin/users?status=active');
+      const second = await admin.get(
+        `/admin/users?status=active&cursor=${encodeURIComponent(first.body.nextCursor)}`,
+      );
+      const emails = [first, second].flatMap((page) =>
+        page.body.items.map((u: { email: string }) => u.email),
+      );
+      expect(emails).toHaveLength(100);
+      expect(emails[0]).toBe('active-119@example.com');
+      expect(emails).toEqual([...emails].sort().reverse());
+    });
+
+    it('keeps the search on every page of a search with more than 50 matches', async () => {
+      await createUser(ctx.prisma, 'admin@example.com', 'admin');
+      await seed(120, 'active');
+      await seed(10, 'pending');
+      const admin = await login(ctx, 'admin@example.com');
+      const emails: string[] = [];
+      let cursor: string | null = null;
+      do {
+        const url: string = `/admin/users?status=active&q=ACTIVE-${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+        const page = await admin.get(url);
+        emails.push(...page.body.items.map((u: { email: string }) => u.email));
+        cursor = page.body.nextCursor;
+      } while (cursor);
+      expect(emails).toHaveLength(120);
+      expect(new Set(emails).size).toBe(120);
+      expect(emails.every((e) => e.startsWith('active-'))).toBe(true);
+    });
+
     it('a page of exactly 50 has no next page', async () => {
       await createUser(ctx.prisma, 'admin@example.com', 'admin');
       await seed(50, 'pending');
@@ -140,7 +174,7 @@ describe('admin and authorization (e2e)', () => {
       expect(page.body.nextCursor).toBeNull();
     });
 
-    it('counts every status, and follows the search', async () => {
+    it('counts every status, whatever the search', async () => {
       await createUser(ctx.prisma, 'admin@example.com', 'admin');
       await seed(3, 'pending');
       await seed(2, 'active');
@@ -158,12 +192,7 @@ describe('admin and authorization (e2e)', () => {
       expect(found.body.items.map((u: { email: string }) => u.email)).toEqual([
         'active-001@example.com',
       ]);
-      expect(found.body.counts).toEqual({
-        pending: 0,
-        active: 1,
-        rejected: 0,
-        disabled: 0,
-      });
+      expect(found.body.counts).toEqual(all.body.counts);
     });
 
     it('searches the name too, ignoring case, and returns nothing for a miss', async () => {

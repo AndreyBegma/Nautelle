@@ -22,10 +22,9 @@ import {
   type Role,
   USER_STATUSES,
   type UserStatus,
-  type AdminUsersPage as UsersPage,
 } from '@nautelle/shared';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { ConfirmGate } from '../../../components/confirm/confirm-gate';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
@@ -102,11 +101,18 @@ function UsersTable({ viewer }: { viewer: string }) {
     () => fetchUsersPage({ status: picked ?? 'active', q }),
     [picked, q],
   );
-  // Pages after the first, loaded with "Load more"; a reload starts over.
-  const [more, setMore] = useState<UsersPage | null>(null);
+  // Pages after the first, loaded with "Load more". They belong to one tab and
+  // search; a row action refreshes them in place instead of starting over.
+  const queryKey = `${picked ?? 'active'}|${q}`;
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    items: AdminUser[];
+    nextCursor: string | null;
+    pages: number;
+  } | null>(null);
+  const more = loaded?.key === queryKey ? loaded : null;
   const [loadingMore, setLoadingMore] = useState(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a fresh first page drops the later ones
-  useEffect(() => setMore(null), [section.data]);
+  const firstLoad = useRef(true);
   const registration = useSection(
     () => api<RegistrationState>('/admin/settings/registration'),
     [],
@@ -127,12 +133,15 @@ function UsersTable({ viewer }: { viewer: string }) {
   const search = useSearchDraft(q, (value) => setParam('q', value.trim()));
   const counts = section.data?.counts;
   const tab = picked ?? 'active';
-  // Without `?tab=`, an empty Active tab hands over to the first with accounts.
-  const fallback = !picked && counts ? defaultUsersTab(counts) : 'active';
+  // Without `?tab=`, an empty Active tab hands over to the first with accounts,
+  // once, from the unfiltered totals: a search never switches the tab.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `setTab` only rewrites the URL
   useEffect(() => {
-    if (fallback !== 'active') setTab(fallback);
-  }, [fallback]);
+    if (!counts || !firstLoad.current) return;
+    firstLoad.current = false;
+    const fallback = picked ? undefined : defaultUsersTab(counts);
+    if (fallback && fallback !== 'active') setTab(fallback);
+  }, [counts]);
   const items = [...(section.data?.items ?? []), ...(more?.items ?? [])];
   const nextCursor = more
     ? more.nextCursor
@@ -142,14 +151,36 @@ function UsersTable({ viewer }: { viewer: string }) {
     setLoadingMore(true);
     try {
       const page = await fetchUsersPage({ status: tab, q, cursor: nextCursor });
-      setMore((current) => ({
-        ...page,
-        items: [...(current?.items ?? []), ...page.items],
-      }));
+      setLoaded({
+        key: queryKey,
+        items: [...(more?.items ?? []), ...page.items],
+        nextCursor: page.nextCursor,
+        pages: (more?.pages ?? 0) + 1,
+      });
     } catch (err) {
       showError(describeError(err));
     } finally {
       setLoadingMore(false);
+    }
+  };
+  // After a row action: walk the pages already on screen again.
+  const refreshLoaded = async () => {
+    if (!more) return;
+    try {
+      let page = await fetchUsersPage({ status: tab, q });
+      const rows: AdminUser[] = [];
+      for (let i = 0; i < more.pages && page.nextCursor; i++) {
+        page = await fetchUsersPage({ status: tab, q, cursor: page.nextCursor });
+        rows.push(...page.items);
+      }
+      setLoaded({
+        key: queryKey,
+        items: rows,
+        nextCursor: page.nextCursor,
+        pages: more.pages,
+      });
+    } catch {
+      setLoaded(null);
     }
   };
 
@@ -160,6 +191,7 @@ function UsersTable({ viewer }: { viewer: string }) {
       showError(describeError(err));
     }
     section.retry();
+    await refreshLoaded();
   };
 
   const roleOf = (user: AdminUser): Role => roles[user.id] ?? user.role;
