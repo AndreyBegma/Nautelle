@@ -1,19 +1,23 @@
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import {
   type BoardCardView,
-  type BoardView,
   cardQueueText,
-  isActiveRoundPhase,
-  ownsWorker,
+  type FleetWorkingView,
+  hasLiveSession,
+  hasLiveSlot,
+  waitsInRunQueue,
+  worksOnOwnWorker,
 } from '@nautelle/shared';
 import { fleetSummary, roundPill } from '../board/format';
 import { boardCardHref } from '../board/href';
 
 /**
- * C-397 (ADR-0098): who works on the project right now, read off the Board —
- * the card workers Nautelle runs, the orchestrator's slots and the people's
- * own sessions. Every row is a card, so every row links to it. C-398
- * (ADR-0102): after them, the cards in the run queue, in the order they start.
+ * C-397 (ADR-0098): who works on the project right now — the card workers
+ * Nautelle runs, the orchestrator's slots and the people's own sessions.
+ * Every row is a card, so every row links to it. C-398 (ADR-0102): after
+ * them, the cards in the run queue, in the order they start. C-473
+ * (ADR-0122): the cards come from `GET /fleet/working`, not the Board; each
+ * hand is a part of the shared `isWorkingCard`.
  */
 export type WorkingKind = 'worker' | 'slot' | 'session' | 'queued';
 
@@ -46,6 +50,14 @@ const KIND_ORDER: readonly WorkingKind[] = [
   'queued',
 ];
 
+/** A tracked terminal session first; else the session that took the card. */
+const sessionState = (card: BoardCardView): string =>
+  card.tracking?.alive
+    ? 'Terminal session running'
+    : card.taken?.branch
+      ? `Taken by a session on ${card.taken.branch}`
+      : 'Taken by a session';
+
 function rowsOf(projectId: string, card: BoardCardView): WorkingRow[] {
   const row = (
     kind: WorkingKind,
@@ -63,28 +75,17 @@ function rowsOf(projectId: string, card: BoardCardView): WorkingRow[] {
     href: boardCardHref(projectId, card.number),
   });
   const rows: WorkingRow[] = [];
-  if (ownsWorker(card) && isActiveRoundPhase(card.round?.phase)) {
+  if (worksOnOwnWorker(card)) {
     const pill = roundPill(card.round);
     if (pill) rows.push(row('worker', pill.label, pill.status));
   }
-  const fleet = card.fleet;
-  if (fleet?.slot && !fleet.slotGone && card.column !== 'completed') {
-    rows.push(row('slot', fleetSummary(fleet), 'running'));
+  if (card.fleet && hasLiveSlot(card)) {
+    rows.push(row('slot', fleetSummary(card.fleet), 'running'));
   }
-  if (card.tracking?.alive) {
-    rows.push(row('session', 'Terminal session running', 'running'));
-  } else if (card.taken?.alive) {
-    rows.push(
-      row(
-        'session',
-        card.taken.branch
-          ? `Taken by a session on ${card.taken.branch}`
-          : 'Taken by a session',
-        'running',
-      ),
-    );
+  if (hasLiveSession(card)) {
+    rows.push(row('session', sessionState(card), 'running'));
   }
-  if (card.queue && card.column === 'todo') {
+  if (card.queue && waitsInRunQueue(card)) {
     rows.push({
       ...row(
         'queued',
@@ -105,10 +106,8 @@ const byPlace = (a: WorkingRow, b: WorkingRow): number =>
  * Workers first, then slots, then sessions, each by card number; then the run
  * queue by place.
  */
-export function workingNow(view: BoardView): WorkingRow[] {
-  return view.columns
-    .filter((column) => column.column !== 'inbox')
-    .flatMap((column) => column.cards)
+export function workingNow(view: FleetWorkingView): WorkingRow[] {
+  return view.cards
     .flatMap((card) => rowsOf(view.projectId, card))
     .sort(
       (a, b) =>
