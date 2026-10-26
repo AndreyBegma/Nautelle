@@ -196,7 +196,9 @@ bun run start:dev      # API http://localhost:8180 · web http://localhost:3517
 bun run docs:dev       # the documentation site at http://localhost:4321/Nautelle/
 ```
 
-Pair a development runner with `--server http://localhost:8180`.
+Every root script is listed in the
+[Commands table](docs/guides/agent-rules.md#commands). Pair a development
+runner with `--server http://localhost:8180`.
 
 ## License
 
