@@ -39,13 +39,18 @@
       "target": { "role": "button", "name": "New webhook", "exact": true }
     },
     {
+      "action": "waitFor",
+      "target": { "role": "dialog", "name": "New webhook" },
+      "timeoutMs": 30000
+    },
+    {
       "action": "fill",
-      "target": { "label": "Name", "exact": true },
+      "target": { "role": "textbox", "name": "Name" },
       "value": "Live demo hook"
     },
     {
       "action": "fill",
-      "target": { "label": "URL", "exact": true },
+      "target": { "role": "textbox", "name": "URL" },
       "value": "https://example.com/hooks/live-demo"
     },
     {
