@@ -63,6 +63,12 @@ A pool of runners per project is out of scope (spec C-400).
    next round of a card therefore starts a new session on the new runner
    (`resume: false`) instead of resuming one that is not there. The cards'
    history (rounds, runs, messages, pull requests) is kept.
+   *Extended by C-477 (#1003):* every plan of the project gets a new
+   `sessionId` and `sessionSince` (the moment of the move), and its tasks'
+   `sessionId` is cleared. Only plan turns after `sessionSince` count as having
+   started the session: until one did, a plan turn starts the new session and
+   a task turn starts one of its own, with nothing to fork. The move's answer
+   and its audit record carry `plansReset`.
 5. **Profiles are chosen again.** The default profile is the one the admin picks
    from the target runner's profiles, or none. The Settings dialog preselects
    the profile with the same key. The orchestrator's profile is cleared.
@@ -86,9 +92,10 @@ A pool of runners per project is out of scope (spec C-400).
 - An admin moves a project between machines without losing its Board.
 - A card stopped mid-work on the old machine restarts its session on the new
   one: its next round begins without the old conversation.
-- `Plan.sessionId` is required, so the move does not clear it. A plan's next
-  turn may try to resume a session that the new machine does not have. This
-  is a known limit.
+- A plan, like a card, continues on the new machine without its old
+  conversation (§4, C-477). Until C-477 the move left `Plan.sessionId`, which is
+  required, untouched, and a plan's next turn tried to resume a session the
+  new machine did not have.
 - The admin removes the old worktrees by hand. Nautelle does not track whether
   they did.
 - Rejected:

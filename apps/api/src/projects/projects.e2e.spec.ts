@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   type ProjectDetail,
   type ProjectErrorBody,
@@ -666,6 +667,82 @@ describe('projects (e2e)', () => {
         defaultProfileId: newProfile.id,
         worktrees: [worktree],
       });
+    });
+
+    /** A plan with one task, both in the session `sessionId`. */
+    const plan = async (projectId: string, sessionId: string) => {
+      const instructions =
+        (await ctx.prisma.plannerInstructions.findFirst()) ??
+        (await ctx.prisma.plannerInstructions.create({
+          data: { projectId: null, version: 1, body: 'INSTRUCTIONS' },
+        }));
+      return ctx.prisma.plan.create({
+        data: {
+          projectId,
+          title: 'Exporter',
+          brief: 'Build an exporter',
+          mode: 'batch',
+          status: 'reviewing',
+          sessionId,
+          instructionsId: instructions.id,
+          contractVersion: 3,
+          profileKey: 'claude-main',
+          model: 'sonnet',
+          tasks: {
+            create: {
+              key: 't1',
+              planVersion: 1,
+              kind: 'feature',
+              title: 'Task 1',
+              summary: 'Task 1',
+              sessionId: randomUUID(),
+            },
+          },
+        },
+        include: { tasks: true },
+      });
+    };
+
+    it("gives the project's plans new sessions and leaves other projects' alone (C-477)", async () => {
+      await connectRunner();
+      const project = await connectProject();
+      const other = await seedProject('/srv/dev/gadget', 'acme/gadget');
+      const target = await laptop();
+      const oldSession = randomUUID();
+      const moved = await plan(project.id, oldSession);
+      const kept = await plan(other.id, randomUUID());
+
+      const before = new Date();
+      const response = await move(project.id, {
+        runnerId: target.runnerId,
+        path: NEW_ROOT,
+      });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ plansReset: 1 });
+
+      const after = await ctx.prisma.plan.findUniqueOrThrow({
+        where: { id: moved.id },
+        include: { tasks: true },
+      });
+      expect(after.sessionId).not.toBe(oldSession);
+      expect(after.sessionSince?.getTime()).toBeGreaterThanOrEqual(
+        before.getTime(),
+      );
+      expect(after.tasks.map((t) => t.sessionId)).toEqual([null]);
+      expect(
+        await ctx.prisma.plan.findUniqueOrThrow({
+          where: { id: kept.id },
+          include: { tasks: true },
+        }),
+      ).toMatchObject({
+        sessionId: kept.sessionId,
+        sessionSince: null,
+        tasks: [{ sessionId: kept.tasks[0].sessionId }],
+      });
+      const record = await ctx.prisma.auditRecord.findFirstOrThrow({
+        where: { projectId: project.id, action: 'project.move' },
+      });
+      expect(record.after).toMatchObject({ plansReset: 1 });
     });
 
     it('rebases a manual in-repo docs source onto the new root', async () => {
