@@ -543,6 +543,8 @@ export class BoardLabels {
           })
         ).map((l) => l.id),
       );
+      // Nothing of this project to say: the set counts as empty.
+      if (ofProject.size === 0) return null;
       const person = rows.filter((r) => r.source === 'person');
       const personIds = new Set(person.map((r) => r.labelId));
       const room =

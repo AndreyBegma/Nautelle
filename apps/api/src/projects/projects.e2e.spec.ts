@@ -1,9 +1,12 @@
-import type {
-  ProjectDetail,
-  ProjectErrorBody,
-  ProjectMemberView,
-  ProjectSummary,
-  Role,
+import {
+  type ProjectDetail,
+  type ProjectErrorBody,
+  type ProjectLabelsResponse,
+  type ProjectMemberView,
+  type ProjectSummary,
+  type Role,
+  STARTER_LABEL_RULES,
+  STARTER_LABELS,
 } from '@nautelle/shared';
 import {
   type ProjectInspection,
@@ -158,6 +161,15 @@ describe('projects (e2e)', () => {
         'project.inspect',
         'project.inspect',
       ]);
+      // C-497 D1: a new project starts with the starter labels.
+      const labels = await admin.get(`/projects/${project.id}/labels`);
+      expect(labels.status).toBe(200);
+      expect(
+        (labels.body as ProjectLabelsResponse).labels.map((l) => l.name),
+      ).toEqual(STARTER_LABELS.map((l) => l.name));
+      expect((labels.body as ProjectLabelsResponse).rules).toHaveLength(
+        STARTER_LABEL_RULES.length,
+      );
 
       // Pushed to the connected runner, and listed in every later welcome.
       const pushed = await runner.socket.next('config');
