@@ -6,7 +6,11 @@ import { TOKEN_SAVER_OFF, TokenSaverService } from './token-saver.service';
 /** The service over a project whose runner stored `stored` capabilities. */
 const serviceWith = (
   stored: unknown,
-  settings: { enabled: boolean; mcpAllow: string[] } | null = null,
+  settings: {
+    enabled: boolean;
+    mcpAllow: string[];
+    filtersOff?: string[];
+  } | null = null,
 ) => {
   const prisma = {
     project: {
@@ -14,6 +18,7 @@ const serviceWith = (
         runner: { capabilities: stored },
         tokenSaverSettings: settings && {
           projectId: 'p1',
+          filtersOff: [],
           ...settings,
           updatedById: null,
           updatedAt: new Date(),
@@ -109,5 +114,50 @@ describe('TokenSaverService.launch with technique flags (#746 D11)', () => {
         flags,
       ),
     ).toEqual(TOKEN_SAVER_OFF);
+  });
+});
+
+describe('TokenSaverService.launch with filter families off (C-442 D2)', () => {
+  const settings = { enabled: true, mcpAllow: [], filtersOff: ['ops'] };
+
+  it('carries filtersOff only to a runner that advertises filterFamiliesOff', async () => {
+    expect(
+      await serviceWith(
+        { ...capabilities, tokenSaver: true, filterFamiliesOff: true },
+        settings,
+      ).launch('p1'),
+    ).toEqual({
+      args: {
+        tokenSaver: { enabled: true, mcpAllow: [], filtersOff: ['ops'] },
+      },
+      on: true,
+      techniques: null,
+    });
+    expect(
+      await serviceWith({ ...capabilities, tokenSaver: true }, settings).launch(
+        'p1',
+      ),
+    ).toEqual({
+      args: { tokenSaver: { enabled: true, mcpAllow: [] } },
+      on: true,
+      techniques: null,
+    });
+  });
+
+  it('sends no filtersOff when the list is empty or names no known family', async () => {
+    const capable = {
+      ...capabilities,
+      tokenSaver: true,
+      filterFamiliesOff: true,
+    };
+    for (const filtersOff of [[], ['gone']]) {
+      expect(
+        await serviceWith(capable, { ...settings, filtersOff }).launch('p1'),
+      ).toEqual({
+        args: { tokenSaver: { enabled: true, mcpAllow: [] } },
+        on: true,
+        techniques: null,
+      });
+    }
   });
 });

@@ -235,6 +235,12 @@ export const capabilitiesSchema = z.object({
    */
   tokenEconomy: z.boolean().optional(),
   /**
+   * C-442 D2: the runner takes `tokenSaver.filtersOff` on every launch and
+   * sets `NAUTELLE_FILTER_OFF` from it. Absent means `false` — the API then
+   * sends no `filtersOff`.
+   */
+  filterFamiliesOff: z.boolean().optional(),
+  /**
    * #447: the runner serves Steward — it reads `watchedProjectSchema.steward`,
    * sends `steward.observed` / `steward.acted`, and handles `session.nudge`,
    * `session.dismiss`, `card.resume` and — when `commands` lists it —
@@ -343,6 +349,12 @@ export const tokenSaverAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `tokenSaver.techniques` on `card.run`; absent is `false`. */
 export const tokenEconomyAvailable = (capabilities: Capabilities): boolean =>
   capabilities.tokenSaver === true && capabilities.tokenEconomy === true;
+
+/** Whether the API may send `tokenSaver.filtersOff` (C-442); absent is `false`. */
+export const filterFamiliesOffAvailable = (
+  capabilities: Capabilities,
+): boolean =>
+  capabilities.tokenSaver === true && capabilities.filterFamiliesOff === true;
 
 /** Whether the API may send Steward's commands (#447); absent is `false`. */
 export const stewardAvailable = (capabilities: Capabilities): boolean =>

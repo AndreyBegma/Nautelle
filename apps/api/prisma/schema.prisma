@@ -4495,6 +4495,8 @@ model TokenSaverSettings {
   mcpByType          Json     @default("{}")
   /// #751 B5: `{ [cardType]: skill[] }` hidden with `skillOverrides: "off"`.
   skillsOffByType    Json     @default("{}")
+  /// C-442: filter families a launch switches off (`NAUTELLE_FILTER_OFF`).
+  filtersOff         String[] @default([])
   updatedById        String?
   updatedAt          DateTime @updatedAt
 

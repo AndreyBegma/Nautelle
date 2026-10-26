@@ -2,13 +2,16 @@ import {
   CARD_TYPES,
   isActiveRoundPhase,
   mcpByTypeSchema,
+  type PatchTokenSaverSettingsBody,
   PREFIX_BUDGET_DEFAULT_TOKENS,
   type PrefixByType,
   prefixByTypeOf,
   skillsOffByTypeSchema,
   type TechniqueFlags,
   TOKEN_SAVER_DEFAULT,
+  TOKEN_SAVER_FILTER_FAMILIES,
   type TokenSaverConfig,
+  type TokenSaverFilterFamily,
   type TokenSaverPrefixSettings,
   type TokenSaverSettingsView,
   type UpdateTokenSaverSettingsBody,
@@ -16,11 +19,12 @@ import {
 import {
   type CardTokenSaver,
   capabilitiesSchema,
+  filterFamiliesOffAvailable,
   tokenEconomyAvailable,
   tokenSaverAvailable,
 } from '@nautelle/shared/protocol';
 import { BadRequestException, Injectable } from '@nestjs/common';
-import type { TokenSaverSettings } from '@prisma/client';
+import type { Prisma, TokenSaverSettings } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
@@ -76,9 +80,31 @@ const prunedByType = (
     ]),
   );
 
-const viewOf = (row: TokenSaverSettings | null): TokenSaverSettingsView => ({
+/**
+ * C-442: the families switched off, in `TOKEN_SAVER_FILTER_FAMILIES` order;
+ * a stored name no family has any more is left out.
+ */
+const filtersOffOf = (
+  row: TokenSaverSettings | null,
+): TokenSaverFilterFamily[] =>
+  TOKEN_SAVER_FILTER_FAMILIES.filter((family) =>
+    row?.filtersOff.includes(family),
+  );
+
+/** C-442 D2: whether the project's runner takes `filtersOff`. */
+const takesFiltersOff = (capabilities: unknown): boolean => {
+  const parsed = capabilitiesSchema.safeParse(capabilities);
+  return parsed.success && filterFamiliesOffAvailable(parsed.data);
+};
+
+const viewOf = (
+  row: TokenSaverSettings | null,
+  filtersOffSupported: boolean,
+): TokenSaverSettingsView => ({
   ...configOf(row),
   ...prefixOf(row),
+  filtersOff: filtersOffOf(row),
+  filtersOffSupported,
   updatedAt: row?.updatedAt.toISOString() ?? null,
 });
 
@@ -94,10 +120,36 @@ export class TokenSaverService {
   ) {}
 
   async view(projectId: string): Promise<TokenSaverSettingsView> {
-    const row = await this.prisma.tokenSaverSettings.findUnique({
-      where: { projectId },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        runner: { select: { capabilities: true } },
+        tokenSaverSettings: true,
+      },
     });
-    return viewOf(row);
+    if (!project) throw projectNotFound();
+    return viewOf(
+      project.tokenSaverSettings,
+      takesFiltersOff(project.runner.capabilities),
+    );
+  }
+
+  /**
+   * C-442 D4: the filter families alone — the Token saver page's switches
+   * leave the rest of the setting as it is. A project admin; audited.
+   */
+  async patch(
+    projectId: string,
+    body: PatchTokenSaverSettingsBody,
+    actor: { userId: string; ctx: AuditContext },
+  ): Promise<TokenSaverSettingsView> {
+    const before = await this.view(projectId);
+    return this.save(
+      projectId,
+      before,
+      { filtersOff: body.filtersOff, updatedById: actor.userId },
+      actor,
+    );
   }
 
   /**
@@ -136,24 +188,49 @@ export class TokenSaverService {
     if (skillsOffByType !== undefined) {
       await this.assertReportedSkills(projectId, skillsOffByType);
     }
-    const data = {
-      enabled: config.enabled,
-      mcpAllow: config.mcpAllow,
-      ...(config.prefixBudgetTokens !== undefined
-        ? { prefixBudgetTokens: config.prefixBudgetTokens }
-        : {}),
-      mcpByType,
-      ...(skillsOffByType !== undefined ? { skillsOffByType } : {}),
-      updatedById: actor.userId,
-    };
+    return this.save(
+      projectId,
+      before,
+      {
+        enabled: config.enabled,
+        mcpAllow: config.mcpAllow,
+        ...(config.prefixBudgetTokens !== undefined
+          ? { prefixBudgetTokens: config.prefixBudgetTokens }
+          : {}),
+        mcpByType,
+        ...(skillsOffByType !== undefined ? { skillsOffByType } : {}),
+        ...(config.filtersOff !== undefined
+          ? { filtersOff: config.filtersOff }
+          : {}),
+        updatedById: actor.userId,
+      },
+      actor,
+    );
+  }
+
+  /** Upserts the row and audits the setting before and after. */
+  private async save(
+    projectId: string,
+    before: TokenSaverSettingsView,
+    data: Omit<Prisma.TokenSaverSettingsUncheckedCreateInput, 'projectId'>,
+    actor: { userId: string; ctx: AuditContext },
+  ): Promise<TokenSaverSettingsView> {
     const row = await this.prisma.tokenSaverSettings.upsert({
       where: { projectId },
       create: { projectId, ...data },
       update: data,
     });
-    const after = viewOf(row);
-    const { updatedAt: _before, ...beforeSettings } = before;
-    const { updatedAt: _after, ...afterSettings } = after;
+    const after = viewOf(row, before.filtersOffSupported);
+    const {
+      updatedAt: _before,
+      filtersOffSupported: _beforeSupported,
+      ...beforeSettings
+    } = before;
+    const {
+      updatedAt: _after,
+      filtersOffSupported: _afterSupported,
+      ...afterSettings
+    } = after;
     await this.audit.record({
       ...actor.ctx,
       action: 'project.update',
@@ -215,6 +292,8 @@ export class TokenSaverService {
    * What the next launch of the project sends and records. #746: a card
    * launch passes its technique flags; they ride on `tokenSaver` only to a
    * runner that advertises `tokenEconomy` (the args schema is strict).
+   * C-442 D2: the switched-off filter families ride on it, when there are
+   * any, only to a runner that advertises `filterFamiliesOff`.
    */
   async launch(
     projectId: string,
@@ -234,7 +313,13 @@ export class TokenSaverService {
     if (!capabilities.success || !tokenSaverAvailable(capabilities.data)) {
       return TOKEN_SAVER_OFF;
     }
-    const tokenSaver = configOf(project.tokenSaverSettings);
+    const filtersOff = filtersOffOf(project.tokenSaverSettings);
+    const tokenSaver: TokenSaverConfig = {
+      ...configOf(project.tokenSaverSettings),
+      ...(filtersOff.length > 0 && filterFamiliesOffAvailable(capabilities.data)
+        ? { filtersOff }
+        : {}),
+    };
     if (techniques === undefined || !tokenEconomyAvailable(capabilities.data)) {
       return { args: { tokenSaver }, on: tokenSaver.enabled, techniques: null };
     }

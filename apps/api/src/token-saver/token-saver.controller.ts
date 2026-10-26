@@ -2,7 +2,15 @@ import type {
   TokenSaverSettingsView,
   TokenSaverSummary,
 } from '@nautelle/shared';
-import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuditCtx } from '../audit';
 import type { AuditContext } from '../audit/audit.types';
 import { type AuthUser, CurrentUser } from '../auth';
@@ -12,13 +20,18 @@ import {
   ProjectRole,
   type ResolvedProjectAccess,
 } from '../projects';
-import { TokenSaverSummaryQueryDto, UpdateTokenSaverSettingsDto } from './dto';
+import {
+  PatchTokenSaverSettingsDto,
+  TokenSaverSummaryQueryDto,
+  UpdateTokenSaverSettingsDto,
+} from './dto';
 import { TokenSaverService } from './token-saver.service';
 import { TokenSaverSummaryService } from './token-saver-summary.service';
 
 /**
  * Token saver (#445 "API"): members read the setting and the summary; a
- * project admin changes the setting. A project the caller cannot see is 404.
+ * project admin changes the setting (`PUT`, or `PATCH` for the filter
+ * families of C-442). A project the caller cannot see is 404.
  */
 @Controller('projects/:projectId/token-saver')
 @UseGuards(ProjectAccessGuard)
@@ -51,7 +64,24 @@ export class TokenSaverController {
         prefixBudgetTokens: dto.prefixBudgetTokens,
         mcpByType: dto.mcpByType,
         skillsOffByType: dto.skillsOffByType,
+        filtersOff: dto.filtersOff,
       },
+      { userId: user.id, ctx },
+    );
+  }
+
+  /** C-442 D4: the Token saver page's filter family switches, alone. */
+  @Patch()
+  @ProjectRole('admin')
+  patch(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Body() dto: PatchTokenSaverSettingsDto,
+  ): Promise<TokenSaverSettingsView> {
+    return this.settings.patch(
+      access.projectId,
+      { filtersOff: dto.filtersOff },
       { userId: user.id, ctx },
     );
   }

@@ -8,6 +8,7 @@ import { BoardWorld, ROOT_B } from '../board/testing/board-e2e';
 import { usageByRun } from '../history/run-usage';
 import type { LocalCall } from '../local/local-call';
 import { LocalHandlers } from '../local/local-handlers';
+import { capabilities } from '../runners/testing/runner-e2e';
 
 /** USD per input token of the test price: $3 / MTok. */
 const INPUT_PRICE = '0.000003';
@@ -99,6 +100,8 @@ describe('token saver (e2e)', () => {
         prefixBudgetTokens: 25_000,
         mcpByType: {},
         skillsOffByType: {},
+        filtersOff: [],
+        filtersOffSupported: false,
         updatedAt: null,
       });
     });
@@ -139,6 +142,121 @@ describe('token saver (e2e)', () => {
         other: 1,
       });
       expect(extra.status).toBe(400);
+    });
+  });
+
+  describe('filter families off (C-442)', () => {
+    /** The runner advertises the token saver and, optionally, the switch. */
+    const advertise = (filterFamiliesOff: boolean) =>
+      w.ctx.prisma.runner.update({
+        where: { id: w.runnerId },
+        data: {
+          capabilities: {
+            ...capabilities,
+            tokenSaver: true,
+            filterFamiliesOff,
+          },
+        },
+      });
+
+    it('a project admin switches a family off with PATCH; it is stored, returned and audited', async () => {
+      const saved = await w.admin.send('patch', settings(), {
+        filtersOff: ['ops'],
+      });
+      expect(saved.status).toBe(200);
+      expect(saved.body).toMatchObject({
+        enabled: true,
+        mcpAllow: [],
+        filtersOff: ['ops'],
+      });
+      expect((await w.viewer.get(settings())).body).toMatchObject({
+        filtersOff: ['ops'],
+      });
+      const [record] = await w.audit('project.update');
+      expect(record).toMatchObject({ projectId: w.a, result: 'ok' });
+    });
+
+    it('PATCH keeps the rest of the setting; PUT without filtersOff keeps the families', async () => {
+      await w.admin.send('put', settings(), {
+        enabled: false,
+        mcpAllow: ['playwright'],
+      });
+      await w.admin.send('patch', settings(), { filtersOff: ['ops', 'js'] });
+      expect((await w.viewer.get(settings())).body).toMatchObject({
+        enabled: false,
+        mcpAllow: ['playwright'],
+        filtersOff: ['js', 'ops'],
+      });
+      await w.admin.send('put', settings(), { enabled: true, mcpAllow: [] });
+      expect((await w.viewer.get(settings())).body).toMatchObject({
+        enabled: true,
+        filtersOff: ['js', 'ops'],
+      });
+    });
+
+    it('refuses an unknown or repeated family, and a body without the list', async () => {
+      for (const body of [
+        { filtersOff: ['nope'] },
+        { filtersOff: ['ops', 'ops'] },
+        { filtersOff: 'ops' },
+        {},
+        { filtersOff: [], enabled: false },
+      ]) {
+        const response = await w.admin.send('patch', settings(), body);
+        expect(response.status).toBe(400);
+      }
+      const put = await w.admin.send('put', settings(), {
+        enabled: true,
+        mcpAllow: [],
+        filtersOff: ['nope'],
+      });
+      expect(put.status).toBe(400);
+    });
+
+    it('a member without the admin role cannot switch one off', async () => {
+      const denied = await w.operator.send('patch', settings(), {
+        filtersOff: ['ops'],
+      });
+      expect(denied.status).toBe(403);
+      const outside = await w.operatorOfB.send('patch', settings(w.a), {
+        filtersOff: ['ops'],
+      });
+      expect(outside.status).toBe(404);
+      expect((await w.viewer.get(settings())).body).toMatchObject({
+        filtersOff: [],
+      });
+    });
+
+    it('says whether the project runner takes the switch', async () => {
+      await advertise(false);
+      expect((await w.viewer.get(settings())).body).toMatchObject({
+        filtersOffSupported: false,
+      });
+      await advertise(true);
+      expect((await w.viewer.get(settings())).body).toMatchObject({
+        filtersOffSupported: true,
+      });
+    });
+
+    it('a card launch carries filtersOff to a capable runner only', async () => {
+      await w.admin.send('patch', settings(), { filtersOff: ['ops'] });
+      await advertise(true);
+      await ranCard();
+      expect(w.sent('card.run')[0].tokenSaver).toEqual({
+        enabled: true,
+        mcpAllow: [],
+        filtersOff: ['ops'],
+      });
+    });
+
+    it('a runner without the capability gets the setting without filtersOff', async () => {
+      await w.admin.send('patch', settings(), { filtersOff: ['ops'] });
+      await advertise(false);
+      await ranCard();
+      expect(w.sent('card.run')[0].tokenSaver).toEqual({
+        enabled: true,
+        mcpAllow: [],
+      });
     });
   });
 
