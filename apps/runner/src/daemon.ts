@@ -30,6 +30,7 @@ import { TmuxServerGuard } from './control/tmux-server';
 import { createDemoHandlers, DemoflowProvisioner, DemoRecorder } from './demos';
 import {
   commandsCapability,
+  demoCapability,
   detectCapabilities,
   extractVersion,
   ptyAvailable,
@@ -240,7 +241,7 @@ export const runDaemon = async (
         gitAuth: { github },
         ...commandsCapability(handlers(), config.disabledCommands),
         policy: reportedPolicy(policy.current()),
-        cardDemo: !config.disabledCommands.includes('card.demo'),
+        ...demoCapability(config.disabledCommands),
         demoflow: demoflow.status(),
       };
     };

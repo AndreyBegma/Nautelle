@@ -50,6 +50,7 @@ describe('correlateCwd (D6)', () => {
       'skill-x',
       'uiprofile-x',
       'review-x',
+      'demo-x',
     ]) {
       expect(correlateCwd(`/srv/dev/.wt-app-${name}`, [APP])).toEqual({
         projectId: 'prj_app',

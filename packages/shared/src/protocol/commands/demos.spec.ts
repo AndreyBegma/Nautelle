@@ -44,6 +44,23 @@ describe('card.demo (ADR-0090)', () => {
         .success,
     ).toBe(false);
   });
+
+  it('takes a checkout of a PR head, a full commit id only (C-456)', () => {
+    const headSha = 'a'.repeat(40);
+    expect(
+      cardDemoArgsSchema.safeParse({ ...args, checkout: { pr: 12, headSha } })
+        .success,
+    ).toBe(true);
+    for (const checkout of [
+      { pr: 12, headSha: 'abc123' },
+      { pr: 0, headSha },
+      { pr: 12, headSha, branch: 'main' },
+    ]) {
+      expect(cardDemoArgsSchema.safeParse({ ...args, checkout }).success).toBe(
+        false,
+      );
+    }
+  });
 });
 
 describe('demo.status (ADR-0090)', () => {
