@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "name": "⌘K lists the Inbox once, to /inbox",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": { "next": "/projects/demo-project" }
+    }
+  ],
+  "steps": [
+    { "action": "marker", "title": "Open ⌘K and type inbox" },
+    { "action": "press", "key": "Control+k" },
+    {
+      "action": "assertVisible",
+      "target": { "text": "New card" },
+      "timeoutMs": 10000
+    },
+    { "action": "wait", "ms": 1500 },
+    {
+      "action": "fill",
+      "target": {
+        "placeholder": "Create, find a card (C-12, #41), go to a page — or ask the Board"
+      },
+      "value": "inbox"
+    },
+    { "action": "wait", "ms": 2500 },
+    { "action": "marker", "title": "One Inbox row, opening /inbox" },
+    { "action": "press", "key": "Enter" },
+    {
+      "action": "assertText",
+      "target": { "role": "heading", "name": "Inbox", "exact": true },
+      "text": "Inbox",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    { "action": "wait", "ms": 2000 }
+  ]
+}

@@ -71,8 +71,8 @@ hit (or any `C-12`/`#41` reference) adds its actions: Run (todo, finished),
 Accept (finished), Stop (in progress) and Open. Run goes straight to the API;
 Accept and Stop open the card on its Board with `?accept=1` / `?stop=1`, and the
 card's own confirmation dialog asks. Only operators see Run, Accept and Stop,
-and only for Board cards; a fleet or Inbox row can be opened. "Inbox" is a page
-row that points at `/work?status=inbox` until the Inbox page lands (C-390).
+and only for Board cards; a fleet or Inbox row can be opened. "Inbox" is the nav's
+own entry, to `/inbox`, listed once and only for roles that have it.
 Settings search is a stopgap too: typing "settings" lists one "<Project> ›
 Settings" row per project (the project pages the palette already offers), each
 opening that project's Settings page. Searching inside the settings blocks

@@ -12,7 +12,6 @@ import {
   Check,
   FilePlus2,
   FolderGit2,
-  Inbox,
   Lightbulb,
   LogOut,
   type LucideIcon,
@@ -69,9 +68,6 @@ export const QUICK_CARD_ACTION = 'action:quick-card';
 
 /** C-393: a palette row that runs a card from where the person is. */
 export const CARD_RUN_PREFIX = 'card:run:';
-
-/** C-393: the Inbox, until it has a page of its own. */
-export const INBOX_HREF = '/work?status=inbox';
 
 /** Cards listed for a lookup. */
 const CARDS_MAX = 6;
@@ -240,9 +236,6 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
           })),
       );
   const pages = sectionPages('workspace');
-  if (matches('inbox')) {
-    pages.unshift({ id: `go:${INBOX_HREF}`, label: 'Inbox', icon: Inbox });
-  }
   const admin = sectionPages('admin');
   if (matches('account')) {
     pages.push({ id: 'go:/account', label: 'Account', icon: User });
