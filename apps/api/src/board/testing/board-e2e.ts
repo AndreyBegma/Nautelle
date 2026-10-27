@@ -609,6 +609,17 @@ export class BoardWorld {
   }
 
   /**
+   * C-505: the runner advertises `cardReadOnly`; without a call it stores
+   * none, as a runner older than C-504.
+   */
+  async advertiseCardReadOnly(cardReadOnly = true): Promise<void> {
+    await this.ctx.prisma.runner.update({
+      where: { id: this.runnerId },
+      data: { capabilities: { ...capabilities, cardReadOnly } },
+    });
+  }
+
+  /**
    * #750: the project's `model-by-type` mode — `on` puts every card in the B
    * arm (class mapping, escalation), `off` in the A arm.
    */
