@@ -313,10 +313,31 @@ describe('paletteGroups: create, Inbox and card lookup (C-393)', () => {
     expect(labelsIn(groups, 'create')).toEqual([]);
   });
 
-  test('Inbox is a page to go to', () => {
+  test('Inbox is listed once, to /inbox, for an operator', () => {
+    const groups = paletteGroups(
+      input({
+        query: 'inbox',
+        role: 'operator',
+        sections: visibleNav('operator', '/'),
+      }),
+    );
+    const rows = groups
+      .flatMap((group) => group.items)
+      .filter((item) => item.label === 'Inbox');
+    expect(rows.map((row) => row.id)).toEqual(['go:/inbox']);
+  });
+
+  test('a viewer has no Inbox row', () => {
+    const groups = paletteGroups(
+      input({
+        query: 'inbox',
+        role: 'viewer',
+        sections: visibleNav('viewer', '/'),
+      }),
+    );
     expect(
-      labelsIn(paletteGroups(input({ query: 'inbox' })), 'pages'),
-    ).toContain('Inbox');
+      groups.flatMap((group) => group.items.map((i) => i.label)),
+    ).not.toContain('Inbox');
   });
 
   test('a card named by its label gets Run, Accept and Open before the lookup', () => {
