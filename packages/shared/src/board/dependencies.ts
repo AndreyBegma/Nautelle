@@ -72,8 +72,24 @@ export const openDependencies = <T extends Pick<CardDependencyRef, 'column'>>(
 ): T[] => dependencies.filter((d) => !isDependencySatisfied(d.column));
 
 /**
+ * C-417: the satisfied dependencies not landed in the base, once Run would
+ * be refused `dependencies_unmerged`: more than one of them (ADR-0065). Empty
+ * while any dependency is open, or when at most one is unmerged.
+ */
+export const unmergedDependencies = <
+  T extends Pick<CardDependencyRef, 'column' | 'landed'>,
+>(
+  dependencies: readonly T[],
+): T[] => {
+  if (openDependencies(dependencies).length > 0) return [];
+  const unmerged = dependencies.filter((d) => !d.landed);
+  return unmerged.length > 1 ? unmerged : [];
+};
+
+/**
  * #443: Ready / Waiting — only a card in To Do with at least one dependency
- * has it; ready once every dependency is satisfied (#638).
+ * has it; ready once every dependency is satisfied (#638). C-417: blocked
+ * when more than one satisfied dependency is not merged yet.
  */
 export const cardReadiness = (
   column: BoardColumn,
@@ -81,10 +97,13 @@ export const cardReadiness = (
 ): CardReadiness | null => {
   if (column !== 'todo' || dependencies.length === 0) return null;
   const open = openDependencies(dependencies);
+  const unmerged = unmergedDependencies(dependencies);
   return {
-    state: open.length === 0 ? 'ready' : 'waiting',
+    state:
+      open.length > 0 ? 'waiting' : unmerged.length > 0 ? 'blocked' : 'ready',
     satisfied: dependencies.length - open.length,
     total: dependencies.length,
     open,
+    unmerged,
   };
 };

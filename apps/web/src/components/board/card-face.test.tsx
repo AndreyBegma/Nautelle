@@ -343,3 +343,41 @@ describe('the selection slot (#596)', () => {
     expect(html).not.toContain('invisible');
   });
 });
+
+describe('CardFace label stripe (C-499)', () => {
+  const label = (name: string, hue: number) => ({
+    id: name,
+    name,
+    hue,
+    source: 'person' as const,
+  });
+  const segments = (html: string) => html.match(/data-label-segment=/g) ?? [];
+
+  test('a card with no labels has no stripe', () => {
+    const html = render('todo', { labels: [] });
+    expect(html).not.toContain('data-label-stripe');
+    expect(html).not.toContain('Labels:');
+  });
+
+  test('two labels draw two segments, aria-hidden, without names on the stripe', () => {
+    const html = render('todo', {
+      labels: [label('frontend', 1), label('backend', 3)],
+    });
+    expect(segments(html)).toHaveLength(2);
+    const stripe = html.slice(html.indexOf('data-label-stripe'));
+    expect(html).toContain('aria-hidden="true"');
+    expect(stripe.slice(0, stripe.indexOf('data-card-number'))).not.toContain(
+      '>frontend<',
+    );
+    expect(html).toContain('Labels: frontend, backend');
+  });
+
+  test('four labels draw the first three segments, and all four are named', () => {
+    const html = render('todo', {
+      labels: [label('a', 1), label('b', 2), label('c', 3), label('d', 4)],
+    });
+    expect(segments(html)).toHaveLength(3);
+    expect(html).not.toContain('data-label-segment="d"');
+    expect(html).toContain('Labels: a, b, c, d');
+  });
+});

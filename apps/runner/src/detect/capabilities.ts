@@ -271,6 +271,18 @@ export const commandsCapability = (
   };
 };
 
+/**
+ * ADR-0090 `cardDemo`, and C-456 `cardDemoCheckout` with it: the runner
+ * records demos — on a PR head too — unless the config switches `card.demo`
+ * off.
+ */
+export const demoCapability = (
+  disabledCommands: readonly string[],
+): { cardDemo: boolean; cardDemoCheckout: boolean } => {
+  const on = !disabledCommands.includes('card.demo');
+  return { cardDemo: on, cardDemoCheckout: on };
+};
+
 export interface DetectOptions {
   exec: Exec;
   home: string;

@@ -390,8 +390,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 25', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(25);
+  it('is version 26', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(26);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
@@ -851,6 +851,32 @@ describe('worker prompt v25 — off-camera sign-in, a recorded demo (C-410)', ()
 
   it('keeps the skip rule last', () => {
     expect(demo.trimEnd().endsWith('skip the scenario.')).toBe(true);
+  });
+});
+
+describe('worker prompt v26 — a followable demo (C-525)', () => {
+  const prompt = cardWorkerPrompt({
+    ...card,
+    design: null,
+    demo: {
+      scenarioPath: 'demoflow/cards/C-12-login.demo.json',
+      env: ['DEMO_LOGIN_EMAIL', 'DEMO_LOGIN_PASSWORD'],
+    },
+  });
+  const start = prompt.indexOf('## Demo video');
+  const demo = prompt.slice(start, prompt.indexOf('\n## ', start + 1));
+
+  it('asks for a marker per step, a caption and a final assertVisible', () => {
+    expect(demo).toContain('one `marker`');
+    expect(demo).toContain('a `caption`');
+    expect(demo).toContain('end `steps` with an `assertVisible`');
+    expect(demo).toContain('never navigate away after it');
+  });
+
+  it('asks for a wait after the result and a longer one at the end', () => {
+    expect(demo).toContain('{ "action": "wait", "ms": 1500 }');
+    expect(demo).toContain('{ "action": "wait", "ms": 3000 }');
+    expect(demo).toContain('Add no other `wait` steps');
   });
 });
 

@@ -181,7 +181,7 @@ describe('Telegram Board commands (e2e, #576)', () => {
       expect(labels(body)).toEqual(
         view.columns.map(
           (c) =>
-            `${{ inbox: 'Inbox', todo: 'To Do', in_progress: 'In progress', finished: 'Finished', completed: 'Completed' }[c.column]} · ${c.cards.length}`,
+            `${{ inbox: 'Suggestions', todo: 'To Do', in_progress: 'In progress', finished: 'Finished', completed: 'Completed' }[c.column]} · ${c.cards.length}`,
         ),
       );
       expect(labels(body)).toContain('To Do · 2');
@@ -189,7 +189,7 @@ describe('Telegram Board commands (e2e, #576)', () => {
 
     it('hides the Inbox from a viewer', async () => {
       const body = await say(VIEWER_CHAT, '/board');
-      expect(labels(body).join()).not.toMatch(/Inbox/);
+      expect(labels(body).join()).not.toMatch(/Suggestions/);
       expect(labels(body)).toContain('To Do · 0');
       expect((await say(VIEWER_CHAT, '/board inbox'))?.text).toBe(
         `widget · ${BOARD_REPLIES.noColumn}`,

@@ -20,6 +20,7 @@ import { ciDot, readinessLine } from '../../lib/board/shipping';
 import { githubUrl } from '../../lib/url';
 import { ApproveRunLink } from './card-design';
 import { FaceIcons, KindIcon } from './card-face-icons';
+import { LabelStripe, LabelsSrText } from './label-stripe';
 import {
   CursorMark,
   type FaceSelection,
@@ -39,7 +40,8 @@ const TEXT_LINK = `${TAP} text-xs text-accent-ink underline-offset-2 hover:under
  * dependency and demo icons, and the menu trigger at its end), the **title**,
  * the **status** (one state signal, below it the approve offer, detail lines
  * and the face's links) and the **footer** (the PR with its CI dot). That is
- * four signals at most; cost, Saved, Steward, the handoff, hooks, the round
+ * four signals at most (the label stripe on the left edge (C-499) is the card's
+ * edge, not a signal); cost, Saved, Steward, the handoff, hooks, the round
  * pill and the sub-states are in the card sheet (`CardSignals`).
  */
 export function CardFace({
@@ -72,6 +74,7 @@ export function CardFace({
   return (
     <SelectionFrame>
       {selection?.selected ? <SelectedTint /> : null}
+      <LabelStripe labels={card.labels} />
       {focused ? <CursorMark /> : null}
       <div
         data-card-number={card.number}
@@ -96,6 +99,7 @@ export function CardFace({
             />
           ) : null}
           <span className="shrink-0 font-mono">{card.label}</span>
+          <LabelsSrText labels={card.labels} />
           <KindIcon card={card} />
           <span className="ms-auto flex shrink-0 items-center gap-1.5">
             <FaceIcons card={card} />

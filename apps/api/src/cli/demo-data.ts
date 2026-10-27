@@ -93,6 +93,8 @@ export const DEMO_CARDS: ReadonlyArray<{
   needsPerson?: CardNeedsPersonReason;
   /** C-394: a design drawn and waiting for approval, with one frame. */
   design?: true;
+  /** C-417: the card runs after these cards, by number. */
+  dependsOn?: readonly number[];
 }> = [
   {
     title: 'Export the activity feed as CSV',
@@ -153,6 +155,14 @@ export const DEMO_CARDS: ReadonlyArray<{
     column: 'todo',
     kind: 'feature',
     design: true,
+  },
+  {
+    // C-417: both dependencies are Finished with an open PR, so Run is
+    // blocked until one of them is merged.
+    title: 'Gift cards on the order history page',
+    column: 'todo',
+    kind: 'feature',
+    dependsOn: [7, 8],
   },
 ];
 
@@ -307,6 +317,7 @@ export const seedDemo = async (
     | 'boardSettings'
     | 'repositoryPushCheck'
     | 'boardCard'
+    | 'boardCardDependency'
     | 'run'
     | 'boardCardRound'
     | 'agentSession'
@@ -420,6 +431,7 @@ export const seedDemo = async (
     create: { projectId: DEMO_PROJECT_ID, maxRunning: DEMO_MAX_RUNNING },
   });
 
+  const cardIds = new Map<number, string>();
   for (const [index, card] of DEMO_CARDS.entries()) {
     const number = index + 1;
     const created = await prisma.boardCard.upsert({
@@ -469,6 +481,7 @@ export const seedDemo = async (
           : { needsPerson: true, needsPersonReason: card.needsPerson }),
       },
     });
+    cardIds.set(number, created.id);
     if (card.design) {
       const runId = `demo-run-design-${number}`;
       const drawnAt = new Date(now.getTime() - 10 * 60_000);
@@ -745,5 +758,17 @@ export const seedDemo = async (
       createdAt: new Date(now.getTime() - 2 * 24 * 60 * 60_000),
     },
   });
+  for (const [index, card] of DEMO_CARDS.entries()) {
+    for (const dependsOn of card.dependsOn ?? []) {
+      const cardId = cardIds.get(index + 1);
+      const dependsOnId = cardIds.get(dependsOn);
+      if (!cardId || !dependsOnId) continue;
+      await prisma.boardCardDependency.upsert({
+        where: { cardId_dependsOnId: { cardId, dependsOnId } },
+        update: {},
+        create: { cardId, dependsOnId },
+      });
+    }
+  }
   return { projectId: DEMO_PROJECT_ID, cards: DEMO_CARDS.length };
 };

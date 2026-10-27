@@ -10,6 +10,7 @@ import type { CaptureHandlers } from '../capture';
 import {
   type CardHandlers,
   cardChecks,
+  cardHeadDelta,
   closeCardPr,
   mergeCard,
   openCardPr,
@@ -343,6 +344,13 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'card.reviewPublish': (args) =>
       context.cards
         ? publishCardReview(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
+    'card.headDelta': (args) =>
+      context.cards
+        ? cardHeadDelta(args, {
             exec: context.exec,
             watchedProjects: context.watchedProjects,
           })

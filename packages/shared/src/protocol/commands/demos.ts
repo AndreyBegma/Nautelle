@@ -7,6 +7,7 @@ import {
 } from '../../demos/contracts';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
+import { headShaSchema } from './approvals';
 import { cardIdSchema, cardShortIdSchema } from './cards';
 
 /**
@@ -47,6 +48,18 @@ export const cardDemoArgsSchema = z
       root: absolutePathSchema,
       shortId: cardShortIdSchema,
     }),
+    /**
+     * C-456: record on the PR's head instead of the card's worktree — the
+     * runner fetches `pull/<pr>/head` (then `headSha` itself), records in a
+     * detached `<parent>/.wt-<repo>-demo-<shortId>` and removes it after.
+     * Sent only to a runner that advertises `cardDemoCheckout`.
+     */
+    checkout: z
+      .strictObject({
+        pr: z.number().int().positive(),
+        headSha: headShaSchema,
+      })
+      .optional(),
     scenario: demoScenarioPathSchema,
     /** Names of the Demo env secrets to read from `runnerDemoEnvPath`. */
     env: z.array(demoSecretNameSchema).max(DEMO_SECRETS_MAX),

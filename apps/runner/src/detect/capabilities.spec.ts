@@ -5,6 +5,7 @@ import type { ConfigProfile } from '../config';
 import { fakeExec, tempDir } from '../testing/fixtures';
 import {
   commandsCapability,
+  demoCapability,
   detectCapabilities,
   ptyAvailable,
   readClaudeProfilesAgentdock,
@@ -94,6 +95,22 @@ describe('commands capability (#233)', () => {
 
   it('has no disabled commands when the config disables none', () => {
     expect(commandsCapability(handlers, []).disabledCommands).toEqual([]);
+  });
+});
+
+describe('demo capability (ADR-0090, C-456)', () => {
+  it('records demos, on a PR head too, while card.demo is enabled', () => {
+    expect(demoCapability([])).toEqual({
+      cardDemo: true,
+      cardDemoCheckout: true,
+    });
+  });
+
+  it('advertises neither when card.demo is disabled', () => {
+    expect(demoCapability(['card.demo'])).toEqual({
+      cardDemo: false,
+      cardDemoCheckout: false,
+    });
   });
 });
 

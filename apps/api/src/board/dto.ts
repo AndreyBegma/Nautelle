@@ -21,12 +21,16 @@ import {
   CARD_EFFORTS,
   CARD_FEEDBACK_MAX,
   CARD_MERGE_POLICIES,
+  CARD_PROPOSAL_TARGET_COLUMNS,
+  CARD_PROPOSALS_MAX,
   type CaptureModel,
   type CardEffort,
   type CardFeedbackRequest,
   type CardMergePolicy,
+  type CardProposalTargetColumn,
   type CreateBoardCardRequest,
   type CreateBoardStackRequest,
+  type CreateCardProposalsRequest,
   type CreateProjectLabelRequest,
   DESIGN_TEMPLATE_KEY_MAX,
   DESIGN_TEMPLATE_KEY_PATTERN,
@@ -575,4 +579,24 @@ export class AcceptSuggestionDto implements AcceptSuggestionRequest {
   @IsOptional()
   @IsIn(BOARD_CARD_KINDS)
   kind?: BoardCardKind;
+}
+
+/** `POST /board/cards/:number/proposals/create` (C-506). */
+export class CreateCardProposalsDto implements CreateCardProposalsRequest {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(CARD_PROPOSALS_MAX)
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(CARD_PROPOSALS_MAX - 1, { each: true })
+  positions!: number[];
+
+  @IsIn(CARD_PROPOSAL_TARGET_COLUMNS)
+  column!: CardProposalTargetColumn;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  roundId!: string;
 }

@@ -16,12 +16,14 @@ import { BoardBulk } from './board-bulk';
 import { BoardCommands } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
 import { BoardFixWaits } from './board-fix-waits';
+import { BoardHeadCarry } from './board-head-carry';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardLabelsController } from './board-labels.controller';
 import { BoardLabels, CardLabelSuggestRef } from './board-labels.service';
 import { BoardPathLabels } from './board-path-labels';
 import { BoardPlanCards } from './board-plan-cards';
 import { BoardPrincipals } from './board-principal';
+import { BoardProposals } from './board-proposals.service';
 import { BoardReview } from './board-review';
 import { BoardRoundsService } from './board-rounds.service';
 import { BoardRunQueue } from './board-run-queue';
@@ -76,10 +78,13 @@ import { PathLabelsRef } from './path-labels-ref';
     BoardDependencies,
     // C-418: fix rounds refused for room go before To Do when a slot frees.
     BoardFixWaits,
+    // C-457: whether a new PR head only merged the base into an earlier one.
+    BoardHeadCarry,
     BoardInboxService,
     // C-497: a project's card labels and the one way automation writes them.
     BoardLabels,
     BoardPlanCards,
+    BoardProposals,
     // C-181: whom an automatic round runs as.
     BoardPrincipals,
     // #884: review steps gate Finished on a card's green PR.

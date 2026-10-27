@@ -423,7 +423,7 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
           count === 1
             ? 'A card was suggested'
             : `${count} cards were suggested`,
-        body: 'Capture found follow-up work in a session; review it in the Inbox.',
+        body: 'Capture found follow-up work in a session; review it in Suggestions on the Board.',
         page: 'board',
       };
     }

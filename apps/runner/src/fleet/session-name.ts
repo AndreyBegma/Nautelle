@@ -52,9 +52,11 @@ export const slotWorktreePath = (root: string, slot: string): string => {
  * Worktrees the runner itself creates, never a slot's: skill runs and project
  * installs (spec 24) `-run-*` / `-skill-*`, plan turns (spec 172) `-plan-*`,
  * UI profile builds (spec 223) `-uiprofile-*`, board cards (#242 D14)
- * `-card-*`, card review steps (#884) `-review-*`.
+ * `-card-*`, card review steps (#884) `-review-*`, demo recordings on a PR
+ * head (C-456) `-demo-*`.
  */
-export const NON_SLOT_WORKTREE = /^(?:run|skill|card|plan|uiprofile|review)-/;
+export const NON_SLOT_WORKTREE =
+  /^(?:run|skill|card|plan|uiprofile|review|demo)-/;
 
 /** The slot of a worktree path that follows the rule for `root`, else null. */
 export const slotOfWorktree = (root: string, path: string): string | null => {

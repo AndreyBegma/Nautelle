@@ -163,6 +163,7 @@ describe('StackFace Run held by dependencies (#638)', () => {
     number,
     label: `C-${number}`,
     column,
+    landed: column === 'completed',
   });
   const approved = (stage: number) => ({ ...ref(stage), gate: null });
 
@@ -204,6 +205,16 @@ describe('StackFace Run held by dependencies (#638)', () => {
     expect(html).toContain('Run C-4: Waits for C-2');
     // C-2 has no dependency and stays runnable.
     expect(html).not.toContain('Run C-2:');
+  });
+
+  test('two Finished, unmerged dependencies show a disabled Run saying why (C-417)', () => {
+    const html = renderWith([
+      { ...dep(1, 'finished'), landed: false },
+      { ...dep(2, 'finished'), landed: false },
+    ]);
+    expect(html).toContain(
+      'Run C-4: C-1 and C-2 are not merged yet; a card branches from one dependency only',
+    );
   });
 
   test('every dependency Finished or Completed leaves Run enabled', () => {

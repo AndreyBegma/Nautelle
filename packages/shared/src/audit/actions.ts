@@ -229,6 +229,10 @@ export const AUDIT_ACTIONS = [
   'card.captured',
   'card.inbox_accepted',
   'card.dismissed',
+  /** C-506: Create selected made cards of an analysis card's proposals (`after: { number, created }`). */
+  'card.proposals_created',
+  /** C-506: Complete without cards dismissed the proposals of an analysis card. */
+  'card.proposals_dismissed',
   /**
    * #273 D16: Accept merged the card's PR (`after: { pr, method, mergeCommit?, issueClosed }`).
    * #359 D7: also the auto-merge, by the system actor.
