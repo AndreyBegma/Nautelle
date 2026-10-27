@@ -531,7 +531,7 @@ const ESCALATE_LINES = [
 ];
 
 /**
- * C-369 (ADR-0090 §2): the project records a demo of finished UI features, so
+ * C-369 (ADR-0090 §2): the project records a demo of every card that changes its UI, so
  * the worker writes the scenario through DemoFlow's MCP server and commits it.
  * Only secret names are listed — a value never reaches the worker. C-410: 7
  * of 12 card demos failed their first recording — strict-mode locators and
@@ -541,7 +541,7 @@ const ESCALATE_LINES = [
 const demoLines = (demo: CardWorkerDemo): string[] => [
   '## Demo video',
   '',
-  `This project records a demo of finished UI features. Before finishing, write a scenario that shows the feature in \`${demo.scenarioPath}\` (DemoFlow MCP validates it) and commit it with the change.`,
+  `This project records a demo of every card that changes its UI. Before finishing, write a scenario that shows the change in \`${demo.scenarioPath}\` (DemoFlow MCP validates it) and commit it with the change.`,
   "- Start the app from the repository's `demoflow.config.json`; the runner assigns the port when it records, so do not hard-code one in the scenario.",
   demo.env.length > 0
     ? `- Read secrets only via \`valueFrom.env\`, using these names: ${demo.env.map((name) => `\`${name}\``).join(', ')}. Never write a secret's value into the scenario.`

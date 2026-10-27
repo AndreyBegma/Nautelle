@@ -227,6 +227,25 @@ describe('demo videos of green cards (e2e, C-370)', () => {
       expect(w.sent('card.merge')).toHaveLength(1);
     });
 
+    it('records a demo of a bug card whose PR changes a UI path', async () => {
+      await enableDemos();
+      await finishedPending();
+      await w.ctx.prisma.boardCard.updateMany({ data: { kind: 'bug' } });
+      await polled();
+      expect(await demos()).toEqual([
+        expect.objectContaining({ headSha: HEAD_SHA, status: 'queued' }),
+      ]);
+    });
+
+    it('records nothing for a bug card whose PR changes no UI path', async () => {
+      await enableDemos();
+      w.handlers['pr.inspect'] = () => ok(prInspection({ files: API_FILES }));
+      await finishedPending();
+      await w.ctx.prisma.boardCard.updateMany({ data: { kind: 'bug' } });
+      await polled();
+      expect(await demos()).toEqual([]);
+    });
+
     it('records nothing with demo videos off', async () => {
       await finishedPending();
       await polled();
@@ -475,7 +494,6 @@ describe('demo videos of green cards (e2e, C-370)', () => {
     });
 
     it.each([
-      ['a bug card', 'only a feature card records one'],
       ['demo videos off', 'demo videos are off for the project'],
       [
         'a PR that changes no UI path',
@@ -489,9 +507,6 @@ describe('demo videos of green cards (e2e, C-370)', () => {
         w.handlers['pr.inspect'] = () => ok(prInspection({ files: API_FILES }));
       }
       await finishedPending();
-      if (what === 'a bug card') {
-        await w.ctx.prisma.boardCard.updateMany({ data: { kind: 'bug' } });
-      }
       await polled();
       await w.ctx.prisma.boardCard.updateMany({ data: { ciState: 'pending' } });
       await polled();
