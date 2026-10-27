@@ -122,6 +122,9 @@ Finished; ask what the person wants instead of re-filing it.
 | You propose it on your own | `candidate: true`: it goes to Suggestions for the person to accept. |
 
 Never create a card that duplicates one in `board_list`. `kind` only when obvious.
+`labels` (names, at most five) only when the person named them; an unknown name is
+refused with the project's labels. `board_list` and `board_card` return each
+card's labels with their source (`person`, `model` or `paths`).
 
 ## Stacks, designs and dependencies
 
