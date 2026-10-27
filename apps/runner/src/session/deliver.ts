@@ -48,6 +48,9 @@ export const deliverText = async (
   return 'not_at_input';
 };
 
+/** How Claude Code shows a long text folded in the box: `[Pasted text #1 +N lines]`. */
+const FOLDED_PASTE = '[Pasted text';
+
 /** C-433: a text is submitted at most this many times. */
 const MAX_SUBMITS = 2;
 
@@ -68,6 +71,8 @@ const leftInBox = async (
     const pane = await tmux.capture(session);
     if (pane === null) return null;
     const box = inputText(pane).replace(/\s+/g, ' ');
+    // A long text is folded into a marker: it is still in the box.
+    if (box.startsWith(FOLDED_PASTE)) continue;
     // The box may also show a placeholder: only the typed text's start counts.
     const length = Math.min(box.length, typed.length, 20);
     if (length === 0 || box.slice(0, length) !== typed.slice(0, length)) {

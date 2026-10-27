@@ -46,6 +46,26 @@ describe('deliverText (C-433)', () => {
     expect(calls).toEqual(['literal', 'submit', 'submit']);
   });
 
+  it('counts a folded paste marker as still in the box', async () => {
+    const long = 'a long message '.repeat(40);
+    const calls: string[] = [];
+    let submits = 0;
+    const tmux: DeliveryTmux = {
+      capture: async () =>
+        box(calls.includes('literal') ? '[Pasted text #1 +12 lines]' : ''),
+      sendLiteral: async () => {
+        calls.push('literal');
+      },
+      sendSubmit: async () => {
+        submits += 1;
+        calls.push('submit');
+      },
+      sendKey: async () => {},
+    };
+    expect(await deliverText(tmux, 's', long, {}, PACING)).toBe('not_at_input');
+    expect(submits).toBe(2);
+  });
+
   it('is not_at_input after two submits that leave the text', async () => {
     const { tmux, calls } = fakePane('hello there', 5);
     expect(await deliverText(tmux, 's', 'hello there', {}, PACING)).toBe(
