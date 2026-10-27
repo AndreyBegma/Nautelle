@@ -9,6 +9,19 @@
     }
   ],
   "steps": [
+    {
+      "action": "click",
+      "target": { "role": "link", "name": "Board", "exact": true },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "assertText",
+      "target": { "role": "heading", "name": "Board", "exact": true },
+      "text": "Board",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    { "action": "wait", "ms": 2000 },
     { "action": "marker", "title": "Open ⌘K and type inbox" },
     { "action": "press", "key": "Control+k" },
     {
