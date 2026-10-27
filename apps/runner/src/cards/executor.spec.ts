@@ -276,6 +276,38 @@ describe('a read-only round (C-504 D2.2, D2.3)', () => {
     expect(store.load('card_1')?.runId).toBe('run_2');
   });
 
+  it("refuses a read-only round over a writing round's uncommitted work: invalid_args, the work kept", async () => {
+    const { f, failure, run, store } = await readOnlyRound();
+    // A feature card's writing round, later turned into an analysis card.
+    await run({ readOnly: undefined });
+    const writing = store.load('card_1');
+    const worktree = writing?.worktree ?? '';
+    expect(writing?.readOnly).toBeUndefined();
+    f.write(worktree, { 'src/app.txt': 'half done\n', 'src/new.ts': 'x\n' });
+    const head = await f.run(worktree, 'rev-parse', 'HEAD');
+
+    expect(await failure(run({ runId: 'run_2' }))).toBe('invalid_args');
+    // Nothing moved or was thrown away, and no guard baseline was recorded.
+    expect(await f.run(worktree, 'rev-parse', 'HEAD')).toBe(head);
+    expect(await f.run(worktree, 'branch', '--show-current')).toBe(
+      'card/c12-why-is-it-slow',
+    );
+    expect(await f.run(worktree, 'status', '--porcelain')).toBe(
+      'M src/app.txt\n?? src/new.ts',
+    );
+    expect(store.load('card_1')?.readOnly).toBeUndefined();
+  });
+
+  it('a read-only round after a clean writing round detaches at origin/<base>', async () => {
+    const { f, run, store } = await readOnlyRound();
+    await run({ readOnly: undefined });
+    const worktree = store.load('card_1')?.worktree ?? '';
+    await run({ runId: 'run_2' });
+    const originMain = await f.run(f.root, 'rev-parse', 'origin/main');
+    expect(store.load('card_1')?.readOnly).toEqual({ start: originMain });
+    expect(await f.run(worktree, 'branch', '--show-current')).toBe('');
+  });
+
   it('D2.3: card.collect of the card is refused with invalid_args', async () => {
     const { f, failure, executor, run } = await readOnlyRound();
     await run();

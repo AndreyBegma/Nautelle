@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import type { LocalErrorCode } from '@nautelle/shared/protocol';
+import { CommandFailure } from '../commands/failure';
 import { gitOk, type SkillsDeps } from '../skills/deps';
 import { commitOf, fetchRef, type GitDeps } from './git';
 import type { CardRecord } from './record';
@@ -24,7 +25,9 @@ export const READ_ONLY_GUARD_MAX_REJECTIONS = 2;
  * D2.2: the card's worktree, detached at the updated `origin/<base>` — made
  * when it is missing, else moved there. `discard` (the last round was
  * read-only too, so nothing in it is the person's) throws away what that
- * round left; otherwise uncommitted changes are carried, or git refuses.
+ * round left. Otherwise the worktree is a writing round's: uncommitted work
+ * in it is the person's, so the round is refused with `invalid_args` rather
+ * than carried into the session, blamed on it and reset by the guard.
  */
 export const placeReadOnlyWorktree = async (
   deps: GitDeps,
@@ -52,6 +55,15 @@ export const placeReadOnlyWorktree = async (
     await resetReadOnlyWorktree(deps, worktree, start);
     return;
   }
+  const dirty = await statusPaths(deps, worktree);
+  if (dirty.length > 0) {
+    throw new CommandFailure(
+      'invalid_args',
+      `${worktree} has uncommitted changes from an earlier round ` +
+        `(${dirty.slice(0, 5).join(', ')}${dirty.length > 5 ? ', …' : ''}); ` +
+        'commit or discard them before a read-only round',
+    );
+  }
   await gitOk(deps.exec, [
     '-C',
     worktree,
@@ -72,17 +84,7 @@ export const readOnlyChanges = async (
   worktree: string,
   start: string,
 ): Promise<string[]> => {
-  const status = await gitOk(deps.exec, [
-    '-C',
-    worktree,
-    'status',
-    '--porcelain',
-    '--untracked-files=all',
-  ]);
-  const changes = status
-    .split('\n')
-    .filter((line) => line.trim() !== '')
-    .map((line) => line.slice(3));
+  const changes = await statusPaths(deps, worktree);
   const head = (
     await gitOk(deps.exec, ['-C', worktree, 'rev-parse', 'HEAD'])
   ).trim();
@@ -92,6 +94,24 @@ export const readOnlyChanges = async (
     );
   }
   return changes;
+};
+
+/** Every path `git status` names in `worktree`; ignored files do not count. */
+const statusPaths = async (
+  deps: Pick<SkillsDeps, 'exec'>,
+  worktree: string,
+): Promise<string[]> => {
+  const status = await gitOk(deps.exec, [
+    '-C',
+    worktree,
+    'status',
+    '--porcelain',
+    '--untracked-files=all',
+  ]);
+  return status
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => line.slice(3));
 };
 
 /**
