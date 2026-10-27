@@ -70,6 +70,8 @@ const harness = (
     /** What each `version` call prints; the last one repeats. */
     versions?: string[];
     installServiceCode?: number;
+    /** What the unit file reads after `install-service`. */
+    unitText?: string | null;
   } = {},
 ): Harness => {
   const {
@@ -83,6 +85,7 @@ const harness = (
     serviceActive = false,
     versions = ['0.15.0 linux-x64'],
     installServiceCode = 0,
+    unitText = 'ExecStart=/new/bin/nautelle-runner run',
     ...rest
   } = overrides;
   const stderr: string[] = [];
@@ -125,6 +128,7 @@ const harness = (
     },
     exec,
     exists: (path) => existing.includes(path),
+    readText: () => unitText,
     stderr: (text) => {
       stderr.push(text);
     },
@@ -646,6 +650,18 @@ describe('startUpdateCheck', () => {
 
   it('prints the full rewrite command when install-service fails', async () => {
     const h = harness({ serviceActive: true, installServiceCode: 1 });
+    h.deps.exists = (path) => path === h.deps.paths.serviceFile;
+    await run(h);
+    expect(h.stderr.join('')).toContain(
+      'nautelle-runner install-service && systemctl --user daemon-reload',
+    );
+  });
+
+  it('prints the full rewrite command when the unit still names the missing binary', async () => {
+    const h = harness({
+      serviceActive: true,
+      unitText: `ExecStart=${NPM_BINARY} run`,
+    });
     h.deps.exists = (path) => path === h.deps.paths.serviceFile;
     await run(h);
     expect(h.stderr.join('')).toContain(

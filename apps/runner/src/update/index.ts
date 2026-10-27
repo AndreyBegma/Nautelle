@@ -58,6 +58,8 @@ export interface UpdateDeps {
   install: (argv: readonly string[]) => Promise<number>;
   exec: Exec;
   exists: (path: string) => boolean;
+  /** A file's text, or null when it cannot be read. */
+  readText: (path: string) => string | null;
   stderr: (text: string) => void;
   paths: Pick<Paths, 'configDir' | 'serviceFile' | 'launchAgentFile'>;
   uid: number;
@@ -160,9 +162,18 @@ export const startUpdateCheck = (deps: UpdateDeps): UpdateCheck | null => {
     return false;
   };
 
-  /** Writes the unit again with the new binary; true when that worked. */
-  const rewriteUnit = async (): Promise<boolean> =>
-    (await deps.exec(PACKAGE_NAME, ['install-service']))?.code === 0;
+  /**
+   * Writes the unit again through the binary `installed()` verified (the old
+   * path is gone, so that is the one on the PATH); true when that exited 0 and
+   * the unit no longer names the missing binary.
+   */
+  const rewriteUnit = async (): Promise<boolean> => {
+    if ((await deps.exec(PACKAGE_NAME, ['install-service']))?.code !== 0) {
+      return false;
+    }
+    const text = deps.readText(unitFile);
+    return text !== null && !text.includes(binary);
+  };
 
   const restartNotice = async (version: string): Promise<void> => {
     let unit: UnitState = 'intact';
