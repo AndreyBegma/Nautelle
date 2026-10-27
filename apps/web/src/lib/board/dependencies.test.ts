@@ -12,7 +12,8 @@ import {
 const ref = (
   number: number,
   column: CardDependencyRef['column'],
-): CardDependencyRef => ({ number, label: `C-${number}`, column });
+  landed = column === 'completed',
+): CardDependencyRef => ({ number, label: `C-${number}`, column, landed });
 
 describe('card dependencies (#337 D8)', () => {
   test('the face says "after C-12", and warns while it is open', () => {
@@ -68,6 +69,19 @@ describe('card dependencies (#337 D8)', () => {
     ).toBe('Waits for C-13, C-14 and C-16');
   });
 
+  test('Run is held while two satisfied dependencies are not merged (C-417)', () => {
+    expect(runWaitsFor([ref(1, 'finished'), ref(2, 'finished')])).toBe(
+      'C-1 and C-2 are not merged yet; a card branches from one dependency only',
+    );
+    expect(runWaitsFor([ref(1, 'finished'), ref(2, 'completed')])).toBeNull();
+    expect(
+      runWaitsFor([ref(1, 'finished'), ref(2, 'finished', true)]),
+    ).toBeNull();
+    expect(runWaitsFor([ref(1, 'finished'), ref(3, 'todo')])).toBe(
+      'Waits for C-3',
+    );
+  });
+
   test('the add field takes 12 or C-12', () => {
     expect(parseCardNumber('12')).toBe(12);
     expect(parseCardNumber(' C-12 ')).toBe(12);
@@ -83,7 +97,13 @@ describe('readiness (#443)', () => {
     expect(readinessChip(null)).toBeNull();
     expect(readinessChip(undefined)).toBeNull();
     expect(
-      readinessChip({ state: 'ready', satisfied: 2, total: 2, open: [] }),
+      readinessChip({
+        state: 'ready',
+        satisfied: 2,
+        total: 2,
+        open: [],
+        unmerged: [],
+      }),
     ).toMatchObject({ text: 'Ready', tone: 'ok', waitsFor: null });
   });
 
@@ -93,6 +113,7 @@ describe('readiness (#443)', () => {
       satisfied: 1,
       total: 3,
       open: [ref(84, 'in_progress'), ref(86, 'todo')],
+      unmerged: [],
     });
     expect(chip).toEqual({
       text: 'Waiting · 1 of 3',
@@ -102,12 +123,33 @@ describe('readiness (#443)', () => {
     });
   });
 
+  test('Blocked names the unmerged ones (C-417)', () => {
+    const unmerged = [ref(1, 'finished'), ref(2, 'finished')];
+    const readiness = {
+      state: 'blocked' as const,
+      satisfied: 2,
+      total: 2,
+      open: [],
+      unmerged,
+    };
+    expect(readinessChip(readiness)).toEqual({
+      text: 'Blocked · merge one of C-1, C-2',
+      tone: 'warn',
+      title:
+        'C-1 and C-2 are not merged yet; a card branches from one dependency only.',
+      waitsFor:
+        'C-1 and C-2 are not merged yet; a card branches from one dependency only',
+    });
+    expect(autoRunNote(true, readiness)).toContain('Will not start');
+  });
+
   test('the Auto-run note says what will start the card', () => {
     const waiting = {
       state: 'waiting' as const,
       satisfied: 1,
       total: 2,
       open: [ref(84, 'in_progress')],
+      unmerged: [],
     };
     expect(autoRunNote(true, waiting)).toBe(
       'Will start automatically once C-84 has a ready pull request.',
@@ -116,7 +158,13 @@ describe('readiness (#443)', () => {
       'Nothing starts on its own. Press Run when you are ready.',
     );
     expect(
-      autoRunNote(true, { state: 'ready', satisfied: 2, total: 2, open: [] }),
+      autoRunNote(true, {
+        state: 'ready',
+        satisfied: 2,
+        total: 2,
+        open: [],
+        unmerged: [],
+      }),
     ).toContain('Press Run');
   });
 });

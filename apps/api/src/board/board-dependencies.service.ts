@@ -19,16 +19,24 @@ import { hiddenFrom } from './inbox-access';
 type Tx = Prisma.TransactionClient;
 
 const DEPENDS_ON = {
-  dependsOn: { select: { number: true, column: true, title: true } },
+  dependsOn: {
+    select: {
+      number: true,
+      column: true,
+      title: true,
+      prNumber: true,
+      prState: true,
+      mergedAt: true,
+      prBase: true,
+    },
+  },
 } as const;
 
-const refOf = (card: {
-  number: number;
-  column: BoardColumn;
-}): CardDependencyRef => ({
+const refOf = (card: LandedFacts & { number: number }): CardDependencyRef => ({
   number: card.number,
   label: cardLabel(card.number),
   column: card.column,
+  landed: landed(card),
 });
 
 const byNumber = (a: { number: number }, b: { number: number }) =>
@@ -56,12 +64,17 @@ const STACK_FACTS = {
   },
 } as const;
 
-type StackFacts = Prisma.BoardCardDependencyGetPayload<{
-  include: typeof STACK_FACTS;
-}>['dependsOn'];
+/** What `landed` reads of a dependency. */
+type LandedFacts = {
+  column: BoardColumn;
+  prNumber: number | null;
+  prState: string | null;
+  mergedAt: Date | null;
+  prBase: string | null;
+};
 
 /** #636: the dependency's PR is open (or draft), not merged nor closed. */
-const hasOpenPr = (dep: StackFacts): boolean =>
+const hasOpenPr = (dep: LandedFacts): boolean =>
   dep.prNumber !== null &&
   dep.mergedAt === null &&
   dep.prState !== 'merged' &&
@@ -72,7 +85,7 @@ const hasOpenPr = (dep: StackFacts): boolean =>
  * the base (not into a branch it was itself stacked on), or it was accepted
  * with no open PR left.
  */
-const landed = (dep: StackFacts): boolean =>
+const landed = (dep: LandedFacts): boolean =>
   dep.mergedAt !== null
     ? dep.prBase === null
     : dep.column === 'completed' && !hasOpenPr(dep);

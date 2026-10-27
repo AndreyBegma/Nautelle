@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "name": "The Board's capture column is called Suggestions",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/work"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Work filters captured cards by the Suggestions status, not Inbox"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "combobox",
+        "name": "Status",
+        "exact": true
+      },
+      "state": "visible",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "select",
+      "target": {
+        "role": "combobox",
+        "name": "Status",
+        "exact": true
+      },
+      "option": "Suggestions"
+    },
+    {
+      "action": "screenshot",
+      "name": "work-suggestions-filter"
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    }
+  ]
+}

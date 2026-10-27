@@ -42,6 +42,18 @@ both sit at the root of that origin.
   whose `type` is not in the tables below is rejected. Unknown *fields* are
   ignored, so a field can be added without breaking the other side.
 - Reconnect with exponential backoff (1 s → 60 s, jitter).
+- A silent socket is found on both ends (#1057). The server sends a WebSocket
+  ping every 20 s to each live runner socket and terminates one that left two
+  pings unanswered (the runner's client answers pings by itself), so the
+  runner goes `offline` without waiting for the OS. With `heartbeat_ack` in
+  `welcome.features` the server answers every `heartbeat` with `ack`; the
+  runner then closes a socket that received no frame for 45 s (three heartbeat
+  intervals) with `4000` `no frames` and reconnects. `4000` is not terminal.
+  An older API never advertises the feature, so its runners never arm the
+  watchdog.
+- Each end logs a closed socket with its lifetime and the time since the last
+  frame it received; the runner adds the time since its last send and whether
+  the socket was live.
 - Close codes the server uses (`RUNNER_CLOSE_CODES`):
 
 | Code | Meaning |
@@ -223,9 +235,15 @@ one.
     "projects": [{ "id": "prj_agentdock", "root": "/home/archi/dev/AgentDock" }],
     "pollIntervalsMs": { "tmux": 2000, "worktrees": 10000 }
   },
-  "ackedSeq": 18230
+  "ackedSeq": 18230,
+  "features": ["command_results_spooled", "heartbeat_ack"]
 }
 ```
+
+`features` lists the `SERVER_FEATURES` the API has; a runner reads its
+absence as an older API. `command_results_spooled`: command results arrive as
+spooled events (#740). `heartbeat_ack`: every `heartbeat` is answered with
+`ack` at the current cursor (#1057).
 
 `config.projects` is the runner's **watch list**: the projects whose roots it
 may refresh and whose collectors it runs, one instance per collector per
@@ -919,7 +937,7 @@ daemon relays their request. Schemas are in `local.ts`.
 | `board.list` | viewer | `column?` | the project's cards: number, title, kind, column, running, PR and CI state, `taken`/`queuedForSessionId`, plus `cardMergePolicy` (#845) |
 | `board.card` | viewer | `card` | one card: body, dependencies, rounds summary, PR, CI, pending question (#845) |
 | `board.wait` | viewer | `cursor?, cards?, holdSec ≤ 10` | events after the cursor (`column`, `round_ended`, `ci`, `pr_merged`, `question`) and the next cursor; the server holds ≤ `LOCAL_BOARD_WAIT_HOLD_MAX_SEC` (10 s, under the 15 s relay timeout) and the MCP tool `board_wait` loops it up to 300 s (ADR-0083) |
-| `card.create` | operator | `title, body?, kind?, candidate?` | a card in To Do, or a candidate in the Inbox (ADR-0058); manual sessions only (`not_a_manual_session`) |
+| `card.create` | operator | `title, body?, kind?, candidate?` | a card in To Do, or a candidate in Suggestions (ADR-0058); manual sessions only (`not_a_manual_session`) |
 | `card.run` | operator | `card, model?, effort?` | a Board Run; Board refusals (`LOCAL_BOARD_REFUSALS`) passed through verbatim; manual sessions only |
 | `card.move` | operator | `card, column, index?` | the move; `completed` is refused `completed_needs_person`; manual sessions only |
 | `card.feedback` | operator | `card, text` | a feedback round on a Finished card; manual sessions only |

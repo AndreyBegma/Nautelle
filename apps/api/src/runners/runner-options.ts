@@ -8,6 +8,8 @@ export interface RunnerOptions {
   pingTimeoutMs: number;
   /** A socket that has not authenticated and sent `hello` by then is closed. */
   helloTimeoutMs: number;
+  /** A live socket is pinged this often and ended after two missed pings (#1057 D4). */
+  pingIntervalMs: number;
 }
 
 export const RUNNER_OPTIONS = Symbol('RUNNER_OPTIONS');
@@ -16,4 +18,5 @@ export const defaultRunnerOptions: RunnerOptions = {
   staleAfterMs: RUNNER_STALE_AFTER_MS,
   pingTimeoutMs: 5_000,
   helloTimeoutMs: 30_000,
+  pingIntervalMs: 20_000,
 };

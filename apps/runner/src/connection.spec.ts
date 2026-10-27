@@ -237,6 +237,114 @@ describe('RunnerConnection', () => {
     expect(clock.pending()).toEqual([]);
   });
 
+  describe('a dead socket (#1057)', () => {
+    const disconnects = (lines: string[]) =>
+      lines
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+        .filter((line) => line.msg === 'disconnected');
+
+    /** A server whose welcome advertises `heartbeat_ack`, answering nothing else. */
+    const ackingServer = () => {
+      const s = server();
+      s.welcome = () => ({
+        ...welcome(0),
+        features: [SERVER_FEATURES.heartbeatAck],
+      });
+      return s;
+    };
+
+    it('D1: the disconnected line says how long it lived and since the last frame and send', async () => {
+      const s = server();
+      const { clock, connection, lines } = connect(s.origin);
+      await until(() => connection.isLive);
+      // t = 15 s: the first heartbeat is sent.
+      clock.advance(15_000);
+      await s.waitFor('heartbeat');
+      // t = 18 s: the server sends a frame.
+      clock.advance(3_000);
+      s.send({ type: 'ack', seq: 0 });
+      await Bun.sleep(50);
+      // t = 22 s: the server closes.
+      clock.advance(4_000);
+      s.close(1011, 'restart');
+      await until(() => disconnects(lines).length === 1);
+      expect(disconnects(lines)[0]).toMatchObject({
+        level: 'warn',
+        code: 1011,
+        reason: 'restart',
+        wasLive: true,
+        livedMs: 22_000,
+        sinceLastFrameMs: 4_000,
+        sinceLastSendMs: 7_000,
+      });
+    });
+
+    it('D1: a socket that never opened has no lifetime', async () => {
+      const s = server();
+      const port = Number(new URL(s.origin).port);
+      s.stop();
+      const { lines } = connect(`http://127.0.0.1:${port}`);
+      await until(() => disconnects(lines).length === 1);
+      expect(disconnects(lines)[0]).toMatchObject({
+        wasLive: false,
+        livedMs: null,
+        sinceLastFrameMs: null,
+        sinceLastSendMs: null,
+      });
+    });
+
+    it('D3: with heartbeat_ack, 45 s without a frame closes 4000 and reconnects', async () => {
+      const s = ackingServer();
+      const { clock, connection, lines } = connect(s.origin);
+      await until(() => connection.isLive);
+      clock.advance(44_999);
+      await Bun.sleep(50);
+      expect(connection.isLive).toBe(true);
+      expect(s.closes).toEqual([]);
+
+      clock.advance(1);
+      expect(connection.isLive).toBe(false);
+      expect(disconnects(lines)[0]).toMatchObject({
+        code: 4000,
+        reason: 'no frames',
+        wasLive: true,
+        sinceLastFrameMs: 45_000,
+      });
+      await until(() => s.closes.length === 1);
+      expect(s.closes).toEqual([{ code: 4000, reason: 'no frames' }]);
+      expect(clock.pending()).toEqual([1_000]);
+
+      clock.advance(1_000);
+      await until(() => connection.isLive);
+      expect(s.connections).toBe(2);
+    });
+
+    it('D3: any frame from the server pushes the deadline back', async () => {
+      const s = ackingServer();
+      const { clock, connection } = connect(s.origin);
+      await until(() => connection.isLive);
+      clock.advance(30_000);
+      s.send({ type: 'ack', seq: 0 });
+      await Bun.sleep(50);
+      clock.advance(44_999);
+      await Bun.sleep(50);
+      expect(connection.isLive).toBe(true);
+      clock.advance(1);
+      expect(connection.isLive).toBe(false);
+    });
+
+    it('D3: without heartbeat_ack the watchdog is never armed', async () => {
+      const s = server();
+      const { clock, connection } = connect(s.origin);
+      await until(() => connection.isLive);
+      clock.advance(10 * 60_000);
+      await Bun.sleep(50);
+      expect(connection.isLive).toBe(true);
+      expect(s.closes).toEqual([]);
+      expect(clock.pending()).toEqual([15_000]);
+    });
+  });
+
   describe('command results go through the spool (#740 D1)', () => {
     const spooledResults = (s: MockServer) =>
       s

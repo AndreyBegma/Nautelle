@@ -91,7 +91,7 @@ describe('decideDrop', () => {
       expect(decision.kind).toBe('refused');
       if (decision.kind === 'refused') {
         expect(decision.error).toBe('invalid_move');
-        expect(decision.text).toContain('Inbox');
+        expect(decision.text).toContain('Suggestions');
       }
     }
   });

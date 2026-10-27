@@ -64,7 +64,7 @@ export interface CardSourceRow {
 }
 
 const COLUMN: Record<BoardColumn, string> = {
-  inbox: 'Inbox',
+  inbox: 'Suggestions',
   todo: 'To do',
   in_progress: 'In progress',
   finished: 'Finished (waiting for a person to accept it)',

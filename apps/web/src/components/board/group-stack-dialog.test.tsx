@@ -66,7 +66,7 @@ describe('Group into stack', () => {
     expect(plan.joins.map((c) => c.number)).toEqual([211, 214, 219, 207]);
     expect(plan.left.map((l) => [l.card.label, l.why])).toEqual([
       ['C-140', 'it is already in S-3'],
-      ['C-241', 'it is a suggestion in Inbox'],
+      ['C-241', 'it is a suggestion'],
     ]);
     expect(plan.ready).toBe(true);
   });

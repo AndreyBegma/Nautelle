@@ -609,10 +609,17 @@ export class CardExecutor {
     });
   }
 
-  /** `card.close` (D10): never merges; unpushed work keeps its branch. */
+  /**
+   * `card.close` (D10): never merges; unpushed work keeps its branch. With
+   * `removeWorktree` the card's review session, worktree and record go too
+   * (#1049) — a review still open when the card ends would leave
+   * `.wt-<repo>-review-*` behind. They go even when the card has no record
+   * here any more.
+   */
   async close(args: CardCloseArgs): Promise<CardCloseResult> {
     this.ownedOrAbsent(args.cardId, args.projectId);
     return this.serial(args.cardId, async () => {
+      if (args.removeWorktree) await this.endReview(args);
       const record = this.store.load(args.cardId);
       if (!record) {
         return { stopped: false, worktreeRemoved: false, branchDeleted: false };
@@ -755,6 +762,25 @@ export class CardExecutor {
         cardReviewWorktreePath(project.root, args.shortId),
       );
       return { stopped: alive };
+    });
+  }
+
+  /**
+   * #1049: `stopReview`'s work for a card that is closing, from the review's
+   * own record (it names the session, the worktree and the root, so `close`
+   * needs no short id). A review of another project is left alone.
+   */
+  private async endReview(args: CardCloseArgs): Promise<void> {
+    await this.serial(reviewKey(args.cardId), async () => {
+      const review = this.reviews.load(args.cardId);
+      if (!review || review.projectId !== args.projectId) return;
+      await this.kill(review.tmuxSession);
+      this.reviews.remove(args.cardId);
+      await removeReviewWorktree(
+        this.options.deps,
+        review.root,
+        review.worktree,
+      );
     });
   }
 
