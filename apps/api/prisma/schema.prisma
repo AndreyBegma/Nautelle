@@ -3709,6 +3709,8 @@ model BoardCard {
   demos                CardDemo[]
   /// C-497 (ADR-0125): the card's labels, a person's and automation's.
   labels               BoardCardLabel[]
+  /// C-457: whether a newer PR head only merged the base into an earlier one.
+  headCarries          CardHeadCarry[]
   /// C-503 (ADR-0126): an analysis card's proposed cards, every round's.
   proposals            BoardCardProposal[]    @relation("BoardCardProposals")
   /// C-503: the proposal this card was created from.
@@ -4988,6 +4990,26 @@ model BoardCardReviewRun {
   @@unique([cardId, headSha, pass, stepId])
   @@index([state])
   @@map("board_card_review_runs")
+}
+
+/// C-457: the runner's answer to `card.headDelta` for one pair of a card's PR
+/// heads, so it is asked once per pair. Only an answer is stored: a runner
+/// that cannot tell is asked again.
+model CardHeadCarry {
+  id        String   @id @default(cuid())
+  cardId    String
+  fromSha   String
+  toSha     String
+  /// `toSha` only merges the base into `fromSha`, cleanly.
+  baseMerge Boolean
+  /// Why it is not one: not_a_merge, parent_mismatch, not_on_base, tree_differs, unknown_commit, git_too_old.
+  reason    String?
+  createdAt DateTime @default(now())
+
+  card BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, fromSha, toSha])
+  @@map("card_head_carries")
 }
 
 // ─── Demo videos (C-368, ADR-0090) ──────────────────────────────────────────
