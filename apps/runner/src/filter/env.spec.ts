@@ -1,19 +1,26 @@
 import { describe, expect, it } from 'bun:test';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   FILTER_ID_NONE,
+  FILTER_ID_NONE_OFF,
   TOKEN_ECONOMY_TECHNIQUES,
+  TOKEN_SAVER_FILTER_FAMILIES,
   TOKEN_SAVER_RAW_ENV,
   TOKEN_SAVER_RUN_KINDS,
 } from '@nautelle/shared';
-import { FILTER_NONE } from './engine';
+import { FILTER_NONE, FILTER_NONE_OFF } from './engine';
 import {
+  FILTER_OFF_ENV,
   FILTER_PROJECT_ENV,
   FILTER_RUN_ENV,
   FILTER_RUN_KIND_ENV,
   FILTER_STATS_ENV,
   filterEnv,
+  filtersOffEnv,
   orchestratorFilterDir,
   RAW_ENV,
+  switchedOffFamilies,
   TECHNIQUE_CACHE_TTL_1H,
   TECHNIQUE_GREP_CUT,
   TECHNIQUE_MCP_CUT,
@@ -31,6 +38,7 @@ describe('filter env (#445 amendment 5)', () => {
   it('mirrors the shared contract the hot path does not load', () => {
     expect(RAW_ENV).toBe(TOKEN_SAVER_RAW_ENV);
     expect(FILTER_NONE).toBe(FILTER_ID_NONE);
+    expect(FILTER_NONE_OFF).toBe(FILTER_ID_NONE_OFF);
     expect([...RUN_KINDS]).toEqual([...TOKEN_SAVER_RUN_KINDS]);
   });
 
@@ -147,5 +155,25 @@ describe('technique flags (#747 D4)', () => {
     expect([
       ...techniquesFrom({ [TECHNIQUES_ENV]: ' mcp-cut, ,grep-cut ' }),
     ]).toEqual(['mcp-cut', 'grep-cut']);
+  });
+});
+
+describe('filter families off (C-442 D1, D3)', () => {
+  it('lists the families/ directories and the Bash read refusal, `tool`', () => {
+    const dirs = readdirSync(join(import.meta.dir, 'families'), {
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+    const families: string[] = [...TOKEN_SAVER_FILTER_FAMILIES];
+    expect(families.sort()).toEqual([...dirs, 'tool'].sort());
+  });
+
+  it('sets NAUTELLE_FILTER_OFF only for a list, and reads back what it set', () => {
+    expect(filtersOffEnv(undefined)).toEqual({});
+    expect(filtersOffEnv([])).toEqual({});
+    const env = filtersOffEnv(['ops', 'tool']);
+    expect(env).toEqual({ [FILTER_OFF_ENV]: 'ops,tool' });
+    expect([...switchedOffFamilies(env)]).toEqual(['ops', 'tool']);
   });
 });

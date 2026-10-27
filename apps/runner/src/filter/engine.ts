@@ -24,6 +24,11 @@ export const FILTER_NONE = 'none';
 export const FILTER_NONE_COMPOUND = 'none:compound';
 export const FILTER_NONE_UNCOVERED = 'none:uncovered';
 export const FILTER_NONE_MODE = 'none:mode';
+/**
+ * C-442: a filter of a switched-off family would have covered the command.
+ * Mirrors `FILTER_ID_NONE_OFF`.
+ */
+export const FILTER_NONE_OFF = 'none:off';
 
 /** Output past this size is not filtered: it streams through unchanged. */
 export const FILTER_BUFFER_BYTES = RAW_CAP_BYTES;
@@ -31,6 +36,11 @@ export const FILTER_BUFFER_BYTES = RAW_CAP_BYTES;
 export interface FilterDeps {
   env: Readonly<Record<string, string | undefined>>;
   filters: readonly Filter[];
+  /**
+   * C-442: the filters of the families switched off, which never run; a
+   * command one of them covers is counted `none:off`.
+   */
+  switchedOff?: readonly Filter[];
   stdout: (bytes: Uint8Array | string) => void;
   stderr: (bytes: Uint8Array | string) => void;
   now: () => number;
@@ -246,7 +256,11 @@ export const runFilter = async (
   if (bypass || !filter || streaming || !raw) {
     for (const held of chunks.splice(0)) forward(held);
     counts = {
-      filter: filter?.id ?? FILTER_NONE_UNCOVERED,
+      filter:
+        filter?.id ??
+        (target && findFilter(deps.switchedOff ?? [], argv)
+          ? FILTER_NONE_OFF
+          : FILTER_NONE_UNCOVERED),
       program,
       rawBytes: total,
       keptBytes: total,

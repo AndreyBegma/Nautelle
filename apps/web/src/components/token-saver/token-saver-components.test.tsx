@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import type { TokenEconomyReport } from '@nautelle/shared';
+import type {
+  TokenEconomyReport,
+  TokenSaverSettingsView,
+} from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   armFixture,
@@ -16,6 +19,7 @@ import {
 } from './cost-per-round';
 import { DescriptionIncompleteBadge } from './description-incomplete-badge';
 import { FilterBreakdown } from './filter-breakdown';
+import { FilterFamilyList } from './filter-families-section';
 import { SavedBadge } from './saved-badge';
 import {
   PromptCacheTable,
@@ -411,5 +415,77 @@ describe('BShareForm (#746 D2)', () => {
     expect(html).toMatch(/readonly/i);
     expect(html).not.toContain('>Save<');
     expect(html).toContain('Only project administrators');
+  });
+});
+
+describe('FilterFamilyList (C-442)', () => {
+  const view = (
+    over: Partial<TokenSaverSettingsView>,
+  ): TokenSaverSettingsView => ({
+    enabled: true,
+    mcpAllow: [],
+    prefixBudgetTokens: 25_000,
+    mcpByType: {},
+    skillsOffByType: {},
+    filtersOff: [],
+    filtersOffSupported: true,
+    updatedAt: null,
+    ...over,
+  });
+  const summary = {
+    ...emptySummary('2026-10-01T00:00:00.000Z', '2026-11-01T00:00:00.000Z'),
+    byFilter: [
+      {
+        filter: 'ops/git-status',
+        estimateUsd: 0.5,
+        estimateTokens: 12_000,
+        commands: 7,
+        bypassed: 0,
+        passedThrough: 0,
+      },
+    ],
+  };
+  const render = (v: TokenSaverSettingsView, isAdmin = true) =>
+    renderToStaticMarkup(
+      <FilterFamilyList
+        view={v}
+        summary={summary}
+        isAdmin={isAdmin}
+        busy={null}
+        onToggle={() => {}}
+      />,
+    );
+  const checked = (html: string, family: string) =>
+    new RegExp(
+      `aria-checked="true"[^>]*aria-labelledby="filter-family-${family}"|aria-labelledby="filter-family-${family}"[^>]*aria-checked="true"`,
+    ).test(html);
+
+  test('one switch per family, on unless switched off, with what it saved', () => {
+    const html = render(view({ filtersOff: ['ops'] }));
+    for (const name of [
+      'JavaScript and TypeScript',
+      'Other languages',
+      'Git and operations',
+      'Whole-file reads through Bash',
+    ]) {
+      expect(html).toContain(name);
+    }
+    expect(checked(html, 'js')).toBe(true);
+    expect(checked(html, 'ops')).toBe(false);
+    expect(html).toContain('≈ 12k tokens saved');
+    expect(html).toContain('7 commands');
+    expect(html).toContain('Nothing filtered in this range');
+    expect(html).not.toContain('after the runner update');
+  });
+
+  test('a runner without the capability says the switch waits for its update', () => {
+    expect(render(view({ filtersOffSupported: false }))).toContain(
+      'takes effect after the runner update',
+    );
+  });
+
+  test('a member who is not an admin sees the switches locked', () => {
+    expect(render(view({}), false)).toContain('aria-disabled="true"');
+    expect(render(view({}), true)).not.toContain('aria-disabled="true"');
   });
 });

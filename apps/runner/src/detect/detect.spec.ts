@@ -159,6 +159,7 @@ describe('capability detection', () => {
       otlp: null,
       tokenSaver: true,
       tokenEconomy: true,
+      filterFamiliesOff: true,
       steward: true,
       handoff: true,
       sessionMessage: true,

@@ -7,6 +7,7 @@ import {
   capabilitiesSchema,
   commands,
   eventsMessageSchema,
+  filterFamiliesOffAvailable,
   localCardFinishArgsSchema,
   PROFILE_MCP_SERVERS_MAX,
   runtimeProfileSchema,
@@ -27,6 +28,7 @@ import {
   isUnfilteredId,
   runnerPredatesFilterReasons,
   TOKEN_SAVER_DEFAULT,
+  TOKEN_SAVER_FILTER_FAMILIES,
   TOKEN_SAVER_MCP_ALLOW_MAX,
   tokenSaverConfigSchema,
   UNFILTERED_FILTER_IDS,
@@ -73,6 +75,35 @@ describe('tokenSaverConfigSchema (#445 D6, D11)', () => {
     ];
     for (const value of bad) {
       expect(tokenSaverConfigSchema.safeParse(value).success).toBe(false);
+    }
+  });
+});
+
+describe('tokenSaverConfigSchema filtersOff (C-442 D2)', () => {
+  it('takes no list, an empty one or any families once each', () => {
+    for (const filtersOff of [
+      undefined,
+      [],
+      ['ops'],
+      [...TOKEN_SAVER_FILTER_FAMILIES],
+    ]) {
+      expect(
+        tokenSaverConfigSchema.safeParse({
+          ...TOKEN_SAVER_DEFAULT,
+          filtersOff,
+        }).success,
+      ).toBe(true);
+    }
+  });
+
+  it('rejects an unknown or repeated family', () => {
+    for (const filtersOff of [['nope'], ['ops', 'ops'], 'ops']) {
+      expect(
+        tokenSaverConfigSchema.safeParse({
+          ...TOKEN_SAVER_DEFAULT,
+          filtersOff,
+        }).success,
+      ).toBe(false);
     }
   });
 });
@@ -126,6 +157,17 @@ describe('tokenSaver capability (#445)', () => {
         capabilitiesSchema.parse({ ...base, tokenSaver: true }),
       ),
     ).toBe(true);
+  });
+
+  it('C-442: takes filtersOff only with the token saver and the switch', () => {
+    const takes = (over: object) =>
+      filterFamiliesOffAvailable(
+        capabilitiesSchema.parse({ ...base, ...over }),
+      );
+    expect(takes({})).toBe(false);
+    expect(takes({ tokenSaver: true })).toBe(false);
+    expect(takes({ filterFamiliesOff: true })).toBe(false);
+    expect(takes({ tokenSaver: true, filterFamiliesOff: true })).toBe(true);
   });
 });
 

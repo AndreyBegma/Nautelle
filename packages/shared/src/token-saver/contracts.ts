@@ -52,10 +52,37 @@ export const mcpServerNameSchema = z
   .regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/);
 
 /**
+ * C-442 D1 (#663 D9): the runner's filter families — the directories of
+ * `apps/runner/src/filter/families/` — plus `tool`, the Bash read refusal. A
+ * runner test pins the list to those directories.
+ */
+export const TOKEN_SAVER_FILTER_FAMILIES = [
+  'js',
+  'lang',
+  'ops',
+  'tool',
+] as const;
+export type TokenSaverFilterFamily =
+  (typeof TOKEN_SAVER_FILTER_FAMILIES)[number];
+export const tokenSaverFilterFamilySchema = z.enum(TOKEN_SAVER_FILTER_FAMILIES);
+
+/** C-442 D2: a set of families, without a duplicate. */
+export const filtersOffSchema = z
+  .array(tokenSaverFilterFamilySchema)
+  .max(TOKEN_SAVER_FILTER_FAMILIES.length)
+  .refine((families) => new Set(families).size === families.length, {
+    message: 'filtersOff has a duplicate',
+  });
+
+/**
  * The setting as the API stores it and sends it on every launch command
  * (D11, `tokenSaver` on the eight launch args). `mcpAllow` lists the servers
  * a launch loads besides `nautelle`; empty means `nautelle` only. With
  * `enabled: false` the runner launches exactly as before #445.
+ *
+ * C-442 D2: `filtersOff` names the filter families the launch switches off;
+ * the API sends it, non-empty, only to a runner that advertises
+ * `filterFamiliesOff` — the schema is strict, so an older one would refuse it.
  */
 export const tokenSaverConfigSchema = z.strictObject({
   enabled: z.boolean(),
@@ -65,6 +92,7 @@ export const tokenSaverConfigSchema = z.strictObject({
     .refine((names) => new Set(names).size === names.length, {
       message: 'mcpAllow has a duplicate',
     }),
+  filtersOff: filtersOffSchema.optional(),
 });
 export type TokenSaverConfig = z.infer<typeof tokenSaverConfigSchema>;
 
@@ -91,16 +119,28 @@ export interface TokenSaverPrefixSettings {
 export interface TokenSaverSettingsView
   extends TokenSaverConfig,
     TokenSaverPrefixSettings {
+  /** C-442: the families switched off, in `TOKEN_SAVER_FILTER_FAMILIES` order. */
+  filtersOff: TokenSaverFilterFamily[];
+  /**
+   * C-442: whether the project's runner advertises `filterFamiliesOff`; when
+   * it does not, a switched-off family takes effect after the runner update.
+   */
+  filtersOffSupported: boolean;
   /** `null` when the project has no row (the default applies). */
   updatedAt: string | null;
 }
 
 /**
  * `PUT /projects/:id/token-saver` (admin). #751: a prefix field left out
- * keeps its value.
+ * keeps its value; C-442: so does `filtersOff`.
  */
 export type UpdateTokenSaverSettingsBody = TokenSaverConfig &
   Partial<TokenSaverPrefixSettings>;
+
+/** C-442 D4: `PATCH /projects/:id/token-saver` (admin) — the families alone. */
+export interface PatchTokenSaverSettingsBody {
+  filtersOff: TokenSaverFilterFamily[];
+}
 
 // The runner event (D12)
 

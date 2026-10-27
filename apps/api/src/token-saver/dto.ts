@@ -1,7 +1,10 @@
 import {
+  type PatchTokenSaverSettingsBody,
   PREFIX_BUDGET_MAX_TOKENS,
   PREFIX_BUDGET_MIN_TOKENS,
+  TOKEN_SAVER_FILTER_FAMILIES,
   TOKEN_SAVER_MCP_ALLOW_MAX,
+  type TokenSaverFilterFamily,
   type UpdateTokenSaverSettingsBody,
 } from '@nautelle/shared';
 import { Transform } from 'class-transformer';
@@ -10,6 +13,7 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsISO8601,
   IsObject,
@@ -55,6 +59,29 @@ export class UpdateTokenSaverSettingsDto
   @IsOptional()
   @IsObject()
   skillsOffByType?: Partial<Record<string, string[]>>;
+
+  /** C-442: left out keeps its value. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(TOKEN_SAVER_FILTER_FAMILIES.length)
+  @ArrayUnique()
+  @IsIn(TOKEN_SAVER_FILTER_FAMILIES, {
+    each: true,
+    message: `each of filtersOff must be one of ${TOKEN_SAVER_FILTER_FAMILIES.join(', ')}`,
+  })
+  filtersOff?: TokenSaverFilterFamily[];
+}
+
+/** `PATCH /projects/:id/token-saver` (C-442 D4, project admin). */
+export class PatchTokenSaverSettingsDto implements PatchTokenSaverSettingsBody {
+  @IsArray()
+  @ArrayMaxSize(TOKEN_SAVER_FILTER_FAMILIES.length)
+  @ArrayUnique()
+  @IsIn(TOKEN_SAVER_FILTER_FAMILIES, {
+    each: true,
+    message: `each of filtersOff must be one of ${TOKEN_SAVER_FILTER_FAMILIES.join(', ')}`,
+  })
+  filtersOff!: TokenSaverFilterFamily[];
 }
 
 /** An ISO 8601 string as `…Z`; anything else is left for `IsISO8601` to refuse. */

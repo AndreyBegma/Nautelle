@@ -91,6 +91,11 @@ export const runFilterCommand = async (
     off.size === 0
       ? allFilters
       : allFilters.filter((filter) => !off.has(familyOf(filter.id)));
+  // C-442: kept aside, so a command they would have covered is counted `none:off`.
+  const switchedOff =
+    off.size === 0
+      ? []
+      : allFilters.filter((filter) => off.has(familyOf(filter.id)));
   if (command === 'read-hook' || command === 'tool-hook') {
     const run = command === 'read-hook' ? runReadHook : runToolHook;
     let output = '';
@@ -109,6 +114,7 @@ export const runFilterCommand = async (
       output = runFilterHook(await io.stdin(), {
         env: io.env,
         filters,
+        switchedOff,
         selfCommand: selfCommand(),
         home: homedir(),
         os: platform(),
@@ -125,6 +131,7 @@ export const runFilterCommand = async (
   const code = await runFilter(args, {
     env: io.env,
     filters,
+    switchedOff,
     stdout: io.stdout,
     stderr: io.stderr,
     now: Date.now,

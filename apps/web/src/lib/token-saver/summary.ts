@@ -5,12 +5,15 @@ import {
   FILTER_ID_NONE_MODE,
   FILTER_ID_NONE_OFF,
   FILTER_ID_NONE_UNCOVERED,
+  FILTER_ID_READ_REFUSED,
   isUnfilteredId,
   runnerPredatesFilterReasons,
+  TOKEN_SAVER_FILTER_FAMILIES,
   TOKEN_SAVER_UNFILTERED_PROGRAMS_MAX,
   type TokenSavedView,
   type TokenSaverBeforeAfter,
   type TokenSaverCostPerRound,
+  type TokenSaverFilterFamily,
   type TokenSaverFilterSavings,
   type TokenSaverPromptCache,
   type TokenSaverRunKind,
@@ -313,6 +316,42 @@ export const topFilters = (
     .slice()
     .sort(bySaved)
     .slice(0, limit);
+
+/** C-442: what one filter family saved in a range, summed over its filters. */
+export interface FamilySavings extends TokenSavedView {
+  family: TokenSaverFilterFamily;
+  commands: number;
+}
+
+/** Whether a `byFilter` row is what switching `family` off stops. */
+const ofFamily = (family: TokenSaverFilterFamily, filter: string): boolean =>
+  // `tool/*` also holds the techniques (mcp-cut, read-guard, …), switched on
+  // their own; the `tool` family is the Bash read refusal alone.
+  family === 'tool'
+    ? filter === FILTER_ID_READ_REFUSED
+    : filter.startsWith(`${family}/`);
+
+/**
+ * C-442: each family's share of `byFilter`, in `TOKEN_SAVER_FILTER_FAMILIES`
+ * order; a family without a row saved nothing. A filter id is `<family>/<name>`;
+ * the `none*` reasons belong to no family.
+ */
+export function familySavings(
+  filters: readonly TokenSaverFilterSavings[],
+): FamilySavings[] {
+  return TOKEN_SAVER_FILTER_FAMILIES.map((family) =>
+    filters
+      .filter((f) => ofFamily(family, f.filter))
+      .reduce<FamilySavings>(
+        (acc, f) => ({
+          ...sum(acc, f),
+          family,
+          commands: acc.commands + f.commands,
+        }),
+        { family, estimateUsd: 0, estimateTokens: 0, commands: 0 },
+      ),
+  );
+}
 
 /**
  * The dashboard's "filters that most often returned the original" (D13): by

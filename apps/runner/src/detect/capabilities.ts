@@ -333,6 +333,8 @@ export const detectCapabilities = async (
     tokenSaver: true,
     // #746: this runner takes `tokenSaver.techniques` on `card.run`.
     tokenEconomy: true,
+    // C-442: this runner takes `tokenSaver.filtersOff` and switches them off.
+    filterFamiliesOff: true,
     // #447: this runner observes for Steward and takes its commands.
     steward: true,
     // #449: this runner keeps handoff notes and takes `card.handoff.set`.

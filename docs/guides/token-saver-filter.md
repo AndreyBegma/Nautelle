@@ -237,6 +237,14 @@ stats reader.
 | `NAUTELLE_FILTER_RUN_KIND` | a `TokenSaverRunKind` |
 | `NAUTELLE_LAUNCH_SETTINGS` | the `--settings` file the launch passed |
 | `CS_ECO` | `off`: the code-sentinel plugin's eco hooks stand down (#616) |
+| `NAUTELLE_FILTER_OFF` | the filter families the project switched off, comma-separated (`js,ops`; `tool` is the Bash read refusal). Unset when none is off (C-442) |
+
+`NAUTELLE_FILTER_OFF` comes from the project's `filtersOff` setting, which the
+API sends in the launch's `tokenSaver` only to a runner that advertises
+`filterFamiliesOff`. A command that a switched-off family would have filtered
+runs as written and is counted `none:off`, as is a whole-file Bash read while
+`tool` is off. `TOKEN_SAVER_FILTER_FAMILIES` in `@nautelle/shared` lists the
+families, and `env.spec.ts` pins it to the `families/` directories plus `tool`.
 
 The orchestrator session has no run dir. It uses a directory of its own,
 `<state>/agentdock/orchestrator/<session>/`.

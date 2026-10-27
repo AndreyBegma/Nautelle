@@ -8,6 +8,7 @@ import {
   isRunnerMcpServer,
   type ProjectRuntimeProfile,
   type TokenSavedView,
+  type TokenSaverFilterFamily,
   type TokenSaverRunKind,
   type TokenSaverSessionKind,
   type TokenSaverUnmeasuredKind,
@@ -55,6 +56,32 @@ export const UNFILTERED_HINT: Record<string, string> = {
     'The session ran in a permission mode where the hook never rewrites (only bypass, auto and plan do).',
   [FILTER_ID_NONE_OFF]:
     'A filter family covers the program, but the launch switched that family off.',
+};
+
+/** C-442: a filter family as a person reads it, with what it covers. */
+export const FILTER_FAMILY_LABEL: Record<
+  TokenSaverFilterFamily,
+  { name: string; covers: string }
+> = {
+  js: {
+    name: 'JavaScript and TypeScript',
+    covers: 'Tests, type checks, linters, builds and package managers.',
+  },
+  lang: {
+    name: 'Other languages',
+    covers:
+      'Python, Go, Rust, JVM, .NET, Ruby and PHP tools; find, ls, tree and search.',
+  },
+  ops: {
+    name: 'Git and operations',
+    covers:
+      'Git, GitHub CLI, Docker, Kubernetes, Terraform, cloud CLIs, make and curl.',
+  },
+  tool: {
+    name: 'Whole-file reads through Bash',
+    covers:
+      'Refuses cat, head, tail and sed -n of a whole file in favour of Read.',
+  },
 };
 
 /** #663: what a session kind of cost per round is called on screen. */

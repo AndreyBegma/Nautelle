@@ -2,6 +2,7 @@ import {
   commandArgv,
   FILTER_NONE_COMPOUND,
   FILTER_NONE_MODE,
+  FILTER_NONE_OFF,
   FILTER_NONE_UNCOVERED,
   findFilter,
 } from './engine';
@@ -73,6 +74,11 @@ export interface HookOutput {
 export interface HookDeps {
   env: Readonly<Record<string, string | undefined>>;
   filters: readonly Filter[];
+  /**
+   * C-442: the filters of the families switched off; a line one of them
+   * would have covered is counted `none:off`.
+   */
+  switchedOff?: readonly Filter[];
   /** The argv that starts this runner; `filter -- …` is appended. */
   selfCommand: readonly string[];
   home: string;
@@ -141,7 +147,9 @@ export const decideHook = (
   const parsed = parseHookCommand(command);
   // #663 D8: a whole-file read through Bash goes through `Read`, in any mode.
   // An unparsed line is never refused (fail open); family `tool` switches it off.
-  if (isRefusedRead(parsed) && !switchedOffFamilies(deps.env).has('tool')) {
+  const refusedRead = isRefusedRead(parsed);
+  const toolOff = switchedOffFamilies(deps.env).has('tool');
+  if (refusedRead && !toolOff) {
     const program = programOfLine(command, parsed);
     return {
       refuse: {
@@ -171,15 +179,22 @@ export const decideHook = (
   // never.
   const rewrites =
     mode === 'bypassPermissions' || mode === 'auto' || mode === 'plan';
+  // C-442: a switched-off family (or `tool`) would have taken the line.
+  const switchedOff =
+    parsed !== null &&
+    ((refusedRead && toolOff) ||
+      coveredStages(parsed, deps.switchedOff ?? []).length > 0);
   // Amendment 12: a matched filter keeps its id; otherwise the row says why
   // none ran — the mode first, since in it nothing would ever be rewritten.
   const id =
     first?.id ??
     (!rewrites
       ? FILTER_NONE_MODE
-      : parsed
-        ? FILTER_NONE_UNCOVERED
-        : FILTER_NONE_COMPOUND);
+      : !parsed
+        ? FILTER_NONE_COMPOUND
+        : switchedOff
+          ? FILTER_NONE_OFF
+          : FILTER_NONE_UNCOVERED);
   const program = programOfLine(command, parsed);
   const leave = (reason: string): HookDecision => ({
     passThrough: reason,
