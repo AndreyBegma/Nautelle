@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "name": "Labels as a colour stripe, chips in the sheet and a Board label filter",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project/board"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "button",
+        "name": "Export the activity feed as CSV",
+        "exact": true
+      },
+      "timeoutMs": 60000
+    },
+    {
+      "action": "marker",
+      "title": "An operator labels a card in its sheet"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Export the activity feed as CSV",
+        "exact": true
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "tab",
+        "name": "Edit",
+        "exact": true
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Edit labels",
+        "exact": true
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "click",
+      "target": {
+        "placeholder": "Add a label"
+      }
+    },
+    {
+      "action": "fill",
+      "target": {
+        "placeholder": "Add a label"
+      },
+      "value": "frontend"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "fill",
+      "target": {
+        "placeholder": "Add a label"
+      },
+      "value": "docs"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Done",
+        "exact": true
+      }
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "list",
+        "name": "Labels"
+      }
+    },
+    {
+      "action": "screenshot",
+      "name": "labels-in-the-sheet",
+      "caption": "Labels are coloured chips in the card sheet"
+    },
+    {
+      "action": "press",
+      "key": "Escape"
+    },
+    {
+      "action": "marker",
+      "title": "The card shows its labels as a colour stripe, no names"
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "screenshot",
+      "name": "label-stripe-on-the-card",
+      "caption": "On the card face they are only a colour stripe, no names"
+    },
+    {
+      "action": "marker",
+      "title": "The Board filters by label, and the filter is in the URL"
+    },
+    {
+      "action": "select",
+      "target": {
+        "label": "Label",
+        "exact": true
+      },
+      "option": "frontend"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "screenshot",
+      "name": "board-filtered-by-label",
+      "caption": "The Board filter keeps cards with that label, and the choice lives in the URL"
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    }
+  ]
+}
