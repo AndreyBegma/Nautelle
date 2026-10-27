@@ -16,6 +16,8 @@ import {
  */
 export function useProductUpdate(admin: boolean): {
   release: ProductRelease | null;
+  /** The version this install runs. */
+  current: string | null;
   dismiss: () => void;
 } {
   const [view, setView] = useState<ProductUpdateView | null>(null);
@@ -44,5 +46,5 @@ export function useProductUpdate(admin: boolean): {
     setDismissed(version);
     storeDismissedProductRelease(version);
   }, [version]);
-  return { release, dismiss };
+  return { release, current: view?.current ?? null, dismiss };
 }

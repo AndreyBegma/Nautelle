@@ -1,9 +1,12 @@
 import {
+  APP_VERSION,
   cardAcceptArgsOf,
+  parseVersion,
   rememberableToolRules,
   toolUseCallOf,
   toolUseDanger,
 } from '@nautelle/shared';
+import { LATEST_RELEASE_SETTING_KEY } from '../updates/product-release.service';
 import {
   DEMO_AWAY_SESSION_ID,
   DEMO_CARD_ACCEPTS,
@@ -14,6 +17,7 @@ import {
   DEMO_TOOL_CALLS,
   DemoDataError,
   demoDatabaseUrl,
+  demoLatestRelease,
   isDemoDatabase,
   maintenanceUrl,
   seedDemo,
@@ -73,6 +77,7 @@ describe('seedDemo', () => {
     agentSession: { upsert: jest.fn() },
     actionRequest: { upsert: jest.fn() },
     toolUseRule: { upsert: jest.fn() },
+    setting: { upsert: jest.fn() },
     taskDesign: { upsert: jest.fn().mockResolvedValue({ id: 'd1' }) },
     planTurn: { upsert: jest.fn().mockResolvedValue({ id: 't1' }) },
     designRevision: { upsert: jest.fn().mockResolvedValue({ id: 'r1' }) },
@@ -115,6 +120,26 @@ describe('seedDemo', () => {
     again.projectLabel.count.mockResolvedValue(6);
     await seedDemo(again as never, 'demo@example.com');
     expect(again.projectLabel.createManyAndReturn).not.toHaveBeenCalled();
+  });
+
+  it('stores no update check by default, so no recording shows the banner', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    expect(db.setting.upsert).not.toHaveBeenCalled();
+  });
+
+  it('stores a fresh check that finds a release above the running version when asked (C-526)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com', { updateAvailable: true });
+    const call = db.setting.upsert.mock.calls[0][0];
+    expect(call.where).toEqual({ key: LATEST_RELEASE_SETTING_KEY });
+    const { checkedAt, latest } = call.create.value;
+    expect(Date.now() - Date.parse(checkedAt)).toBeLessThan(60_000);
+    expect(call.update.value).toEqual(call.create.value);
+    const ours = parseVersion(APP_VERSION);
+    const theirs = parseVersion(latest.version);
+    expect(theirs && ours && theirs.minor > ours.minor).toBe(true);
+    expect(demoLatestRelease('0.18.3').version).toBe('0.19.0');
   });
 
   it('seeds enough accounts for a second page of Admin › Users (C-483)', async () => {

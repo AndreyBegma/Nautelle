@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>4 · Dismissed until next release</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--font-sans:"SF Pro Text","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--focus-width:3px;--focus-offset:4px;--color-ok:#5fd3a0;--color-hue-1:#5b9cf6;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-ink:#7ee0c0;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255/.06);--glass-scrim:rgb(9 9 12/.55);--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-shadow:rgb(0 0 0/.35);--glass-shadow-clear:rgb(0 0 0/.15);--glass-blur:26px;--canvas-glow:18%;--radius-control:6px;--radius-surface:8px;--size-control:28px;--size-nav:28px}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-ok:#0a8156;--color-hue-1:#1f64d6;--color-hue-2:#00805e;--color-hue-2-ink:#006a4e;--color-hue-2-soft:color-mix(in oklab,#00805e 13%,transparent);--color-hue-7:#7244e0;--glass-sheen:rgb(255 255 255/.4);--glass-scrim:rgb(248 250 255/.62);--glass-edge:rgb(20 40 110/.12);--glass-spec:rgb(255 255 255/.7);--glass-shadow:rgb(20 40 110/.1);--glass-shadow-clear:rgb(20 40 110/.06)}
+*,*::before,*::after{box-sizing:border-box}html{background:var(--color-ground);color:var(--color-ink);font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}body{margin:0;min-height:100vh}h1,p{margin:0}
+:focus-visible{outline:var(--focus-width) solid var(--color-focus);outline-offset:var(--focus-offset)}svg{flex-shrink:0}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(var(--glass-blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.shell{display:flex;gap:12px;padding:12px;min-height:100vh}
+.rail{position:sticky;top:12px;height:calc(100vh - 24px);width:232px;flex-shrink:0;border-radius:var(--radius-surface);display:flex;flex-direction:column;gap:2px;padding:10px 8px}
+.rail__brand{display:flex;align-items:center;gap:8px;height:36px;padding:0 8px;margin-bottom:8px;font-weight:600;font-size:15px}
+.rail__group{font-size:12px;font-weight:500;color:var(--color-ink-3);padding:12px 10px 4px}
+.rail__item{display:flex;align-items:center;gap:10px;height:var(--size-nav);padding:0 10px;border-radius:var(--radius-control);color:var(--color-ink-2);text-decoration:none}
+.rail__item[aria-current='page']{background:var(--color-accent-soft);color:var(--color-ink);font-weight:500}
+.rail__item--primary{height:38px;border:1px solid color-mix(in oklab,var(--color-accent) 45%,transparent);color:var(--color-ink)}
+.rail__tile{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;background:var(--color-accent);color:var(--color-on-accent)}
+.swatch{display:inline-block;width:20px;height:20px;border-radius:5px;background:var(--color-accent)}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+.topbar{height:56px;border-radius:var(--radius-surface);display:flex;align-items:center;gap:12px;padding:0 12px 0 16px}
+.crumbs{display:flex;align-items:center;gap:6px;flex:1;min-width:0;color:var(--color-ink-2)}.crumbs [aria-current]{color:var(--color-ink);font-weight:600;font-size:15px}
+.live-dot{width:8px;height:8px;border-radius:999px;background:var(--color-ok)}
+.page{width:100%;max-width:80rem;margin:0 auto;padding:8px 4px 96px;display:flex;flex-direction:column;gap:24px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--size-control);padding:0 12px;border-radius:var(--radius-control);border:1px solid transparent;font:inherit;font-size:13px;font-weight:500;white-space:nowrap;cursor:pointer;color:var(--color-ink);background:none}
+.btn--solid{background:var(--color-accent);color:var(--color-on-accent)}
+.badge{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;background:var(--color-hover);color:var(--color-ink-2)}
+.badge--md{height:22px;padding:0 8px;font-size:12px}
+.status-pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;background:var(--color-hue-2-soft);color:var(--color-hue-2-ink);align-self:flex-start}.status-pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--color-hue-2)}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.page-header__eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em}
+.page-header__desc{color:var(--color-ink-2);margin-top:6px}
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.board__col{display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--radius-surface);background:color-mix(in oklab,var(--color-surface) 60%,transparent);border:1px solid var(--color-line)}
+.board__head{display:flex;justify-content:space-between;padding:2px 4px;font-size:12px;font-weight:500;color:var(--color-ink-2)}
+.board-card{padding:10px 12px;border-radius:var(--radius-surface);display:flex;flex-direction:column;gap:6px}
+.board-card__id{font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3)}.board-card__title{font-size:13px;font-weight:500}
+.capsule{display:none}
+@media (max-width:1023px){.rail{width:64px}.rail__label,.rail__group{display:none}}
+@media (max-width:639px){.rail{display:none}.shell{padding:8px 12px}.board{grid-template-columns:1fr}
+.capsule{display:flex;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);gap:4px;padding:4px;border-radius:999px}.capsule a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 14px;border-radius:999px;font-size:11px;color:var(--color-ink-2);text-decoration:none}.capsule a[aria-current]{background:var(--color-accent-soft);color:var(--color-ink)}}
+</style></head>
+<body><div class="canvas" aria-hidden="true"></div>
+<div class="shell">
+<nav class="rail glass" aria-label="Main"><div class="rail__brand"><span class="swatch"></span><span class="rail__label">Nautelle</span></div>
+<a class="rail__item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="rail__label">Workspace</span></a>
+<div class="rail__group">web-app</div>
+<a class="rail__item rail__item--primary" href="#" aria-current="page"><span class="rail__tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/></svg></span><span class="rail__label">Work</span></a>
+<a class="rail__item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg><span class="rail__label">Activity</span></a>
+<div class="rail__group">Admin</div>
+<a class="rail__item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg><span class="rail__label">Runners</span></a>
+</nav>
+<div class="main">
+<header class="topbar glass"><nav class="crumbs" aria-label="Breadcrumb"><span>web-app</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><span aria-current="page">Work</span></nav><span class="live-dot" title="Live"></span><span class="badge badge--md" style="width:28px;height:28px">AB</span></header>
+<main class="page">
+<header class="page-header"><div><span class="page-header__eyebrow">web-app</span><h1>Work</h1><p class="page-header__desc">Cards the fleet is working on, and what waits on you.</p></div><button type="button" class="btn btn--solid"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New</button></header>
+<div class="board">
+<div class="board__col"><div class="board__head"><span>To Do</span><span class="badge">2</span></div><article class="board-card surface-content"><span class="board-card__id">C-530</span><span class="board-card__title">Runner reconnect backoff</span></article><article class="board-card surface-content"><span class="board-card__id">C-531</span><span class="board-card__title">Budget CSV export</span></article></div>
+<div class="board__col"><div class="board__head"><span>In progress</span><span class="badge">1</span></div><article class="board-card surface-content"><span class="board-card__id">C-526</span><span class="board-card__title">Update banner: current → new version</span><span class="status-pill">Running</span></article></div>
+<div class="board__col"><div class="board__head"><span>Done</span><span class="badge">1</span></div><article class="board-card surface-content"><span class="board-card__id">C-410</span><span class="board-card__title">Release v0.18.0</span></article></div>
+</div>
+</main></div></div>
+<nav class="capsule glass" aria-label="Main"><a href="#" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/></svg>Work</a><a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/></svg>Fleet</a><a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</a></nav>
+</body></html>

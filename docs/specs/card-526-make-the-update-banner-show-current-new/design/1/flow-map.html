@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Flow map</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--font-sans:"SF Pro Text","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%;--radius-control:6px;--radius-surface:8px}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-accent:#4f46e5;--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--glass-shadow-clear:rgb(20 40 110/.06)}
+*,*::before,*::after{box-sizing:border-box}html{background:var(--color-ground);color:var(--color-ink);font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}body{margin:0;min-height:100vh}h1,h2,p{margin:0}
+.mono,code{font-family:var(--font-mono)}code{font-size:12px;padding:1px 5px;border-radius:4px;background:var(--color-hover)}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.badge{display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;background:var(--color-hover);color:var(--color-ink-2)}
+.badge--ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}.badge--danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}.badge--warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.wrap{max-width:1360px;margin:0 auto;padding:32px 24px 48px;display:flex;flex-direction:column;gap:24px}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+h2{font-size:16px;line-height:24px;font-weight:600}
+.desc{color:var(--color-ink-2);max-width:72ch;margin-top:6px}
+.row{display:flex;align-items:stretch;gap:10px}
+.step{flex:1 1 0;min-width:0;border-radius:var(--radius-surface);padding:12px;display:flex;flex-direction:column;gap:10px}
+.step__head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.step__n{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;background:var(--color-accent);color:var(--color-on-accent);font-size:11px;font-weight:600}
+.thumb{border-radius:6px;border:1px solid var(--color-line);background:var(--color-surface);padding:8px;display:flex;flex-direction:column;gap:6px;min-height:128px}
+.tb{border-radius:5px;padding:6px;border:1px solid color-mix(in oklab,var(--color-info) 30%,transparent);background:color-mix(in oklab,var(--color-info) 10%,transparent);display:flex;flex-direction:column;gap:5px}
+.ln{display:block;height:6px;border-radius:3px;background:var(--color-line-strong)}
+.pair{display:flex;align-items:center;gap:4px}.pd{width:26px;height:8px;border-radius:999px}
+.code{height:14px;border-radius:3px;background:color-mix(in oklab,var(--color-ink) 12%,transparent);position:relative}
+.code i{position:absolute;right:2px;top:2px;width:12px;height:10px;border-radius:2px;background:var(--color-line-strong)}.code.ok i{background:var(--color-ok)}
+.warnln{background:color-mix(in oklab,var(--color-warn) 50%,transparent)}
+.arrow{display:flex;align-items:center;color:var(--color-ink-3)}
+.cap{font-size:12px;line-height:18px;color:var(--color-ink-2)}
+.branches{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.br{border-radius:var(--radius-surface);padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.br__h{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.br p{font-size:12px;line-height:18px;color:var(--color-ink-2)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--color-ink-2)}
+@media (max-width:1023px){.branches{grid-template-columns:1fr 1fr}}
+@media (max-width:700px){.wrap{padding:20px 16px 32px}.row{flex-direction:column}.arrow{justify-content:center;height:20px}.arrow svg{transform:rotate(90deg)}.branches{grid-template-columns:1fr}}
+</style></head>
+<body><div class="canvas" aria-hidden="true"></div>
+<main class="wrap">
+<header><span class="eyebrow">C-526 · Flow map</span><h1>From “an update exists” to “the command is on the clipboard”</h1><p class="desc">An admin sees how far behind the install is, opens How to update and copies a command to run on the server. The web app never runs the upgrade.</p></header>
+
+<section class="row" aria-label="Main path">
+<article class="step surface-content"><div class="step__head"><span class="step__n">1</span>Banner appears</div>
+<div class="thumb" aria-hidden="true"><div class="tb"><div class="pair"><span class="ln" style="width:56px"></span><span class="pd" style="background:var(--color-danger)"></span><span style="font-size:9px">→</span><span class="pd" style="background:var(--color-ok)"></span></div><span class="ln" style="width:60%"></span></div><span class="ln" style="width:40%;height:10px"></span><span class="ln" style="width:90%"></span><span class="ln" style="width:75%"></span></div>
+<p class="cap"><code>GET /admin/updates</code> reports an update: running <span class="badge badge--danger mono">0.17.1</span> → <span class="badge badge--ok mono">0.18.0</span></p></article>
+<div class="arrow" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+<article class="step surface-content"><div class="step__head"><span class="step__n">2</span>How to update open</div>
+<div class="thumb" aria-hidden="true"><div class="tb"><div class="pair"><span class="ln" style="width:56px"></span><span class="pd" style="background:var(--color-danger)"></span><span style="font-size:9px">→</span><span class="pd" style="background:var(--color-ok)"></span></div><span class="ln warnln" style="width:55%"></span><div class="code"><i></i></div><div class="code"><i></i></div><div class="code"><i></i></div></div></div>
+<p class="cap">Backup first, then three ways: Compose, install.sh, a pinned version</p></article>
+<div class="arrow" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+<article class="step surface-content"><div class="step__head"><span class="step__n">3</span>Command copied</div>
+<div class="thumb" aria-hidden="true"><div class="tb"><div class="pair"><span class="ln" style="width:56px"></span><span class="pd" style="background:var(--color-danger)"></span><span style="font-size:9px">→</span><span class="pd" style="background:var(--color-ok)"></span></div><span class="ln warnln" style="width:55%"></span><div class="code ok"><i></i></div><div class="code"><i></i></div><div class="code"><i></i></div></div></div>
+<p class="cap">The button reads <span class="badge badge--ok">✓ Copied</span> for 2 s and screen readers announce it. The demo ends here.</p></article>
+<div class="arrow" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+<article class="step surface-content"><div class="step__head"><span class="step__n">4</span>Dismissed</div>
+<div class="thumb" aria-hidden="true"><span class="ln" style="width:40%;height:10px"></span><span class="ln" style="width:90%"></span><span class="ln" style="width:75%"></span><span class="ln" style="width:85%"></span></div>
+<p class="cap">✕ hides the banner in this browser until a newer release, as it does today</p></article>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:10px"><h2>Branches</h2>
+<div class="branches">
+<div class="br surface-content"><div class="br__h"><span class="badge">back</span>Collapse</div><p>“How to update” toggles. Closing it returns to step 1 without moving the banner.</p></div>
+<div class="br surface-content"><div class="br__h"><span class="badge">skip</span>Dismiss from any step</div><p>✕ goes to step 4 from step 1, 2 or 3.</p></div>
+<div class="br surface-content"><div class="br__h"><span class="badge badge--danger">error</span>Clipboard blocked</div><p>On plain HTTP, or when permission is denied, the button reads “Select to copy” and selects the command text. Nothing is lost.</p></div>
+<div class="br surface-content"><div class="br__h"><span class="badge">skip</span>No banner at all</div><p>No banner when the install is up to date, the check is off, no answer has come back yet, the viewer is not an admin, or this release was dismissed.</p></div>
+<div class="br surface-content"><div class="br__h"><span class="badge badge--ok">loop</span>Next release</div><p>A version newer than the dismissed one starts the flow again at step 1.</p></div>
+<div class="br surface-content"><div class="br__h"><span class="badge badge--warn">out</span>Links leave the app</div><p>The release notes, the docs Upgrade page and the Backup page open in a new tab.</p></div>
+</div></section>
+<p class="legend"><span><span class="badge badge--danger">red</span> running version</span><span><span class="badge badge--ok">green</span> latest version</span></p>
+</main></body></html>

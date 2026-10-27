@@ -1,11 +1,14 @@
 import {
+  APP_VERSION,
   type CardNeedsPersonReason,
   captureFingerprint,
+  parseVersion,
 } from '@nautelle/shared';
 import type { BoardColumn, CardEffort, PrismaClient } from '@prisma/client';
 import { hashPassword } from '../auth/password';
 import { generateToken } from '../auth/tokens';
 import { writeStarterLabels } from '../board/starter-labels';
+import { LATEST_RELEASE_SETTING_KEY } from '../updates/product-release.service';
 
 /**
  * The database a demo recording runs on (C-383, ADR-0090): `agentdock_demo`,
@@ -38,6 +41,22 @@ export const maintenanceUrl = (url: string): string => {
 };
 
 export const DEMO_RUNNER_ID = 'demo-runner';
+
+/**
+ * C-526: a release one minor above the running version, so the update banner
+ * shows in a recording without asking GitHub. Falls back to `99.0.0` if the
+ * running version does not parse.
+ */
+export const demoLatestRelease = (
+  current: string = APP_VERSION,
+): { version: string; url: string } => {
+  const parsed = parseVersion(current);
+  const version = parsed ? `${parsed.major}.${parsed.minor + 1}.0` : '99.0.0';
+  return {
+    version,
+    url: `https://github.com/AndreyBegma/Nautelle/releases/tag/v${version}`,
+  };
+};
 export const DEMO_PROJECT_ID = 'demo-project';
 
 /**
@@ -274,6 +293,16 @@ export const DEMO_EXTRA_USERS: ReadonlyArray<{
   },
 ];
 
+/** What a recording asks of the seed beyond the demo project. */
+export interface SeedDemoOptions {
+  /**
+   * C-526: store a fresh update check that finds a newer release, so the
+   * update banner shows. Off by default: every other recording opens without
+   * the banner.
+   */
+  updateAvailable?: boolean;
+}
+
 /**
  * Seeds the demo project and its cards for the admin `adminEmail`, who must
  * exist (`bun run admin:create`). Every row has a fixed key, so running it
@@ -301,8 +330,10 @@ export const seedDemo = async (
     | 'designFrame'
     | 'projectLabel'
     | 'projectLabelPathRule'
+    | 'setting'
   >,
   adminEmail: string,
+  options: SeedDemoOptions = {},
 ): Promise<{ projectId: string; cards: number }> => {
   const email = adminEmail.trim().toLowerCase();
   const admin = await prisma.user.findUnique({ where: { email } });
@@ -697,6 +728,19 @@ export const seedDemo = async (
             }
           : {}),
       },
+    });
+  }
+  if (options.updateAvailable) {
+    // C-526: the stored daily check, fresh and with a newer release, so the
+    // update banner shows and the service does not ask GitHub.
+    const lastCheck = {
+      checkedAt: now.toISOString(),
+      latest: demoLatestRelease(),
+    };
+    await prisma.setting.upsert({
+      where: { key: LATEST_RELEASE_SETTING_KEY },
+      update: { value: lastCheck },
+      create: { key: LATEST_RELEASE_SETTING_KEY, value: lastCheck },
     });
   }
   await prisma.toolUseRule.upsert({

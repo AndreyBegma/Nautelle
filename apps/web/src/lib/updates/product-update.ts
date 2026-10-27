@@ -13,6 +13,21 @@ export const DISMISSED_PRODUCT_RELEASE_KEY = 'nautelle.productUpdate.dismissed';
 /** How to upgrade an install (the docs site). */
 export const UPGRADE_GUIDE_URL = docsUrl('/operations/upgrade/');
 
+/** Taking a backup before an upgrade (the docs site). */
+export const BACKUP_GUIDE_URL = docsUrl('/operations/backup/');
+
+/** The usual upgrade, run in the `nautelle` directory on the server. */
+export const COMPOSE_UPGRADE_COMMAND =
+  'docker compose pull\ndocker compose up -d';
+
+/** Re-running the installer: it keeps `.env` and every password. */
+export const INSTALL_SCRIPT_COMMAND =
+  'curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/compose/install.sh | sh';
+
+/** The line an install pinned to a release sets in `nautelle/.env`. */
+export const pinnedVersionLine = (latest: ProductRelease): string =>
+  `NAUTELLE_VERSION=${latest.version}`;
+
 /** `Nautelle 0.16.0 is available` — the banner's title. */
 export const productUpdateTitle = (latest: ProductRelease): string =>
   `Nautelle ${latest.version} is available`;

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Breakdown</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--font-sans:"SF Pro Text","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-accent:#5b5bf6;--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%;--radius-control:6px;--radius-surface:8px}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-accent:#4f46e5;--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--glass-shadow-clear:rgb(20 40 110/.06)}
+*,*::before,*::after{box-sizing:border-box}html{background:var(--color-ground);color:var(--color-ink);font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}body{margin:0}h1,h2,p,ul{margin:0}
+code,.mono{font-family:var(--font-mono)}code{font-size:12px;padding:1px 5px;border-radius:4px;background:var(--color-hover)}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.wrap{max-width:1280px;margin:0 auto;padding:32px 24px 48px;display:flex;flex-direction:column;gap:28px}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+.desc{color:var(--color-ink-2);margin-top:6px;max-width:72ch}
+.section{display:flex;flex-direction:column;gap:12px}
+.section__title{font-size:16px;line-height:24px;font-weight:600}.section__desc{font-size:13px;color:var(--color-ink-2)}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.comp{border-radius:var(--radius-surface);padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.comp__h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:600}
+.comp p,.comp li{font-size:13px;line-height:20px;color:var(--color-ink-2)}
+.comp ul{padding-left:18px}
+.badge{display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;background:var(--color-hover);color:var(--color-ink-2)}
+.badge--md{height:22px;padding:0 8px;font-size:12px}
+.badge--ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}.badge--danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.demo{display:flex;align-items:center;gap:6px;padding:10px;border-radius:var(--radius-control);background:var(--color-surface);border:1px solid var(--color-line);flex-wrap:wrap;font-size:12px;color:var(--color-ink-3)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:4px;border:1px solid var(--color-line-strong);background:var(--color-raised);font:inherit;font-size:12px;font-weight:500;color:var(--color-ink)}
+.btn--ok{color:var(--color-ok);border-color:color-mix(in oklab,var(--color-ok) 40%,transparent);background:color-mix(in oklab,var(--color-ok) 12%,var(--color-content))}
+.tag{display:inline-flex;height:18px;padding:0 6px;border-radius:4px;border:1px solid var(--color-line-strong);font-size:11px;font-weight:500;color:var(--color-ink-2);align-items:center}
+.table-wrap{border-radius:var(--radius-surface);overflow-x:auto}
+.table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
+.table th{height:32px;padding:0 12px;text-align:left;font-size:12px;font-weight:500;color:var(--color-ink-3);border-bottom:1px solid var(--color-line)}
+.table td{padding:8px 12px;border-bottom:1px solid var(--color-line);vertical-align:top;color:var(--color-ink-2)}
+.table td:first-child{color:var(--color-ink);font-weight:500;white-space:nowrap}
+.table tbody tr:last-child td{border-bottom:0}
+@media (max-width:1023px){.grid{grid-template-columns:1fr 1fr}}
+@media (max-width:639px){.wrap{padding:20px 16px 32px}.grid{grid-template-columns:1fr}}
+</style></head>
+<body><div class="canvas" aria-hidden="true"></div>
+<main class="wrap">
+<header><span class="eyebrow">C-526 · Breakdown</span><h1>What the steps share</h1><p class="desc">The components, states and rules behind the update banner. Everything comes from glass-ui (ADR-0011). Anything glass-ui lacks is added to glass-ui, not to <code>apps/web</code>.</p></header>
+
+<section class="section"><div><h2 class="section__title">Components</h2><p class="section__desc">In the order they appear in the banner.</p></div>
+<div class="grid">
+<article class="comp surface-content"><div class="comp__h">Banner <span class="tag">glass-ui · existing</span></div><p><code>tone="info"</code> with <code>onDismiss</code>, as today. The title is “Nautelle update available”. It is mounted in the app shell and shown to admins only.</p></article>
+<article class="comp surface-content"><div class="comp__h">VersionChange <span class="tag">glass-ui · new</span></div>
+<div class="demo">Running <span class="badge badge--md badge--danger mono">0.17.1</span><span aria-hidden="true">→</span>Latest <span class="badge badge--md badge--ok mono">0.18.0</span></div>
+<p>Props: <code>from</code> and <code>to</code>, plus optional labels. It draws two mono Badges, danger then ok, joined by a lucide arrow. Both badges carry text labels and the pair reads aloud as “Running 0.17.1, latest 0.18.0”.</p></article>
+<article class="comp surface-content"><div class="comp__h">Disclosure <span class="tag">glass-ui · existing</span></div><p>The trigger is a glass-sm “How to update” button with a chevron and <code>aria-expanded</code>. It starts closed every time the banner mounts. On a phone it spans the full width.</p></article>
+<article class="comp surface-content"><div class="comp__h">CodeBlock + copy <span class="tag">glass-ui · extend if missing</span></div>
+<div class="demo"><span class="btn">Copy</span>→<span class="btn btn--ok">✓ Copied</span>or<span class="btn">Select to copy</span></div>
+<p>Whether CodeBlock already has a copy button is [Unknown]. If it does not, a <code>copyable</code> prop is added to glass-ui. The button sits pinned at the top right while the code scrolls under it. It copies exactly the block's text.</p></article>
+<article class="comp surface-content"><div class="comp__h">Backup line <span class="tag">warn tone</span></div><p>A database icon, “Take a backup first.”, the note that downgrading is not supported, and a link to the docs Backup page. It uses the warn tone because this is a caution, not an error.</p></article>
+<article class="comp surface-content"><div class="comp__h">Links</div><p>Release notes opens <code>release.url</code>. Upgrade guide opens <code>UPGRADE_GUIDE_URL</code>. Back up an install opens <code>docsUrl('/operations/backup/')</code>. All three open in a new tab with <code>rel="noreferrer"</code>.</p></article>
+</div></section>
+
+<section class="section"><div><h2 class="section__title">States</h2></div>
+<div class="table-wrap surface-content"><table class="table"><thead><tr><th>State</th><th>When</th><th>What shows</th></tr></thead><tbody>
+<tr><td>Hidden</td><td>The viewer is not an admin, no update is available, the check is off, it has not answered yet, or this release was dismissed</td><td>Nothing, as <code>productUpdateNotice()</code> does today</td></tr>
+<tr><td>Collapsed</td><td>A newer release exists and has not been dismissed</td><td>One row: icon, title, VersionChange, the two links, How to update, ✕</td></tr>
+<tr><td>Expanded</td><td>The trigger is pressed</td><td>The backup line, the three numbered ways and the server/runner note</td></tr>
+<tr><td>Copied</td><td>The clipboard write succeeds</td><td><span class="badge badge--ok">✓ Copied</span> on that button and an ok border on its block for 2 s, announced through aria-live</td></tr>
+<tr><td>Copy blocked</td><td><code>navigator.clipboard</code> is missing (plain HTTP) or the write is rejected</td><td>The button reads “Select to copy” and the block's text is selected; no error toast</td></tr>
+<tr><td>Dismissed</td><td>✕ is pressed</td><td>The banner unmounts and the version is stored in <code>nautelle.productUpdate.dismissed</code>, as today</td></tr>
+</tbody></table></div></section>
+
+<section class="section"><div><h2 class="section__title">Rules</h2></div>
+<div class="grid">
+<article class="comp surface-content"><div class="comp__h">No upgrade from the web app</div><p>There is no “Upgrade now” button and no endpoint for one. The server cannot restart its own compose stack, and a runner may live on another machine. The banner has no solid button, so the page keeps its single primary action.</p></article>
+<article class="comp surface-content"><div class="comp__h">Data</div><p>The data comes from <code>GET /admin/updates</code>, whose <code>ProductUpdateView</code> already includes <code>current</code>. <code>ProductUpdateNotice</code> gains a <code>current</code> prop next to <code>release</code>. The API and the schema do not change.</p></article>
+<article class="comp surface-content"><div class="comp__h">Tests and demo</div><ul><li><code>product-update-notice.test.tsx</code> covers:<ul><li>both versions render with their labels;</li><li>the disclosure toggles;</li><li>copy writes the exact text and shows Copied;</li><li>a blocked clipboard falls back to “Select to copy”;</li><li>✕ calls <code>onDismiss</code>.</li></ul></li><li>Demo: the banner appears, How to update opens, the Compose command is copied, and the recording ends on Copied.</li></ul></article>
+</div></section>
+</main></body></html>
