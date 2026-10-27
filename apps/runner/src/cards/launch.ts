@@ -9,7 +9,7 @@ import type { ConfigProfile } from '../config';
 import { demoflowMcpConfig } from '../demos/pin';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { SESSION_TOKEN_ENV } from '../local/session-tokens';
-import { CARD_ESCALATE_ENV } from '../mcp/tools';
+import { CARD_ESCALATE_ENV, CARD_NEED_PERSON_ENV } from '../mcp/tools';
 import type { OtlpEndpoint } from '../otlp/token';
 import { runEnv } from '../skills/run/launch';
 import type { LaunchSpec } from '../skills/run/record';
@@ -123,10 +123,12 @@ export const CLAUDE_EFFORT_ENV = 'CLAUDE_CODE_EFFORT_LEVEL';
  * it reaches it under every wiring — plugin, injected or Token saver.
  */
 const roundEnv = (
-  args: Partial<Pick<CardRunArgs, 'effort' | 'escalate'>>,
+  args: Partial<Pick<CardRunArgs, 'effort' | 'escalate' | 'needPerson'>>,
 ): Record<string, string> => ({
   ...(args.effort ? { [CLAUDE_EFFORT_ENV]: args.effort } : {}),
   ...(args.escalate ? { [CARD_ESCALATE_ENV]: '1' } : {}),
+  // C-511: likewise for `need_person`.
+  ...(args.needPerson ? { [CARD_NEED_PERSON_ENV]: '1' } : {}),
 });
 
 /**
@@ -149,7 +151,7 @@ export const cardLaunchSpec = (
     | 'runId'
     | 'shortId'
   > &
-    Partial<Pick<CardRunArgs, 'effort' | 'escalate' | 'demo'>>,
+    Partial<Pick<CardRunArgs, 'effort' | 'escalate' | 'needPerson' | 'demo'>>,
   worktree: string,
   otlp: OtlpEndpoint | null,
   wiring?: CardWiringFiles,

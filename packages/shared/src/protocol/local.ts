@@ -14,6 +14,11 @@ import {
   ANALYSIS_REPORT_MAX,
   cardProposalsInputSchema,
 } from '../board/analysis';
+import {
+  TASK_CHECKLIST_MAX,
+  TASK_CHECKLIST_TEXT_MAX,
+  TASK_NOTE_MAX,
+} from '../board/task';
 import { DESIGN_COMMENT_MAX } from '../design/limits';
 import { taskDesignStatusSchema } from '../design/types';
 import {
@@ -127,6 +132,11 @@ export const localErrorCodeSchema = z.enum([
    * escalated, or in the A arm of `model-by-type`.
    */
   'not_escalatable',
+  /**
+   * C-511: `card.needPerson` while the task the card raised before is still
+   * open; `message` names it.
+   */
+  'task_open',
   /** #884: `card.reviewReport` from a session that is not a running review step. */
   'not_a_review_session',
   /** `card.track` from a session that is not a person's own `manual` one (issue #282 D1). */
@@ -455,6 +465,32 @@ export const LOCAL_WORK_CARD_KINDS = [
   'feature',
   'bug',
 ] as const satisfies readonly (typeof LOCAL_CARD_KINDS)[number][];
+
+/**
+ * `card.needPerson` (C-511): the card worker's `need_person` tool. Like
+ * `card.finish`, the card is resolved from the request's `session.id`, never
+ * from an argument; any other session is answered `not_a_card_session`. It
+ * raises a task for a person, makes the card depend on it and ends the round;
+ * the card resumes its session once the task is Done. A second call while
+ * that task is open is `task_open`.
+ */
+export const localCardNeedPersonArgsSchema = z.strictObject({
+  /** The task's title: what the person must do. */
+  title: z.string().trim().min(1).max(LOCAL_CARD_TITLE_MAX),
+  /** Why the worker cannot go on without it; the task's description. */
+  why: z.string().trim().min(1).max(TASK_NOTE_MAX),
+  /** The steps, one checklist item each. */
+  checklist: z
+    .array(z.string().trim().min(1).max(TASK_CHECKLIST_TEXT_MAX))
+    .max(TASK_CHECKLIST_MAX)
+    .optional(),
+});
+export const localCardNeedPersonResultSchema = z.object({
+  /** The code card's per-project number (`C-<number>`). */
+  number: z.number().int().positive(),
+  /** The task's per-project number. */
+  task: z.number().int().positive(),
+});
 
 /**
  * `card.track` (issue #282 D1, ADR-0030 §1): the `track_card` tool of a
@@ -1201,6 +1237,12 @@ export const localMethods = {
   'card.escalate': {
     args: localCardEscalateArgsSchema,
     result: localCardEscalateResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.needPerson': {
+    args: localCardNeedPersonArgsSchema,
+    result: localCardNeedPersonResultSchema,
     minRole: 'operator',
     needsProject: true,
   },

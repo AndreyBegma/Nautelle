@@ -11,7 +11,9 @@ import {
   type CardReviewFixFinding,
   type CardRoundPhase,
   type CardRoundTrigger,
+  type CardTaskDoneInput,
   type CardWorkerDemo,
+  captureFingerprint,
   cardAttachmentSnapshotSchema,
   cardBranch,
   cardChange,
@@ -26,6 +28,7 @@ import {
   cardReviewFixPrompt,
   cardSpecPath,
   cardSpecPrBody,
+  cardTaskDonePrompt,
   cardWorkerPrompt,
   demoScenarioPath,
   isActiveRoundPhase,
@@ -43,6 +46,7 @@ import {
   cardEffortAvailable,
   cardEscalateAvailable,
   cardFreshStartAvailable,
+  cardNeedPersonAvailable,
   cardRunArgsSchema,
   cardStartBranchAvailable,
   ISSUE_TITLE_MAX,
@@ -102,6 +106,7 @@ import type { CardWithRounds } from './board-mapper';
 import { toSettingsView } from './board-mapper';
 import { BoardPrincipals } from './board-principal';
 import { BoardStacks } from './board-stacks';
+import { BoardTasks } from './board-tasks';
 import {
   ACTIVE_PHASES,
   BOARD_SYSTEM_ACTOR,
@@ -142,6 +147,20 @@ export class CardNotEscalatable extends Error {
   constructor() {
     super('this round cannot escalate');
   }
+}
+
+/** C-511 D6: `card.needPerson` refused — the task it raised is still open. */
+export class CardTaskOpen extends Error {
+  constructor(readonly task: number) {
+    super(`${cardLabel(task)} is still open`);
+  }
+}
+
+/** C-511: what `card.needPerson` asks a person for. */
+export interface CardNeedPersonInput {
+  title: string;
+  why: string;
+  checklist?: readonly string[];
 }
 
 /** #447 DA-15: the mode a round started in (`runs.args.permissionMode`). */
@@ -328,6 +347,7 @@ export class BoardRoundsService {
     private readonly prefixLaunch: PrefixLaunchService,
     private readonly principals: BoardPrincipals,
     private readonly fixWaits: BoardFixWaits,
+    private readonly tasks: BoardTasks,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -729,6 +749,240 @@ export class BoardRoundsService {
       });
     }
     return { number: card.number, relaunched };
+  }
+
+  /**
+   * C-511 (D2–D6): the worker's `need_person`. The card is the one whose
+   * Claude session asks, with an active round, in the asking runner's
+   * project; any other session is `null` (`not_a_card_session`). A raised
+   * task still open refuses it (`CardTaskOpen`). In one transaction it raises
+   * a task for the round's author (D3), makes the card depend on it, ends the
+   * round `finished` by the worker — never `ended`, so a stack run does not
+   * pause — and puts the card back on top of To Do with its session, branch
+   * and worktree, without a collect. The resume (D5) goes through the card's
+   * stack-run entry, queued again, else through Auto-run when ready, armed as
+   * the round's author. The runner stops the asking session after the answer.
+   */
+  async needPersonByWorker(
+    project: { id: string; runnerId: string },
+    sessionId: string,
+    input: CardNeedPersonInput,
+  ): Promise<{ number: number; task: number } | null> {
+    if (!UUID.test(sessionId)) return null;
+    const found = await this.prisma.boardCard.findFirst({
+      where: {
+        projectId: project.id,
+        sessionId,
+        kind: { not: 'task' },
+        project: { runnerId: project.runnerId },
+      },
+      select: { id: true },
+    });
+    if (!found) return null;
+    const title = input.title.trim();
+    const why = input.why.trim();
+    const checklist = (input.checklist ?? []).map((t) => t.trim());
+    const now = new Date();
+    const raised = await this.prisma.$transaction(async (tx) => {
+      const card = await this.work.lock(tx, found.id);
+      const round = card.rounds[0];
+      if (!round || !isActiveRoundPhase(round.phase)) return null;
+      // D6: one open raised task per card.
+      const open = await tx.boardCard.findFirst({
+        where: {
+          raisedForCardId: card.id,
+          kind: 'task',
+          column: { not: 'completed' },
+        },
+        orderBy: { number: 'asc' },
+        select: { number: true },
+      });
+      if (open) throw new CardTaskOpen(open.number);
+      const assigneeId = await this.taskAssigneeOf(tx, project.id, [
+        round.authorId,
+        card.autoRunArmedById,
+        card.createdById,
+      ]);
+      const next = await this.work.nextCard(tx, project.id);
+      const taskPosition = await this.work.place(
+        tx,
+        { id: '', projectId: project.id },
+        'todo',
+        0,
+      );
+      const task = await tx.boardCard.create({
+        data: {
+          projectId: project.id,
+          ...next,
+          title,
+          fingerprint: captureFingerprint(title),
+          body: why,
+          kind: 'task',
+          kindSource: 'person',
+          column: 'todo',
+          position: taskPosition,
+          issueOnRun: false,
+          specOnRun: false,
+          assigneeId,
+          raisedForCardId: card.id,
+          createdById: round.authorId,
+          movedAt: now,
+        },
+        select: { id: true, number: true },
+      });
+      await this.tasks.writeChecklist(tx, task.id, checklist);
+      // A new task has no dependencies of its own, so no cycle can close.
+      await tx.boardCardDependency.create({
+        data: { cardId: card.id, dependsOnId: task.id },
+      });
+      const ended = await this.work.endRound(tx, round.id, 'finished', now, {
+        finishedBy: 'worker',
+        summary:
+          `Raised ${cardLabel(task.number)} for a person: ${title}`.slice(
+            0,
+            CARD_SUMMARY_MAX,
+          ),
+      });
+      if (ended) await this.work.closeRun(tx, round.runId, 'succeeded');
+      // D4: above the task, so the card reads as the work it waits for.
+      const position = await this.work.place(tx, card, 'todo', 0);
+      // D5: a running stack run starts the card again after Done.
+      const { count: requeued } = await tx.boardRunQueueCard.updateMany({
+        where: { cardId: card.id, run: { state: 'running' } },
+        data: { status: 'queued', roundId: null },
+      });
+      await tx.boardCard.update({
+        where: { id: card.id },
+        data: {
+          column: 'todo',
+          position,
+          movedAt: now,
+          movedById: null,
+          ...(requeued > 0
+            ? {}
+            : {
+                autoRunWhenReady: true,
+                autoRunArmedById: round.authorId ?? card.autoRunArmedById,
+              }),
+        },
+      });
+      return {
+        card,
+        round,
+        task,
+        assigneeId,
+        requeued: requeued > 0,
+        ended,
+      };
+    });
+    if (!raised) return null;
+    const { card, round, task } = raised;
+    await this.audit.record({
+      actor: SYSTEM_ACTOR,
+      action: 'card.task_raised',
+      target: { type: 'board_card', id: card.id },
+      projectId: project.id,
+      after: {
+        number: card.number,
+        round: round.round,
+        task: task.number,
+        assigneeId: raised.assigneeId,
+        checklist: checklist.length,
+        resume: raised.requeued ? 'stack_run' : 'auto_run',
+      },
+      result: 'ok',
+    });
+    if (raised.ended) {
+      this.work.publishRun(project.id, round.runId, 'succeeded');
+    }
+    this.work.publish(project.id, task.id);
+    this.work.publish(project.id, card.id);
+    return { number: card.number, task: task.number };
+  }
+
+  /**
+   * C-511 D3: who a raised task is for — the first of `candidates` still on
+   * the project (a member, or an active admin), else the project's oldest
+   * admin by membership, else the oldest active admin.
+   */
+  private async taskAssigneeOf(
+    tx: Tx,
+    projectId: string,
+    candidates: readonly (string | null)[],
+  ): Promise<string> {
+    const ids = [...new Set(candidates.flatMap((id) => (id ? [id] : [])))];
+    const users = await tx.user.findMany({
+      where: { id: { in: ids }, status: 'active' },
+      select: {
+        id: true,
+        role: true,
+        memberships: { where: { projectId }, select: { userId: true } },
+      },
+    });
+    const onProject = new Set(
+      users
+        .filter((u) => u.role === 'admin' || u.memberships.length > 0)
+        .map((u) => u.id),
+    );
+    const first = ids.find((id) => onProject.has(id));
+    if (first) return first;
+    const member = await tx.projectMember.findFirst({
+      where: {
+        projectId,
+        user: { role: 'admin', status: 'active' },
+        OR: [{ roleOverride: null }, { roleOverride: 'admin' }],
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { userId: true },
+    });
+    if (member) return member.userId;
+    const admin = await tx.user.findFirst({
+      where: { role: 'admin', status: 'active' },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (!admin) throw new Error('no active admin to assign the task to');
+    return admin.id;
+  }
+
+  /**
+   * C-511 D5: the task the card's latest round raised, once it is Done — its
+   * Run is then the `task_done` round. `null` otherwise.
+   */
+  private async taskDoneOf(
+    card: CardWithRounds,
+  ): Promise<CardTaskDoneInput | null> {
+    const latest = card.rounds[0];
+    if (!latest || card.sessionId === null) return null;
+    const task = await this.prisma.boardCard.findFirst({
+      where: {
+        raisedForCardId: card.id,
+        kind: 'task',
+        column: 'completed',
+        createdAt: { gte: latest.startedAt },
+      },
+      orderBy: { number: 'desc' },
+      select: {
+        number: true,
+        title: true,
+        taskNote: true,
+        checklist: {
+          orderBy: { position: 'asc' },
+          select: { text: true, doneAt: true },
+        },
+      },
+    });
+    return task
+      ? {
+          number: task.number,
+          title: task.title,
+          checklist: task.checklist.map((i) => ({
+            text: i.text,
+            done: i.doneAt !== null,
+          })),
+          note: task.taskNote,
+        }
+      : null;
   }
 
   /**
@@ -1167,6 +1421,18 @@ export class BoardRoundsService {
       card.escalatedAt === null &&
       capabilities !== null &&
       cardEscalateAvailable(capabilities);
+    // C-511 D2: a card worker's round may raise a task for a person — not
+    // Nautelle's own fix rounds, and only on a runner that offers the tool.
+    const needPerson =
+      !isFixRound(trigger) &&
+      card.source !== 'fleet' &&
+      card.source !== 'terminal' &&
+      capabilities !== null &&
+      cardNeedPersonAvailable(capabilities);
+    // C-511 D5: the Run after the raised task's Done resumes with its result.
+    const taskDone =
+      trigger === 'run' && resume ? await this.taskDoneOf(card) : null;
+    const roundTrigger: CardRoundTrigger = taskDone ? 'task_done' : trigger;
     const demo = cardRoundDemo(
       card,
       await this.demoSettings(project.id),
@@ -1184,60 +1450,63 @@ export class BoardRoundsService {
       ? fix.reason === 'review'
         ? cardReviewFixPrompt(fix)
         : cardCiFixPrompt(fix)
-      : resume || (trigger === 'feedback' && feedback !== null)
-        ? escalation
-          ? escalationRoundPrompt(card, nextPrompt, nextRound(null))
-          : nextPrompt
-        : cardWorkerPrompt({
-            number: card.number,
-            title: card.title,
-            body: card.body,
-            kind: card.kind,
-            // #854: the branch the round is expected to work on.
-            branch: startBranch ?? branch,
-            base,
-            specPath,
-            specPr: specPr
-              ? { repo: specPr.repo, url: specPr.url, branch: specPr.branch }
-              : null,
-            issueNumber: issue.number,
-            design:
-              designFrames.length > 0 && design
+      : taskDone
+        ? cardTaskDonePrompt(taskDone)
+        : resume || (trigger === 'feedback' && feedback !== null)
+          ? escalation
+            ? escalationRoundPrompt(card, nextPrompt, nextRound(null))
+            : nextPrompt
+          : cardWorkerPrompt({
+              number: card.number,
+              title: card.title,
+              body: card.body,
+              kind: card.kind,
+              // #854: the branch the round is expected to work on.
+              branch: startBranch ?? branch,
+              base,
+              specPath,
+              specPr: specPr
+                ? { repo: specPr.repo, url: specPr.url, branch: specPr.branch }
+                : null,
+              issueNumber: issue.number,
+              design:
+                designFrames.length > 0 && design
+                  ? {
+                      frames: designFrames.map((f) => ({
+                        name: f.name,
+                        path: f.path,
+                      })),
+                      rationale: design.rationale,
+                      comments: design.comments,
+                    }
+                  : null,
+              stack: stack
                 ? {
-                    frames: designFrames.map((f) => ({
-                      name: f.name,
-                      path: f.path,
-                    })),
-                    rationale: design.rationale,
-                    comments: design.comments,
+                    label: stackLabel(stack.number),
+                    title: stack.title,
+                    stage: stack.stage,
+                    stageTitle: stack.stageTitle,
+                    stageCount: stack.stageCount,
+                    design:
+                      stack.design && stackFrames.length > 0
+                        ? {
+                            frames: stackFrames.map((f) => ({
+                              name: f.name,
+                              path: f.path,
+                            })),
+                            rationale: stack.design.rationale,
+                          }
+                        : null,
                   }
                 : null,
-            stack: stack
-              ? {
-                  label: stackLabel(stack.number),
-                  title: stack.title,
-                  stage: stack.stage,
-                  stageTitle: stack.stageTitle,
-                  stageCount: stack.stageCount,
-                  design:
-                    stack.design && stackFrames.length > 0
-                      ? {
-                          frames: stackFrames.map((f) => ({
-                            name: f.name,
-                            path: f.path,
-                          })),
-                          rationale: stack.design.rationale,
-                        }
-                      : null,
-                }
-              : null,
-            attachments: attachmentBriefs,
-            projectRules,
-            ...cardPromptSaver(saver),
-            // #750 D8: the text goes with the tool the runner offers.
-            ...cardPromptEscalate(escalate),
-            demo,
-          });
+              attachments: attachmentBriefs,
+              projectRules,
+              ...cardPromptSaver(saver),
+              // #750 D8: the text goes with the tool the runner offers.
+              ...cardPromptEscalate(escalate),
+              ...(needPerson ? { needPerson: true } : {}),
+              demo,
+            });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null && specPr === null
         ? [{ path: specPath, content: specContent(card, issue.number) }]
@@ -1272,6 +1541,7 @@ export class BoardRoundsService {
         : {}),
       ...(followUp ? { newBranch: true } : {}),
       ...(escalate ? { escalate: true as const } : {}),
+      ...(needPerson ? { needPerson: true as const } : {}),
       ...(startBranch !== null ? { startBranch } : {}),
       ...(demo !== null ? { demo: true as const } : {}),
       ...withCardPrefix(saver.args, prefix.prefix),
@@ -1303,7 +1573,7 @@ export class BoardRoundsService {
           args: {
             card: card.number,
             round: next,
-            trigger,
+            trigger: roundTrigger,
             promptVersion: CARD_WORKER_PROMPT_VERSION,
             // #663: what the round ran at; `null` is the CLI's default.
             effort,
@@ -1328,7 +1598,7 @@ export class BoardRoundsService {
           cardId: card.id,
           round: next,
           runId: run.id,
-          trigger,
+          trigger: roundTrigger,
           autoRunAfter,
           feedback,
           cardTitle: card.title,
@@ -1453,7 +1723,8 @@ export class BoardRoundsService {
       number: card.number,
       round: round.round,
       runId: round.runId,
-      trigger,
+      trigger: roundTrigger,
+      ...(taskDone ? { taskDone: taskDone.number } : {}),
       ...(fix
         ? fix.reason === 'review'
           ? { reviewFix: fix.findings.length }
@@ -1465,6 +1736,7 @@ export class BoardRoundsService {
       resume,
       ...(fresh ? { fresh } : {}),
       ...(escalate ? { escalate } : {}),
+      ...(needPerson ? { needPerson } : {}),
       profileKey: profile.key,
       model,
       effort,

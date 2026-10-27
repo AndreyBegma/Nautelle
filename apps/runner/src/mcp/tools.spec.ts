@@ -19,6 +19,7 @@ import {
   ESCALATE_CARD_MCP_TOOL,
   MCP_TOOLS,
   type McpToolDefinition,
+  NEED_PERSON_MCP_TOOL,
   REPORT_REVIEW_MCP_TOOL,
   REVIEW_SESSION_TOOLS,
 } from './tools';
@@ -138,6 +139,97 @@ describe('escalate_card (#750 D8)', () => {
 
   it('describes the tool for the worker', () => {
     expect(ESCALATE_CARD_MCP_TOOL.description).toContain('Opus');
+  });
+});
+
+describe('need_person (C-511)', () => {
+  const listedWith = async (options: {
+    escalate?: boolean;
+    needPerson?: boolean;
+    review?: boolean;
+  }): Promise<string[]> => {
+    const server = buildMcpServer(
+      async () => ({ ok: true, data: {} }),
+      options,
+    );
+    const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'test', version: '0' });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+    return names(client);
+  };
+
+  it('is not one of the tools every session gets', () => {
+    expect(MCP_TOOLS.map((tool) => tool.name)).not.toContain('need_person');
+    expect(NEED_PERSON_MCP_TOOL.method).toBe('card.needPerson');
+  });
+
+  it('is listed only on a round launched with needPerson, never in a review session', async () => {
+    expect(await listedWith({})).not.toContain('need_person');
+    expect(await listedWith({ needPerson: false })).not.toContain(
+      'need_person',
+    );
+    const listed = await listedWith({ needPerson: true });
+    expect(listed).toContain('need_person');
+    expect(listed).toHaveLength(MCP_TOOLS.length + 2);
+    expect(await listedWith({ escalate: true, needPerson: true })).toHaveLength(
+      MCP_TOOLS.length + 3,
+    );
+    expect(await listedWith({ needPerson: true, review: true })).not.toContain(
+      'need_person',
+    );
+    expect(mcpToolsOf({ needPerson: true }).map((tool) => tool.name)).toContain(
+      'need_person',
+    );
+  });
+
+  it('calls card.needPerson with the title, the why and the checklist', async () => {
+    const calls: Call[] = [];
+    const server = buildMcpServer(
+      async (method, args) => {
+        calls.push({ method, args });
+        return { ok: true, data: { number: 7, task: 8 } };
+      },
+      { needPerson: true },
+    );
+    const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'test', version: '0' });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+    const args = {
+      title: 'Add the STRIPE_KEY secret',
+      why: 'The payment test needs a real key.',
+      checklist: ['Create a test key', 'Add it to the env'],
+    };
+    const result = await client.callTool({
+      name: 'need_person',
+      arguments: args,
+    });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toEqual({ number: 7, task: 8 });
+    expect(calls).toEqual([{ method: 'card.needPerson', args }]);
+    expect(localMethods['card.needPerson'].args.safeParse(args).success).toBe(
+      true,
+    );
+  });
+
+  it('turns task_open into a tool error carrying its code', async () => {
+    const server = buildMcpServer(
+      async () => ({
+        ok: false,
+        error: { code: 'task_open', message: 'C-8 is still open' },
+      }),
+      { needPerson: true },
+    );
+    const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'test', version: '0' });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+    const result = await client.callTool({
+      name: 'need_person',
+      arguments: { title: 'Add the key', why: 'Needed.' },
+    });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toEqual({
+      error: { code: 'task_open', message: 'C-8 is still open' },
+    });
   });
 });
 

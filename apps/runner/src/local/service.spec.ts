@@ -709,6 +709,33 @@ describe('LocalService — escalate_card stops the asking round (#750 D8)', () =
     await other.service.handle('request', escalate, as('s-own', WORKTREE));
     expect(other.stopped).toEqual([]);
   });
+
+  it('C-511: stops the round whose worker raised a task with need_person, not one refused with task_open', async () => {
+    current = asking;
+    const needPerson = {
+      ...escalate,
+      method: 'card.needPerson',
+      args: { title: 'Add the key', why: 'The test needs it.' },
+    };
+    const raised = { ok: true as const, data: { number: 1, task: 2 } };
+    const { service, stopped } = setup(false, true, {
+      liveRound,
+      reply: raised,
+    });
+    expect(
+      await service.handle('request', needPerson, as(SESSION, WORKTREE)),
+    ).toEqual(raised);
+    expect(stopped).toEqual([
+      { cardId: 'card_1', runId: 'run_1', sessionId: SESSION },
+    ]);
+
+    const refused = setup(false, true, {
+      liveRound,
+      reply: { ok: false, error: { code: 'task_open' } },
+    });
+    await refused.service.handle('request', needPerson, as(SESSION, WORKTREE));
+    expect(refused.stopped).toEqual([]);
+  });
 });
 
 describe('LocalService — authenticated callers (#113)', () => {

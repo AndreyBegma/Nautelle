@@ -226,7 +226,9 @@ function roundItems(
               ? 'feedback'
               : round.trigger === 'review_fix'
                 ? 'review fix'
-                : 'run'}{' '}
+                : round.trigger === 'task_done'
+                  ? 'task done'
+                  : 'run'}{' '}
             · {roundStateLabel(round)}
           </span>
           {round.autoRunAfter != null ? (

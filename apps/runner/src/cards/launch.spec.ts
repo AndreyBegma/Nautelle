@@ -240,6 +240,17 @@ describe('card worker launch (#242 D5)', () => {
     ).toBeUndefined();
   });
 
+  it('C-511: offers need_person through the env only when the round may raise a task', () => {
+    expect(
+      cardLaunchSpec(profile, { ...args(false), needPerson: true }, '/wt', null)
+        .env.NAUTELLE_CARD_NEED_PERSON,
+    ).toBe('1');
+    expect(
+      cardLaunchSpec(profile, args(false), '/wt', null).env
+        .NAUTELLE_CARD_NEED_PERSON,
+    ).toBeUndefined();
+  });
+
   it("#389: the card's env wins over a profile that sets the same names", () => {
     const spec = cardLaunchSpec(
       { ...profile, env: { ...profile.env, NAUTELLE_CARD: 'other' } },

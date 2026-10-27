@@ -261,6 +261,11 @@ export const cardRunArgsSchema = z
      */
     escalate: z.literal(true).optional(),
     /**
+     * C-511: offer the worker `need_person` — a code card's round. Sent only
+     * to a runner that advertises `cardNeedPerson`.
+     */
+    needPerson: z.literal(true).optional(),
+    /**
      * #854 D1: the branch a session-gone taken card was worked on. When origin
      * has it, the runner puts the card's worktree on it — from
      * `origin/<startBranch>` — and the round works there instead of `branch`;

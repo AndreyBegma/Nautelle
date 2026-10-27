@@ -159,6 +159,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'card.feedback': 'Sent feedback on a card',
   'card.finished': 'Finished a card round',
   'card.escalated': 'A card worker asked for Opus',
+  'card.task_raised': 'A card worker raised a task for a person',
   'card.accepted': 'Accepted a board card',
   'card.task_done': 'Marked a task done',
   'card.task_reopened': 'Reopened a task',

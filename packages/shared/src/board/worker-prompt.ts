@@ -45,9 +45,10 @@ import type { BoardCardKind } from './types';
  * `assertVisible` on the result, and explicit `wait` steps (1500 ms after the
  * step that shows a result, 3000 ms at the end) because the runner's pinned
  * DemoFlow does not pace recordings yet. These waits go away when the pin
- * moves to the paced release (DemoFlow C-203, a follow-up).
+ * moves to the paced release (DemoFlow C-203, a follow-up). Version 27
+ * (C-511): with `needPerson`, when to call `need_person` and when not to.
  */
-export const CARD_WORKER_PROMPT_VERSION = 26;
+export const CARD_WORKER_PROMPT_VERSION = 27;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'NAUTELLE_CARD';
@@ -94,6 +95,9 @@ export const FINISH_CARD_TOOL = 'finish_card';
 
 /** #750 D8: the runner MCP tool a non-Opus round in the B arm asks for Opus with. */
 export const ESCALATE_CARD_TOOL = 'escalate_card';
+
+/** C-511: the runner MCP tool a card worker raises a task for a person with. */
+export const NEED_PERSON_TOOL = 'need_person';
 
 /**
  * #359 D3: the PR description the worker writes, worktree-relative. Under
@@ -192,6 +196,11 @@ export interface CardWorkerPromptInput {
    * `escalate_card`. Absent is off.
    */
   escalate?: boolean;
+  /**
+   * C-511: the round is launched with `needPerson`; the prompt then says when
+   * to call `need_person`. Absent is off.
+   */
+  needPerson?: boolean;
   /**
    * C-369: the project records demo videos and the round is launched with
    * `demo` (DemoFlow's MCP server); the prompt then asks for the scenario.
@@ -531,6 +540,18 @@ const ESCALATE_LINES = [
 ];
 
 /**
+ * C-511: when the worker cannot go on without a person, it raises a task and
+ * stops, instead of failing or waiting; the card resumes after Done. A
+ * question the card already answers is no reason — nor one for the person
+ * watching, which the question flow asks.
+ */
+const NEED_PERSON_LINES = [
+  '## When only a person can unblock the card',
+  '',
+  `If the \`${NEED_PERSON_TOOL}\` tool is listed, call it when you cannot go on without a person: a secret, credential or access you do not have; a manual step outside this worktree (a DNS change, a console setting, a gate to approve); or a decision only a person may take. \`title\` says what the person must do, \`why\` why you cannot go on, and \`checklist\` the steps, one each. It ends this round and raises a task for a person; once they mark it Done, Nautelle resumes this session with their note. Commit what is worth keeping first. Do not call it for a question the card or the repository already answers, or to ask the person watching — ask and wait for that.`,
+];
+
+/**
  * C-369 (ADR-0090 §2): the project records a demo of finished UI features, so
  * the worker writes the scenario through DemoFlow's MCP server and commits it.
  * Only secret names are listed — a value never reaches the worker. C-410: 7
@@ -589,6 +610,7 @@ const assemblePrompt = (
     ...(card.tokenSaver ? [...HANDOFF_LINES, ''] : []),
     ...(card.projectRules ? [card.projectRules, ''] : []),
     ...(card.escalate ? [...ESCALATE_LINES, ''] : []),
+    ...(card.needPerson ? [...NEED_PERSON_LINES, ''] : []),
     ...(card.demo ? [...demoLines(card.demo), ''] : []),
     '## When you are done',
     '',
@@ -628,6 +650,45 @@ const assemblePrompt = (
 /** D9: the prompt of a feedback round, resuming the same session. */
 export const cardFeedbackPrompt = (feedback: string): string =>
   `Review feedback (${CARD_DATA_LINE})\n\n${fence(feedback.trim())}\n\nAddress it on the same branch, commit, then call ${FINISH_CARD_TOOL}.`;
+
+/** C-511: the task a `task_done` round's prompt reports back to the worker. */
+export interface CardTaskDoneInput {
+  /** The task's per-project number. */
+  number: number;
+  title: string;
+  checklist: readonly { text: string; done: boolean }[];
+  /** The note given with Done; `null` without one. */
+  note: string | null;
+}
+
+/**
+ * C-511: the prompt of a `task_done` round, resuming the session that called
+ * `need_person` — the task, its checklist with ticks and the Done note, as
+ * data.
+ */
+export const cardTaskDonePrompt = (task: CardTaskDoneInput): string => {
+  const lines = [`Title: ${oneLine(task.title)}`];
+  if (task.checklist.length > 0) {
+    lines.push(
+      '',
+      'Checklist:',
+      ...task.checklist.map(
+        (item) => `- [${item.done ? 'x' : ' '}] ${oneLine(item.text)}`,
+      ),
+    );
+  }
+  lines.push(
+    '',
+    task.note?.trim() ? `Note: ${task.note.trim()}` : 'Note: (none)',
+  );
+  return [
+    `A person marked done the task ${cardLabel(task.number)} you raised with ${NEED_PERSON_TOOL} (${CARD_DATA_LINE}):`,
+    '',
+    fence(lines.join('\n')),
+    '',
+    `Continue the card from where you stopped. An unticked item may still be missing: check before you rely on it, and raise another task if you still cannot go on. When you are done, call ${FINISH_CARD_TOOL}.`,
+  ].join('\n');
+};
 
 /** A retry after a failed, ended or cancelled round resumes with this. */
 export const CARD_CONTINUE_PROMPT = 'continue';

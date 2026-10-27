@@ -20,6 +20,7 @@ import { BoardReview } from '../board/board-review';
 import {
   BoardRoundsService,
   CardNotEscalatable,
+  CardTaskOpen,
 } from '../board/board-rounds.service';
 import { BoardSessionService } from '../board/board-session.service';
 import {
@@ -165,6 +166,7 @@ export class LocalHandlers {
     'card.finish': (args, call) => this.cardFinish(args, call),
     'card.finishAnalysis': (args, call) => this.cardFinishAnalysis(args, call),
     'card.escalate': (args, call) => this.cardEscalate(args, call),
+    'card.needPerson': (args, call) => this.cardNeedPerson(args, call),
     'card.reviewReport': (args, call) => this.cardReviewReport(args, call),
     'card.track': (args, call) => this.cardTrack(args, call),
   };
@@ -287,6 +289,40 @@ export class LocalHandlers {
       escalated: true,
       relaunched: escalated.relaunched,
     };
+  }
+
+  /**
+   * C-511 D2: the card worker's `need_person`. The card is the one whose
+   * Claude session asks, like `card.escalate`; a person's tracked or manual
+   * session is no card worker and is answered `not_a_card_session`. A task
+   * the card raised that is still open is `task_open`, naming it (D6).
+   */
+  private async cardNeedPerson(
+    args: LocalMethodArgs<'card.needPerson'>,
+    call: LocalCall,
+  ): Promise<LocalMethodResult<'card.needPerson'>> {
+    const project = projectOf(call);
+    const session = call.session;
+    let raised: Awaited<ReturnType<BoardRoundsService['needPersonByWorker']>>;
+    try {
+      raised =
+        session && session.runtime === 'claude'
+          ? await this.rounds.needPersonByWorker(
+              { id: project.id, runnerId: call.runnerId },
+              session.id,
+              args,
+            )
+          : null;
+    } catch (error) {
+      if (error instanceof CardTaskOpen) {
+        throw new LocalError('task_open', error.message);
+      }
+      throw error;
+    }
+    if (!raised) {
+      throw new LocalError('not_a_card_session', 'not a board card session');
+    }
+    return raised;
   }
 
   /**

@@ -10,7 +10,11 @@ import {
 import type { LocalCommandDeps } from '../local/subcommand';
 import { LOCAL_RETRY_METHODS, LOCAL_RETRY_WINDOW_MS } from '../local/types';
 import { buildMcpServer, type McpRequest } from './server';
-import { CARD_ESCALATE_ENV, CARD_REVIEW_ENV } from './tools';
+import {
+  CARD_ESCALATE_ENV,
+  CARD_NEED_PERSON_ENV,
+  CARD_REVIEW_ENV,
+} from './tools';
 
 /** The daemon retries inside its window, then makes one last attempt (#434). */
 const RETRY_CALL_MS =
@@ -62,6 +66,8 @@ export const runMcp = async (
     cardNote,
     // #750 D8: set in the env of a round launched with `escalate`.
     escalate: deps.env[CARD_ESCALATE_ENV] === '1',
+    // C-511: set in the env of a round launched with `needPerson`.
+    needPerson: deps.env[CARD_NEED_PERSON_ENV] === '1',
     // #884: set in the env of a review session (`card.review`).
     review: deps.env[CARD_REVIEW_ENV] === '1',
   });
