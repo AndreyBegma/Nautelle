@@ -18,7 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiUnreachableError, api } from '../../lib/api';
 import {
   AttachSupervisor,
-  shouldReattach,
+  decideClose,
   ticketRequestFor,
 } from '../../lib/terminal/attach';
 import {
@@ -429,21 +429,22 @@ export function TerminalView({
           if (stale()) return;
           // An answer can no longer arrive; a shown history stays readable.
           if (controller.state === 'loading') closePast();
-          const retry = shouldReattach({
+          const action = decideClose({
             attached,
             refused,
             reason: endReason,
             code: event.code,
+            mode: attachMode,
           });
-          if (retry && !attached) {
+          if (action.kind === 'retry-attach') {
             supervisor.attemptFailed();
             return;
           }
-          if (retry) {
+          if (action.kind === 'reattach') {
             // The runner dropped the socket; the session may still run. The
-            // xterm stays, tmux redraws it. A hold may have moved on: read.
-            if (attachMode === 'write') {
-              attachMode = 'read';
+            // xterm stays, tmux redraws it.
+            attachMode = action.mode;
+            if (action.demoted) {
               term.options.disableStdin = true;
               term.options.cursorBlink = false;
               demoted.current?.();

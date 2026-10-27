@@ -189,3 +189,27 @@ export const ticketRequestFor = <T extends { mode: 'read' | 'write' }>(
   base: Omit<T, 'mode'>,
   mode: T['mode'],
 ): T => ({ ...base, mode }) as T;
+
+/** What the view does with a closed socket. */
+export type CloseAction =
+  | { kind: 'retry-attach' }
+  | { kind: 'reattach'; mode: 'read' | 'write'; demoted: boolean }
+  | { kind: 'final' };
+
+/**
+ * The view's close handling, without the DOM: a failed first attach goes back
+ * to the backoff, a dropped attach keeps the terminal and reattaches (a write
+ * attach comes back as read: one writer, the hold may have moved on), anything
+ * else is final.
+ */
+export const decideClose = (
+  close: AttachClose & { mode: 'read' | 'write' },
+): CloseAction => {
+  if (!shouldReattach(close)) return { kind: 'final' };
+  if (!close.attached) return { kind: 'retry-attach' };
+  return {
+    kind: 'reattach',
+    mode: 'read',
+    demoted: close.mode === 'write',
+  };
+};

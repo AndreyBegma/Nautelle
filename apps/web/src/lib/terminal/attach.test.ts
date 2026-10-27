@@ -5,6 +5,7 @@ import {
   type AttachState,
   AttachSupervisor,
   attachRetryDelay,
+  decideClose,
   isTransientCloseCode,
   shouldReattach,
   ticketRequestFor,
@@ -99,6 +100,67 @@ describe('shouldReattach', () => {
     expect(
       shouldReattach({ ...base, attached: false, code: 1006, reason: 'idle' }),
     ).toBe(false);
+  });
+});
+
+describe('decideClose', () => {
+  const base = {
+    attached: true,
+    refused: false,
+    code: 1006,
+    mode: 'write' as const,
+  };
+  test('a drop after attached keeps the terminal and reattaches', () => {
+    expect(decideClose({ ...base, reason: 'socket' }).kind).toBe('reattach');
+    expect(decideClose({ ...base, mode: 'read' })).toEqual({
+      kind: 'reattach',
+      mode: 'read',
+      demoted: false,
+    });
+  });
+
+  test('a write attach comes back as read and is reported as demoted', () => {
+    expect(decideClose(base)).toEqual({
+      kind: 'reattach',
+      mode: 'read',
+      demoted: true,
+    });
+  });
+
+  test('final reasons and refusals end the terminal', () => {
+    for (const reason of ['session_ended', 'idle', 'max_duration', 'client']) {
+      expect(decideClose({ ...base, reason })).toEqual({ kind: 'final' });
+    }
+    expect(decideClose({ ...base, refused: true })).toEqual({ kind: 'final' });
+  });
+
+  test('a drop before attached goes back to the first-attach retry', () => {
+    expect(decideClose({ ...base, attached: false })).toEqual({
+      kind: 'retry-attach',
+    });
+  });
+
+  test('a demoted reattach asks for read and the supervisor reconnects', () => {
+    const { supervisor, advance, states, starts, last } = setup();
+    supervisor.begin();
+    supervisor.attached();
+    const action = decideClose(base);
+    expect(action.kind).toBe('reattach');
+    if (action.kind !== 'reattach') return;
+    expect(
+      ticketRequestFor<{ kind: string; mode: 'read' | 'write' }>(
+        { kind: 'x' },
+        action.mode,
+      ),
+    ).toEqual({
+      kind: 'x',
+      mode: 'read',
+    });
+    supervisor.dropped();
+    expect(last()).toEqual({ phase: 'reconnecting', attempt: 2 });
+    advance(attachRetryDelay(0));
+    expect(starts.at(-1)).toBe(2);
+    expect(states.length).toBeGreaterThan(0);
   });
 });
 
