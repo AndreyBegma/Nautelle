@@ -148,12 +148,29 @@ describe('stacked card branches (e2e, #636)', () => {
     await link(card.number, a.number);
     await link(card.number, b.number);
 
+    // C-417: the board says so before the click.
+    expect((await detail(card.number)).readiness).toMatchObject({
+      state: 'blocked',
+      open: [],
+      unmerged: [{ number: a.number }, { number: b.number }],
+    });
+
     const refused = await w.runCard(card.number);
     expect(refused.status).toBe(409);
     expect(refused.body.error).toBe(BOARD_ERROR.dependenciesUnmerged);
     expect(refused.body.dependencies).toEqual([
-      { number: a.number, label: `C-${a.number}`, column: 'finished' },
-      { number: b.number, label: `C-${b.number}`, column: 'finished' },
+      {
+        number: a.number,
+        label: `C-${a.number}`,
+        column: 'finished',
+        landed: false,
+      },
+      {
+        number: b.number,
+        label: `C-${b.number}`,
+        column: 'finished',
+        landed: false,
+      },
     ]);
     expect(w.sent('card.run')).toHaveLength(0);
 
@@ -177,6 +194,7 @@ describe('stacked card branches (e2e, #636)', () => {
     });
     await link(card.number, a.number);
     await link(card.number, b.number);
+    expect((await detail(card.number)).readiness?.state).toBe('ready');
     expect((await w.runCard(card.number)).status).toBe(200);
     expect(runBase()).toBe(BASE);
   });
@@ -617,6 +635,7 @@ describe('stacked card branches (e2e, #636)', () => {
           number: c284.number,
           label: `C-${c284.number}`,
           column: 'completed',
+          landed: false,
         },
       ]);
       expect(await w.card(c283.number)).toMatchObject({

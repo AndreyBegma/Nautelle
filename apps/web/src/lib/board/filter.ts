@@ -20,13 +20,23 @@ export const STATE_FILTER_LABEL: Record<StateFilter, string> = {
 export interface BoardFilter {
   text: string;
   kind: BoardCardKind | '';
+  /** C-499: a label's name; one label, like kind. */
+  label: string;
   state: StateFilter | '';
 }
 
-export const NO_FILTER: BoardFilter = { text: '', kind: '', state: '' };
+export const NO_FILTER: BoardFilter = {
+  text: '',
+  kind: '',
+  label: '',
+  state: '',
+};
 
 export const isFiltering = (filter: BoardFilter): boolean =>
-  filter.text.trim() !== '' || filter.kind !== '' || filter.state !== '';
+  filter.text.trim() !== '' ||
+  filter.kind !== '' ||
+  filter.label !== '' ||
+  filter.state !== '';
 
 /** The filterable state of a card; `null` when its round is idle, finished or absent. */
 export function stateOf(card: BoardCardView): StateFilter | null {
@@ -52,19 +62,27 @@ function matchesText(card: BoardCardView, text: string): boolean {
 }
 
 /**
- * A plan task has no kind and no round, so only the text reaches it; a kind or
- * state filter hides it.
+ * A plan task has no kind, label or round, so only the text reaches it; a kind,
+ * label or state filter hides it.
  */
 export function matchesFilter(
   item: WorkBoardItem,
   filter: BoardFilter,
 ): boolean {
   if (isPlanItem(item)) {
-    if (filter.kind !== '' || filter.state !== '') return false;
+    if (filter.kind !== '' || filter.label !== '' || filter.state !== '') {
+      return false;
+    }
     return item.label.toLowerCase().includes(filter.text.trim().toLowerCase());
   }
   const { card } = item;
   if (filter.kind !== '' && card.kind !== filter.kind) return false;
+  if (
+    filter.label !== '' &&
+    !card.labels.some((label) => label.name === filter.label)
+  ) {
+    return false;
+  }
   if (filter.state !== '' && stateOf(card) !== filter.state) return false;
   return matchesText(card, filter.text);
 }
@@ -89,20 +107,24 @@ export function boardMeta(items: readonly WorkBoardItem[]): {
 export const countLabel = (shown: number, total: number): string =>
   shown === total ? String(total) : `${shown}/${total}`;
 
+/** `LABEL_NAME_PATTERN` allows 32 characters; a longer value is no label. */
+const LABEL_NAME_MAX = 32;
+
 const isKind = (value: string): value is BoardCardKind =>
   (BOARD_CARD_KINDS as readonly string[]).includes(value);
 const isState = (value: string): value is StateFilter =>
   (STATE_FILTERS as readonly string[]).includes(value);
 
-/** The board's filters in the URL (`?q=&kind=&state=`); an unknown value reads as unset. */
+/** The board's filters in the URL (`?q=&kind=&label=&state=`); an unknown value reads as unset. */
 export const boardFilterCodec: FilterCodec<BoardFilter> = {
-  keys: ['q', 'kind', 'state'],
+  keys: ['q', 'kind', 'label', 'state'],
   parse: (params) => {
     const kind = params.get('kind') ?? '';
     const state = params.get('state') ?? '';
     return {
       text: (params.get('q') ?? '').trim(),
       kind: isKind(kind) ? kind : '',
+      label: (params.get('label') ?? '').trim().slice(0, LABEL_NAME_MAX),
       state: isState(state) ? state : '',
     };
   },
@@ -110,6 +132,7 @@ export const boardFilterCodec: FilterCodec<BoardFilter> = {
     const params = new URLSearchParams();
     if (filters.text.trim()) params.set('q', filters.text.trim());
     if (filters.kind) params.set('kind', filters.kind);
+    if (filters.label) params.set('label', filters.label);
     if (filters.state) params.set('state', filters.state);
     const text = params.toString();
     return text ? `?${text}` : '';

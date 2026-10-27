@@ -172,6 +172,8 @@ export class TestRunnerSocket {
     origin: string,
     token: string | null,
     headers: Record<string, string> = {},
+    /** `false` plays a dead link: the gateway's pings go unanswered. */
+    autoPong = true,
   ) {
     const url = `${origin.replace(/^http/, 'ws')}${RUNNER_SOCKET_PATH}`;
     this.socket = new WebSocket(url, {
@@ -179,6 +181,7 @@ export class TestRunnerSocket {
         ...headers,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
+      autoPong,
     });
     this.socket.on('message', (data) => {
       this.inbox.push(serverMessageSchema.parse(JSON.parse(data.toString())));
