@@ -4,6 +4,7 @@ import {
   type CardReadiness,
   isDependencySatisfied,
   openDependencies,
+  unmergedDependencies,
 } from '@nautelle/shared';
 
 /**
@@ -68,16 +69,23 @@ export const labelList = (
   return `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`;
 };
 
+/** C-417: "C-1 and C-2 are not merged yet; a card branches from one dependency only". */
+const unmergedText = (unmerged: readonly CardDependencyRef[]) =>
+  `${labelList(unmerged)} are not merged yet; a card branches from one dependency only`;
+
 /**
  * #638: why Run is held — "Waits for C-13, C-14 and C-16" — or null when
  * every dependency is in Finished or Completed. The API refuses such a Run
- * with 409 `dependency_open`; there is no override.
+ * with 409 `dependency_open`; there is no override. C-417: with all of them
+ * satisfied, more than one not merged holds it too (`dependencies_unmerged`).
  */
 export function runWaitsFor(
   dependsOn: readonly CardDependencyRef[] | null | undefined,
 ): string | null {
   const open = openDependencies(dependsOn ?? []);
-  return open.length > 0 ? `Waits for ${labelList(open)}` : null;
+  if (open.length > 0) return `Waits for ${labelList(open)}`;
+  const unmerged = unmergedDependencies(dependsOn ?? []);
+  return unmerged.length > 0 ? unmergedText(unmerged) : null;
 }
 
 /** #443: the face's Ready / Waiting chip, and what a waiting card waits for. */
@@ -103,6 +111,15 @@ export function readinessChip(
       waitsFor: null,
     };
   }
+  if (readiness.state === 'blocked') {
+    const reason = unmergedText(readiness.unmerged);
+    return {
+      text: `Blocked · merge one of ${readiness.unmerged.map((d) => d.label).join(', ')}`,
+      tone: 'warn',
+      title: `${reason}.`,
+      waitsFor: reason,
+    };
+  }
   const waitsFor = `Waits for ${labelList(readiness.open)}`;
   return {
     text: `Waiting · ${readiness.satisfied} of ${readiness.total}`,
@@ -121,6 +138,9 @@ export function autoRunNote(
   if (readiness?.state === 'waiting') {
     const open = readiness.open;
     return `Will start automatically once ${labelList(open)} ${open.length === 1 ? 'has a' : 'have'} ready pull request${open.length === 1 ? '' : 's'}.`;
+  }
+  if (readiness?.state === 'blocked') {
+    return `Will not start while ${labelList(readiness.unmerged)} are not merged; it starts once all but one are.`;
   }
   return 'Nothing is left to wait for, so nothing will start it. Press Run.';
 }

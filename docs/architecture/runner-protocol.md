@@ -42,6 +42,18 @@ both sit at the root of that origin.
   whose `type` is not in the tables below is rejected. Unknown *fields* are
   ignored, so a field can be added without breaking the other side.
 - Reconnect with exponential backoff (1 s → 60 s, jitter).
+- A silent socket is found on both ends (#1057). The server sends a WebSocket
+  ping every 20 s to each live runner socket and terminates one that left two
+  pings unanswered (the runner's client answers pings by itself), so the
+  runner goes `offline` without waiting for the OS. With `heartbeat_ack` in
+  `welcome.features` the server answers every `heartbeat` with `ack`; the
+  runner then closes a socket that received no frame for 45 s (three heartbeat
+  intervals) with `4000` `no frames` and reconnects. `4000` is not terminal.
+  An older API never advertises the feature, so its runners never arm the
+  watchdog.
+- Each end logs a closed socket with its lifetime and the time since the last
+  frame it received; the runner adds the time since its last send and whether
+  the socket was live.
 - Close codes the server uses (`RUNNER_CLOSE_CODES`):
 
 | Code | Meaning |
@@ -223,9 +235,15 @@ one.
     "projects": [{ "id": "prj_agentdock", "root": "/home/archi/dev/AgentDock" }],
     "pollIntervalsMs": { "tmux": 2000, "worktrees": 10000 }
   },
-  "ackedSeq": 18230
+  "ackedSeq": 18230,
+  "features": ["command_results_spooled", "heartbeat_ack"]
 }
 ```
+
+`features` lists the `SERVER_FEATURES` the API has; a runner reads its
+absence as an older API. `command_results_spooled`: command results arrive as
+spooled events (#740). `heartbeat_ack`: every `heartbeat` is answered with
+`ack` at the current cursor (#1057).
 
 `config.projects` is the runner's **watch list**: the projects whose roots it
 may refresh and whose collectors it runs, one instance per collector per

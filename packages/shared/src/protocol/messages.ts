@@ -121,6 +121,12 @@ export const SERVER_FEATURES = {
    * the runner also sends each result as a `command.result` frame.
    */
   commandResultsSpooled: 'command_results_spooled',
+  /**
+   * Every `heartbeat` is answered with `ack` (#1057 D2), so the server sends
+   * something periodic. Only with it does the runner close a socket that has
+   * been silent for three heartbeat intervals.
+   */
+  heartbeatAck: 'heartbeat_ack',
 } as const;
 
 export const commandProgressMessageSchema = z.object({
