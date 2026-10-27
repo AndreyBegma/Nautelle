@@ -302,6 +302,13 @@ export const capabilitiesSchema = z.object({
    */
   cardDemo: z.boolean().optional(),
   /**
+   * C-456: the runner takes `checkout` on `card.demo` — it records on a
+   * detached checkout of the PR head, for a card whose worktree is gone.
+   * `card.demo` args are strict, so the API sends the field only when this is
+   * `true`. Absent means `false`.
+   */
+  cardDemoCheckout: z.boolean().optional(),
+  /**
    * C-503 (ADR-0126): the runner takes `readOnly` on `card.run` — an
    * analysis card's round. `card.run` args are strict, so the API sends the
    * field only when this is `true`. Absent means `false`.
@@ -379,6 +386,12 @@ export const prefixOverlaysAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `card.demo` (ADR-0090); absent is `false`. */
 export const cardDemoAvailable = (capabilities: Capabilities): boolean =>
   capabilities.cardDemo === true;
+
+/** Whether the API may send `card.demo`'s `checkout` (C-456); absent is `false`. */
+export const cardDemoCheckoutAvailable = (
+  capabilities: Capabilities,
+): boolean =>
+  capabilities.cardDemo === true && capabilities.cardDemoCheckout === true;
 
 /** Whether the API may send `card.run`'s `readOnly` (ADR-0126); absent is `false`. */
 export const cardReadOnlyAvailable = (capabilities: Capabilities): boolean =>

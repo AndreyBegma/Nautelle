@@ -9,6 +9,7 @@ import type { CardExecutor } from './executor';
 export { type CardChecksDeps, cardChecks } from './checks';
 export { type CardCiRetriggerDeps, retriggerCardCi } from './ci-retrigger';
 export { CardExecutor, type CardExecutorOptions } from './executor';
+export { type CardHeadDeltaDeps, cardHeadDelta } from './head-delta';
 export { type CardMergeDeps, mergeCard } from './merge';
 export { type CardPrCloseDeps, closeCardPr } from './pr-close';
 export { type CardPrOpenDeps, openCardPr } from './pr-open';
@@ -26,7 +27,7 @@ export {
  * (#359 D5) with `cardChecks`, `card.ciRetrigger` (#484) with
  * `retriggerCardCi`, `card.prRetarget` (#636) with `retargetCardPr`, and
  * `card.prOpen` (#709) with `openCardPr`, and `card.reviewPublish` (#884)
- * with `publishCardReview`. `card.review` and `card.reviewStop` (#884) are
+ * with `publishCardReview`, and `card.headDelta` (C-457) with `cardHeadDelta`. `card.review` and `card.reviewStop` (#884) are
  * the executor's: they share its tmux and its card store.
  */
 export type CardHandlers = {

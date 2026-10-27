@@ -37,6 +37,8 @@ export class MockServer {
   readonly pairingAccess: AccessSeen[] = [];
   readonly socketAccess: AccessSeen[] = [];
   connections = 0;
+  /** The close code and reason of every socket that closed, in order. */
+  readonly closes: { code: number; reason: string }[] = [];
   pairing: PairingHandler = () =>
     Response.json({ error: 'invalid_code' }, { status: 400 });
   /** Sent on every new socket once `hello` arrives; null sends nothing. */
@@ -90,7 +92,8 @@ export class MockServer {
             if (reply) ws.send(JSON.stringify(reply));
           }
         },
-        close: (ws) => {
+        close: (ws, code, reason) => {
+          this.closes.push({ code, reason });
           if (this.socket === ws) this.socket = null;
         },
       },

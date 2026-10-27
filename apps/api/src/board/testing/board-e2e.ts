@@ -35,6 +35,7 @@ type WorldCommand =
   | 'card.prClose'
   | 'card.prRetarget'
   | 'card.prOpen'
+  | 'card.headDelta'
   | 'card.review'
   | 'card.reviewStop'
   | 'card.reviewPublish'
@@ -134,6 +135,8 @@ export class BoardWorld {
   prRetargetServed = true;
   /** #709: whether the runner advertises `card.prOpen`. */
   prOpenServed = true;
+  /** C-457: whether the runner advertises `card.headDelta`. */
+  headDeltaServed = true;
   /** #884: whether the runner serves `card.review` (`reviewSupport`). */
   reviewServed = true;
   /** #329 D4: the delayed collect retries scheduled so far, oldest first. */
@@ -222,6 +225,15 @@ export class BoardWorld {
         return this.answer('card.prOpen', { ...args });
       });
     jest
+      .spyOn(this.commands, 'servesHeadDelta')
+      .mockImplementation(() => this.headDeltaServed);
+    jest
+      .spyOn(this.commands, 'headDelta')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.headDelta');
+        return this.answer('card.headDelta', { ...args });
+      });
+    jest
       .spyOn(this.commands, 'reviewSupport')
       .mockImplementation(() =>
         this.offline
@@ -293,6 +305,8 @@ export class BoardWorld {
       'card.ciRetrigger': { retriggered: true },
       'card.demo': { status: 'queued' },
       'card.prRetarget': { retargeted: true, alreadyThere: false },
+      // C-457: no head is a base merge unless a suite says so.
+      'card.headDelta': { baseMerge: false, reason: 'not_a_merge' },
       'card.prOpen': {
         opened: true,
         prNumber: 91,
@@ -364,6 +378,7 @@ export class BoardWorld {
     jest.mocked(this.commands.ciRetrigger).mockClear();
     jest.mocked(this.commands.retargetPr).mockClear();
     jest.mocked(this.commands.openPr).mockClear();
+    jest.mocked(this.commands.headDelta).mockClear();
     jest.mocked(this.commands.review).mockClear();
     jest.mocked(this.commands.stopReview).mockClear();
     jest.mocked(this.commands.publishReview).mockClear();
@@ -377,6 +392,7 @@ export class BoardWorld {
     this.ciRetriggerServed = true;
     this.prRetargetServed = true;
     this.prOpenServed = true;
+    this.headDeltaServed = true;
     this.retries = [];
     await resetDatabase(this.ctx.prisma);
     ({ runnerId: this.runnerId, projectId: this.a } = await seedProject(
@@ -499,6 +515,13 @@ export class BoardWorld {
   prOpens(): Record<string, unknown>[] {
     return jest
       .mocked(this.commands.openPr)
+      .mock.calls.map(([, args]) => ({ ...args }));
+  }
+
+  /** C-457: the `card.headDelta` commands sent, oldest first. */
+  headDeltas(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.headDelta)
       .mock.calls.map(([, args]) => ({ ...args }));
   }
 

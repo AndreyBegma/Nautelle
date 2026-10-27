@@ -1003,6 +1003,24 @@ export class BoardWork implements OnModuleInit {
     this.publish(project.id, cardId);
     await this.restack(cardId);
     if (count > 0 && complete) await this.completeMerged(project, cardId);
+    // C-417: a merge may be the one that lets a dependant with two unlanded
+    // dependencies auto-run; the claim keeps this to once.
+    if (count > 0 && this.cardSatisfied) {
+      const merged = await this.prisma.boardCard.findUnique({
+        where: { id: cardId },
+        select: { id: true, number: true },
+      });
+      if (merged) {
+        await this.cardSatisfied(project.id, merged, BOARD_SYSTEM_ACTOR).catch(
+          (error: unknown) => {
+            this.logger.error(
+              `the auto-run after the merge of ${cardLabel(merged.number)} failed`,
+              error instanceof Error ? error.stack : String(error),
+            );
+          },
+        );
+      }
+    }
   }
 
   /**

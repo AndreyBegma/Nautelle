@@ -45,19 +45,39 @@ describe('isDependencySatisfied', () => {
 describe('openDependencies', () => {
   it('is every dependency not in Finished or Completed', () => {
     const deps = [
-      { number: 12, label: 'C-12', column: 'todo' as const },
-      { number: 13, label: 'C-13', column: 'completed' as const },
-      { number: 14, label: 'C-14', column: 'finished' as const },
-      { number: 15, label: 'C-15', column: 'in_progress' as const },
+      { number: 12, label: 'C-12', column: 'todo' as const, landed: false },
+      { number: 13, label: 'C-13', column: 'completed' as const, landed: true },
+      { number: 14, label: 'C-14', column: 'finished' as const, landed: false },
+      {
+        number: 15,
+        label: 'C-15',
+        column: 'in_progress' as const,
+        landed: false,
+      },
     ];
     expect(openDependencies(deps).map((d) => d.number)).toEqual([12, 15]);
   });
 });
 
 describe('cardReadiness', () => {
-  const accepted = { number: 83, label: 'C-83', column: 'completed' as const };
-  const open = { number: 84, label: 'C-84', column: 'in_progress' as const };
-  const finished = { number: 85, label: 'C-85', column: 'finished' as const };
+  const accepted = {
+    number: 83,
+    label: 'C-83',
+    column: 'completed' as const,
+    landed: true,
+  };
+  const open = {
+    number: 84,
+    label: 'C-84',
+    column: 'in_progress' as const,
+    landed: false,
+  };
+  const finished = {
+    number: 85,
+    label: 'C-85',
+    column: 'finished' as const,
+    landed: false,
+  };
 
   it('is ready when every dependency is in Finished or Completed', () => {
     expect(cardReadiness('todo', [accepted, finished])).toEqual({
@@ -65,7 +85,28 @@ describe('cardReadiness', () => {
       satisfied: 2,
       total: 2,
       open: [],
+      unmerged: [],
     });
+  });
+
+  it('is blocked when two satisfied dependencies are not merged', () => {
+    const other = {
+      number: 86,
+      label: 'C-86',
+      column: 'finished' as const,
+      landed: false,
+    };
+    expect(cardReadiness('todo', [finished, other])).toEqual({
+      state: 'blocked',
+      satisfied: 2,
+      total: 2,
+      open: [],
+      unmerged: [finished, other],
+    });
+  });
+
+  it('is ready when only one satisfied dependency is not merged', () => {
+    expect(cardReadiness('todo', [accepted, finished])?.state).toBe('ready');
   });
 
   it('is waiting while one is open, naming the open ones', () => {
@@ -74,6 +115,7 @@ describe('cardReadiness', () => {
       satisfied: 1,
       total: 2,
       open: [open],
+      unmerged: [],
     });
   });
 

@@ -26,6 +26,7 @@ import {
 
 const PING_TIMEOUT_MS = 1_500;
 const STALE_AFTER_MS = 1_000;
+const PING_INTERVAL_MS = 300;
 
 const event = (
   seq: number,
@@ -52,8 +53,12 @@ describe('/runner gateway (e2e)', () => {
   let admin: Session;
   const sockets: TestRunnerSocket[] = [];
 
-  const open = (token: string | null, headers?: Record<string, string>) => {
-    const socket = new TestRunnerSocket(ctx.origin, token, headers);
+  const open = (
+    token: string | null,
+    headers?: Record<string, string>,
+    autoPong?: boolean,
+  ) => {
+    const socket = new TestRunnerSocket(ctx.origin, token, headers, autoPong);
     sockets.push(socket);
     return socket;
   };
@@ -65,6 +70,7 @@ describe('/runner gateway (e2e)', () => {
     ctx = await createRunnerE2eApp({
       pingTimeoutMs: PING_TIMEOUT_MS,
       staleAfterMs: STALE_AFTER_MS,
+      pingIntervalMs: PING_INTERVAL_MS,
     });
   });
   afterAll(() => ctx.app.close());
@@ -332,7 +338,7 @@ describe('/runner gateway (e2e)', () => {
         runnerId,
         config: { projects: [], pollIntervalsMs: {} },
         ackedSeq: 0,
-        features: ['command_results_spooled'],
+        features: ['command_results_spooled', 'heartbeat_ack'],
       });
 
       const shown = await detail(runnerId);
@@ -425,6 +431,53 @@ describe('/runner gateway (e2e)', () => {
         (await detail(runnerId)).status === 'offline' ? true : undefined,
       );
     });
+
+    it('#1057 D2: answers each heartbeat with ack at the current cursor', async () => {
+      const { token } = await pairedRunner(ctx, admin);
+      const socket = open(token);
+      const welcome = await socket.connect();
+      expect(welcome.features).toContain('heartbeat_ack');
+      const beat = () =>
+        socket.send({
+          type: 'heartbeat',
+          ts: new Date().toISOString(),
+          load: [0, 0, 0],
+          tmuxSessions: 0,
+          collectors: {},
+        });
+
+      beat();
+      expect(await socket.next('ack')).toEqual({ type: 'ack', seq: 0 });
+      socket.send({ type: 'events', events: range(1, 2) });
+      expect(await socket.next('ack')).toEqual({ type: 'ack', seq: 2 });
+      beat();
+      expect(await socket.next('ack')).toEqual({ type: 'ack', seq: 2 });
+    });
+
+    it('#1057 D4: terminates a live socket that answers no ping, and the runner goes offline', async () => {
+      const { runnerId, token } = await pairedRunner(ctx, admin);
+      const silent = open(token, undefined, false);
+      await silent.connect();
+      expect((await detail(runnerId)).status).toBe('online');
+
+      const started = Date.now();
+      const { code } = await silent.closed;
+      expect(code).toBe(1006);
+      // Two pings unanswered, ended on the third tick.
+      expect(Date.now() - started).toBeGreaterThanOrEqual(2 * PING_INTERVAL_MS);
+      await eventually('offline', async () =>
+        (await detail(runnerId)).status === 'offline' ? true : undefined,
+      );
+    });
+
+    it('#1057 D4: keeps a socket that answers its pings', async () => {
+      const { runnerId, token } = await pairedRunner(ctx, admin);
+      const socket = open(token);
+      await socket.connect();
+      await new Promise((resolve) => setTimeout(resolve, 5 * PING_INTERVAL_MS));
+      expect(socket.socket.readyState).toBe(socket.socket.OPEN);
+      expect((await detail(runnerId)).status).not.toBe('offline');
+    });
   });
 
   describe('heartbeat profiles (#348)', () => {
@@ -451,10 +504,12 @@ describe('/runner gateway (e2e)', () => {
     let seq = 0;
     const settled = async (socket: TestRunnerSocket) => {
       // The gateway handles messages in order: the ack of a following event
-      // means the beat before it is stored.
+      // means the beat before it is stored. The beat's own ack (#1057 D2)
+      // comes first and is skipped.
       seq += 1;
       socket.send({ type: 'events', events: [event(seq)] });
-      await socket.next('ack');
+      let acked = -1;
+      while (acked < seq) acked = (await socket.next('ack')).seq;
     };
 
     it('merges reported agentdock into the stored profile, ignores unknown ids, and leaves capabilities alone without profiles', async () => {
@@ -722,7 +777,7 @@ describe('/runner gateway (e2e)', () => {
       const { runnerId, token } = await pairedRunner(ctx, admin);
       const first = open(token);
       const welcome = await first.connect();
-      expect(welcome.features).toEqual(['command_results_spooled']);
+      expect(welcome.features).toContain('command_results_spooled');
       const pinging = admin
         .send('post', `/admin/runners/${runnerId}/ping`)
         .then((r) => r);

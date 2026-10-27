@@ -25,6 +25,7 @@ import {
   type CardPrTarget,
   type CardRoundView,
   isActiveRoundPhase,
+  openDependencies,
   WORK_CARD_KINDS,
 } from '@nautelle/shared';
 import { ExternalLink, Move, Zap } from 'lucide-react';
@@ -129,6 +130,7 @@ import { SavedBadge } from '../token-saver/saved-badge';
 import { CardDependenciesSection } from './card-dependencies';
 import { CardDescription } from './card-description';
 import { ApproveRunLink, CardDesignSection } from './card-design';
+import { CardLabels } from './card-labels';
 import {
   AutoCollectToggle,
   AutoRunSection,
@@ -1099,8 +1101,10 @@ export function CardDetailBody({
       ) : null}
       {canOperate && waitsFor && (canRun(card) || canRetry(card)) ? (
         <p id="board-run-waits" className="-mt-3 text-xs text-ink-3">
-          {waitsFor}. Run opens once every card it depends on has a ready pull
-          request (Finished) or is accepted.
+          {waitsFor}.{' '}
+          {openDependencies(card.dependsOn ?? []).length > 0
+            ? 'Run opens once every card it depends on has a ready pull request (Finished) or is accepted.'
+            : 'Run opens once all but one of them are merged.'}
         </p>
       ) : null}
       {canOperate && offer?.reason ? (
@@ -1347,6 +1351,14 @@ export function CardDetailBody({
             <Badge tone="neutral" label="Auto" />
           </div>
         ) : null}
+      </Field>
+      <Field label="Labels">
+        <CardLabels
+          projectId={projectId}
+          card={card}
+          canOperate={canOperate}
+          onSaved={onSaved}
+        />
       </Field>
       {fleet ? null : (
         <CardOptionToggles

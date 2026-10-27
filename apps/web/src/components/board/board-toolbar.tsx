@@ -2,7 +2,7 @@
 
 import { Input, Select } from '@andrewbehma/glass-ui/field';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
-import { BOARD_CARD_KINDS } from '@nautelle/shared';
+import { BOARD_CARD_KINDS, type ProjectLabelView } from '@nautelle/shared';
 import { Search } from 'lucide-react';
 import {
   type BoardFilter,
@@ -19,9 +19,16 @@ const capitalize = (text: string) =>
 
 /**
  * The board's filter bar (C-29): search over title, C-number and PR, Kind and
- * State as instant selects. The filters live in the URL.
+ * Label and State as instant selects. The filters live in the URL.
  */
-export function BoardToolbar({ url }: { url: UrlFilters<BoardFilter> }) {
+export function BoardToolbar({
+  url,
+  labels,
+}: {
+  url: UrlFilters<BoardFilter>;
+  /** The project's labels; empty until they load. */
+  labels: readonly ProjectLabelView[];
+}) {
   const { filters, set } = url;
   const text = useSearchDraft(filters.text, (value) => set({ text: value }));
   return (
@@ -61,6 +68,24 @@ export function BoardToolbar({ url }: { url: UrlFilters<BoardFilter> }) {
             {BOARD_CARD_KINDS.map((kind) => (
               <option key={kind} value={kind}>
                 {capitalize(kind)}
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Label"
+            value={filters.label}
+            className="w-full sm:w-36"
+            onChange={(e) => set({ label: e.target.value })}
+          >
+            <option value="">Any label</option>
+            {/* A label in the URL the project no longer has stays selectable, so the chip is not silently dropped. */}
+            {filters.label !== '' &&
+            !labels.some((label) => label.name === filters.label) ? (
+              <option value={filters.label}>{filters.label}</option>
+            ) : null}
+            {labels.map((label) => (
+              <option key={label.id} value={label.name}>
+                {label.name}
               </option>
             ))}
           </Select>

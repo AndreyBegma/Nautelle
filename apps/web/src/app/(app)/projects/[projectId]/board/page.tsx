@@ -9,6 +9,7 @@ import {
   type BoardCardView,
   type BoardPlanTaskView,
   type BoardView,
+  LABELS_CHANGED_EVENT,
   PLANNER_LIVE_EVENT,
   type PlanSummary,
   QUEUE_LIVE_EVENT,
@@ -65,6 +66,7 @@ import {
   parseLinkedPlans,
 } from '../../../../../lib/board/format';
 import { newWorkBrief } from '../../../../../lib/board/intake';
+import { fetchProjectLabels } from '../../../../../lib/board/labels';
 import {
   boardItems,
   fetchPlanTasks,
@@ -136,8 +138,10 @@ function BoardScreen() {
 
   useLive(`project:${projectId}`, (message) => {
     // D14: a plan task moves with its plan (planner) and its issue (queue).
+    // C-499: a recoloured or renamed label recolours the stripes.
     if (
       message.event !== BOARD_CHANGED_EVENT &&
+      message.event !== LABELS_CHANGED_EVENT &&
       message.event !== PLANNER_LIVE_EVENT &&
       message.event !== QUEUE_LIVE_EVENT
     ) {
@@ -173,6 +177,10 @@ function BoardScreen() {
   ]);
 
   const board = useSection(() => fetchBoard(projectId), [projectId]);
+  const labels = useSection(
+    () => fetchProjectLabels(projectId).catch(() => null),
+    [projectId],
+  );
   const planTasks = useSection(() => fetchPlanTasks(projectId), [projectId]);
   const planTaskItems: readonly BoardPlanTaskView[] =
     planTasks.data?.items ?? [];
@@ -186,13 +194,15 @@ function BoardScreen() {
   // columns never left the skeleton.
   const { refresh: refreshBoard } = board;
   const { refresh: refreshPlanTasks } = planTasks;
+  const { refresh: refreshLabels } = labels;
   const { refresh: refreshTriage } = triage;
   useEffect(() => {
     if (version === 0) return;
     refreshBoard();
     refreshPlanTasks();
     refreshTriage();
-  }, [version, refreshBoard, refreshPlanTasks, refreshTriage]);
+    refreshLabels();
+  }, [version, refreshBoard, refreshPlanTasks, refreshTriage, refreshLabels]);
   const hints = useMemo(
     () => new Map((triage.data?.cards ?? []).map((c) => [c.number, c.hints])),
     [triage.data],
@@ -445,7 +455,7 @@ function BoardScreen() {
         </div>
       ) : null}
 
-      <BoardToolbar url={url} />
+      <BoardToolbar url={url} labels={labels.data?.labels ?? []} />
 
       <AsyncSection
         section={board}

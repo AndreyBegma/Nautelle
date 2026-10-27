@@ -36,11 +36,18 @@ import {
   type LocalResult,
   localFail,
 } from './local/types';
-import { errorMessage, type Logger } from './log';
+import { errorMessage, type LogFields, type Logger } from './log';
 import { socketUrl } from './server-url';
 import type { Spool } from './spool';
 
 export const HEARTBEAT_INTERVAL_MS = 15_000;
+/**
+ * With `heartbeat_ack`, a socket that received no frame for this long is
+ * dead: the runner closes it and reconnects (#1057 D3).
+ */
+export const SILENCE_LIMIT_MS = 3 * HEARTBEAT_INTERVAL_MS;
+/** The close the watchdog sends on a silent socket; not terminal. */
+export const SILENT_CLOSE = { code: 4000, reason: 'no frames' } as const;
 /** A connection that lasted this long resets the backoff (D6). */
 export const BACKOFF_RESET_AFTER_MS = 60_000;
 
@@ -158,11 +165,15 @@ export class RunnerConnection {
   private state: State = 'idle';
   private socket: WebSocket | null = null;
   private openedAt: number | null = null;
+  /** When the current socket last received / sent a frame (#1057 D1). */
+  private lastFrameAt: number | null = null;
+  private lastSendAt: number | null = null;
   /** Highest seq sent on the current connection. */
   private sentSeq = 0;
   /** `welcome.features` of the last connection; empty for an older API. */
   private serverFeatures: ReadonlySet<string> = new Set();
   private cancelHeartbeat: Cancel = () => {};
+  private cancelWatchdog: Cancel = () => {};
   private cancelReconnect: Cancel = () => {};
   private resolveDone: (reason: StopReason) => void = () => {};
   /** Runner-initiated `local.request`s awaiting their `local.response` (spec 201 D6). */
@@ -326,10 +337,13 @@ export class RunnerConnection {
       if (this.socket !== socket) return;
       this.state = 'open';
       this.openedAt = this.options.clock.now();
+      this.lastFrameAt = null;
+      this.lastSendAt = null;
       void this.sendHello(socket);
     };
     socket.onmessage = (event) => {
       if (this.socket !== socket) return;
+      this.lastFrameAt = this.options.clock.now();
       this.receive(event.data);
     };
     socket.onerror = () => {
@@ -392,6 +406,7 @@ export class RunnerConnection {
         this.state = 'live';
         this.flush();
         this.startHeartbeat();
+        this.startWatchdog();
         this.options.onConfig?.(message.config);
         return;
       }
@@ -502,6 +517,34 @@ export class RunnerConnection {
     }
   }
 
+  /**
+   * Armed only when the server answers heartbeats (#1057 D3): an older API
+   * may send nothing for minutes on a healthy socket. Fires when the last
+   * frame is `SILENCE_LIMIT_MS` old, re-arming for the rest otherwise.
+   */
+  private startWatchdog(): void {
+    this.cancelWatchdog();
+    if (!this.serverFeatures.has(SERVER_FEATURES.heartbeatAck)) return;
+    const { clock } = this.options;
+    const check = (): void => {
+      const socket = this.socket;
+      if (this.state !== 'live' || !socket) return;
+      const silentMs = clock.now() - (this.lastFrameAt ?? clock.now());
+      if (silentMs < SILENCE_LIMIT_MS) {
+        this.cancelWatchdog = clock.setTimeout(
+          check,
+          SILENCE_LIMIT_MS - silentMs,
+        );
+        return;
+      }
+      // A dead link may never deliver the close handshake: treat the socket
+      // as closed now, so its own `onclose` later finds it replaced.
+      this.closed(SILENT_CLOSE.code, SILENT_CLOSE.reason);
+      socket.close(SILENT_CLOSE.code, SILENT_CLOSE.reason);
+    };
+    this.cancelWatchdog = clock.setTimeout(check, SILENCE_LIMIT_MS);
+  }
+
   /** Sends a message when the socket is open; pane frames and terminal bytes use it. */
   sendMessage(message: RunnerMessage): boolean {
     return this.send(message);
@@ -511,12 +554,15 @@ export class RunnerConnection {
     const socket = this.socket;
     if (!socket || socket.readyState !== WebSocket.OPEN) return false;
     socket.send(JSON.stringify(message));
+    this.lastSendAt = this.options.clock.now();
     return true;
   }
 
   private closed(code: number, reason: string): void {
     const { log, clock, backoff } = this.options;
+    const facts = this.closeFacts(code, reason);
     this.cancelHeartbeat();
+    this.cancelWatchdog();
     this.socket = null;
     this.options.pane?.reset();
     this.options.runLog?.reset();
@@ -524,7 +570,7 @@ export class RunnerConnection {
     this.dropLocal();
     if (this.state === 'stopped') return;
     if (TERMINAL_CLOSE_CODES.has(code)) {
-      log.error('the server closed the connection for good', { code, reason });
+      log.error('the server closed the connection for good', facts);
       this.finish({ kind: 'terminal', code, reason });
       return;
     }
@@ -535,8 +581,22 @@ export class RunnerConnection {
       backoff.reset();
     }
     this.openedAt = null;
-    log.warn('disconnected', { code, reason });
+    log.warn('disconnected', facts);
     this.scheduleReconnect();
+  }
+
+  /** What the close line says (#1057 D1); a `null` time never happened. */
+  private closeFacts(code: number, reason: string): LogFields {
+    const now = this.options.clock.now();
+    const since = (at: number | null) => (at === null ? null : now - at);
+    return {
+      code,
+      reason,
+      wasLive: this.state === 'live',
+      livedMs: since(this.openedAt),
+      sinceLastFrameMs: since(this.lastFrameAt),
+      sinceLastSendMs: since(this.lastSendAt),
+    };
   }
 
   private scheduleReconnect(): void {
@@ -551,6 +611,7 @@ export class RunnerConnection {
   private finish(reason: StopReason): void {
     this.state = 'stopped';
     this.cancelHeartbeat();
+    this.cancelWatchdog();
     this.cancelReconnect();
     const socket = this.socket;
     this.socket = null;

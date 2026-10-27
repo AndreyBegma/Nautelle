@@ -342,6 +342,74 @@ describe('demo videos of green cards (e2e, C-370)', () => {
   });
 
   /**
+   * C-455: a Finished card the CI pass does not read (auto-merge off, a
+   * protected path) still gets the demo of a new green head, from the merge
+   * watch — which stores no checks and merges nothing.
+   */
+  describe('the merge watch (C-455)', () => {
+    /** C-1 is Finished with its checks read green; the CI pass skips it. */
+    const finishedOutside = async () => {
+      await setAutoMerge(false);
+      await enableDemos();
+      await finishedPending();
+      await w.ctx.prisma.boardCard.updateMany({
+        data: { ciState: 'green', protectedPaths: ['prisma/schema.prisma'] },
+      });
+    };
+
+    /** The merge watch reads a card at most once per interval. */
+    const watched = async (extra: Record<string, unknown> = {}) => {
+      const reads: Map<string, number> = Reflect.get(shipping, 'mergeReads');
+      reads.clear();
+      checksAnswer(extra);
+      await shipping.watchMerges();
+      await w.work.settled();
+    };
+
+    it('records one auto demo of a green head; ciState, column and merge stay', async () => {
+      await finishedOutside();
+      await watched();
+      await watched();
+      expect(await demos()).toEqual([
+        expect.objectContaining({ trigger: 'auto', headSha: HEAD_SHA }),
+      ]);
+      expect(w.demosSent()).toHaveLength(1);
+      expect(await w.card(1)).toMatchObject({
+        column: 'finished',
+        ciState: 'green',
+        mergedAt: null,
+      });
+      expect(w.sent('card.merge')).toEqual([]);
+    });
+
+    it('supersedes the demo of the old head and records the new one', async () => {
+      await finishedOutside();
+      await watched();
+      await watched({ headSha: NEXT_HEAD });
+      const [old, next] = await demos();
+      expect(old).toMatchObject({ status: 'skipped' });
+      expect(next).toMatchObject({ headSha: NEXT_HEAD, status: 'queued' });
+      expect(w.sent('card.merge')).toEqual([]);
+    });
+
+    it('records nothing for a card that needs a person (ADR-0095 §1)', async () => {
+      await finishedOutside();
+      await w.ctx.prisma.boardCard.updateMany({ data: { needsPerson: true } });
+      await watched();
+      expect(await demos()).toEqual([]);
+    });
+
+    it('records nothing for a pending or a red head', async () => {
+      await finishedOutside();
+      await watched(PENDING);
+      await watched({
+        checks: [{ name: 'ci/check', bucket: 'fail', link: null }],
+      });
+      expect(await demos()).toEqual([]);
+    });
+  });
+
+  /**
    * #946 (ADR-0099): a green head is recorded as soon as it reads green —
    * before its review steps decide, whatever the merge settings — and every
    * head that gets no demo says why in the API's log, once.

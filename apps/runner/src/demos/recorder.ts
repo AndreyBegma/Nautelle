@@ -9,7 +9,7 @@ import {
   rmSync,
   statSync,
 } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { basename, dirname, join, relative, sep } from 'node:path';
 import { ATTACHMENT_VIDEO_MAX_BYTES } from '@nautelle/shared';
 import {
   type CardDemoArgs,
@@ -20,6 +20,7 @@ import {
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { cardWorktreePath } from '../cards/launch';
+import { placeReviewWorktree, removeReviewWorktree } from '../cards/review';
 import { type Clock, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import { watchedProject } from '../control/target';
@@ -119,6 +120,16 @@ export const planPort = async (
   return { port, args: ['--port', String(port), '--fresh-app'] };
 };
 
+/**
+ * C-456: `<parent>/.wt-<repo>-demo-<shortId>`, the detached checkout of a PR
+ * head a demo records on when the card's worktree is gone. `demo-` is a
+ * runner worktree (`NON_SLOT_WORKTREE`).
+ */
+export const cardDemoWorktreePath = (root: string, shortId: string): string => {
+  const trimmed = root.replace(/\/+$/, '');
+  return join(dirname(trimmed), `.wt-${basename(trimmed)}-demo-${shortId}`);
+};
+
 /** `path` is `dir` or inside it, both real paths. */
 const within = (path: string, dir: string): boolean =>
   path === dir || path.startsWith(`${dir}${sep}`);
@@ -190,10 +201,10 @@ export class DemoRecorder {
         `${DEMO_QUEUE_MAX} demos are already waiting on this runner`,
       );
     }
-    this.queue.push({ args, project });
-    const status = this.current.size < this.limit ? 'recording' : 'queued';
+    const job = { args, project };
+    this.queue.push(job);
     this.drain();
-    return { status };
+    return { status: this.queue.includes(job) ? 'queued' : 'recording' };
   }
 
   /** Resolves once nothing records and nothing waits; for tests and shutdown. */
@@ -207,10 +218,24 @@ export class DemoRecorder {
     return this.deps.maxConcurrent ?? DEMO_DEFAULT_MAX_CONCURRENT;
   }
 
+  /**
+   * C-456: a checkout demo waits while another of the same card records —
+   * both would use one `-demo-<shortId>` worktree.
+   */
+  private sharesCheckout(job: Job): boolean {
+    const dir = (j: Job) =>
+      j.args.checkout
+        ? cardDemoWorktreePath(j.args.worktree.root, j.args.worktree.shortId)
+        : null;
+    const mine = dir(job);
+    return mine !== null && [...this.current].some((j) => dir(j) === mine);
+  }
+
   private drain(): void {
     while (this.current.size < this.limit) {
-      const next = this.queue.shift();
-      if (!next) return;
+      const at = this.queue.findIndex((job) => !this.sharesCheckout(job));
+      if (at < 0) return;
+      const [next] = this.queue.splice(at, 1);
       this.current.add(next);
       void this.run(next).finally(() => {
         this.current.delete(next);
@@ -301,10 +326,73 @@ export class DemoRecorder {
     pick: () => Promise<number>,
   ): Promise<Outcome> {
     const { args } = job;
-    const worktree = cardWorktreePath(
-      args.worktree.root,
-      args.worktree.shortId,
-    );
+    if (!args.checkout) {
+      const worktree = cardWorktreePath(
+        args.worktree.root,
+        args.worktree.shortId,
+      );
+      return this.recordIn(job, worktree, started, pick);
+    }
+    return this.recordOnCheckout(job, args.checkout, started, pick);
+  }
+
+  /**
+   * C-456: records on a detached checkout of the PR head — fetched from
+   * `pull/<pr>/head`, then as the commit itself — in its own worktree, which
+   * goes after the recording however it ended.
+   */
+  private async recordOnCheckout(
+    job: Job,
+    checkout: NonNullable<CardDemoArgs['checkout']>,
+    started: (scenarioPath: string) => void,
+    pick: () => Promise<number>,
+  ): Promise<Outcome> {
+    const { root, shortId } = job.args.worktree;
+    const worktree = cardDemoWorktreePath(root, shortId);
+    const git = { exec: this.deps.exec };
+    const head = `the head ${checkout.headSha.slice(0, 12)} of PR #${checkout.pr}`;
+    try {
+      let commit: string | null;
+      try {
+        commit = await placeReviewWorktree(
+          git,
+          root,
+          worktree,
+          `pull/${checkout.pr}/head`,
+          checkout.headSha,
+        );
+      } catch (error) {
+        return failed(
+          `${head} could not be checked out: ${errorMessage(error)}`,
+        );
+      }
+      if (commit === null) {
+        return failed(
+          `${checkout.headSha} of PR #${checkout.pr} is not on origin`,
+        );
+      }
+      return await this.recordIn(job, worktree, started, pick);
+    } finally {
+      try {
+        await removeReviewWorktree(git, root, worktree);
+      } catch (error) {
+        this.deps.log.warn('demo: the checkout worktree stays', {
+          card: job.args.card,
+          demoId: job.args.demoId,
+          worktree,
+          reason: errorMessage(error),
+        });
+      }
+    }
+  }
+
+  private async recordIn(
+    job: Job,
+    worktree: string,
+    started: (scenarioPath: string) => void,
+    pick: () => Promise<number>,
+  ): Promise<Outcome> {
+    const { args } = job;
     if (!existsSync(worktree) || !lstatSync(worktree).isDirectory()) {
       return failed(`the card's worktree ${worktree} does not exist`);
     }
@@ -379,6 +467,10 @@ export class DemoRecorder {
           cwd: top,
           env: {
             ...definedOnly(this.deps.env),
+            // The project's dev command names its demo database after the
+            // card; a `-demo-` checkout carries no `card-<id>` suffix to
+            // derive it from, so parallel demos would share one database.
+            NAUTELLE_CARD: args.worktree.shortId,
             PORT: String(plan.port),
             ...secrets,
           },

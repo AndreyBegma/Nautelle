@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type CardDemoArgs,
@@ -16,6 +16,7 @@ import { fakeExec, memoryLogger, TOKEN, tempDir } from '../testing/fixtures';
 import { DEMOFLOW_PACKAGE } from './pin';
 import type { DemoflowExit, DemoflowSpawn } from './process';
 import {
+  cardDemoWorktreePath,
   DEMO_DEFAULT_MAX_CONCURRENT,
   DEMO_QUEUE_MAX,
   DemoRecorder,
@@ -212,6 +213,7 @@ const setup = (
     sleeps,
     lines: logger.lines,
     worktree,
+    root,
   };
 };
 
@@ -279,6 +281,7 @@ describe('DemoRecorder', () => {
     // Only the names the command lists, not every project secret.
     expect(call.env.OTHER).toBeUndefined();
     expect(call.env.PORT).toBe('41234');
+    expect(call.env.NAUTELLE_CARD).toBe(SHORT_ID);
     expect(call.env.PATH).toBe('/usr/bin');
     expect('UNSET' in call.env).toBe(false);
     expect(call.args.join(' ')).not.toContain(SECRET);
@@ -599,6 +602,171 @@ describe('DemoRecorder', () => {
     for (let i = 0; i < DEMO_QUEUE_MAX + DEMO_DEFAULT_MAX_CONCURRENT; i += 1)
       recorder.command(args(`d${i}`));
     expect(() => recorder.command(args('one-more'))).toThrow(/already waiting/);
+  });
+});
+
+describe('DemoRecorder on a checkout of the PR head (C-456)', () => {
+  const PR = 5;
+  const exec = createExec(process.env, 10_000);
+  const git = async (cwd: string, ...argv: string[]) => {
+    const result = await exec('git', [
+      '-C',
+      cwd,
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.com',
+      ...argv,
+    ]);
+    expect(result?.code).toBe(0);
+    return (result?.stdout ?? '').trim();
+  };
+
+  /**
+   * `origin` holds the PR head only as `refs/pull/<PR>/head`, as GitHub does;
+   * `root` is a clone made before it, so the head must be fetched.
+   */
+  const repository = async (root: string): Promise<string> => {
+    const origin = join(root, '..', 'origin');
+    mkdirSync(origin);
+    await git(origin, 'init', '--quiet', '-b', 'develop');
+    writeFileSync(join(origin, 'README.md'), 'shop\n');
+    await git(origin, 'add', '-A');
+    await git(origin, 'commit', '--quiet', '-m', 'initial');
+    await git(root, 'clone', '--quiet', origin, '.');
+    await git(origin, 'checkout', '--quiet', '-b', 'card/c7');
+    mkdirSync(join(origin, 'demoflow', 'cards'), { recursive: true });
+    writeFileSync(
+      join(origin, 'demoflow.config.json'),
+      JSON.stringify({
+        baseUrl: 'http://localhost:3000',
+        devCommand: {
+          command: 'bun run dev',
+          readyUrl: 'http://localhost:3000',
+        },
+      }),
+    );
+    writeFileSync(join(origin, SCENARIO), '{"steps":[]}');
+    await git(origin, 'add', '-A');
+    await git(origin, 'commit', '--quiet', '-m', 'the card');
+    const head = await git(origin, 'rev-parse', 'HEAD');
+    await git(origin, 'update-ref', `refs/pull/${PR}/head`, head);
+    await git(origin, 'checkout', '--quiet', 'develop');
+    await git(origin, 'branch', '--quiet', '-D', 'card/c7');
+    return head;
+  };
+
+  const worktrees = async (root: string) =>
+    (await git(root, 'worktree', 'list', '--porcelain'))
+      .split('\n')
+      .filter((line) => line.startsWith('worktree '));
+
+  it('records from a detached worktree at the head and removes it after', async () => {
+    const calls: Call[] = [];
+    const render = rendering(calls);
+    let seen = { head: '', branch: '' };
+    const { recorder, args, events, root } = setup({
+      exec,
+      spawn: async (binary, argv, options) => {
+        seen = {
+          head: await git(options.cwd, 'rev-parse', 'HEAD'),
+          branch: await git(options.cwd, 'rev-parse', '--abbrev-ref', 'HEAD'),
+        };
+        return render(binary, argv, options);
+      },
+    });
+    const headSha = await repository(root);
+    const demo = cardDemoWorktreePath(root, SHORT_ID);
+
+    recorder.command({ ...args(), checkout: { pr: PR, headSha } });
+    await recorder.idle();
+
+    expect(statuses(events)).toEqual(['recording']);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].cwd).toBe(demo);
+    expect(calls[0].cwd.endsWith(`.wt-shop-demo-${SHORT_ID}`)).toBe(true);
+    expect(seen).toEqual({ head: headSha, branch: 'HEAD' });
+    // The dev command's per-card demo database cannot come from the path.
+    expect(calls[0].env.NAUTELLE_CARD).toBe(SHORT_ID);
+    expect(existsSync(demo)).toBe(false);
+    expect(await worktrees(root)).toHaveLength(1);
+  });
+
+  it('removes the worktree when the recording fails', async () => {
+    const calls: Call[] = [];
+    const { recorder, args, events, root } = setup({
+      exec,
+      spawn: failing(calls),
+    });
+    const headSha = await repository(root);
+    const demo = cardDemoWorktreePath(root, SHORT_ID);
+
+    recorder.command({ ...args(), checkout: { pr: PR, headSha } });
+    await recorder.idle();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].cwd).toBe(demo);
+    expect(statuses(events)[1]).toStartWith(
+      'failed: DemoFlow execution failed',
+    );
+    expect(existsSync(demo)).toBe(false);
+    expect(await worktrees(root)).toHaveLength(1);
+  });
+
+  it('records two checkout demos of one card one after the other', async () => {
+    const calls: Call[] = [];
+    const render = rendering(calls);
+    let running = 0;
+    let most = 0;
+    const { recorder, args, events, root } = setup({
+      exec,
+      maxConcurrent: 2,
+      freePorts: [41001, 41002],
+      spawn: async (binary, argv, options) => {
+        running += 1;
+        most = Math.max(most, running);
+        await new Promise((done) => setTimeout(done, 20));
+        running -= 1;
+        return render(binary, argv, options);
+      },
+    });
+    const headSha = await repository(root);
+    const checkout = { pr: PR, headSha };
+
+    expect(recorder.command({ ...args('d1'), checkout })).toEqual({
+      status: 'recording',
+    });
+    expect(recorder.command({ ...args('d2'), checkout })).toEqual({
+      status: 'queued',
+    });
+    await recorder.idle();
+
+    expect(calls).toHaveLength(2);
+    expect(most).toBe(1);
+    expect(statuses(events)).toEqual(['recording', 'recording']);
+    expect(existsSync(cardDemoWorktreePath(root, SHORT_ID))).toBe(false);
+  });
+
+  it('fails with a clear reason when the head cannot be fetched, leaving no worktree', async () => {
+    const calls: Call[] = [];
+    const { recorder, args, events, root } = setup({
+      exec,
+      spawn: rendering(calls),
+    });
+    await repository(root);
+    const missing = 'f'.repeat(40);
+
+    recorder.command({
+      ...args(),
+      checkout: { pr: PR + 1, headSha: missing },
+    });
+    await recorder.idle();
+
+    expect(calls).toHaveLength(0);
+    expect(statuses(events)).toEqual([
+      `failed: ${missing} of PR #${PR + 1} is not on origin`,
+    ]);
+    expect(existsSync(cardDemoWorktreePath(root, SHORT_ID))).toBe(false);
   });
 });
 

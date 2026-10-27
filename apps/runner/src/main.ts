@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { arch, hostname, platform } from 'node:os';
 
 /** A compiled binary runs from Bun's embedded filesystem. */
@@ -72,6 +72,13 @@ const update = await (async () => {
       Bun.spawn([...args], { stdio: ['inherit', 'inherit', 'inherit'] }).exited,
     exec: createExec(process.env),
     exists: existsSync,
+    readText: (path) => {
+      try {
+        return readFileSync(path, 'utf8');
+      } catch {
+        return null;
+      }
+    },
     stderr: (text) => process.stderr.write(text),
     paths: resolvePaths(process.env),
     uid: process.getuid?.() ?? 0,

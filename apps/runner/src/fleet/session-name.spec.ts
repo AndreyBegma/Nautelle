@@ -84,6 +84,7 @@ describe('worktree paths', () => {
     for (const name of [
       'card-ab12cd34',
       'review-ab12cd34',
+      'demo-ab12cd34',
       'plan-abc123',
       'uiprofile-abc123',
     ]) {
