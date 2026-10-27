@@ -10,6 +10,7 @@ import { CardDesignTurnService } from './card-design-turn.service';
 import { PlanService } from './plan.service';
 import { PlanCandidatesService } from './plan-candidates.service';
 import { PlanCardsService } from './plan-cards.service';
+import { PlanCloser } from './plan-closer';
 import { PlanDocsSink } from './plan-docs-sink';
 import { PlanSendService } from './plan-send.service';
 import { PlanStore } from './plan-store';
@@ -45,6 +46,7 @@ import { StackDesignTurnService } from './stack-design-turn.service';
     PlanDocsSink,
     PlanCandidatesService,
     PlanCardsService,
+    PlanCloser,
     PlanSendService,
     PlanService,
     PlanStore,

@@ -19,6 +19,7 @@ import {
   PlanCandidatesService,
   toCandidateView,
 } from './plan-candidates.service';
+import { PlanCloser } from './plan-closer';
 import { intakeSplit } from './plan-intake';
 import { questionsOf } from './plan-mapper';
 import { findCycle } from './plan-send';
@@ -76,6 +77,7 @@ export class PlanCardsService {
     private readonly planCards: BoardPlanCards,
     private readonly candidates: PlanCandidatesService,
     private readonly audit: AuditService,
+    private readonly closer: PlanCloser,
   ) {}
 
   async create(plan: Plan, actor: PlanActor): Promise<CreatePlanCardsResponse> {
@@ -177,6 +179,8 @@ export class PlanCardsService {
       return created;
     });
     await this.planCards.announce(cards, actor);
+    // The plan is done: its worktree is no longer needed.
+    await this.closer.close(plan, actor);
     this.store.publish(plan.projectId, plan.id);
     return {
       cards: chosen.map((task: PlanTask, i) => ({

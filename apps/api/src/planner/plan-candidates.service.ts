@@ -28,6 +28,7 @@ import { BoardStacks } from '../board/board-stacks';
 import { BoardTriage } from '../board-ai/board-triage.service';
 import { PrismaService } from '../database/prisma.service';
 import type { PlanActor } from './plan.service';
+import { PlanCloser } from './plan-closer';
 import { PlanStore } from './plan-store';
 import { plannerError } from './planner-error';
 
@@ -162,6 +163,7 @@ export class PlanCandidatesService {
     private readonly attachments: AttachmentsService,
     private readonly audit: AuditService,
     private readonly triage: BoardTriage,
+    private readonly closer: PlanCloser,
   ) {}
 
   /**
@@ -239,7 +241,7 @@ export class PlanCandidatesService {
     candidateId: string,
     actor: PlanActor,
   ): Promise<PlanCandidateView> {
-    const row = await this.prisma.$transaction(async (tx) => {
+    const decision = await this.prisma.$transaction(async (tx) => {
       const [fresh] = await this.lock(tx, [plan.id]);
       const current = await this.pendingOf(tx, fresh, candidateId);
       const updated = await tx.planCandidate.update({
@@ -251,9 +253,10 @@ export class PlanCandidatesService {
         },
         include: withCard,
       });
-      await this.closeIfDecided(tx, plan.id);
-      return updated;
+      const done = await this.closeIfDecided(tx, plan.id);
+      return { updated, done };
     });
+    const { updated: row, done } = decision;
     await this.audit.record({
       ...actor.ctx,
       action: 'plan.candidate_rejected',
@@ -263,6 +266,7 @@ export class PlanCandidatesService {
       result: 'ok',
       meta: { candidateId: row.id },
     });
+    if (done) await this.closer.close(plan, actor);
     this.store.publish(plan.projectId, plan.id);
     return toCandidateView(row);
   }
@@ -355,8 +359,11 @@ export class PlanCandidatesService {
           },
         });
       }
-      for (const planId of planIds) await this.closeIfDecided(tx, planId);
-      return { cards, placed, stack, claims };
+      const done: string[] = [];
+      for (const planId of planIds) {
+        if (await this.closeIfDecided(tx, planId)) done.push(planId);
+      }
+      return { cards, placed, stack, claims, done };
     });
 
     await this.planCards.announce(made.cards, actor);
@@ -376,6 +383,9 @@ export class PlanCandidatesService {
         claim.ids,
         actor,
       );
+    }
+    for (const planId of made.done) {
+      await this.closer.close({ id: planId, projectId }, actor);
     }
     for (const planId of planIds) this.store.publish(projectId, planId);
     // #660: hints for the new cards, in the background.
@@ -527,12 +537,14 @@ export class PlanCandidatesService {
     return row;
   }
 
-  /** ADR-0058 §5: an intake with no pending candidate is done; it leaves Drafts. */
-  private async closeIfDecided(tx: Tx, planId: string): Promise<void> {
+  /** ADR-0058 §5: an intake with no pending candidate is done; it leaves Drafts.
+   * True when this call made it done, so the caller sends `plan.close`. */
+  private async closeIfDecided(tx: Tx, planId: string): Promise<boolean> {
     const pending = await tx.planCandidate.count({
       where: { planId, status: 'pending' },
     });
-    if (pending > 0) return;
+    if (pending > 0) return false;
     await tx.plan.update({ where: { id: planId }, data: { status: 'done' } });
+    return true;
   }
 }
