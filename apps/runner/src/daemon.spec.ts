@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import type {
   CommandResultMessage,
@@ -17,6 +23,7 @@ import { localRequest } from './local/client';
 import { loadSessionTokenSecret, SessionTokens } from './local/session-tokens';
 import { FORBIDDEN, fixtureProtobuf, PROTOBUF_SESSION } from './otlp/testing';
 import { loadOtlpToken, otlpTokenPath } from './otlp/token';
+import { PlanStore } from './planner/store';
 import { reportedPolicy } from './policy/schema';
 import {
   permissivePolicy,
@@ -342,7 +349,7 @@ describe('daemon — local socket (spec 201)', () => {
     cleanup();
   });
 
-  const start = () => {
+  const start = (projects: PairedConfig['projects'] = []) => {
     const controller = new AbortController();
     let connection: RunnerConnection | null = null;
     writePolicy(join(dir, 'runner.json'));
@@ -352,7 +359,7 @@ describe('daemon — local socket (spec 201)', () => {
         runnerId: 'rn_1',
         token: TOKEN,
         profiles: [],
-        projects: [],
+        projects,
         disabledCommands: [],
         otlp: { enabled: false, grpc: null, http: null },
         fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
@@ -463,6 +470,57 @@ describe('daemon — local socket (spec 201)', () => {
     controller.abort();
     await done;
     expect(existsSync(join(dir, 'runner.sock'))).toBe(false);
+  });
+
+  it('sweeps orphaned plan and review worktrees at start; a live plan, a card and its review stay (#1045)', async () => {
+    const root = join(dir, 'fixture');
+    mkdirSync(root, { recursive: true });
+    const beside = (name: string) => {
+      const path = join(dir, `.wt-fixture-${name}`);
+      mkdirSync(path, { recursive: true });
+      // Older than the sweep's minimum age.
+      const old = new Date(Date.now() - 60 * 60_000);
+      utimesSync(path, old, old);
+      return path;
+    };
+    const livePlan = beside('plan-live0001');
+    const orphanPlan = beside('plan-orph0001');
+    const card = beside('card-abc12345');
+    const cardReview = beside('review-abc12345');
+    const orphanReview = beside('review-orphan01');
+    new PlanStore(join(dir, 'plans')).savePlan({
+      planId: 'plan_1',
+      projectId: 'prj_fixture',
+      root,
+      repo: 'fixture',
+      shortId: 'live0001',
+      worktree: livePlan,
+      lastActiveAt: '2026-10-26T10:00:00.000Z',
+    });
+    new CardStore(join(dir, 'cards')).save({
+      cardId: 'card_1',
+      projectId: 'prj_fixture',
+      root,
+      repo: 'fixture',
+      shortId: 'abc12345',
+      worktree: card,
+      branch: 'fix/1-x',
+      base: 'develop',
+      tmuxSession: 'nautelle-card-abc12345',
+      runId: 'run_1',
+      phase: 'running',
+      startedAt: '2026-10-26T10:00:00.000Z',
+    });
+
+    const { controller, done, live } = start([{ id: 'prj_fixture', root }]);
+    await live();
+    await until(() => !existsSync(orphanPlan) && !existsSync(orphanReview));
+    for (const kept of [livePlan, card, cardReview]) {
+      expect(existsSync(kept)).toBe(true);
+    }
+
+    controller.abort();
+    await done;
   });
 
   it('knows a card round started before a restart: finish_card from its session goes out with it (#482)', async () => {

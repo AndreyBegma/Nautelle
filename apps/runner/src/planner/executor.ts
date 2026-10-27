@@ -33,6 +33,7 @@ import {
   type SkillsDeps,
 } from '../skills/deps';
 import { writeJsonAtomic } from '../skills/run/record';
+import { removeRunnerWorktree } from '../worktrees/remove';
 import {
   planTurnLaunchSpec,
   planTurnSessionName,
@@ -52,8 +53,8 @@ import { type PlanRecord, PlanStore, type TurnRecord } from './store';
 export const PLAN_TICK_MS = 2000;
 /** D15: how often idle plans are looked for. */
 export const PLAN_CLEANUP_MS = 60 * 60_000;
-/** D15: a plan with no turn for this long loses its worktree. */
-export const PLAN_IDLE_MS = 14 * 24 * 60 * 60_000;
+/** D15, #1045 D3: a plan with no turn for this long loses its worktree. */
+export const PLAN_IDLE_MS = 3 * 24 * 60 * 60_000;
 
 export interface PlanExecutorOptions {
   deps: SkillsDeps;
@@ -81,6 +82,11 @@ export interface PlanExecutorOptions {
    * attempt's note.
    */
   runNotes?: RunNotes;
+  /**
+   * #1045: sweeps the orphaned plan and review worktrees after each idle
+   * cleanup; the daemon's, which knows the card records too.
+   */
+  sweep?: () => Promise<void>;
   tickMs?: number;
   cleanupMs?: number;
   idleMs?: number;
@@ -367,7 +373,15 @@ export class PlanTurnExecutor {
     }
   }
 
-  /** D15: the worktrees of plans idle for 14 days are removed. */
+  /** #1045: every worktree a plan record names, for the orphan sweep. */
+  worktrees(): string[] {
+    return this.store.plans().map((plan) => plan.worktree);
+  }
+
+  /**
+   * D15, #1045 D3: the worktrees of plans idle for 3 days are removed, then
+   * the orphaned ones are swept.
+   */
   async cleanup(): Promise<void> {
     const now = this.options.deps.clock.now();
     const idleMs = this.options.idleMs ?? PLAN_IDLE_MS;
@@ -387,6 +401,11 @@ export class PlanTurnExecutor {
         });
       }
     }
+    await this.options.sweep?.().catch((error) => {
+      this.options.log.warn('planner: cannot sweep orphaned worktrees', {
+        error: errorMessage(error),
+      });
+    });
   }
 
   private async closePlan(plan: PlanRecord): Promise<boolean> {
@@ -695,18 +714,12 @@ export class PlanTurnExecutor {
     }
   }
 
-  /** The plan's worktree is gone; true when there was one to remove. */
-  private async removeWorktree(plan: PlanRecord): Promise<boolean> {
-    if (!existsSync(plan.worktree)) return false;
-    await gitOk(this.options.deps.exec, [
-      '-C',
-      plan.root,
-      'worktree',
-      'remove',
-      '--force',
-      plan.worktree,
-    ]);
-    return true;
+  /**
+   * The plan's worktree is gone, even when `git worktree remove` fails
+   * (#1045 D1); true when there was one to remove.
+   */
+  private removeWorktree(plan: PlanRecord): Promise<boolean> {
+    return removeRunnerWorktree(this.options.deps, plan.root, plan.worktree);
   }
 }
 

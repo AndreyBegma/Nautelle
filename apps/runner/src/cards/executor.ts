@@ -63,6 +63,7 @@ import { RUN_FILES, writeJsonAtomic } from '../skills/run/record';
 import { type StewardProjectConfig, stewardConfigOf } from '../steward/config';
 import { emitActed, emitObserved } from '../steward/emit';
 import { readPane } from '../steward/pane-rules';
+import { removeRunnerWorktree } from '../worktrees/remove';
 import { type AttachmentSource, syncAttachments } from './attachments';
 import { answerDialog, KNOWN_DIALOGS, matchKnownDialog } from './dialogs';
 import { guardFinish } from './finish-guard';
@@ -85,7 +86,6 @@ import {
   cardReviewLaunchSpec,
   cardReviewWorktreePath,
   placeReviewWorktree,
-  removeReviewWorktree,
 } from './review';
 import {
   heldDetail,
@@ -756,7 +756,7 @@ export class CardExecutor {
         .catch(() => false);
       if (alive) await this.kill(tmuxSession);
       this.reviews.remove(args.cardId);
-      await removeReviewWorktree(
+      await removeRunnerWorktree(
         this.options.deps,
         project.root,
         cardReviewWorktreePath(project.root, args.shortId),
