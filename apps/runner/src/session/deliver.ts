@@ -6,7 +6,7 @@ import {
   readQuestion,
 } from '../cards/question';
 import type { TmuxControl } from '../control/tmux';
-import { readPane } from '../steward/pane-rules';
+import { inputText, readPane } from '../steward/pane-rules';
 
 /** The tmux calls delivery makes — `TmuxControl`'s, exact-target each. */
 export type DeliveryTmux = Pick<
@@ -28,6 +28,7 @@ export const deliverText = async (
   session: string,
   text: string,
   options: { idleOnly?: boolean } = {},
+  pacing: AnswerPacing = ANSWER_PACING,
 ): Promise<SessionMessageOutcome> => {
   const pane = await tmux.capture(session);
   if (pane === null) return 'no_session';
@@ -37,8 +38,48 @@ export const deliverText = async (
     return 'not_at_input';
   }
   await tmux.sendLiteral(session, text);
-  await tmux.sendSubmit(session);
-  return 'sent';
+  await pacing.sleep(pacing.settleMs);
+  for (let submit = 0; submit < MAX_SUBMITS; submit += 1) {
+    await tmux.sendSubmit(session);
+    const left = await leftInBox(tmux, session, text, pacing);
+    if (left === null) return 'no_session';
+    if (!left) return 'sent';
+  }
+  return 'not_at_input';
+};
+
+/** How Claude Code shows a long text folded in the box: `[Pasted text #1 +N lines]`. */
+const FOLDED_PASTE = '[Pasted text';
+
+/** C-433: a text is submitted at most this many times. */
+const MAX_SUBMITS = 2;
+
+/**
+ * C-433: whether `text` is still typed in the input box after a submit. The
+ * pane is read up to `pacing.reads` times, `settleMs` apart, and the first
+ * read without the text ends it. `null` when the session is gone.
+ */
+const leftInBox = async (
+  tmux: DeliveryTmux,
+  session: string,
+  text: string,
+  pacing: AnswerPacing,
+): Promise<boolean | null> => {
+  const typed = text.replace(/\s+/g, ' ').trim();
+  for (let read = 0; read < pacing.reads; read += 1) {
+    await pacing.sleep(pacing.settleMs);
+    const pane = await tmux.capture(session);
+    if (pane === null) return null;
+    const box = inputText(pane).replace(/\s+/g, ' ');
+    // A long text is folded into a marker: it is still in the box.
+    if (box.startsWith(FOLDED_PASTE)) continue;
+    // The box may also show a placeholder: only the typed text's start counts.
+    const length = Math.min(box.length, typed.length, 20);
+    if (length === 0 || box.slice(0, length) !== typed.slice(0, length)) {
+      return false;
+    }
+  }
+  return true;
 };
 
 /** #967: how an answer waits for the selector to move on. */

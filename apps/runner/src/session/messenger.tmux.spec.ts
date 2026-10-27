@@ -209,6 +209,43 @@ describe.skipIf(!tmuxInstalled)('session.message on a real pane (#489)', () => {
     expect(await t.received()).toBe('Also update the changelog\r');
   });
 
+  it('C-433: text left in the box gets a second Enter, and is sent only once the box is empty', async () => {
+    const t0 = tempDir();
+    teardown.push(async () => t0.cleanup());
+    const [empty, typed] = ['empty', 'typed'].map((name, i) => {
+      const file = join(t0.dir, `${name}.txt`);
+      const text = i === 0 ? '' : 'Also update the changelog';
+      writeFileSync(
+        file,
+        `\n● Done.\n\n╭─────────╮\n│ > ${text} │\n╰─────────╯\n`,
+      );
+      return file;
+    }) as [string, string];
+    // The first Enter leaves the text in the box, the second submits it.
+    const t = await setup(empty, typed, empty);
+    expect(
+      await t.send({ kind: 'text', text: 'Also update the changelog' }),
+    ).toEqual({ outcome: 'sent' });
+    expect(await t.received(2)).toBe('Also update the changelog\r\r');
+  });
+
+  it('C-433: text that two Enters leave in the box is not_at_input', async () => {
+    const t0 = tempDir();
+    teardown.push(async () => t0.cleanup());
+    const empty = join(t0.dir, 'empty.txt');
+    const typed = join(t0.dir, 'typed.txt');
+    writeFileSync(empty, '\n● Done.\n\n╭─────╮\n│ >   │\n╰─────╯\n');
+    writeFileSync(
+      typed,
+      '\n● Done.\n\n╭─────╮\n│ > Also update the changelog │\n╰─────╯\n',
+    );
+    const t = await setup(empty, typed, typed);
+    expect(
+      await t.send({ kind: 'text', text: 'Also update the changelog' }),
+    ).toEqual({ outcome: 'not_at_input' });
+    expect(await t.received(2)).toBe('Also update the changelog\r\r');
+  });
+
   it('sends nothing to a permission prompt', async () => {
     const t0 = tempDir();
     teardown.push(async () => t0.cleanup());

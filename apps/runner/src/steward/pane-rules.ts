@@ -44,6 +44,23 @@ const BUSY = /esc to interrupt/i;
  */
 const EMPTY_PROMPT = /^\s*(?:│\s*)?[>❯]\s*(?:│\s*)?$/;
 
+/** An input line with a marker: `│ > text │` boxed, `❯ text` in the newer one. */
+const INPUT_LINE = /^\s*(?:│\s*)?[>❯]\s*(.*?)\s*(?:│\s*)?$/;
+
+/**
+ * C-433: the text in the input box — the last line that starts with the
+ * input marker, whitespace trimmed; `''` for an empty box or a pane with no
+ * input line. Only the first line of a wrapped input is read.
+ */
+export const inputText = (pane: string): string => {
+  const lines = pane.split('\n');
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const match = INPUT_LINE.exec(lines[i] ?? '');
+    if (match) return match[1] ?? '';
+  }
+  return '';
+};
+
 /** How far above the input box an API error still counts as the last output. */
 const API_ERROR_WINDOW = 12;
 
