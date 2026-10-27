@@ -38,7 +38,11 @@
     },
     {
       "action": "click",
-      "target": { "role": "switch", "name": "Git and operations", "exact": true }
+      "target": {
+        "role": "switch",
+        "name": "Git and operations",
+        "exact": true
+      }
     },
     {
       "action": "assertVisible",
