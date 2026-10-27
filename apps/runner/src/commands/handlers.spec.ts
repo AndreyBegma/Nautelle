@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -10,9 +10,17 @@ import {
 } from '@nautelle/shared/protocol';
 import type { CardHandlers } from '../cards';
 import type { Exec } from '../detect/exec';
+import { createDocsHandlers } from '../docs';
+import { createPlannerHandlers, type PlanTurnExecutor } from '../planner';
 import { permissivePolicy } from '../policy/testing';
+import { type CodeAsker, createRepoHandlers } from '../repo';
+import { createSkillHandlers, type SkillRunExecutor } from '../skills';
 import { FakeClock } from '../testing/fake-clock';
-import { fakeExec } from '../testing/fixtures';
+import { fakeExec, memoryLogger } from '../testing/fixtures';
+import {
+  createUiProfileHandlers,
+  type UiProfileBuildExecutor,
+} from '../uiprofile';
 import type { CommandHandlers } from './dispatcher';
 import { CommandFailure } from './failure';
 import { createHandlers, type HandlerContext } from './handlers';
@@ -330,6 +338,85 @@ describe("every handler receives the dispatcher's signal (#754 D2)", () => {
           exec,
           watchedProjects: () => [{ id: 'prj_a', root }],
           cards: {} as CardHandlers,
+        }),
+      );
+      await call(handlers, name, args, signal);
+      if (given.length === 0) silent.push(name);
+      if (!given.every((s) => s === signal)) dropped.push(name);
+    }
+    expect(silent).toEqual([]);
+    expect(dropped).toEqual([]);
+  });
+
+  // The subsystem handlers that spawn `git` / `gh` through the exec they are built with.
+  const groupSpawning = (root: string): [CommandName, unknown][] => [
+    ['skill.inspect', { source: 'acme/skills' }],
+    [
+      'skill.install',
+      {
+        source: 'acme/skills',
+        skillId: 'estimate',
+        commit: 'a'.repeat(40),
+        contentHash: 'b'.repeat(64),
+        target: {
+          scope: 'project',
+          projectId: 'prj_a',
+          root,
+          base: 'main',
+          runtime: 'claude',
+        },
+      },
+    ],
+    ['skill.list', { projectId: 'prj_a', root }],
+    ['repo.search', { projectId: 'prj_a', root, query: 'x' }],
+    ['repo.read', { projectId: 'prj_a', root, path: 'README.md' }],
+    ['uiprofile.fingerprint', { projectId: 'prj_a', root, globs: [] }],
+    ['docs.publish_specs', { projectId: 'prj_a', root, docsRoot: tmpdir() }],
+    ['docs.pr_state', { projectId: 'prj_a', root, docsRoot: tmpdir(), pr: 7 }],
+    ['plan.publish_specs', { projectId: 'prj_a', root }],
+    ['plan.queue_issues', { projectId: 'prj_a', root }],
+  ];
+
+  it('runs every child of a spawning subsystem handler under it', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'nautelle-root-'));
+    mkdirSync(join(root, '.git'));
+    writeFileSync(join(root, 'README.md'), 'hello\n');
+    const signal = new AbortController().signal;
+    const silent: string[] = [];
+    const dropped: string[] = [];
+    for (const [name, args] of groupSpawning(root)) {
+      const given: (AbortSignal | undefined)[] = [];
+      const exec: Exec = async (_binary, _args, options) => {
+        given.push(options?.signal);
+        return null;
+      };
+      const deps = {
+        exec,
+        clock: new FakeClock(),
+        home: root,
+        profiles: () => [],
+        watchedProjects: () => [{ id: 'prj_a', root }],
+        fetch: (async () => new Response('{}')) as unknown as typeof fetch,
+        tempRoot: root,
+      };
+      const handlers = createHandlers(
+        context({
+          exec,
+          watchedProjects: deps.watchedProjects,
+          skills: createSkillHandlers(deps, {} as SkillRunExecutor),
+          planner: createPlannerHandlers(
+            { ...deps, log: memoryLogger().log },
+            {} as PlanTurnExecutor,
+          ),
+          uiprofile: createUiProfileHandlers(
+            deps,
+            {} as UiProfileBuildExecutor,
+          ),
+          docs: createDocsHandlers(deps),
+          repo: createRepoHandlers(
+            { ...deps, policy: permissivePolicy },
+            {} as CodeAsker,
+          ),
         }),
       );
       await call(handlers, name, args, signal);

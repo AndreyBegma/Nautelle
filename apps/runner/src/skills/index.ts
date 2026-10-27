@@ -3,6 +3,7 @@ import type {
   CommandResult,
   SkillCommandName,
 } from '@nautelle/shared/protocol';
+import { withSignal } from '../detect/exec';
 import { SkillCatalog } from './catalog';
 import type { SkillsDeps } from './deps';
 import { inspectSkills, installSkill, uninstallSkill } from './install';
@@ -26,12 +27,17 @@ export const createSkillHandlers = (
   executor: SkillRunExecutor,
 ): SkillHandlers => {
   const catalog = new SkillCatalog({ fetch: deps.fetch, clock: deps.clock });
+  // #754 D2: whatever these spawn dies with the command.
+  const bound = (signal?: AbortSignal) => ({
+    ...deps,
+    exec: withSignal(deps.exec, signal),
+  });
   return {
     'skill.search': (args) => catalog.search(args),
-    'skill.inspect': (args) => inspectSkills(args, deps),
-    'skill.install': (args) => installSkill(args, deps),
+    'skill.inspect': (args, signal) => inspectSkills(args, bound(signal)),
+    'skill.install': (args, signal) => installSkill(args, { ...deps, signal }),
     'skill.uninstall': (args) => uninstallSkill(args, deps),
-    'skill.list': (args) => listSkills(args, deps),
+    'skill.list': (args, signal) => listSkills(args, bound(signal)),
     'skill.run': (args) => executor.run(args),
     'skill.cancel': (args) => executor.cancel(args),
   };

@@ -3,6 +3,7 @@ import type {
   CommandResult,
   UiProfileCommandName,
 } from '@nautelle/shared/protocol';
+import { withSignal } from '../detect/exec';
 import type { SkillsDeps } from '../skills/deps';
 import type { UiProfileBuildExecutor } from './executor';
 import { fingerprint } from './fingerprint';
@@ -27,7 +28,8 @@ export const createUiProfileHandlers = (
   executor: UiProfileBuildExecutor,
 ): UiProfileHandlers => ({
   'uiprofile.build': (args) => executor.run(args),
-  'uiprofile.fingerprint': (args) => fingerprint(args, deps),
+  'uiprofile.fingerprint': (args, signal) =>
+    fingerprint(args, { ...deps, exec: withSignal(deps.exec, signal) }),
   'uiprofile.cancel': (args) => executor.cancel(args),
   'uiprofile.learn': (args) => executor.learner.learn(args),
 });
