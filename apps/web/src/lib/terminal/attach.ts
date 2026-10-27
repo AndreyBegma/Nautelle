@@ -15,6 +15,31 @@ export const attachRetryDelay = (attempt: number): number =>
  */
 export const isTransientCloseCode = (code: number): boolean => code < 4000;
 
+/** What the view knows when its socket closes. */
+export interface AttachClose {
+  attached: boolean;
+  /** The server refused the attach (an `error` frame). */
+  refused: boolean;
+  /** The reason of the `closed` frame, if one came before the close. */
+  reason?: string;
+  code: number;
+}
+
+/**
+ * Whether a closed socket is worth another attach. Before `attached`: a
+ * transient code with no answer. After it: only a dropped runner socket (reason
+ * `socket`, or no reason and a transient code); `session_ended`, `idle`,
+ * `max_duration`, `client` and refusals are final.
+ */
+export const shouldReattach = (close: AttachClose): boolean => {
+  if (close.refused) return false;
+  if (!close.attached) {
+    return close.reason === undefined && isTransientCloseCode(close.code);
+  }
+  if (close.reason !== undefined) return close.reason === 'socket';
+  return isTransientCloseCode(close.code);
+};
+
 export type AttachState =
   | { phase: 'connecting'; attempt: number }
   | { phase: 'reconnecting'; attempt: number }
@@ -92,6 +117,27 @@ export class AttachSupervisor {
     );
   }
 
+  /**
+   * The socket closed after `attached` for a transient reason (the runner
+   * dropped it). Same path as a failed first attach: reconnecting, backoff, and
+   * a fresh 30 s deadline, then `failed` waits for `retry()`.
+   */
+  dropped(): void {
+    if (this.done) return;
+    this.running = false;
+    this.stopTimers();
+    this.options.abort();
+    // As if attempt 1 had just attached: the next start is attempt 2, which
+    // the view reports as a reconnect, not a first connect.
+    this.attempt = 1;
+    this.deadline = this.setTimer(() => this.giveUp(), ATTACH_GIVE_UP_MS);
+    this.options.onState({ phase: 'reconnecting', attempt: 2 });
+    this.retryTimer = this.setTimer(() => {
+      this.retryTimer = null;
+      this.startAttempt();
+    }, attachRetryDelay(0));
+  }
+
   /** The view is going away. */
   dispose(): void {
     this.done = true;
@@ -134,3 +180,36 @@ export class AttachSupervisor {
     this.clear('deadline');
   }
 }
+
+/**
+ * The ticket request for one attempt. The mode is read per attempt: after a
+ * write attach is demoted to read, a reattach must not ask for the hold again.
+ */
+export const ticketRequestFor = <T extends { mode: 'read' | 'write' }>(
+  base: Omit<T, 'mode'>,
+  mode: T['mode'],
+): T => ({ ...base, mode }) as T;
+
+/** What the view does with a closed socket. */
+export type CloseAction =
+  | { kind: 'retry-attach' }
+  | { kind: 'reattach'; mode: 'read' | 'write'; demoted: boolean }
+  | { kind: 'final' };
+
+/**
+ * The view's close handling, without the DOM: a failed first attach goes back
+ * to the backoff, a dropped attach keeps the terminal and reattaches (a write
+ * attach comes back as read: one writer, the hold may have moved on), anything
+ * else is final.
+ */
+export const decideClose = (
+  close: AttachClose & { mode: 'read' | 'write' },
+): CloseAction => {
+  if (!shouldReattach(close)) return { kind: 'final' };
+  if (!close.attached) return { kind: 'retry-attach' };
+  return {
+    kind: 'reattach',
+    mode: 'read',
+    demoted: close.mode === 'write',
+  };
+};

@@ -130,6 +130,9 @@ export function TerminalSheet({
   const narrow = useNarrow();
   const [mode, setMode] = useState<TerminalMode>('read');
   const [attempt, setAttempt] = useState(0);
+  // Bumped when the person picks a mode; a drop that lowers write to read must
+  // not remount the view, which keeps its screen and its reattach clock.
+  const [epoch, setEpoch] = useState(0);
   const [status, setStatus] = useState<TerminalStatus>({
     phase: 'requesting',
   });
@@ -161,6 +164,7 @@ export function TerminalSheet({
     status.phase === 'attached';
   const switchMode = (next: TerminalMode) => {
     setMode(next);
+    setEpoch((n) => n + 1);
     setStatus({ phase: 'requesting' });
     setAttempt((n) => n + 1);
   };
@@ -250,11 +254,12 @@ export function TerminalSheet({
             ) : null}
             <div className="min-h-0 flex-1">
               <TerminalView
-                key={`${attempt}:${mode}`}
+                key={`${attempt}:${epoch}`}
                 projectId={projectId}
                 target={target}
                 mode={mode}
                 onStatus={setStatus}
+                onDemoted={() => setMode('read')}
               />
             </div>
           </div>
