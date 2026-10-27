@@ -18,6 +18,7 @@ import { runDaemon } from './daemon';
 import { createExec, type Exec } from './detect/exec';
 import { detectProfiles, withAuthentication } from './detect/profiles';
 import { type Env, type Paths, resolvePaths } from './env';
+import { GitAuth } from './git-auth';
 import { runHook } from './hooks/run';
 import { type LegacyReport, legacyReportLines } from './legacy';
 import { runAway } from './local/away';
@@ -382,6 +383,17 @@ const runCommand = async ({
   return EXIT.terminalClose;
 };
 
+/** C-441 D3: how the runner's git reaches GitHub, from a probe of its own. */
+const gitAuthLine = async (exec: Exec): Promise<string> => {
+  if ((await new GitAuth(exec).probe()) === 'gh') {
+    return 'git auth: gh (github.com over HTTPS)';
+  }
+  const hint = (await exec('gh', ['--version']))
+    ? ' — run `gh auth login`'
+    : '';
+  return `git auth: native${hint}`;
+};
+
 const statusCommand = async ({
   deps,
   paths,
@@ -410,6 +422,7 @@ const statusCommand = async ({
     deps,
     `spool:    ${spool.segments} segment(s), ${spool.bytes} bytes, last seq ${spool.lastSeq}, acked ${spool.ackedSeq}`,
   );
+  out(deps, await gitAuthLine(deps.exec ?? createExec(deps.env)));
   if (config.server) {
     try {
       const response = await deps.fetch(config.server, {

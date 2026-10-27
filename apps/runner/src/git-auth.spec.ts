@@ -255,3 +255,83 @@ describe('GitAuth hardening (C-126)', () => {
     expect(seen).toEqual([HARDENED_GIT_CONFIG, undefined]);
   });
 });
+
+/** C-441: a push that fails on SSH or auth re-checks `gh` and retries once. */
+describe('GitAuth re-probe on failure (C-441)', () => {
+  const DENIED = 'git@github.com: Permission denied (publickey).';
+
+  const setup = (stderr: string) => {
+    let time = 1_000_000;
+    const state = { loggedIn: false, probes: 0, runs: [] as boolean[] };
+    const spy: Exec = async (binary, args, options) => {
+      if (binary === 'gh') {
+        state.probes += 1;
+        return { code: state.loggedIn ? 0 : 1, stdout: '', stderr: '' };
+      }
+      void args;
+      const viaGh = (options?.gitConfig ?? []).some(
+        ([key]) => key === 'credential.https://github.com.helper',
+      );
+      state.runs.push(viaGh);
+      return viaGh
+        ? { code: 0, stdout: 'pushed', stderr: '' }
+        : { code: 128, stdout: '', stderr };
+    };
+    const auth = new GitAuth(spy, () => time);
+    return {
+      state,
+      auth,
+      git: auth.wrap(spy),
+      advance: (ms: number) => {
+        time += ms;
+      },
+    };
+  };
+
+  it('retries a publickey push once with gh settings when gh is now logged in', async () => {
+    const { state, auth, git } = setup(DENIED);
+    await auth.probe();
+    state.loggedIn = true;
+    const result = await git('git', ['-C', '/r', 'push', 'origin', 'main']);
+    expect(result).toEqual({ code: 0, stdout: 'pushed', stderr: '' });
+    expect(state.runs).toEqual([false, true]);
+    expect(auth.github).toBe('gh');
+  });
+
+  it('does not retry a non-auth failure or re-probe for it', async () => {
+    const { state, auth, git } = setup('! [rejected] main (non-fast-forward)');
+    await auth.probe();
+    state.loggedIn = true;
+    const result = await git('git', ['push', 'origin', 'main']);
+    expect(result?.code).toBe(128);
+    expect(state.runs).toEqual([false]);
+    expect(state.probes).toBe(1);
+  });
+
+  it('does not retry a local git command that happens to print an auth error', async () => {
+    const { state, auth, git } = setup(DENIED);
+    await auth.probe();
+    state.loggedIn = true;
+    await git('git', ['status']);
+    expect(state.runs).toEqual([false]);
+    expect(state.probes).toBe(1);
+  });
+
+  it('does not retry when the probe finds the mode unchanged', async () => {
+    const { state, git } = setup(DENIED);
+    const result = await git('git', ['fetch', 'origin']);
+    expect(result?.code).toBe(128);
+    expect(state.runs).toEqual([false]);
+    expect(state.probes).toBe(1);
+  });
+
+  it('re-probes at most once per 30 s', async () => {
+    const { state, git, advance } = setup(DENIED);
+    await git('git', ['push']);
+    await git('git', ['push']);
+    expect(state.probes).toBe(1);
+    advance(30_000);
+    await git('git', ['push']);
+    expect(state.probes).toBe(2);
+  });
+});
