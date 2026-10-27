@@ -7,6 +7,7 @@ import {
   attachRetryDelay,
   isTransientCloseCode,
   shouldReattach,
+  ticketRequestFor,
 } from './attach';
 
 /** A manual clock: `advance` fires timers in order of their due time. */
@@ -223,5 +224,18 @@ describe('AttachSupervisor', () => {
     supervisor.dispose();
     advance(120_000);
     expect(starts).toEqual([1]);
+  });
+});
+
+describe('ticketRequestFor', () => {
+  test('the reattach ticket after a demotion asks for read', () => {
+    const base = { kind: 'session', projectId: 'p1' };
+    let attachMode: 'read' | 'write' = 'write';
+    expect(ticketRequestFor(base, attachMode).mode).toBe('write');
+    attachMode = 'read';
+    expect(ticketRequestFor(base, attachMode)).toEqual({
+      ...base,
+      mode: 'read',
+    });
   });
 });

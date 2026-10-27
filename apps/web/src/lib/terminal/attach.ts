@@ -180,3 +180,12 @@ export class AttachSupervisor {
     this.clear('deadline');
   }
 }
+
+/**
+ * The ticket request for one attempt. The mode is read per attempt: after a
+ * write attach is demoted to read, a reattach must not ask for the hold again.
+ */
+export const ticketRequestFor = <T extends { mode: 'read' | 'write' }>(
+  base: Omit<T, 'mode'>,
+  mode: T['mode'],
+): T => ({ ...base, mode }) as T;

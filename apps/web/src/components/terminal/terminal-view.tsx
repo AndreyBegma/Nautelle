@@ -16,7 +16,11 @@ import type { Terminal as XTerm } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef, useState } from 'react';
 import { ApiUnreachableError, api } from '../../lib/api';
-import { AttachSupervisor, shouldReattach } from '../../lib/terminal/attach';
+import {
+  AttachSupervisor,
+  shouldReattach,
+  ticketRequestFor,
+} from '../../lib/terminal/attach';
 import {
   CLOSE_REASON_LABEL,
   clampSize,
@@ -328,10 +332,9 @@ export function TerminalView({
         term.dispose();
       };
 
-      const request: TicketRequest = {
+      const requestBase: Omit<TicketRequest, 'mode'> = {
         kind,
         projectId,
-        mode: attachMode,
         ...(slot ? { slot } : {}),
         ...(runId ? { runId } : {}),
         ...(sessionId ? { sessionId } : {}),
@@ -363,7 +366,7 @@ export function TerminalView({
         try {
           ticket = await api<TerminalTicketResponse>('/terminal/tickets', {
             method: 'POST',
-            body: request,
+            body: ticketRequestFor<TicketRequest>(requestBase, attachMode),
           });
         } catch (error) {
           if (stale()) return;
