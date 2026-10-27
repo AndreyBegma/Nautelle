@@ -440,6 +440,20 @@ export class BoardShipping
       await this.mergedOutside(project, card, result);
       return;
     }
+    if (result.state === 'open' || result.state === 'draft') {
+      // C-455: the CI pass does not read this card, so its demo is kept here
+      // — an older head's is superseded, a new green head is recorded. The
+      // checks are not stored and nothing is merged.
+      await this.demos.supersede(project.id, card.id, result.headSha);
+      if (
+        cardCiStateOf(result.checks) === 'green' &&
+        !card.needsPerson &&
+        !isActiveRoundPhase(card.rounds[0]?.phase)
+      ) {
+        await this.recordDemo(project, card, result.headSha);
+      }
+      return;
+    }
     if (result.state !== 'closed') return;
     await this.prisma.boardCard.update({
       where: { id: card.id },
