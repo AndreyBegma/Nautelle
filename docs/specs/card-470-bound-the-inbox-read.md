@@ -23,14 +23,15 @@ Stack **S-20**, stage 0.
 - A project whose readiness fails is still `missing`, as before (`inbox.service.ts:268-279`).
 
 ## Acceptance criteria
-- [ ] `apps/api/src/inbox/inbox.e2e.spec.ts`: project A has 60 pending requests and project B has 1. The Inbox lists 50 of A's and B's 1.
-- [ ] `apps/api/src/inbox/inbox.e2e.spec.ts`: a non-member never sees another project's requests (authorization test of the new query).
-- [ ] `apps/api/src/readiness/readiness.e2e.spec.ts`: `viewMany` with 10 projects on 2 runners runs one project query and one profile query. Its views equal those of `view` for each id.
-- [ ] One project failing readiness still yields `missing` for it and the items of the others.
-- [ ] `bun run check` passes. No web change, so no demo.
+- [x] `apps/api/src/inbox/inbox.e2e.spec.ts`: project A has 60 pending requests and project B has 1. The Inbox lists 50 of A's and B's 1.
+- [x] `apps/api/src/inbox/inbox.e2e.spec.ts`: a non-member never sees another project's requests (authorization test of the new query).
+- [x] `apps/api/src/readiness/readiness.e2e.spec.ts`: `viewMany` with 10 projects on 2 runners runs one project query and one profile query. Its views equal those of `view` for each id.
+- [x] One project failing readiness still yields `missing` for it and the items of the others.
+- [x] `bun run check` passes. No web change, so no demo.
 
 ## Risks
 - Requests are capped before `mayDecideActionRequest` filters them (`inbox.service.ts:232-240`). A project with 50 requests the caller may not decide hides newer ones the caller may. This is the same limit as today, now per project.
 
 ## Open questions
 - Should `resolver.resolve` be batched too? Default: only if the spec test shows it querying per project. Then batch it in the same card.
+  - Answered: `RuntimeProfileResolver.resolve` ran up to three queries per project, so it is batched as `resolveMany` (the orchestrator settings in one query, the profiles they and the project defaults name in one). `viewMany` therefore runs four queries in all — the projects, the runners' profiles, the settings and the named profiles — whatever the number of projects.

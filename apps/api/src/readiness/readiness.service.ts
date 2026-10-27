@@ -35,8 +35,25 @@ export class ReadinessService {
   ) {}
 
   async view(projectId: string): Promise<ProjectReadinessView> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
+    const view = (await this.viewMany([projectId])).get(projectId);
+    if (view instanceof Error) throw view;
+    if (!view) throw projectNotFound();
+    return view;
+  }
+
+  /**
+   * The readiness of every project, in a fixed number of queries whatever
+   * their number (C-470): the Inbox reads each busy project on every load.
+   * A project that is gone or cannot be read is its own `Error`; the others
+   * still answer.
+   */
+  async viewMany(
+    projectIds: readonly string[],
+  ): Promise<Map<string, ProjectReadinessView | Error>> {
+    const ids = [...new Set(projectIds)];
+    if (ids.length === 0) return new Map();
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: ids } },
       select: {
         id: true,
         runnerId: true,
@@ -49,11 +66,12 @@ export class ReadinessService {
         },
       },
     });
-    if (!project) throw projectNotFound();
-    const [pick, profiles] = await Promise.all([
-      this.resolver.resolve(project),
+    const [picks, profiles] = await Promise.all([
+      this.resolver.resolveMany(projects),
       this.prisma.runtimeProfile.findMany({
-        where: { runnerId: project.runnerId },
+        where: {
+          runnerId: { in: [...new Set(projects.map((p) => p.runnerId))] },
+        },
         select: {
           id: true,
           key: true,
@@ -64,30 +82,56 @@ export class ReadinessService {
         },
       }),
     ]);
-    const runnerConnected = this.presence.isConnected(project.runnerId);
-    const missingCommands = runnerConnected
-      ? ACTION_COMMANDS.filter(
-          (name) =>
-            this.presence.commandSupport(project.runnerId, name) === 'missing',
-        )
-      : [];
-    const suggestion = suggestRuntimeProfile(profiles, project.runnerId);
-    const chosen = pick.profile;
-    return {
-      profile:
-        chosen && pick.source
-          ? { key: chosen.key, label: chosen.label, source: pick.source }
-          : null,
-      suggestion: suggestion
-        ? { id: suggestion.id, key: suggestion.key, label: suggestion.label }
-        : null,
-      actions: projectReadiness({
-        profile: pick,
-        runnerConnected,
-        missingCommands,
-        specTarget: resolveSpecTarget(project).kind,
-        shipSessionContent: project.shipSessionContent,
-      }),
-    };
+    const byId = new Map(projects.map((p) => [p.id, p]));
+    const views = new Map<string, ProjectReadinessView | Error>();
+    for (const id of ids) {
+      const project = byId.get(id);
+      const pick = picks.get(id);
+      if (!project || !pick) {
+        views.set(id, projectNotFound());
+        continue;
+      }
+      try {
+        const runnerConnected = this.presence.isConnected(project.runnerId);
+        const missingCommands = runnerConnected
+          ? ACTION_COMMANDS.filter(
+              (name) =>
+                this.presence.commandSupport(project.runnerId, name) ===
+                'missing',
+            )
+          : [];
+        const suggestion = suggestRuntimeProfile(
+          profiles.filter((p) => p.runnerId === project.runnerId),
+          project.runnerId,
+        );
+        const chosen = pick.profile;
+        views.set(id, {
+          profile:
+            chosen && pick.source
+              ? { key: chosen.key, label: chosen.label, source: pick.source }
+              : null,
+          suggestion: suggestion
+            ? {
+                id: suggestion.id,
+                key: suggestion.key,
+                label: suggestion.label,
+              }
+            : null,
+          actions: projectReadiness({
+            profile: pick,
+            runnerConnected,
+            missingCommands,
+            specTarget: resolveSpecTarget(project).kind,
+            shipSessionContent: project.shipSessionContent,
+          }),
+        });
+      } catch (error) {
+        views.set(
+          id,
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      }
+    }
+    return views;
   }
 }

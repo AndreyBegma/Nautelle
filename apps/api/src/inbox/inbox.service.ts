@@ -14,6 +14,7 @@ import {
   sortInboxItems,
 } from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
+import { type ActionRequest, Prisma } from '@prisma/client';
 import type { AuthUser } from '../auth';
 import { BoardService } from '../board/board.service';
 import { cardFaceArgs } from '../board/board-mapper';
@@ -219,15 +220,23 @@ export class InboxService {
     user: AuthUser,
     projects: InboxProject[],
   ): Promise<InboxItemView[]> {
-    const rows = await this.prisma.actionRequest.findMany({
-      where: {
-        projectId: { in: projects.map((p) => p.id) },
-        status: 'pending',
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'asc' },
-      take: REQUESTS_PER_PROJECT * projects.length,
-    });
+    // ADR-0106: at most REQUESTS_PER_PROJECT of each project, the oldest
+    // first, so one noisy project cannot push out another's (C-470).
+    const rows = await this.prisma.$queryRaw<ActionRequest[]>`
+      SELECT "id", "projectId", "runnerId", "sessionId", "requestedById",
+        "kind", "summary", "args", "status", "decidedById", "decidedAt",
+        "note", "result", "ruleId", "expiresAt", "createdAt"
+      FROM (
+        SELECT *, ROW_NUMBER() OVER (
+          PARTITION BY "projectId" ORDER BY "createdAt", "id"
+        ) AS "rank"
+        FROM action_requests
+        WHERE "projectId" IN (${Prisma.join(projects.map((p) => p.id))})
+          AND "status" = 'pending'
+          AND "expiresAt" > ${new Date()}
+      ) AS ranked
+      WHERE "rank" <= ${REQUESTS_PER_PROJECT}
+      ORDER BY "createdAt", "id"`;
     const names = new Map(projects.map((p) => [p.id, p.name]));
     return rows
       .filter((row) =>
@@ -266,25 +275,30 @@ export class InboxService {
     });
     const ids = new Set(busy.map((b) => b.projectId));
     const busyProjects = projects.filter((p) => ids.has(p.id));
-    const read = await Promise.allSettled(
-      busyProjects.map((project) => this.readiness.view(project.id)),
-    );
     const items: InboxItemView[] = [];
     const missing: InboxMissingProject[] = [];
-    read.forEach((result, i) => {
-      const project = busyProjects[i];
-      if (result.status === 'rejected') {
+    if (busyProjects.length === 0) return { items, missing };
+    const read = await this.readiness
+      .viewMany(busyProjects.map((p) => p.id))
+      .catch((error: unknown) => {
+        const failed =
+          error instanceof Error ? error : new Error(String(error));
+        return new Map(busyProjects.map((p) => [p.id, failed]));
+      });
+    for (const project of busyProjects) {
+      const view = read.get(project.id);
+      if (!view || view instanceof Error) {
         this.logger.warn(
-          `Inbox: readiness of ${project.id} failed: ${String(result.reason)}`,
+          `Inbox: readiness of ${project.id} failed: ${String(view)}`,
         );
         missing.push({
           projectId: project.id,
           projectName: project.name,
           message: 'Its setup could not be read.',
         });
-        return;
+        continue;
       }
-      for (const blocker of result.value.actions.run) {
+      for (const blocker of view.actions.run) {
         const since =
           blocker.code === 'runner_offline'
             ? (project.runnerLastSeenAt ?? project.createdAt)
@@ -298,7 +312,7 @@ export class InboxService {
           blocker,
         });
       }
-    });
+    }
     return { items, missing };
   }
 }

@@ -50,30 +50,65 @@ export class RuntimeProfileResolver {
     options: { key?: string | null } = {},
   ): Promise<RuntimeProfilePick<ResolvedProfile>> {
     const { key } = options;
-    const [explicit, settings] = await Promise.all([
-      key
-        ? this.prisma.runtimeProfile.findUnique({
-            where: { runnerId_key: { runnerId: project.runnerId, key } },
-            select: PROFILE_SELECT,
-          })
-        : null,
-      key
-        ? null
-        : this.prisma.projectOrchestratorSettings.findUnique({
-            where: { projectId: project.id },
-            select: { profileId: true },
-          }),
-    ]);
-    const [orchestrator, fallback] = await Promise.all([
-      this.byId(settings?.profileId ?? null),
-      this.byId(key ? null : project.defaultProfileId),
-    ]);
+    if (!key) {
+      const picks = await this.resolveMany([project]);
+      return picks.get(project.id) as RuntimeProfilePick<ResolvedProfile>;
+    }
+    const explicit = await this.prisma.runtimeProfile.findUnique({
+      where: { runnerId_key: { runnerId: project.runnerId, key } },
+      select: PROFILE_SELECT,
+    });
     return pickRuntimeProfile({
       runnerId: project.runnerId,
-      explicit: key ? { key, profile: explicit } : null,
-      orchestrator,
-      default: fallback,
+      explicit: { key, profile: explicit },
+      orchestrator: null,
+      default: null,
     });
+  }
+
+  /**
+   * D1's pick of each project when the action names no key, in two queries
+   * whatever the number of projects (C-470): the orchestrator settings, then
+   * every profile they or the project defaults name.
+   */
+  async resolveMany(
+    projects: readonly ProfileProject[],
+  ): Promise<Map<string, RuntimeProfilePick<ResolvedProfile>>> {
+    if (projects.length === 0) return new Map();
+    const settings = await this.prisma.projectOrchestratorSettings.findMany({
+      where: { projectId: { in: projects.map((p) => p.id) } },
+      select: { projectId: true, profileId: true },
+    });
+    const orchestratorOf = new Map(
+      settings.map((s) => [s.projectId, s.profileId]),
+    );
+    const ids = new Set<string>();
+    for (const project of projects) {
+      const orchestrator = orchestratorOf.get(project.id);
+      if (orchestrator) ids.add(orchestrator);
+      if (project.defaultProfileId) ids.add(project.defaultProfileId);
+    }
+    const rows =
+      ids.size === 0
+        ? []
+        : await this.prisma.runtimeProfile.findMany({
+            where: { id: { in: [...ids] } },
+            select: PROFILE_SELECT,
+          });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const profile = (id: string | null | undefined) =>
+      id ? (byId.get(id) ?? null) : null;
+    return new Map(
+      projects.map((project) => [
+        project.id,
+        pickRuntimeProfile({
+          runnerId: project.runnerId,
+          explicit: null,
+          orchestrator: profile(orchestratorOf.get(project.id)),
+          default: profile(project.defaultProfileId),
+        }),
+      ]),
+    );
   }
 
   /** The usable profile, or `fail(details, message)` thrown (D2). */
@@ -92,14 +127,5 @@ export class RuntimeProfileResolver {
       details,
       noProfileMessage({ ...details, runtime: pick.profile?.runtime }),
     );
-  }
-
-  private byId(id: string | null): Promise<ResolvedProfile | null> {
-    return id
-      ? this.prisma.runtimeProfile.findUnique({
-          where: { id },
-          select: PROFILE_SELECT,
-        })
-      : Promise.resolve(null);
   }
 }
