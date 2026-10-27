@@ -1,12 +1,27 @@
 import { describe, expect, it } from 'bun:test';
-import type {
-  CardCommandName,
-  CardReviewCommandName,
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  type CardCommandName,
+  type CardReviewCommandName,
+  type CommandName,
+  commandNames,
 } from '@nautelle/shared/protocol';
 import type { CardHandlers } from '../cards';
+import type { Exec } from '../detect/exec';
+import { createDocsHandlers } from '../docs';
+import { createPlannerHandlers, type PlanTurnExecutor } from '../planner';
 import { permissivePolicy } from '../policy/testing';
+import { type CodeAsker, createRepoHandlers } from '../repo';
+import { createSkillHandlers, type SkillRunExecutor } from '../skills';
 import { FakeClock } from '../testing/fake-clock';
-import { fakeExec } from '../testing/fixtures';
+import { fakeExec, memoryLogger } from '../testing/fixtures';
+import {
+  createUiProfileHandlers,
+  type UiProfileBuildExecutor,
+} from '../uiprofile';
+import type { CommandHandlers } from './dispatcher';
 import { CommandFailure } from './failure';
 import { createHandlers, type HandlerContext } from './handlers';
 
@@ -196,5 +211,219 @@ describe('card command handlers (#242)', () => {
       'card.collect',
       'card.reviewStop',
     ]);
+  });
+});
+
+/** Calls `name` with `args` and `signal`, whatever it answers. */
+const call = (
+  handlers: CommandHandlers,
+  name: CommandName,
+  args: unknown,
+  signal: AbortSignal,
+): Promise<unknown> =>
+  Promise.resolve()
+    .then(() =>
+      (handlers[name] as (a: unknown, s: AbortSignal) => unknown)(args, signal),
+    )
+    .catch(() => undefined);
+
+describe("every handler receives the dispatcher's signal (#754 D2)", () => {
+  it('hands it to the executor that serves the command', async () => {
+    const seen = new Map<string, AbortSignal | undefined>();
+    const record = (name: string, signal?: AbortSignal) => {
+      seen.set(name, signal);
+      return Promise.resolve({});
+    };
+    // Any command name it is asked for, recording what it was given.
+    const group = <T>(): T =>
+      new Proxy(
+        {},
+        {
+          get: (_target, name) => (_args: unknown, signal?: AbortSignal) =>
+            record(String(name), signal),
+        },
+      ) as T;
+    const handlers = createHandlers(
+      context({
+        skills: group(),
+        planner: group(),
+        uiprofile: group(),
+        cards: group(),
+        capture: group(),
+        normalize: group(),
+        assess: group(),
+        docs: group(),
+        steward: group(),
+        handoff: group(),
+        repo: group(),
+        prefix: group(),
+        demos: group(),
+        terminal: {
+          attach: (_args, signal) => record('terminal.attach', signal) as never,
+        },
+        sessionMessage: {
+          message: (_args, signal) =>
+            record('session.message', signal) as never,
+        },
+      }),
+    );
+    const signal = new AbortController().signal;
+    for (const name of commandNames) await call(handlers, name, {}, signal);
+    expect(seen.size).toBeGreaterThanOrEqual(40);
+    for (const [name, given] of seen) {
+      expect({ name, same: given === signal }).toEqual({ name, same: true });
+    }
+  });
+
+  // The handlers that spawn `git`, `gh` or `tmux` themselves.
+  const SPAWNING: CommandName[] = [
+    'project.inspect',
+    'project.refresh',
+    'project.push_check',
+    'orchestrator.stop',
+    'orchestrator.status',
+    'orchestrator.message',
+    'slot.stop',
+    'slot.message',
+    'issue.create',
+    'pr.inspect',
+    'pr.approve',
+    'pr.requestChanges',
+    'pr.voidApproval',
+    'worktree.status',
+    'card.merge',
+    'card.prClose',
+    'card.checks',
+    'card.ciRetrigger',
+    'card.prRetarget',
+    'card.prOpen',
+    'card.reviewPublish',
+  ];
+
+  it('runs every child of a spawning handler under it', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'nautelle-root-'));
+    mkdirSync(join(root, '.git'));
+    const args = {
+      projectId: 'prj_a',
+      cardId: 'card_1',
+      root,
+      path: root,
+      slot: 'a',
+      pr: 7,
+      prNumber: 7,
+      headSha: 'a'.repeat(40),
+      branch: 'card/c1-x',
+      base: 'main',
+      title: 'A title',
+      body: 'A body',
+      text: 'hello',
+      note: 'a note',
+      by: 'someone',
+      at: '2026-10-26T00:00:00.000Z',
+      labels: [],
+      queue: false,
+      comments: [],
+    };
+    const signal = new AbortController().signal;
+    const silent: string[] = [];
+    const dropped: string[] = [];
+    for (const name of SPAWNING) {
+      const given: (AbortSignal | undefined)[] = [];
+      const exec: Exec = async (_binary, _args, options) => {
+        given.push(options?.signal);
+        return null;
+      };
+      const handlers = createHandlers(
+        context({
+          exec,
+          watchedProjects: () => [{ id: 'prj_a', root }],
+          cards: {} as CardHandlers,
+        }),
+      );
+      await call(handlers, name, args, signal);
+      if (given.length === 0) silent.push(name);
+      if (!given.every((s) => s === signal)) dropped.push(name);
+    }
+    expect(silent).toEqual([]);
+    expect(dropped).toEqual([]);
+  });
+
+  // The subsystem handlers that spawn `git` / `gh` through the exec they are built with.
+  const groupSpawning = (root: string): [CommandName, unknown][] => [
+    ['skill.inspect', { source: 'acme/skills' }],
+    [
+      'skill.install',
+      {
+        source: 'acme/skills',
+        skillId: 'estimate',
+        commit: 'a'.repeat(40),
+        contentHash: 'b'.repeat(64),
+        target: {
+          scope: 'project',
+          projectId: 'prj_a',
+          root,
+          base: 'main',
+          runtime: 'claude',
+        },
+      },
+    ],
+    ['skill.list', { projectId: 'prj_a', root }],
+    ['repo.search', { projectId: 'prj_a', root, query: 'x' }],
+    ['repo.read', { projectId: 'prj_a', root, path: 'README.md' }],
+    ['uiprofile.fingerprint', { projectId: 'prj_a', root, globs: [] }],
+    ['docs.publish_specs', { projectId: 'prj_a', root, docsRoot: tmpdir() }],
+    ['docs.pr_state', { projectId: 'prj_a', root, docsRoot: tmpdir(), pr: 7 }],
+    ['plan.publish_specs', { projectId: 'prj_a', root }],
+    ['plan.queue_issues', { projectId: 'prj_a', root }],
+  ];
+
+  it('runs every child of a spawning subsystem handler under it', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'nautelle-root-'));
+    mkdirSync(join(root, '.git'));
+    writeFileSync(join(root, 'README.md'), 'hello\n');
+    const signal = new AbortController().signal;
+    const silent: string[] = [];
+    const dropped: string[] = [];
+    for (const [name, args] of groupSpawning(root)) {
+      const given: (AbortSignal | undefined)[] = [];
+      const exec: Exec = async (_binary, _args, options) => {
+        given.push(options?.signal);
+        return null;
+      };
+      const deps = {
+        exec,
+        clock: new FakeClock(),
+        home: root,
+        profiles: () => [],
+        watchedProjects: () => [{ id: 'prj_a', root }],
+        fetch: (async () => new Response('{}')) as unknown as typeof fetch,
+        tempRoot: root,
+      };
+      const handlers = createHandlers(
+        context({
+          exec,
+          watchedProjects: deps.watchedProjects,
+          skills: createSkillHandlers(deps, {} as SkillRunExecutor),
+          planner: createPlannerHandlers(
+            { ...deps, log: memoryLogger().log },
+            {} as PlanTurnExecutor,
+          ),
+          uiprofile: createUiProfileHandlers(
+            deps,
+            {} as UiProfileBuildExecutor,
+          ),
+          docs: createDocsHandlers(deps),
+          repo: createRepoHandlers(
+            { ...deps, policy: permissivePolicy },
+            {} as CodeAsker,
+          ),
+        }),
+      );
+      await call(handlers, name, args, signal);
+      if (given.length === 0) silent.push(name);
+      if (!given.every((s) => s === signal)) dropped.push(name);
+    }
+    expect(silent).toEqual([]);
+    expect(dropped).toEqual([]);
   });
 });

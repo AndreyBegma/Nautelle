@@ -6,6 +6,7 @@ import {
   skillInstallMinRole,
 } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
+import type { Exec } from '../detect/exec';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
 import { sha256 } from './discover';
 import { inspectSkills, installSkill, uninstallSkill } from './install';
@@ -283,6 +284,40 @@ describe('skill.install', () => {
     expect(await codeOf(installSkill(args, f.deps(exec)))).toBe(
       'already_exists',
     );
+  });
+
+  it('opens no pull request once the command timed out after the push (#754 D3)', async () => {
+    const f = await setup();
+    const preview = await previewOf(f);
+    const fake = withFakeGh(f.git, f.root);
+    const controller = new AbortController();
+    // The timeout lands while `git push` runs: the push finishes, the PR must not start.
+    const exec: Exec = async (binary, a, options) => {
+      const result = await fake.exec(binary, a, options);
+      if (binary === 'git' && a.includes('push')) controller.abort();
+      return result;
+    };
+    expect(
+      await codeOf(
+        installSkill(
+          {
+            ...preview,
+            target: {
+              scope: 'project',
+              projectId: f.project.id,
+              root: f.root,
+              base: 'main',
+              runtime: 'claude',
+            },
+          },
+          { ...f.deps(exec), signal: controller.signal },
+        ),
+      ),
+    ).toBe('timeout');
+    expect(fake.calls).toEqual([]);
+    // The cleanup still runs: no worktree, no local branch.
+    expect(existsSync(join(f.ws, '.wt-widget-skill-abc12345'))).toBe(false);
+    expect(await f.run(f.root, 'branch', '--list', 'skills/*')).toBe('');
   });
 
   it('refuses a project the runner does not watch', async () => {

@@ -195,6 +195,29 @@ describe('plan.publish_specs (D10)', () => {
     expect(calls.some((c) => c.includes('push'))).toBe(false);
   });
 
+  it('opens no pull request once the command timed out after the push (#754 D3)', async () => {
+    const { f, gh, args } = await setup();
+    const controller = new AbortController();
+    // The timeout lands while `git push` runs: the push finishes, the PR must not start.
+    const exec: Exec = async (binary, a, options) => {
+      const result = await gh.exec(binary, a, options);
+      if (binary === 'git' && a.includes('push')) controller.abort();
+      return result;
+    };
+    expect(
+      await codeOf(
+        publishSpecs(args(), { ...f.deps(exec), signal: controller.signal }),
+      ),
+    ).toBe('timeout');
+    expect(
+      gh.calls.some((c) => c.args[0] === 'pr' && c.args[1] === 'create'),
+    ).toBe(false);
+    // The cleanup still runs.
+    expect(
+      await f.run(f.root, 'worktree', 'list', '--porcelain'),
+    ).not.toContain('plan-docs');
+  });
+
   it('refuses a specDir that resolves outside the worktree, and cleans up', async () => {
     const { f, gh, args } = await setup();
     const outside = join(f.ws, 'outside');

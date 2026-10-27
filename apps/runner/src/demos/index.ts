@@ -6,7 +6,10 @@ export { DemoRecorder } from './recorder';
 
 /** Demo videos' command (C-369, ADR-0090). */
 export interface DemoHandlers {
-  'card.demo': (args: CardDemoArgs) => Promise<CardDemoResult>;
+  'card.demo': (
+    args: CardDemoArgs,
+    signal?: AbortSignal,
+  ) => Promise<CardDemoResult>;
 }
 
 export const createDemoHandlers = (recorder: DemoRecorder): DemoHandlers => ({

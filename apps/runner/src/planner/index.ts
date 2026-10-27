@@ -16,6 +16,7 @@ export { type RunSlots, SharedRunSlots } from './slots';
 export type PlannerHandlers = {
   [N in PlannerCommandName]: (
     args: CommandArgs<N>,
+    signal?: AbortSignal,
   ) => Promise<CommandResult<N>> | CommandResult<N>;
 };
 
@@ -26,6 +27,7 @@ export const createPlannerHandlers = (
   'plan.turn': (args) => executor.run(args),
   'plan.cancel': (args) => executor.cancel(args),
   'plan.close': (args) => executor.close(args),
-  'plan.publish_specs': (args) => publishSpecs(args, deps),
-  'plan.queue_issues': (args) => queueIssues(args, deps),
+  'plan.publish_specs': (args, signal) =>
+    publishSpecs(args, { ...deps, signal }),
+  'plan.queue_issues': (args, signal) => queueIssues(args, { ...deps, signal }),
 });

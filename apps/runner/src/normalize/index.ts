@@ -12,7 +12,10 @@ export {
 
 /** The one `text.normalize` handler (issue #271 "Runner"). */
 export type NormalizeHandlers = {
-  [N in TextCommandName]: (args: CommandArgs<N>) => Promise<CommandResult<N>>;
+  [N in TextCommandName]: (
+    args: CommandArgs<N>,
+    signal?: AbortSignal,
+  ) => Promise<CommandResult<N>>;
 };
 
 export const createNormalizeHandlers = (

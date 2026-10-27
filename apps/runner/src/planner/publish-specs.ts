@@ -6,8 +6,9 @@ import type {
   PlanPublishSpecsArgs,
   PlanPublishSpecsResult,
 } from '@nautelle/shared/protocol';
-import { CommandFailure } from '../commands/failure';
+import { CommandFailure, stopIfAborted } from '../commands/failure';
 import { watchedProject } from '../control/target';
+import { withSignal } from '../detect/exec';
 import { resolveFleetProject } from '../fleet/project';
 import {
   GH_TIMEOUT_MS,
@@ -124,15 +125,21 @@ export interface SpecsPrContent {
  * retry after the PR was opened answers that PR. Shared by
  * `plan.publish_specs` (the code repository) and `docs.publish_specs` (an
  * external docs repository, #379).
+ *
+ * #754 D3: every step runs under `signal`, and none starts once it aborted —
+ * a push the timeout cut short never gets its PR. The cleanup runs anyway.
  */
 export const openSpecsPr = async (
   target: SpecsPrTarget,
   content: SpecsPrContent,
-  deps: Pick<SkillsDeps, 'exec' | 'shortId' | 'tempRoot'>,
+  deps: Pick<SkillsDeps, 'exec' | 'shortId' | 'tempRoot'> & {
+    signal?: AbortSignal;
+  },
 ): Promise<PlanPublishSpecsResult> => {
-  const { exec } = deps;
+  const { signal } = deps;
+  const exec = withSignal(deps.exec, signal);
   const { root, github } = target;
-  const existing = await openPr(deps, github, content.branch);
+  const existing = await openPr({ exec }, github, content.branch);
   if (existing) return existing;
 
   await gitOk(
@@ -183,6 +190,7 @@ export const openSpecsPr = async (
       '-m',
       content.title,
     ]);
+    stopIfAborted(signal, 'git push');
     // `--force`: the branch is this plan's or card's alone; an earlier attempt may have pushed it.
     await gitOk(
       exec,
@@ -197,6 +205,7 @@ export const openSpecsPr = async (
       ],
       NETWORK_TIMEOUT_MS,
     );
+    stopIfAborted(signal, 'gh pr create');
     const bodyFile = join(temp, 'body.md');
     await writeFile(bodyFile, content.body, { mode: 0o600 });
     const created = await exec(
@@ -225,19 +234,37 @@ export const openSpecsPr = async (
     return { prNumber: pr.number, prUrl: pr.url };
   } finally {
     await rm(temp, { recursive: true, force: true });
-    await exec('git', ['-C', root, 'worktree', 'remove', '--force', worktree]);
+    // Without the signal: a timed-out attempt still removes its worktree.
+    await deps.exec('git', [
+      '-C',
+      root,
+      'worktree',
+      'remove',
+      '--force',
+      worktree,
+    ]);
     // The pushed branch stays for its PR; the local one is not needed.
-    await exec('git', ['-C', root, 'branch', '--quiet', '-D', content.branch]);
+    await deps.exec('git', [
+      '-C',
+      root,
+      'branch',
+      '--quiet',
+      '-D',
+      content.branch,
+    ]);
   }
 };
 
 /** `plan.publish_specs` (D10): one docs pull request into the project's `base`. */
 export const publishSpecs = async (
   args: PlanPublishSpecsArgs,
-  deps: SkillsDeps,
+  deps: SkillsDeps & { signal?: AbortSignal },
 ): Promise<PlanPublishSpecsResult> => {
   const project = watchedProject(args, deps.watchedProjects());
-  const fleet = await resolveFleetProject(deps.exec, project);
+  const fleet = await resolveFleetProject(
+    withSignal(deps.exec, deps.signal),
+    project,
+  );
   if (!fleet.github) {
     throw new CommandFailure(
       'not_a_repository',

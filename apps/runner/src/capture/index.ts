@@ -17,6 +17,7 @@ export {
 export type CaptureHandlers = {
   [N in CaptureCommandName]: (
     args: CommandArgs<N>,
+    signal?: AbortSignal,
   ) => Promise<CommandResult<N>>;
 };
 

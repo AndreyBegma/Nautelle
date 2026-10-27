@@ -25,10 +25,26 @@ export interface ExecOptions {
    * runner's own environment already carries, never replacing them.
    */
   gitConfig?: readonly (readonly [key: string, value: string])[];
+  /**
+   * #754 D1: the command's signal (#740 D5). On abort the child gets
+   * `SIGKILL`, as on a timeout, and the call resolves `null`; an already
+   * aborted signal spawns nothing.
+   */
+  signal?: AbortSignal;
 }
 
 /** Capability probes give up after this long (D5). */
 export const EXEC_TIMEOUT_MS = 5_000;
+
+/**
+ * `exec` with `signal` on every call that does not name its own: whatever a
+ * command spawns, through any helper, dies when the command times out.
+ */
+export const withSignal = (exec: Exec, signal?: AbortSignal): Exec =>
+  signal
+    ? (binary, args, options) =>
+        exec(binary, args, { ...options, signal: options?.signal ?? signal })
+    : exec;
 
 /** `env` without its unset variables, as a child process takes it. */
 export const definedOnly = (env: Env): Record<string, string> =>
@@ -65,6 +81,9 @@ export const createExec =
   async (binary, args, options) => {
     const path = Bun.which(binary, { PATH: env.PATH ?? '' });
     if (!path) return null;
+    const signal = options?.signal;
+    if (signal?.aborted) return null;
+    let abort: (() => void) | undefined;
     try {
       const proc = Bun.spawn([path, ...args], {
         env: withGitConfig(definedOnly(env), options?.gitConfig ?? []),
@@ -74,6 +93,10 @@ export const createExec =
         timeout: options?.timeoutMs ?? timeoutMs,
         killSignal: 'SIGKILL',
       });
+      if (signal) {
+        abort = () => proc.kill('SIGKILL');
+        signal.addEventListener('abort', abort, { once: true });
+      }
       const [stdout, stderr, code] = await Promise.all([
         new Response(proc.stdout).text(),
         new Response(proc.stderr).text(),
@@ -83,5 +106,7 @@ export const createExec =
       return { code, stdout, stderr };
     } catch {
       return null;
+    } finally {
+      if (abort) signal?.removeEventListener('abort', abort);
     }
   };

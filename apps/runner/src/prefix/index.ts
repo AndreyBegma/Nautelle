@@ -11,6 +11,7 @@ export { PrefixCalls, type PrefixCallsOptions } from './calls';
 export type PrefixHandlers = {
   [N in PrefixCommandName]: (
     args: CommandArgs<N>,
+    signal?: AbortSignal,
   ) => Promise<CommandResult<N>> | CommandResult<N>;
 };
 

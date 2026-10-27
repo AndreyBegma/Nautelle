@@ -8,8 +8,9 @@ import {
   skillInstallBranch,
 } from '@nautelle/shared/protocol';
 import { ghOf } from '../cards/github';
-import { CommandFailure } from '../commands/failure';
+import { CommandFailure, stopIfAborted } from '../commands/failure';
 import { watchedProject } from '../control/target';
+import { withSignal } from '../detect/exec';
 import { resolveFleetProject } from '../fleet/project';
 import { assertPushAllowed } from '../git/branch-guard';
 import {
@@ -66,14 +67,18 @@ export const installPrBody = (
  * `skills/<name>` in a worktree of its own, from `origin/<base>`; the main
  * checkout's tree and HEAD are never touched. The worktree and local branch
  * are removed whatever happens; a pushed branch stays for its PR.
+ *
+ * #754 D3: every step runs under `signal`, and none starts once it aborted —
+ * a push the timeout cut short never gets its PR. The cleanup runs anyway.
  */
 export const installProjectSkill = async (
   args: SkillInstallArgs & { target: ProjectTarget },
   prepared: PreparedSkill,
-  deps: SkillsDeps,
+  deps: SkillsDeps & { signal?: AbortSignal },
 ): Promise<SkillInstallResult> => {
   const { target } = args;
-  const { exec } = deps;
+  const { signal } = deps;
+  const exec = withSignal(deps.exec, signal);
   const project = watchedProject(target, deps.watchedProjects());
   const fleet = await resolveFleetProject(exec, project);
   if (!fleet.github) {
@@ -158,6 +163,7 @@ export const installProjectSkill = async (
       prepared.provenance,
       join(worktree, installPath),
     );
+    stopIfAborted(signal, 'git add');
     await gitOk(exec, ['-C', worktree, 'add', '--', installPath]);
     await gitOk(exec, [
       '-C',
@@ -168,6 +174,7 @@ export const installProjectSkill = async (
       '-m',
       `feat(skills): install ${args.skillId} from ${args.source}`,
     ]);
+    stopIfAborted(signal, 'git push');
     await gitOk(
       exec,
       [
@@ -180,6 +187,7 @@ export const installProjectSkill = async (
       ],
       NETWORK_TIMEOUT_MS,
     );
+    stopIfAborted(signal, 'gh pr create');
     const bodyFile = join(bodyDir, 'body.md');
     await writeFile(bodyFile, installPrBody(args, prepared, installPath), {
       mode: 0o600,
@@ -210,7 +218,15 @@ export const installProjectSkill = async (
     return { path: installPath, prUrl: pr.url };
   } finally {
     await rm(bodyDir, { recursive: true, force: true });
-    await exec('git', ['-C', root, 'worktree', 'remove', '--force', worktree]);
-    await exec('git', ['-C', root, 'branch', '--quiet', '-D', branch]);
+    // Without the signal: a timed-out attempt still removes its worktree.
+    await deps.exec('git', [
+      '-C',
+      root,
+      'worktree',
+      'remove',
+      '--force',
+      worktree,
+    ]);
+    await deps.exec('git', ['-C', root, 'branch', '--quiet', '-D', branch]);
   }
 };

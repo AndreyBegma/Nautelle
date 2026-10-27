@@ -96,6 +96,22 @@ describe('plan.queue_issues (D10)', () => {
     expect((error as CommandFailure).message).toContain('Could not resolve');
   });
 
+  it('labels no further issue once the command timed out (#754 D3)', async () => {
+    const { calls, deps } = setup();
+    const controller = new AbortController();
+    const exec: Exec = async (binary, args, options) => {
+      const result = await deps.exec(binary, args, options);
+      if (binary === 'gh') controller.abort();
+      return result;
+    };
+    const error = await queueIssues(
+      { projectId: 'prj_widget', numbers: [41, 42] },
+      { ...deps, exec, signal: controller.signal },
+    ).catch((e: unknown) => e);
+    expect((error as CommandFailure).code).toBe('timeout');
+    expect(calls.map((c) => c[2])).toEqual(['41']);
+  });
+
   it('refuses a project the runner does not watch', async () => {
     const { deps } = setup();
     const error = await queueIssues(

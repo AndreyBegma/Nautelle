@@ -35,6 +35,7 @@ export type CardHandlers = {
     | Exclude<CardCommandName, 'card.merge'>
     | Exclude<CardReviewCommandName, 'card.reviewPublish'>]: (
     args: CommandArgs<N>,
+    signal?: AbortSignal,
   ) => Promise<CommandResult<N>>;
 };
 

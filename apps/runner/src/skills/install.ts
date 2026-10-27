@@ -11,6 +11,7 @@ import type {
 import { isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
+import { withSignal } from '../detect/exec';
 import { profileOf, randomShortId, type SkillsDeps } from './deps';
 import { discoverSkills } from './discover';
 import { profileSkillsDir, writeSkillDir } from './layout';
@@ -75,10 +76,13 @@ const profileFor = (
  * `skill.install` (D3–D5): fetch exactly the previewed commit, check the
  * skill's `contentHash` against the preview, then copy — never `npx`, never a
  * symlink, nothing of the skill executed. A mismatch writes nothing.
+ *
+ * #754 D3: the fetch runs under `signal`; a project install stops between its
+ * steps once it aborted (`installProjectSkill`).
  */
 export const installSkill = async (
   args: SkillInstallArgs,
-  deps: SkillsDeps,
+  deps: SkillsDeps & { signal?: AbortSignal },
 ): Promise<SkillInstallResult> => {
   const { target } = args;
   // Cheap refusals before the network.
@@ -93,7 +97,11 @@ export const installSkill = async (
     throw new CommandFailure('already_exists', `${profileDest} already exists`);
   }
 
-  const checkout = await fetchCommit(deps, args.source, args.commit);
+  const checkout = await fetchCommit(
+    { ...deps, exec: withSignal(deps.exec, deps.signal) },
+    args.source,
+    args.commit,
+  );
   try {
     const found = discoverSkills(checkout.dir);
     const skill = found.skills.find((s) => s.skillId === args.skillId);
