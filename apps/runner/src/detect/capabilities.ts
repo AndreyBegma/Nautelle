@@ -347,6 +347,8 @@ export const detectCapabilities = async (
     cardEscalate: true,
     // #854: this runner takes `card.run` `startBranch`.
     cardStartBranch: true,
+    // C-504 (ADR-0126): this runner launches `card.run` `readOnly` rounds read-only.
+    cardReadOnly: true,
     // #751 B1: this runner sends `prefix.measured` for its launches.
     prefixMeasure: true,
     // #751: this runner takes `card.run` `tokenSaver.prefix`.

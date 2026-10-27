@@ -9,7 +9,7 @@ import type { ConfigProfile } from '../config';
 import { demoflowMcpConfig } from '../demos/pin';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { SESSION_TOKEN_ENV } from '../local/session-tokens';
-import { CARD_ESCALATE_ENV } from '../mcp/tools';
+import { CARD_ANALYSIS_ENV, CARD_ESCALATE_ENV } from '../mcp/tools';
 import type { OtlpEndpoint } from '../otlp/token';
 import { runEnv } from '../skills/run/launch';
 import type { LaunchSpec } from '../skills/run/record';
@@ -69,16 +69,53 @@ export const cardSessionFlags = (session: CardSession): string[] =>
   session.resume ? ['--resume', session.id] : ['--session-id', session.id];
 
 /**
+ * C-504 D2.1 (ADR-0126): the git and gh subcommands a read-only round may not
+ * run — every one that writes a commit, a ref, the index or the remote.
+ */
+export const READ_ONLY_DENIED_COMMANDS = [
+  'git commit',
+  'git push',
+  'git merge',
+  'git rebase',
+  'git reset',
+  'git checkout',
+  'git switch',
+  'git stash',
+  'git tag',
+  'git branch',
+  'git worktree',
+  'gh pr',
+  'gh issue',
+  'gh release',
+  'gh api',
+] as const;
+
+/**
+ * C-504 D2.1: what `--disallowedTools` denies a read-only round — the file
+ * writing tools and, as Bash prefix rules, `READ_ONLY_DENIED_COMMANDS`. Deny
+ * rules hold in every permission mode, `bypassPermissions` included (checked
+ * against Claude Code 2.1.310).
+ */
+export const READ_ONLY_DENIED_TOOLS: readonly string[] = [
+  'Edit',
+  'Write',
+  'NotebookEdit',
+  ...READ_ONLY_DENIED_COMMANDS.map((command) => `Bash(${command}:*)`),
+];
+
+/**
  * D5: the profile's binary and args, the session, model and permission mode,
  * then the prompt as one argv element after `--`, so a prompt that starts
  * with `-` is never read as a flag. No `-p`: the worker is interactive, and
  * `claude [options] -- <prompt>` starts the session with that prompt
  * submitted — with `--resume` too (checked against Claude Code 2.1.300).
+ * C-504 D2.1: a `readOnly` round adds its deny rules as argv, so they hold
+ * under every wiring; the project's permission mode is kept.
  */
 export const cardArgv = (
   profile: ConfigProfile,
   args: Pick<CardRunArgs, 'session' | 'model' | 'permissionMode' | 'prompt'> &
-    Partial<Pick<CardRunArgs, 'effort' | 'demo'>>,
+    Partial<Pick<CardRunArgs, 'effort' | 'demo' | 'readOnly'>>,
   wiring?: CardWiringFiles,
   tokenSaver?: TokenSaverLaunch | null,
 ): { binary: string; args: string[] } => ({
@@ -104,6 +141,7 @@ export const cardArgv = (
     ...(args.effort ? ['--effort', args.effort] : []),
     '--permission-mode',
     CLI_PERMISSION_MODE[args.permissionMode],
+    ...(args.readOnly ? ['--disallowedTools', ...READ_ONLY_DENIED_TOOLS] : []),
     '--',
     args.prompt,
   ],
@@ -120,13 +158,15 @@ export const CLAUDE_EFFORT_ENV = 'CLAUDE_CODE_EFFORT_LEVEL';
 /**
  * #750: what the round's env adds for its effort and for `escalate_card`
  * (D8). The MCP server reads `CARD_ESCALATE_ENV` from the session's env, so
- * it reaches it under every wiring — plugin, injected or Token saver.
+ * it reaches it under every wiring — plugin, injected or Token saver. C-504
+ * D3: a `readOnly` round is an analysis session (`CARD_ANALYSIS_ENV`).
  */
 const roundEnv = (
-  args: Partial<Pick<CardRunArgs, 'effort' | 'escalate'>>,
+  args: Partial<Pick<CardRunArgs, 'effort' | 'escalate' | 'readOnly'>>,
 ): Record<string, string> => ({
   ...(args.effort ? { [CLAUDE_EFFORT_ENV]: args.effort } : {}),
   ...(args.escalate ? { [CARD_ESCALATE_ENV]: '1' } : {}),
+  ...(args.readOnly ? { [CARD_ANALYSIS_ENV]: '1' } : {}),
 });
 
 /**
@@ -149,7 +189,7 @@ export const cardLaunchSpec = (
     | 'runId'
     | 'shortId'
   > &
-    Partial<Pick<CardRunArgs, 'effort' | 'escalate' | 'demo'>>,
+    Partial<Pick<CardRunArgs, 'effort' | 'escalate' | 'demo' | 'readOnly'>>,
   worktree: string,
   otlp: OtlpEndpoint | null,
   wiring?: CardWiringFiles,

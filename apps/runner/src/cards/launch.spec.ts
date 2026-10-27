@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CardRunArgs } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
+import { CARD_ANALYSIS_ENV } from '../mcp/tools';
 import { PREFIX_MEASURED_FILE } from '../prefix/record';
 import { tempDir } from '../testing/fixtures';
 import {
@@ -14,6 +15,7 @@ import {
   cardPort,
   cardTokenSaver,
   cardWorktreePath,
+  READ_ONLY_DENIED_TOOLS,
 } from './launch';
 
 const profile: ConfigProfile = {
@@ -360,5 +362,109 @@ describe('card worker launch (#242 D5)', () => {
       });
       expect(argv[argv.indexOf('--permission-mode') + 1]).toBe(cli);
     }
+  });
+
+  describe('C-504 D2.1: a read-only round', () => {
+    /** The entries `--disallowedTools` takes: everything up to `--`. */
+    const deniedOf = (argv: string[]): string[] => {
+      const flag = argv.indexOf('--disallowedTools');
+      return flag === -1 ? [] : argv.slice(flag + 1, argv.indexOf('--'));
+    };
+    const readOnly = { ...args(false), readOnly: true as const };
+
+    it('denies the editing tools and every listed git and gh command', () => {
+      const denied = deniedOf(cardArgv(profile, readOnly).args);
+      expect(denied).toEqual([...READ_ONLY_DENIED_TOOLS]);
+      for (const tool of ['Edit', 'Write', 'NotebookEdit']) {
+        expect(denied).toContain(tool);
+      }
+      for (const command of [
+        'git commit',
+        'git push',
+        'git merge',
+        'git rebase',
+        'git reset',
+        'git checkout',
+        'git switch',
+        'git stash',
+        'git tag',
+        'git branch',
+        'git worktree',
+        'gh pr',
+        'gh issue',
+        'gh release',
+        'gh api',
+      ]) {
+        expect(denied).toContain(`Bash(${command}:*)`);
+      }
+    });
+
+    it('carries the deny rules and keeps the permission mode under every wiring', () => {
+      const { dir, cleanup } = tempDir();
+      try {
+        const tokenSaver = cardTokenSaver(
+          profile,
+          {
+            ...readOnly,
+            pullRequest: undefined,
+            tokenSaver: { enabled: true, mcpAllow: [] },
+          },
+          dir,
+          dir,
+          ['/opt/nautelle/bin/nautelle-runner'],
+          { wiring: 'plugin' },
+        );
+        expect(tokenSaver).not.toBeNull();
+        const launches = {
+          plugin: cardArgv(profile, {
+            ...readOnly,
+            permissionMode: 'bypassPermissions',
+          }),
+          injected: cardArgv(
+            profile,
+            { ...readOnly, permissionMode: 'bypassPermissions' },
+            { settings: '/s.json', mcp: '/m.json' },
+          ),
+          tokenSaver: cardArgv(
+            profile,
+            { ...readOnly, permissionMode: 'bypassPermissions' },
+            undefined,
+            tokenSaver,
+          ),
+        };
+        for (const { args: argv } of Object.values(launches)) {
+          expect(deniedOf(argv)).toEqual([...READ_ONLY_DENIED_TOOLS]);
+          expect(argv[argv.indexOf('--permission-mode') + 1]).toBe(
+            'bypassPermissions',
+          );
+          // The prompt still ends the argv, after `--`.
+          expect(argv.at(-1)).toBe(PROMPT);
+          expect(argv.at(-2)).toBe('--');
+        }
+        expect(launches.injected.args).toContain('--mcp-config');
+        expect(launches.tokenSaver.args).toContain(
+          tokenSaver?.settingsFile ?? 'a Token saver settings file',
+        );
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('a round that is not read-only denies nothing', () => {
+      expect(cardArgv(profile, args(false)).args).not.toContain(
+        '--disallowedTools',
+      );
+    });
+
+    it('D3: is an analysis session, through the env', () => {
+      expect(
+        cardLaunchSpec(profile, readOnly, '/wt', null).env[CARD_ANALYSIS_ENV],
+      ).toBe('1');
+      expect(
+        cardLaunchSpec(profile, args(false), '/wt', null).env[
+          CARD_ANALYSIS_ENV
+        ],
+      ).toBeUndefined();
+    });
   });
 });

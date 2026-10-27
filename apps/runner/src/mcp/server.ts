@@ -17,6 +17,7 @@ import { RUNNER_VERSION } from '../version';
 import { type BoardWaitClock, boardWait } from './board-wait';
 import {
   ESCALATE_CARD_MCP_TOOL,
+  FINISH_ANALYSIS_MCP_TOOL,
   MCP_TOOLS,
   type McpToolDefinition,
   REPORT_REVIEW_MCP_TOOL,
@@ -102,16 +103,24 @@ const withCardNote = async (
  * too. With `review` (#884), the session is a review step: `report_review`
  * and the read tools (`REVIEW_SESSION_TOOLS`) only — never `finish_card`,
  * `escalate_card` or a tool that changes the Board; `review` wins over
- * `escalate`.
+ * `escalate`. With `analysis` (C-504 D3), an analysis card's worker:
+ * `finish_analysis` in place of `finish_card`, and never `escalate_card`.
  */
 export const mcpToolsOf = (options: {
   escalate?: boolean;
   review?: boolean;
+  analysis?: boolean;
 }): readonly McpToolDefinition[] => {
   if (options.review) {
     return [
       ...MCP_TOOLS.filter((t) => REVIEW_SESSION_TOOLS.includes(t.name)),
       REPORT_REVIEW_MCP_TOOL,
+    ];
+  }
+  if (options.analysis) {
+    return [
+      ...MCP_TOOLS.filter((t) => t.name !== 'finish_card'),
+      FINISH_ANALYSIS_MCP_TOOL,
     ];
   }
   return options.escalate ? [...MCP_TOOLS, ESCALATE_CARD_MCP_TOOL] : MCP_TOOLS;
@@ -130,6 +139,8 @@ export const buildMcpServer = (
     escalate?: boolean;
     /** #884: a review session (`CARD_REVIEW_ENV`). */
     review?: boolean;
+    /** C-504: an analysis session (`CARD_ANALYSIS_ENV`). */
+    analysis?: boolean;
     /** Tests only: the clock `board_wait` measures its timeout with. */
     waitClock?: BoardWaitClock;
   } = {},

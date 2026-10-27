@@ -15,6 +15,7 @@ import { AssessExecutor, createAssessHandlers } from './assess';
 import { Backoff } from './backoff';
 import { CaptureExecutor, createCaptureHandlers } from './capture';
 import { CardExecutor, createCardHandlers } from './cards';
+import { readOnlyChanges, resetReadOnlyWorktree } from './cards/read-only';
 import type { Clock } from './clock';
 import { CollectorRegistry, collectors } from './collectors';
 import { type CommandHandlers, createDispatcher } from './commands/dispatcher';
@@ -817,6 +818,13 @@ export const runDaemon = async (
             .filter((r) => r.phase === 'starting' || r.phase === 'running'),
           cwd,
         ),
+      // C-504 D2.4: the read-only guard reads the worktree with git.
+      readOnlyWorktree: {
+        changes: (worktree, start) =>
+          readOnlyChanges({ exec: options.exec }, worktree, start),
+        reset: (worktree, start) =>
+          resetReadOnlyWorktree({ exec: options.exec }, worktree, start),
+      },
       // #750 D8: after the tool's answer has reached the worker.
       stopRoundSoon: (round) => {
         clock.setTimeout(() => {

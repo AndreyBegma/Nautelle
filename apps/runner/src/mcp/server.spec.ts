@@ -76,6 +76,44 @@ describe('nautelle MCP server (spec 201 D20)', () => {
     expect(tools.every((tool) => tool.description)).toBe(true);
   });
 
+  it('C-504 D3: an analysis session lists finish_analysis, and neither finish_card nor escalate_card', async () => {
+    const calls: Call[] = [];
+    const server = buildMcpServer(
+      async (method, args) => {
+        calls.push({ method, args });
+        return { ok: true, data: { finished: true } };
+      },
+      { analysis: true, escalate: true },
+    );
+    const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'test', version: '0' });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    expect(names).toContain('finish_analysis');
+    expect(names).not.toContain('finish_card');
+    expect(names).not.toContain('escalate_card');
+    expect(names).toContain('board_card');
+
+    const report = {
+      report: 'It is slow because of N+1 queries.',
+      proposals: [
+        { title: 'Batch the reads', body: 'Use one query.', kind: 'bug' },
+      ],
+    };
+    const result = await client.callTool({
+      name: 'finish_analysis',
+      arguments: report,
+    });
+    expect(result.isError).toBeFalsy();
+    expect(calls).toEqual([{ method: 'card.finishAnalysis', args: report }]);
+
+    // Any other session never sees it.
+    const { client: plain } = await connect(() => ({ ok: true, data: {} }));
+    const plainNames = (await plain.listTools()).tools.map((tool) => tool.name);
+    expect(plainNames).not.toContain('finish_analysis');
+    expect(plainNames).toContain('finish_card');
+  });
+
   it('maps every tool 1:1 to its local method (D7)', async () => {
     const { client, calls } = await connect(() => ({ ok: true, data: {} }));
     const cases: [string, Record<string, unknown>, Call][] = [
