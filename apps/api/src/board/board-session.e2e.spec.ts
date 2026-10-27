@@ -19,6 +19,7 @@ import {
 import { capabilities } from '../runners/testing/runner-e2e';
 import { SessionMessageService } from '../session-message/session-message.service';
 import { BOARD_WAIT_TICK_MS } from './board-wait.service';
+import { writeStarterLabels } from './starter-labels';
 import {
   BoardWorld,
   HEAD_SHA,
@@ -93,6 +94,8 @@ describe('the Board from a session (#845, e2e)', () => {
   afterAll(() => w.close());
   beforeEach(async () => {
     await w.reset();
+    await writeStarterLabels(w.ctx.prisma, w.a);
+    await writeStarterLabels(w.ctx.prisma, w.b);
     await asLocalUser(w.operatorId);
   });
   afterEach(() => w.work.settled());
@@ -328,6 +331,63 @@ describe('the Board from a session (#845, e2e)', () => {
         sourceSessionId: sessionId,
         createdById: w.operatorId,
       });
+    });
+
+    it('C-502: card_create takes labels by name as the person’s own, refuses an unknown name with the list', async () => {
+      await manualSession();
+      const made = await data<{ number: number }>(
+        ask('card.create', { title: 'Style the tabs', labels: ['frontend'] }),
+      );
+      const rows = await w.ctx.prisma.boardCardLabel.findMany({
+        where: { card: { projectId: w.a, number: made.number } },
+        include: { label: true },
+      });
+      expect(rows.map((r) => [r.label.name, r.source])).toEqual([
+        ['frontend', 'person'],
+      ]);
+
+      const code = await refusal(
+        ask('card.create', { title: 'X', labels: ['frontend', 'nope'] }),
+      );
+      expect(code).toBe('label_unknown');
+      const answer = await ask('card.create', { title: 'X', labels: ['nope'] });
+      expect(answer.error?.message).toContain('nope');
+      expect(answer.error?.message).toContain('backend');
+      expect(
+        await w.ctx.prisma.boardCard.count({ where: { projectId: w.a } }),
+      ).toBe(1);
+    });
+
+    it('C-502: board_list and board_card return labels with their source; another project’s session cannot read them', async () => {
+      await manualSession();
+      await data(
+        ask('card.create', { title: 'Style the tabs', labels: ['frontend'] }),
+      );
+      await data(ask('card.create', { title: 'Plain card' }));
+      const list = await data<{
+        cards: { title: string; labels: { name: string; source: string }[] }[];
+      }>(ask('board.list', {}));
+      expect(list.cards.map((c) => [c.title, c.labels])).toEqual([
+        ['Plain card', []],
+        ['Style the tabs', [{ name: 'frontend', source: 'person' }]],
+      ]);
+      const card = await data<{ labels: unknown }>(
+        ask('board.card', { card: 1 }),
+      );
+      expect(card.labels).toEqual([{ name: 'frontend', source: 'person' }]);
+
+      await memberOfB();
+      const other = await data<{ cards: unknown[] }>(
+        ask('board.list', {}, OTHER_MANUAL, w.b),
+      );
+      expect(JSON.stringify(other)).not.toContain('frontend');
+      // A label is the project's: B's name does not resolve in A's project.
+      await w.ctx.prisma.projectLabel.create({
+        data: { projectId: w.b, name: 'b-only', hue: 4, position: 99 },
+      });
+      expect(
+        await refusal(ask('card.create', { title: 'A', labels: ['b-only'] })),
+      ).toBe('label_unknown');
     });
 
     it('runs, moves, stops and sends feedback through the Board', async () => {

@@ -423,3 +423,36 @@ describe('stack, design and dependency tools (C-377)', () => {
     });
   });
 });
+
+describe('card_create labels (C-502)', () => {
+  it('passes the label names to card.create', async () => {
+    const { client, calls } = await connect(() => ({
+      ok: true,
+      data: { number: 3, label: 'C-3', url: '/x', column: 'todo' },
+    }));
+    const result = await client.callTool({
+      name: 'card_create',
+      arguments: { title: 'Style the tabs', labels: ['frontend', 'docs'] },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(calls).toEqual([
+      {
+        method: 'card.create',
+        args: { title: 'Style the tabs', labels: ['frontend', 'docs'] },
+      },
+    ]);
+  });
+
+  it('refuses more labels than a card holds before asking the API', async () => {
+    const { client, calls } = await connect(() => ({ ok: true, data: {} }));
+    const result = await client.callTool({
+      name: 'card_create',
+      arguments: {
+        title: 'Too many',
+        labels: ['a', 'b', 'c', 'd', 'e', 'f'],
+      },
+    });
+    expect(result.isError).toBe(true);
+    expect(calls).toEqual([]);
+  });
+});

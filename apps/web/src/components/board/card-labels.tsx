@@ -11,6 +11,7 @@ import {
   LABELS_PER_CARD_MAX,
   type ProjectLabelView,
 } from '@nautelle/shared';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { describeBoardError } from '../../lib/board/format';
 import {
@@ -19,6 +20,7 @@ import {
   fetchProjectLabels,
   setCardLabels,
 } from '../../lib/board/labels';
+import { settingsItemHref } from '../../lib/projects/settings-sections';
 import { useSection } from '../../lib/section/use-section';
 
 /**
@@ -82,6 +84,12 @@ export function CardLabels({
   return (
     <div className="flex flex-col gap-2">
       {editing ? null : <LabelChips chips={chips} />}
+      <Link
+        href={settingsItemHref(projectId, 'labels')}
+        className="w-fit text-sm font-medium underline-offset-2 hover:underline"
+      >
+        Manage labels
+      </Link>
       {canOperate && options.length > 0 && !editing ? (
         <div>
           <Button variant="glass" size="sm" onClick={() => setEditing(true)}>

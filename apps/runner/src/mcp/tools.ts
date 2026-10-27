@@ -6,6 +6,7 @@ import {
   CARD_RECOMMENDABLE_MODELS,
   DESIGN_COMMENT_MAX,
   ESCALATE_CARD_TOOL,
+  LABELS_PER_CARD_MAX,
   REVIEW_FINDING_BODY_MAX,
   REVIEW_FINDING_SEVERITIES,
   REVIEW_FINDING_TITLE_MAX,
@@ -251,7 +252,7 @@ export const MCP_TOOLS = [
   {
     name: 'board_list',
     description:
-      'The Board of this project: its settings (merge policy, maxRunning, active rounds), the cards in board order, with number, title, kind, column, running round, pull request state and CI state, and the stacks, with number, title, stages and their card numbers, design status and run. Optional column filter. Read tool: any session of the project may call it.',
+      'The Board of this project: its settings (merge policy, maxRunning, active rounds), the cards in board order, with number, title, kind, column, labels (name and source), running round, pull request state and CI state, and the stacks, with number, title, stages and their card numbers, design status and run. Optional column filter. Read tool: any session of the project may call it.',
     method: 'board.list',
     untrusted: true,
     input: {
@@ -264,7 +265,7 @@ export const MCP_TOOLS = [
   {
     name: 'board_card',
     description:
-      'One board card in full: body, dependencies, a summary of its rounds, pull request, CI and the question its session is waiting on, if any. Read tool: any session of the project may call it.',
+      'One board card in full: body, labels (name and source), dependencies, a summary of its rounds, pull request, CI and the question its session is waiting on, if any. Read tool: any session of the project may call it.',
     method: 'board.card',
     untrusted: true,
     input: { card: cardNumber },
@@ -321,6 +322,13 @@ export const MCP_TOOLS = [
         .boolean()
         .optional()
         .describe('True to put the card in Suggestions as a proposal.'),
+      labels: z
+        .array(z.string().trim().min(1).max(32))
+        .max(LABELS_PER_CARD_MAX)
+        .optional()
+        .describe(
+          'Names of the project’s labels, e.g. ["frontend"]; a person’s choice, so no label is suggested after. An unknown name is refused label_unknown with the project’s names.',
+        ),
     },
   },
   {

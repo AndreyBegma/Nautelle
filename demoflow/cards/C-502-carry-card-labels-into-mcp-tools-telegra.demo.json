@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "name": "Card labels in the sheet's Manage labels link and the Work list",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project/board"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "waitFor",
+      "target": {
+        "role": "button",
+        "name": "Export the activity feed as CSV",
+        "exact": true
+      },
+      "timeoutMs": 60000
+    },
+    {
+      "action": "marker",
+      "title": "An operator labels a card in its sheet"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Export the activity feed as CSV",
+        "exact": true
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "tab",
+        "name": "Edit",
+        "exact": true
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Edit labels",
+        "exact": true
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "click",
+      "target": {
+        "placeholder": "Add a label"
+      }
+    },
+    {
+      "action": "fill",
+      "target": {
+        "placeholder": "Add a label"
+      },
+      "value": "frontend"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "fill",
+      "target": {
+        "placeholder": "Add a label"
+      },
+      "value": "docs"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Done",
+        "exact": true
+      }
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "list",
+        "name": "Labels"
+      }
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "role": "link",
+        "name": "Manage labels",
+        "exact": true
+      }
+    },
+    {
+      "action": "screenshot",
+      "name": "manage-labels-link",
+      "caption": "The sheet links straight to Settings, Labels"
+    },
+    {
+      "action": "press",
+      "key": "Escape"
+    },
+    {
+      "action": "marker",
+      "title": "The Work list shows the same stripe on a labelled card"
+    },
+    {
+      "action": "navigate",
+      "path": "/work"
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "screenshot",
+      "name": "work-list-label-stripe",
+      "caption": "A labelled card has its label stripe in the Work list"
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    }
+  ]
+}

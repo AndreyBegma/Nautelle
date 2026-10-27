@@ -471,6 +471,31 @@ export class BoardLabels {
     await this.assertLabels(this.prisma, projectId, labelIds);
   }
 
+  /**
+   * C-502 D2: the ids of the project's labels named `names`. A name that is
+   * no label of the project is refused `label_unknown`, with the project's
+   * names in the message so a session can retry.
+   */
+  async idsByName(
+    projectId: string,
+    names: readonly string[],
+  ): Promise<string[]> {
+    const wanted = [...new Set(names)];
+    if (wanted.length === 0) return [];
+    const labels = await this.labels(projectId);
+    const byName = new Map(labels.map((l) => [l.name, l.id]));
+    const unknown = wanted.filter((n) => !byName.has(n));
+    if (unknown.length > 0) {
+      const known = labels.map((l) => l.name).join(', ') || 'none';
+      throw boardError(
+        422,
+        BOARD_ERROR.labelUnknown,
+        `Unknown label ${unknown.join(', ')}; the project's labels are: ${known}`,
+      );
+    }
+    return wanted.map((n) => byName.get(n) as string);
+  }
+
   /** Writes a new card's `labelIds` as the person's, inside its create. */
   async writeOnCreate(
     tx: Tx,

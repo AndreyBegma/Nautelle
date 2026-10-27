@@ -24,6 +24,7 @@ const card = (over: Partial<BoardCardDetail> = {}) =>
     prState: null,
     ciState: 'none',
     body: '',
+    labels: [],
     ...over,
   }) as BoardCardDetail;
 
@@ -62,6 +63,21 @@ describe('board actions', () => {
     );
     expect(text).toContain('Agent: Running (round 2)');
     expect(text).toContain('Pull request: #34 open · checks green');
+  });
+
+  it('C-502: prints the labels after the Kind line, and nothing without any', () => {
+    const labelled = cardText(
+      card({
+        labels: [
+          { id: '1', name: 'frontend', hue: 1, source: 'person' },
+          { id: '2', name: 'backend', hue: 3, source: 'paths' },
+        ],
+      }),
+    ).split('\n');
+    expect(labelled[labelled.findIndex((l) => l.startsWith('Kind:')) + 1]).toBe(
+      'Labels: frontend, backend',
+    );
+    expect(cardText(card({ labels: [] }))).not.toContain('Labels:');
   });
 
   it('offers the write buttons the web offers, and none to a reader', () => {
