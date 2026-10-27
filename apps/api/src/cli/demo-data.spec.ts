@@ -121,9 +121,15 @@ describe('seedDemo', () => {
     expect(again.projectLabel.createManyAndReturn).not.toHaveBeenCalled();
   });
 
-  it('stores a fresh check that finds a release above the running version (C-526)', async () => {
+  it('stores no update check by default, so no recording shows the banner', async () => {
     const db = prisma();
     await seedDemo(db as never, 'demo@example.com');
+    expect(db.setting.upsert).not.toHaveBeenCalled();
+  });
+
+  it('stores a fresh check that finds a release above the running version when asked (C-526)', async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com', { updateAvailable: true });
     const call = db.setting.upsert.mock.calls[0][0];
     expect(call.where).toEqual({ key: LATEST_RELEASE_SETTING_KEY });
     const { checkedAt, latest } = call.create.value;

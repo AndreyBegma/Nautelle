@@ -69,6 +69,7 @@ In a compose install these go in `nautelle/api.env`, one `KEY=value` per line, a
 | `ADMIN_EMAIL`<br/>`ADMIN_PASSWORD`<br/>`ADMIN_NAME` | —<br/>—<br/>— | optional | The first admin without the browser (C-367): set both, and the API creates that admin on boot while no user exists — else it logs a one-time `<WEB_URL>/setup?token=…` link. `bun run admin:create` reads them too, to skip its prompts. Remove them once the admin exists. |
 | `DEMO_LOGIN_EMAIL`<br/>`DEMO_LOGIN_PASSWORD` | —<br/>— | optional | Demo recordings (C-383, ADR-0090): scripts/demo-dev.sh runs the API on a database of its own (agentdock_demo_&lt;card&gt;) and creates its admin from these; `bun run demo:db seed` gives that admin the demo project. The runner sets them from the project's Demo env — never put a real account here. |
 | `DEMO_API_PORT` | — | optional | The demo API's port; default the web app's PORT + 1000. |
+| `DEMO_UPDATE_AVAILABLE` | — | optional | `1`: the demo seed also stores an update check that finds a newer release, so the update banner shows (C-526's recording). Unset, no demo recording shows the banner. |
 
 ## Web app
 

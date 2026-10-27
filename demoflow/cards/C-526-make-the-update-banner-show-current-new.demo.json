@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "Update banner: running → new version and how to update",
-  "description": "C-526: the update banner shows the running version in red and the new one in green, a How to update section with the backup warning and three copyable upgrade commands, and the Release notes and Upgrade guide links.",
+  "description": "C-526: the update banner shows the running version in red and the new one in green, a How to update section with the backup warning and three copyable upgrade commands, and the Release notes and Upgrade guide links. Record it with DEMO_UPDATE_AVAILABLE=1 in the environment, so the demo seed stores a newer release; without it no update is offered.",
   "viewport": {
     "width": 1440,
     "height": 900

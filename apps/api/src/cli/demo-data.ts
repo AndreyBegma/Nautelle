@@ -283,6 +283,16 @@ export const DEMO_EXTRA_USERS: ReadonlyArray<{
   },
 ];
 
+/** What a recording asks of the seed beyond the demo project. */
+export interface SeedDemoOptions {
+  /**
+   * C-526: store a fresh update check that finds a newer release, so the
+   * update banner shows. Off by default: every other recording opens without
+   * the banner.
+   */
+  updateAvailable?: boolean;
+}
+
 /**
  * Seeds the demo project and its cards for the admin `adminEmail`, who must
  * exist (`bun run admin:create`). Every row has a fixed key, so running it
@@ -312,6 +322,7 @@ export const seedDemo = async (
     | 'setting'
   >,
   adminEmail: string,
+  options: SeedDemoOptions = {},
 ): Promise<{ projectId: string; cards: number }> => {
   const email = adminEmail.trim().toLowerCase();
   const admin = await prisma.user.findUnique({ where: { email } });
@@ -706,17 +717,19 @@ export const seedDemo = async (
       },
     });
   }
-  // C-526: the stored daily check, fresh and with a newer release, so the
-  // update banner shows and the service does not ask GitHub during a recording.
-  const lastCheck = {
-    checkedAt: now.toISOString(),
-    latest: demoLatestRelease(),
-  };
-  await prisma.setting.upsert({
-    where: { key: LATEST_RELEASE_SETTING_KEY },
-    update: { value: lastCheck },
-    create: { key: LATEST_RELEASE_SETTING_KEY, value: lastCheck },
-  });
+  if (options.updateAvailable) {
+    // C-526: the stored daily check, fresh and with a newer release, so the
+    // update banner shows and the service does not ask GitHub.
+    const lastCheck = {
+      checkedAt: now.toISOString(),
+      latest: demoLatestRelease(),
+    };
+    await prisma.setting.upsert({
+      where: { key: LATEST_RELEASE_SETTING_KEY },
+      update: { value: lastCheck },
+      create: { key: LATEST_RELEASE_SETTING_KEY, value: lastCheck },
+    });
+  }
   await prisma.toolUseRule.upsert({
     where: { id: 'demo-rule-lint' },
     update: {},

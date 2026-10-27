@@ -14,7 +14,8 @@ import {
  *
  * - `url`: prints its URL, for the script to hand to Prisma and the API;
  * - `create`: drops whatever a previous recording left and creates it empty;
- * - `seed`: adds the demo project and cards for DEMO_LOGIN_EMAIL;
+ * - `seed`: adds the demo project and cards for DEMO_LOGIN_EMAIL, and with
+ *   DEMO_UPDATE_AVAILABLE=1 a newer release for the update banner (C-526);
  * - `drop`: drops it.
  */
 
@@ -66,7 +67,9 @@ async function main() {
       process.env.DATABASE_URL = url;
       const prisma = new PrismaService();
       try {
-        const seeded = await seedDemo(prisma, email);
+        const seeded = await seedDemo(prisma, email, {
+          updateAvailable: process.env.DEMO_UPDATE_AVAILABLE === '1',
+        });
         console.log(
           `Demo project ${seeded.projectId} with ${seeded.cards} cards ready`,
         );
