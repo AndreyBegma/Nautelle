@@ -1,6 +1,6 @@
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import type { BoardCardView } from '@nautelle/shared';
-import { Bug, ImageIcon, Link2, Play } from 'lucide-react';
+import { Bug, ImageIcon, Link2, ListChecks, Play } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { dependencyChip } from '../../lib/board/dependencies';
 import { demoChip } from '../../lib/demos/format';
@@ -44,8 +44,19 @@ function FaceIcon({
   );
 }
 
-/** C-392: the kind as a small red bug; any other kind is the default. */
+/**
+ * C-392: the kind as a small red bug; C-510: a task as a quiet check-list
+ * icon, the one thing that tells it from a code card at a glance; any other
+ * kind is the default.
+ */
 export function KindIcon({ card }: { card: BoardCardView }) {
+  if (card.kind === 'task') {
+    return (
+      <FaceIcon label="Task" dataAttr="data-kind-icon">
+        <ListChecks aria-hidden="true" className={ICON} />
+      </FaceIcon>
+    );
+  }
   if (card.kind !== 'bug') return null;
   return (
     <FaceIcon label="Bug" tone="danger" dataAttr="data-kind-icon">

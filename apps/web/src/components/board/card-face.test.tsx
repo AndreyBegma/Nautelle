@@ -53,6 +53,47 @@ const design = (status: 'reviewing' | 'approved'): BoardCardView['design'] => ({
   busySince: null,
 });
 
+describe('CardFace task (C-510)', () => {
+  const anna = { id: 'u1', name: 'Anna' };
+  const task = (extra: Partial<BoardCardView> = {}) =>
+    render('todo', {
+      kind: 'task',
+      assignee: anna,
+      checklist: { done: 2, total: 4 },
+      prNumber: null,
+      prUrl: null,
+      prState: null,
+      ...extra,
+    });
+
+  test('a task has the task icon, one quiet line, the assignee and 2/4', () => {
+    const html = task();
+    expect(row(html, 'header')).toContain('data-kind-icon');
+    expect(row(html, 'header')).toContain('aria-label="Task"');
+    expect(row(html, 'status')).toContain('Anna is on it');
+    expect(row(html, 'footer')).toContain('data-task-assignee');
+    expect(row(html, 'footer')).toContain('2/4');
+  });
+
+  test('a task draws no run pill, no approve offer and no PR', () => {
+    const html = task({ round: round('running') });
+    expect(html).not.toContain('data-face-state');
+    expect(html).not.toContain('PR #');
+  });
+
+  test('a done task says who did it', () => {
+    expect(row(task({ column: 'completed' }), 'status')).toContain(
+      'Done by Anna',
+    );
+  });
+
+  test('a code card has no task parts', () => {
+    const html = render('todo');
+    expect(html).not.toContain('data-task-line');
+    expect(html).not.toContain('data-task-assignee');
+  });
+});
+
 describe('CardFace run queue (C-398)', () => {
   test('a card in the run queue says it waits for a slot, with its place', () => {
     const status = row(

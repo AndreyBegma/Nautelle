@@ -4,6 +4,7 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
+import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   type AttachmentView,
@@ -14,6 +15,7 @@ import {
   WORK_CARD_KINDS,
 } from '@nautelle/shared';
 import { useEffect, useRef, useState } from 'react';
+import { Segment } from '../../app/(app)/workflows/segment';
 import { ApiError } from '../../lib/api';
 import { describeUploadFailure } from '../../lib/attachments/format';
 import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploads';
@@ -32,6 +34,7 @@ import {
 } from '../../lib/board/quick-card';
 import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { AttachmentList } from '../attachments/attachment-list';
+import { NewTaskForm } from './new-task-form';
 
 const KIND_LABEL: Record<BoardCardKind, string> = {
   feature: 'Feature',
@@ -80,6 +83,7 @@ export function QuickCardDialog({
 }) {
   const [text, setText] = useState('');
   const [title, setTitle] = useState('');
+  const [mode, setMode] = useState<'code' | 'task'>('code');
   const [kind, setKind] = useState<BoardCardKind>('feature');
   const [runNow, setRunNow] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -108,6 +112,7 @@ export function QuickCardDialog({
     setText(initialText ?? '');
     setCarried(initialAttachments ?? []);
     setTitle('');
+    setMode('code');
     setKind('feature');
     setRunNow(false);
     setError(undefined);
@@ -204,107 +209,143 @@ export function QuickCardDialog({
         description="Say what to do. It lands in To Do as one card — no interview."
         className="sm:max-w-xl"
       >
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void save();
-          }}
-        >
-          <Field label="Quick card text" htmlFor="quick-card-text">
-            <Textarea
-              id="quick-card-text"
-              rows={5}
-              autoFocus
-              value={text}
-              maxLength={QUICK_CARD_TEXT_MAX}
-              disabled={busy}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (
-                  e.key === 'Enter' &&
-                  !e.shiftKey &&
-                  !e.nativeEvent.isComposing
-                ) {
-                  e.preventDefault();
-                  void save();
-                }
-              }}
-            />
-          </Field>
-          <section aria-label="Attachments" className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Attachments</span>
-            <AttachmentList attachments={carried} canRemove={false} />
-            <AttachmentDropzone
-              uploads={uploads}
-              label="Attach files for the card"
-            />
-          </section>
-          <div className="grid gap-4 sm:grid-cols-[1fr_9rem]">
-            <Field
-              label="Title"
-              htmlFor="quick-card-title"
-              hint={
-                drafting
-                  ? 'Writing a title…'
-                  : 'Suggested from your text; edit it if it is off.'
-              }
-            >
-              <Input
-                id="quick-card-title"
-                value={title}
-                maxLength={BOARD_CARD_TITLE_MAX}
+        {/* C-510: a task is work for a person; the switch picks its form. */}
+        <SegmentedControl size="sm" aria-label="Card type">
+          <Segment
+            size="sm"
+            layoutId="new-card-type"
+            active={mode === 'code'}
+            onSelect={() => setMode('code')}
+          >
+            Code
+          </Segment>
+          <Segment
+            size="sm"
+            layoutId="new-card-type"
+            active={mode === 'task'}
+            onSelect={() => setMode('task')}
+          >
+            Task
+          </Segment>
+        </SegmentedControl>
+        {mode === 'task' ? (
+          <NewTaskForm
+            projectId={projectId}
+            open={open}
+            onCancel={() => onOpenChange(false)}
+            onCreated={(card) => {
+              const result: QuickCardResult = {
+                card,
+                run: { state: 'not_requested' },
+              };
+              toast.success(quickCardToast(result));
+              onSaved?.(result);
+              onOpenChange(false);
+            }}
+          />
+        ) : (
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void save();
+            }}
+          >
+            <Field label="Quick card text" htmlFor="quick-card-text">
+              <Textarea
+                id="quick-card-text"
+                rows={5}
+                autoFocus
+                value={text}
+                maxLength={QUICK_CARD_TEXT_MAX}
                 disabled={busy}
-                placeholder="First line of the text"
-                onChange={(e) => {
-                  touched.current.title = true;
-                  setTitle(e.target.value);
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === 'Enter' &&
+                    !e.shiftKey &&
+                    !e.nativeEvent.isComposing
+                  ) {
+                    e.preventDefault();
+                    void save();
+                  }
                 }}
               />
             </Field>
-            <Field label="Kind" htmlFor="quick-card-kind">
-              <Select
-                id="quick-card-kind"
-                value={kind}
-                disabled={busy}
-                onChange={(e) => {
-                  touched.current.kind = true;
-                  setKind(e.target.value as BoardCardKind);
-                }}
+            <section aria-label="Attachments" className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium">Attachments</span>
+              <AttachmentList attachments={carried} canRemove={false} />
+              <AttachmentDropzone
+                uploads={uploads}
+                label="Attach files for the card"
+              />
+            </section>
+            <div className="grid gap-4 sm:grid-cols-[1fr_9rem]">
+              <Field
+                label="Title"
+                htmlFor="quick-card-title"
+                hint={
+                  drafting
+                    ? 'Writing a title…'
+                    : 'Suggested from your text; edit it if it is off.'
+                }
               >
-                {WORK_CARD_KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {KIND_LABEL[k]}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-          <Checkbox
-            label="Run now"
-            hint="Starts the card now if a worker is free; otherwise it waits in the run queue for one."
-            checked={runNow}
-            disabled={busy}
-            onChange={(e) => setRunNow(e.target.checked)}
-          />
-          {error ? (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              variant="glass"
+                <Input
+                  id="quick-card-title"
+                  value={title}
+                  maxLength={BOARD_CARD_TITLE_MAX}
+                  disabled={busy}
+                  placeholder="First line of the text"
+                  onChange={(e) => {
+                    touched.current.title = true;
+                    setTitle(e.target.value);
+                  }}
+                />
+              </Field>
+              <Field label="Kind" htmlFor="quick-card-kind">
+                <Select
+                  id="quick-card-kind"
+                  value={kind}
+                  disabled={busy}
+                  onChange={(e) => {
+                    touched.current.kind = true;
+                    setKind(e.target.value as BoardCardKind);
+                  }}
+                >
+                  {WORK_CARD_KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {KIND_LABEL[k]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <Checkbox
+              label="Run now"
+              hint="Starts the card now if a worker is free; otherwise it waits in the run queue for one."
+              checked={runNow}
               disabled={busy}
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!valid}>
-              {busy ? 'Saving…' : runNow ? 'Create and run' : 'Create card'}
-            </Button>
-          </div>
-        </form>
+              onChange={(e) => setRunNow(e.target.checked)}
+            />
+            {error ? (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="glass"
+                disabled={busy}
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!valid}>
+                {busy ? 'Saving…' : runNow ? 'Create and run' : 'Create card'}
+              </Button>
+            </div>
+          </form>
+        )}
       </DialogContent>
     </DialogRoot>
   );

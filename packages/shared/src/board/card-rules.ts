@@ -22,7 +22,8 @@ import {
 type RuleCard = Pick<
   BoardCardView,
   'source' | 'tracking' | 'column' | 'round' | 'design' | 'queue'
->;
+> &
+  Partial<Pick<BoardCardView, 'kind'>>;
 
 /** C-398: the card waits in the run queue for a slot (or a dependency). */
 export const isQueued = (card: RuleCard): boolean =>
@@ -47,10 +48,12 @@ export const isSessionAlive = (card: RuleCard): boolean =>
 /**
  * #282 D1/D4: the board starts, stops and answers a worker only for a card
  * that owns one. A `fleet` card's worker is the orchestrator's; a `terminal`
- * card's is the person's own session while it lives.
+ * card's is the person's own session while it lives. C-510: a `task` has no
+ * worker at all — a person does it — so Run, Stop and the like are never
+ * offered for it.
  */
 export const ownsWorker = (card: RuleCard): boolean =>
-  !isFleetCard(card) && !isSessionAlive(card);
+  card.kind !== 'task' && !isFleetCard(card) && !isSessionAlive(card);
 
 export const canRun = (card: RuleCard): boolean =>
   ownsWorker(card) &&

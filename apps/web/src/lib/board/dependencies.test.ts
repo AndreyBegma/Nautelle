@@ -68,6 +68,27 @@ describe('card dependencies (#337 D8)', () => {
     ).toBe('Waits for C-13, C-14 and C-16');
   });
 
+  test('a card that waits on a task names its assignee (C-510)', () => {
+    const task = (number: number, assigneeName: string | null) => ({
+      ...ref(number, 'todo'),
+      kind: 'task' as const,
+      assigneeName,
+    });
+    expect(runWaitsFor([task(12, 'Anna')])).toBe('Waits for C-12 · Anna');
+    expect(runWaitsFor([task(12, null)])).toBe('Waits for C-12');
+    expect(runWaitsFor([task(12, 'Anna'), ref(13, 'todo')])).toBe(
+      'Waits for C-12 · Anna and C-13',
+    );
+    expect(
+      readinessChip({
+        state: 'waiting',
+        satisfied: 0,
+        total: 1,
+        open: [task(12, 'Anna')],
+      })?.waitsFor,
+    ).toBe('Waits for C-12 · Anna');
+  });
+
   test('the add field takes 12 or C-12', () => {
     expect(parseCardNumber('12')).toBe(12);
     expect(parseCardNumber(' C-12 ')).toBe(12);

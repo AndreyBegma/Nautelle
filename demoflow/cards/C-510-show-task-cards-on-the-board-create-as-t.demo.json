@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "name": "A task for a person: create, tick, Done, and the waiting card is Ready",
+  "description": "C-510 (ADR-0127): the new-card dialog creates a Task with an assignee and a checklist; the task has a clean face and a sheet; a code card that waits on it says whom; ticking the items and pressing Done turns that card Ready.",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project/board"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "assertText",
+      "target": {
+        "role": "heading",
+        "name": "Board",
+        "exact": true
+      },
+      "text": "Board",
+      "match": "exact",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "marker",
+      "title": "Create a task for a person"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "New work"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Quick card",
+        "exact": true
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "[role=dialog] button[aria-pressed]:has-text(\"Task\")"
+      },
+      "zoom": true,
+      "caption": "The new-card dialog has a Code | Task switch"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Task title"
+      },
+      "value": "Add the Stripe secret to staging"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Checklist"
+      },
+      "value": "Create the key in Stripe\nAdd it to the staging env"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "label": "Assignee"
+      },
+      "zoom": true,
+      "caption": "The assignee is you by default"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Create task",
+        "exact": true
+      }
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "[data-task-line]"
+      },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "The task face is quiet: an icon, one line, the assignee and 0/2"
+    },
+    {
+      "action": "screenshot",
+      "name": "task-face"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "marker",
+      "title": "A code card waits on the task"
+    },
+    {
+      "action": "navigate",
+      "path": "/projects/demo-project/board/cards/1"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Runs after card"
+      },
+      "value": "C-10",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Add",
+        "exact": true
+      }
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "#board-run-waits"
+      },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "It says whom it waits for: the task and its assignee"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "marker",
+      "title": "Tick the checklist, then Done"
+    },
+    {
+      "action": "navigate",
+      "path": "/projects/demo-project/board/cards/10"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "[data-task-unblocks]"
+      },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "The task sheet lists what it unblocks; there are no rounds or PR tabs"
+    },
+    {
+      "action": "click",
+      "target": {
+        "label": "Create the key in Stripe"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "label": "Add it to the staging env"
+      },
+      "zoom": true,
+      "caption": "Both items ticked"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Done",
+        "exact": true
+      }
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "marker",
+      "title": "The waiting card is Ready"
+    },
+    {
+      "action": "navigate",
+      "path": "/projects/demo-project/board/cards/1"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "text": "All ready",
+        "exact": true
+      },
+      "timeoutMs": 30000,
+      "zoom": true,
+      "caption": "Done satisfied the dependency: C-1 can run"
+    },
+    {
+      "action": "screenshot",
+      "name": "dependent-ready"
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    }
+  ]
+}

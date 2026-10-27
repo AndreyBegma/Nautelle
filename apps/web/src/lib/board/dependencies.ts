@@ -38,7 +38,7 @@ export function dependencyChip(
     title:
       open.length > 0
         ? `Runs after ${labels.join(', ')}. No ready pull request yet: ${open
-            .map((d) => d.label)
+            .map(dependencyName)
             .join(', ')}.`
         : `Runs after ${labels.join(', ')}, all ready.`,
   };
@@ -59,11 +59,22 @@ export function parseCardNumber(raw: string): number | null {
 export const isOpenDependency = (column: BoardColumn): boolean =>
   !isDependencySatisfied(column);
 
+/**
+ * C-510: how one dependency is named — "C-12", or "C-12 · Anna" for a task, so
+ * a card that waits on a person says whom.
+ */
+export const dependencyName = (
+  ref: Pick<CardDependencyRef, 'label' | 'kind' | 'assigneeName'>,
+): string =>
+  ref.kind === 'task' && ref.assigneeName
+    ? `${ref.label} · ${ref.assigneeName}`
+    : ref.label;
+
 /** "C-84" / "C-84 and C-86" / "C-84, C-86 and C-90". */
 export const labelList = (
-  refs: readonly Pick<CardDependencyRef, 'label'>[],
+  refs: readonly Pick<CardDependencyRef, 'label' | 'kind' | 'assigneeName'>[],
 ) => {
-  const labels = refs.map((d) => d.label);
+  const labels = refs.map(dependencyName);
   if (labels.length <= 1) return labels[0] ?? '';
   return `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`;
 };
