@@ -61,9 +61,20 @@ describe('card readiness and auto-run (e2e, #443)', () => {
         satisfied: 0,
         total: 2,
         open: [
-          { number: a.number, label: `C-${a.number}`, column: 'todo' },
-          { number: b.number, label: `C-${b.number}`, column: 'todo' },
+          {
+            number: a.number,
+            label: `C-${a.number}`,
+            column: 'todo',
+            landed: false,
+          },
+          {
+            number: b.number,
+            label: `C-${b.number}`,
+            column: 'todo',
+            landed: false,
+          },
         ],
+        unmerged: [],
       });
 
       await accept(a.number);
@@ -79,6 +90,7 @@ describe('card readiness and auto-run (e2e, #443)', () => {
         satisfied: 2,
         total: 2,
         open: [],
+        unmerged: [],
       });
     });
 
@@ -203,6 +215,30 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       await w.work.settled();
       expect(w.sent('card.run')).toHaveLength(2);
       expect((await w.card(c.number)).rounds).toHaveLength(1);
+      expect(await w.audit('card.auto_run_failed')).toEqual([]);
+    });
+
+    it('waits while two Finished dependencies are unmerged, and starts once one is merged (C-417)', async () => {
+      const { a, b, c } = await world();
+      await autoRun(c.number);
+      await finish(a.number);
+      await finish(b.number);
+      await w.work.settled();
+
+      expect((await w.card(c.number)).column).toBe('todo');
+      expect((await w.card(c.number)).autoRunWhenReady).toBe(true);
+      expect(await w.audit('card.auto_run_failed')).toEqual([]);
+      expect((await face(c.number))?.readiness).toMatchObject({
+        state: 'blocked',
+      });
+
+      const dependency = await w.card(a.number);
+      await w.work.markMerged(dependency.id, dependency.prNumber ?? 0);
+      await w.work.settled();
+
+      const card = await w.card(c.number);
+      expect(card.column).toBe('in_progress');
+      expect(card.autoRunWhenReady).toBe(false);
       expect(await w.audit('card.auto_run_failed')).toEqual([]);
     });
 

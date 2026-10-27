@@ -423,19 +423,28 @@ export interface CardDependencyRef {
   label: string;
   /** Open while not `finished` or `completed` (#638). */
   column: BoardColumn;
+  /**
+   * C-417: its work is in the project base (merged into it, or accepted with
+   * no open PR). A card branches from at most one dependency that has not.
+   */
+  landed: boolean;
 }
 
 /**
  * #443: a To Do card with dependencies is `ready` once every one is
  * satisfied — in Finished or Completed (#638) — `waiting` while one is open.
+ * C-417: `blocked` when every one is satisfied but more than one has not
+ * landed; Run would be refused `dependencies_unmerged` (ADR-0065).
  */
 export interface CardReadiness {
-  state: 'ready' | 'waiting';
+  state: 'ready' | 'waiting' | 'blocked';
   /** Dependencies in Finished or Completed. */
   satisfied: number;
   total: number;
   /** The open ones, in number order: "Waits for C-84". */
   open: CardDependencyRef[];
+  /** C-417: the satisfied ones not landed, in number order; empty unless `blocked`. */
+  unmerged: CardDependencyRef[];
 }
 
 /** #337 D8: one dependency as the card sheet lists it. */
