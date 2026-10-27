@@ -23,6 +23,7 @@ import {
   type RunnerPeer,
 } from './runner-connections';
 import { RunnerIngestService } from './runner-ingest.service';
+import { keepAlive } from './runner-keepalive';
 import { RunnerLive } from './runner-live';
 import { RunnerLocalRequests } from './runner-local-requests';
 import { RUNNER_OPTIONS, type RunnerOptions } from './runner-options';
@@ -74,6 +75,11 @@ class RunnerSocket {
   private release: () => void = () => {};
   private live: LiveConnection | null = null;
   private closed = false;
+  /** The ack cursor last sent; a heartbeat's `ack` repeats it (#1057 D2). */
+  private ackedSeq = 0;
+  private readonly openedAt = Date.now();
+  private lastFrameAt: number | null = null;
+  private stopKeepAlive: () => void = () => {};
   private readonly helloTimer: NodeJS.Timeout;
   private readonly peer: RunnerPeer;
 
@@ -83,8 +89,11 @@ class RunnerSocket {
     private readonly deps: Deps,
   ) {
     this.peer = peerOf(request);
-    socket.on('message', (data) => this.enqueue(() => this.receive(data)));
-    socket.on('close', () => this.onClose());
+    socket.on('message', (data) => {
+      this.lastFrameAt = Date.now();
+      this.enqueue(() => this.receive(data));
+    });
+    socket.on('close', (code, reason) => this.onClose(code, reason.toString()));
     this.helloTimer = setTimeout(
       () => this.close(POLICY_VIOLATION, 'hello expected'),
       deps.options.helloTimeoutMs,
@@ -181,6 +190,8 @@ class RunnerSocket {
         this.deps.logger.warn(`runner ${runnerId}: repeated hello ignored`);
         return;
       case 'heartbeat':
+        // #1057 D2: something periodic for the runner's watchdog to see.
+        live.send({ type: 'ack', seq: this.ackedSeq });
         live.lastBeatAt = Date.now();
         live.heartbeat = {
           receivedAt: new Date(live.lastBeatAt).toISOString(),
@@ -197,7 +208,8 @@ class RunnerSocket {
           if (result) this.result(runnerId, result);
         }
         const acked = await this.deps.ingest.events(runnerId, message.events);
-        live.send({ type: 'ack', seq: Number(acked) });
+        this.ackedSeq = Number(acked);
+        live.send({ type: 'ack', seq: this.ackedSeq });
         return;
       }
       case 'command.result':
@@ -271,6 +283,7 @@ class RunnerSocket {
       return;
     }
     clearTimeout(this.helloTimer);
+    this.ackedSeq = Number(acked);
     const live = new LiveConnection(
       runnerId,
       this.socket,
@@ -291,11 +304,25 @@ class RunnerSocket {
         type: 'welcome',
         runnerId,
         config,
-        ackedSeq: Number(acked),
-        features: [SERVER_FEATURES.commandResultsSpooled],
+        ackedSeq: this.ackedSeq,
+        features: [
+          SERVER_FEATURES.commandResultsSpooled,
+          SERVER_FEATURES.heartbeatAck,
+        ],
       });
     });
     if (this.closed) return;
+    this.stopKeepAlive = keepAlive(
+      this.socket,
+      this.deps.options.pingIntervalMs,
+      () => {
+        this.deps.logger.warn(
+          `runner ${runnerId}: two pings unanswered, socket terminated`,
+        );
+        // No close handshake on a dead link; `close` follows with 1006.
+        this.socket.terminate();
+      },
+    );
     // After the welcome: a `subscribe` sent from here is the runner's first.
     this.deps.streams.connected(live);
     this.deps.logger.log(`runner ${runnerId} connected`);
@@ -324,6 +351,7 @@ class RunnerSocket {
     if (this.closed) return;
     this.closed = true;
     clearTimeout(this.helloTimer);
+    this.stopKeepAlive();
     this.release();
     if (this.live) this.detach(this.live);
     if (this.socket.readyState <= this.socket.OPEN) {
@@ -331,13 +359,21 @@ class RunnerSocket {
     }
   }
 
-  private onClose(): void {
+  private onClose(code: number, reason: string): void {
     const wasLive = this.live !== null;
     this.closed = true;
     clearTimeout(this.helloTimer);
+    this.stopKeepAlive();
     this.release();
     if (this.live) this.detach(this.live);
-    if (wasLive) this.deps.logger.log(`runner ${this.runnerId} disconnected`);
+    if (!wasLive) return;
+    // #1057 D1: what tells a dead link from a closed one.
+    const now = Date.now();
+    const lastFrame =
+      this.lastFrameAt === null ? 'none' : `${now - this.lastFrameAt} ms ago`;
+    this.deps.logger.log(
+      `runner ${this.runnerId} disconnected: code ${code}${reason ? ` (${reason})` : ''}, lived ${now - this.openedAt} ms, last frame ${lastFrame}`,
+    );
   }
 
   /** Both close paths may run; the second finds nothing left to do. */
