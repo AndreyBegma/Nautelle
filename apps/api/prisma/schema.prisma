@@ -3355,6 +3355,8 @@ enum CardRoundTrigger {
   escalation
   /// #884 (ADR-0084): started by Nautelle for blocking review findings.
   review_fix
+  /// C-511: the card's session resumed after the task it raised is Done.
+  task_done
 }
 
 /// Shared `CARD_ROUND_PHASES` (D4, D6).

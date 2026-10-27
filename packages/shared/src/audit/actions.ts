@@ -217,6 +217,8 @@ export const AUDIT_ACTIONS = [
   'card.finished',
   // #750 D9: the worker's `escalate_card` (reason, model, relaunched).
   'card.escalated',
+  /** C-511: a card worker's `need_person` raised a task (`after: { number, task, round }`). */
+  'card.task_raised',
   'card.accepted',
   /** C-509 (ADR-0127): a person pressed Done on a task (`after: { number, note? }`). */
   'card.task_done',

@@ -47,9 +47,14 @@ const STACK_METHODS = new Set<LocalMethodName>([
 
 /**
  * C-503: `card.finishAnalysis` answers only an analysis card's session — its
- * own sweep is `board-analysis.e2e.spec.ts`.
+ * own sweep is `board-analysis.e2e.spec.ts`. C-511: `card.needPerson` ends
+ * the round `card.finish` needs — its own suite is
+ * `board-need-person.e2e.spec.ts`.
  */
-const OWN_SUITE = new Set<LocalMethodName>(['card.finishAnalysis']);
+const OWN_SUITE = new Set<LocalMethodName>([
+  'card.finishAnalysis',
+  'card.needPerson',
+]);
 
 /** The args each method is called with in the all-methods sweep. */
 const ARGS: Record<Exclude<LocalMethodName, LocalStackMethod>, unknown> = {
@@ -84,6 +89,10 @@ const ARGS: Record<Exclude<LocalMethodName, LocalStackMethod>, unknown> = {
   'card.escalate': {
     reason: 'misclassified',
     note: 'The card needs a schema decision.',
+  },
+  'card.needPerson': {
+    title: 'Create the OAuth app',
+    why: 'The worker cannot create it.',
   },
   'card.reviewReport': {
     findings: [

@@ -6,6 +6,7 @@ import {
   CARD_RECOMMENDABLE_MODELS,
   DESIGN_COMMENT_MAX,
   ESCALATE_CARD_TOOL,
+  NEED_PERSON_TOOL,
   REVIEW_FINDING_BODY_MAX,
   REVIEW_FINDING_SEVERITIES,
   REVIEW_FINDING_TITLE_MAX,
@@ -13,6 +14,9 @@ import {
   REVIEW_REPORT_TOOL,
   REVIEW_SUMMARY_MAX,
   requestableActionRequestKindSchema,
+  TASK_CHECKLIST_MAX,
+  TASK_CHECKLIST_TEXT_MAX,
+  TASK_NOTE_MAX,
 } from '@nautelle/shared';
 import {
   BOARD_WAIT_TIMEOUT_MAX_SEC,
@@ -567,6 +571,45 @@ export const ESCALATE_CARD_MCP_TOOL = {
       .describe(
         'What you found and why you stop: the decision that is open, what you tried, what the next worker needs.',
       ),
+  },
+} as const satisfies McpToolDefinition;
+
+/**
+ * C-511: set to `1` in the env of a card round launched with `needPerson`;
+ * the MCP server offers `need_person` only then.
+ */
+export const CARD_NEED_PERSON_ENV = 'NAUTELLE_CARD_NEED_PERSON';
+
+/**
+ * C-511: the card worker raises a task for a person and stops. Not in
+ * `MCP_TOOLS`: it is listed only on a round launched with `needPerson`, and
+ * the runner stops the session once it answers, like `escalate_card`.
+ */
+export const NEED_PERSON_MCP_TOOL = {
+  name: NEED_PERSON_TOOL,
+  description:
+    'Only for the worker of a Nautelle board card: stop because only a person can unblock the card — a missing secret, credential or access, a manual step outside the worktree, or a decision only a person may take. It raises a task for a person, makes this card wait for it and ends this round; when the person marks the task Done, Nautelle resumes this session with their note. One open task per card (task_open); any other session is refused (not_a_card_session).',
+  method: 'card.needPerson',
+  input: {
+    title: z
+      .string()
+      .trim()
+      .min(1)
+      .max(LOCAL_CARD_TITLE_MAX)
+      .describe('What the person must do, e.g. "Add the STRIPE_KEY secret".'),
+    why: z
+      .string()
+      .trim()
+      .min(1)
+      .max(TASK_NOTE_MAX)
+      .describe(
+        'Why you cannot go on without it, and what you will do once it is done, in full sentences.',
+      ),
+    checklist: z
+      .array(z.string().trim().min(1).max(TASK_CHECKLIST_TEXT_MAX))
+      .max(TASK_CHECKLIST_MAX)
+      .optional()
+      .describe('The steps for the person, one item each.'),
   },
 } as const satisfies McpToolDefinition;
 

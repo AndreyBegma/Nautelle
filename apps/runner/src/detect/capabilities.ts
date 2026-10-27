@@ -345,6 +345,8 @@ export const detectCapabilities = async (
     cardFreshStart: true,
     // #750 D8: this runner offers `escalate_card` and stops the round after it.
     cardEscalate: true,
+    // C-511: this runner offers `need_person` and stops the round after it.
+    cardNeedPerson: true,
     // #854: this runner takes `card.run` `startBranch`.
     cardStartBranch: true,
     // #751 B1: this runner sends `prefix.measured` for its launches.

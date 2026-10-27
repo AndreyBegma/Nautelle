@@ -164,6 +164,7 @@ describe('capability detection', () => {
       sessionMessage: true,
       cardEffort: true,
       cardFreshStart: true,
+      cardNeedPerson: true,
       cardEscalate: true,
       cardStartBranch: true,
       prefixMeasure: true,

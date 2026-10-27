@@ -276,6 +276,12 @@ export const capabilitiesSchema = z.object({
    */
   cardEscalate: z.boolean().optional(),
   /**
+   * C-511: the runner takes `needPerson` on `card.run`, offers the worker
+   * `need_person` and stops the session after it answers. Absent means
+   * `false` — the API sends no `needPerson` and the tool is not offered.
+   */
+  cardNeedPerson: z.boolean().optional(),
+  /**
    * #854: the runner takes `startBranch` on `card.run` and puts the card's
    * worktree on it when origin has it. Absent means `false` — the API sends
    * no `startBranch` and the round launches on the card's own branch.
@@ -367,6 +373,10 @@ export const cardFreshStartAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `card.run`'s `escalate` (#750); absent is `false`. */
 export const cardEscalateAvailable = (capabilities: Capabilities): boolean =>
   capabilities.cardEscalate === true;
+
+/** Whether the API may send `card.run`'s `needPerson` (C-511); absent is `false`. */
+export const cardNeedPersonAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.cardNeedPerson === true;
 
 /** Whether the API may send `card.run`'s `startBranch` (#854); absent is `false`. */
 export const cardStartBranchAvailable = (capabilities: Capabilities): boolean =>

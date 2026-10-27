@@ -33,9 +33,11 @@ import {
   cardChange,
   cardFeedbackPrompt,
   cardNextRoundPrompt,
+  cardTaskDonePrompt,
   cardWorkerPrompt,
   ESCALATE_CARD_TOOL,
   HANDOFF_NOTE_PATH,
+  NEED_PERSON_TOOL,
 } from './worker-prompt';
 
 const bytes = (text: string): number => new TextEncoder().encode(text).length;
@@ -391,7 +393,7 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
   };
 
   it('is version 26', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(26);
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(27);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
@@ -786,6 +788,54 @@ describe('worker prompt v23 — escalate_card (#750 D8)', () => {
     expect(prompt.indexOf(ESCALATE_CARD_TOOL)).toBeLessThan(
       prompt.indexOf('## Card C-12'),
     );
+  });
+});
+
+describe('worker prompt v27 — need_person (C-511)', () => {
+  const plain = { ...card, design: null };
+
+  it('tells the worker when to raise a task only when the round may', () => {
+    for (const needPerson of [undefined, false]) {
+      const prompt = cardWorkerPrompt({ ...plain, needPerson });
+      expect(prompt).not.toContain(NEED_PERSON_TOOL);
+    }
+    const prompt = cardWorkerPrompt({ ...plain, needPerson: true });
+    const section = prompt.slice(
+      prompt.indexOf('## When only a person can unblock the card'),
+      prompt.indexOf('## When you are done'),
+    );
+    expect(section).toContain(`If the \`${NEED_PERSON_TOOL}\` tool is listed`);
+    for (const signal of ['secret', 'manual step', 'decision', 'checklist']) {
+      expect(section).toContain(signal);
+    }
+    expect(prompt.indexOf(NEED_PERSON_TOOL)).toBeLessThan(
+      prompt.indexOf('## Card C-12'),
+    );
+  });
+
+  it('reports the Done task back with its checklist and note, as data', () => {
+    const prompt = cardTaskDonePrompt({
+      number: 13,
+      title: 'Add the STRIPE_KEY secret',
+      checklist: [
+        { text: 'Create a test key', done: true },
+        { text: 'Add it to the env', done: false },
+      ],
+      note: '  Added to apps/api/.env.  ',
+    });
+    expect(prompt).toContain(`C-13 you raised with ${NEED_PERSON_TOOL}`);
+    expect(prompt).toContain('- [x] Create a test key');
+    expect(prompt).toContain('- [ ] Add it to the env');
+    expect(prompt).toContain('Note: Added to apps/api/.env.');
+    expect(prompt).toContain('finish_card');
+    const bare = cardTaskDonePrompt({
+      number: 13,
+      title: 'Approve the gate',
+      checklist: [],
+      note: null,
+    });
+    expect(bare).not.toContain('Checklist:');
+    expect(bare).toContain('Note: (none)');
   });
 });
 

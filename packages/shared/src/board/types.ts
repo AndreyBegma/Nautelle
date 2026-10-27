@@ -92,7 +92,9 @@ export const isMirroredCardSource = (
  * D4: what started a round. `ci_fix` (#359 D6) is Nautelle's own round for a
  * red check or a merge conflict on the card's PR; `escalation` (#750 D9) is
  * the relaunch on Opus after the worker's `escalate_card`; `review_fix`
- * (#884, ADR-0084) is Nautelle's own round for blocking review findings.
+ * (#884, ADR-0084) is Nautelle's own round for blocking review findings;
+ * `task_done` (C-511) resumes the card's session after the task its worker
+ * raised with `need_person` is Done.
  */
 export const CARD_ROUND_TRIGGERS = [
   'run',
@@ -100,6 +102,7 @@ export const CARD_ROUND_TRIGGERS = [
   'ci_fix',
   'escalation',
   'review_fix',
+  'task_done',
 ] as const;
 export type CardRoundTrigger = (typeof CARD_ROUND_TRIGGERS)[number];
 

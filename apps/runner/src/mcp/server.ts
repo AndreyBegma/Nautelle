@@ -19,6 +19,7 @@ import {
   ESCALATE_CARD_MCP_TOOL,
   MCP_TOOLS,
   type McpToolDefinition,
+  NEED_PERSON_MCP_TOOL,
   REPORT_REVIEW_MCP_TOOL,
   REVIEW_SESSION_TOOLS,
 } from './tools';
@@ -99,13 +100,14 @@ const withCardNote = async (
 
 /**
  * The tools a session is offered. With `escalate` (#750 D8), `escalate_card`
- * too. With `review` (#884), the session is a review step: `report_review`
- * and the read tools (`REVIEW_SESSION_TOOLS`) only — never `finish_card`,
- * `escalate_card` or a tool that changes the Board; `review` wins over
- * `escalate`.
+ * too; with `needPerson` (C-511), `need_person`. With `review` (#884), the
+ * session is a review step: `report_review` and the read tools
+ * (`REVIEW_SESSION_TOOLS`) only — never `finish_card`, `escalate_card`,
+ * `need_person` or a tool that changes the Board; `review` wins over both.
  */
 export const mcpToolsOf = (options: {
   escalate?: boolean;
+  needPerson?: boolean;
   review?: boolean;
 }): readonly McpToolDefinition[] => {
   if (options.review) {
@@ -114,7 +116,11 @@ export const mcpToolsOf = (options: {
       REPORT_REVIEW_MCP_TOOL,
     ];
   }
-  return options.escalate ? [...MCP_TOOLS, ESCALATE_CARD_MCP_TOOL] : MCP_TOOLS;
+  return [
+    ...MCP_TOOLS,
+    ...(options.escalate ? [ESCALATE_CARD_MCP_TOOL] : []),
+    ...(options.needPerson ? [NEED_PERSON_MCP_TOOL] : []),
+  ];
 };
 
 /**
@@ -128,6 +134,8 @@ export const buildMcpServer = (
   options: {
     cardNote?: McpCardNote;
     escalate?: boolean;
+    /** C-511: a card round launched with `needPerson`. */
+    needPerson?: boolean;
     /** #884: a review session (`CARD_REVIEW_ENV`). */
     review?: boolean;
     /** Tests only: the clock `board_wait` measures its timeout with. */

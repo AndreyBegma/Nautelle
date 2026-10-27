@@ -48,6 +48,15 @@ import {
   localRequestArgsSchema,
 } from './types';
 
+/**
+ * #750 D8, C-511: the methods after whose answer the runner stops the asking
+ * round — `escalate_card` and `need_person`.
+ */
+const STOPS_ROUND: ReadonlySet<string> = new Set([
+  'card.escalate',
+  'card.needPerson',
+]);
+
 /** #750 D8: the round whose worker called `escalate_card`, as it was then. */
 export interface EscalatedRound {
   cardId: string;
@@ -431,11 +440,12 @@ export class LocalService {
     const projects = this.deps.projects();
     const projectId = correlateCwd(binding.cwd, projects).projectId;
     // #750 D8: the asking round is fixed before the call — the API may start
-    // the relaunch on Opus before it answers.
-    const asking =
-      input.method === 'card.escalate'
-        ? this.escalatingRound(binding.cwd, binding.sessionId)
-        : null;
+    // the relaunch on Opus before it answers. C-511: `need_person` ends the
+    // round the same way.
+    const stopsRound = STOPS_ROUND.has(input.method);
+    const asking = stopsRound
+      ? this.escalatingRound(binding.cwd, binding.sessionId)
+      : null;
     let relayed = this.gate(input);
     if (input.method === 'card.finish') {
       const guarded = this.guardFinish(binding, relayed);
@@ -453,7 +463,7 @@ export class LocalService {
       session: { runtime: 'claude', id: binding.sessionId },
       via: input.via,
     });
-    if (input.method === 'card.escalate' && result.ok && asking) {
+    if (stopsRound && result.ok && asking) {
       this.deps.stopRoundSoon?.(asking);
     }
     if (input.method === 'card.finish' && !result.ok) {
