@@ -6,6 +6,7 @@ import type { BoardColumn, CardEffort, PrismaClient } from '@prisma/client';
 import { hashPassword } from '../auth/password';
 import { generateToken } from '../auth/tokens';
 import { writeStarterLabels } from '../board/starter-labels';
+import { actionRequestLink } from '../local/action-request-mapper';
 
 /**
  * The database a demo recording runs on (C-383, ADR-0090): `agentdock_demo`,
@@ -293,6 +294,7 @@ export const seedDemo = async (
     | 'boardCardRound'
     | 'agentSession'
     | 'actionRequest'
+    | 'notification'
     | 'toolUseRule'
     | 'boardRunQueueCard'
     | 'taskDesign'
@@ -655,6 +657,29 @@ export const seedDemo = async (
           ...(call.suggestions ? { suggestions: [...call.suggestions] } : {}),
         },
         expiresAt: new Date(now.getTime() + call.expiresInMinutes * 60_000),
+      },
+    });
+  }
+  // C-469: the bell's action-request item, which opens the Inbox.
+  const bellRequest = DEMO_TOOL_CALLS[0];
+  const bellLink = actionRequestLink(DEMO_PROJECT_ID, bellRequest.id);
+  if (
+    !(await prisma.notification.findFirst({
+      where: { userId: admin.id, link: bellLink },
+      select: { id: true },
+    }))
+  ) {
+    await prisma.notification.create({
+      data: {
+        userId: admin.id,
+        kind: 'action.requested',
+        projectId: DEMO_PROJECT_ID,
+        runnerId: DEMO_RUNNER_ID,
+        title: `A session asks to use ${bellRequest.toolName}`,
+        body: `Allow ${bellRequest.toolName} in an unattended Claude Code session`,
+        link: bellLink,
+        firstAt: now,
+        lastAt: now,
       },
     });
   }

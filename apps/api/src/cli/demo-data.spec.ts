@@ -72,6 +72,7 @@ describe('seedDemo', () => {
     boardCardRound: { upsert: jest.fn() },
     agentSession: { upsert: jest.fn() },
     actionRequest: { upsert: jest.fn() },
+    notification: { findFirst: jest.fn(), create: jest.fn() },
     toolUseRule: { upsert: jest.fn() },
     taskDesign: { upsert: jest.fn().mockResolvedValue({ id: 'd1' }) },
     planTurn: { upsert: jest.fn().mockResolvedValue({ id: 't1' }) },
