@@ -6,7 +6,7 @@
       "action": "include",
       "fragment": "sign-in",
       "with": {
-        "next": "/projects/demo-project/board/cards/11"
+        "next": "/projects/demo-project/board/cards/12"
       }
     }
   ],

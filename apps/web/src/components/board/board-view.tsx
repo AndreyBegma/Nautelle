@@ -654,7 +654,7 @@ function RunMenuItem({
   return (
     <MenuItem disabled={disabled || hold !== null} onSelect={onRun}>
       {runActionLabel(card)}
-      {hold ? ` — ${hold.charAt(0).toLowerCase()}${hold.slice(1)}` : ''}
+      {hold ? ` — ${hold.replace(/^Waits/, 'waits')}` : ''}
     </MenuItem>
   );
 }

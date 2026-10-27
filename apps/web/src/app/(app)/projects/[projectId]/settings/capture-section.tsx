@@ -58,7 +58,7 @@ export function CaptureFields({
     <section aria-label="Capture" className="flex flex-col gap-4">
       <SectionHeader
         title="Capture"
-        description="Propose cards from your own Claude Code sessions. They land in the Board’s Inbox."
+        description="Propose cards from your own Claude Code sessions. They land in the Board’s Suggestions."
       />
       <div className="flex items-center justify-between gap-4">
         <div>

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "name": "Run says why two unmerged dependencies block it",
+  "description": "C-417 (ADR-0065): a To Do card that depends on two Finished cards with open pull requests has Run disabled, with the reason, instead of refusing the click.",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project/board/cards/11"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "Two Finished dependencies, neither merged"
+    },
+    {
+      "action": "waitFor",
+      "target": {
+        "css": "#board-run-waits"
+      },
+      "timeoutMs": 60000,
+      "zoom": true,
+      "caption": "Run is disabled and says why"
+    },
+    {
+      "action": "assertText",
+      "target": {
+        "css": "#board-run-waits"
+      },
+      "text": "C-7 and C-8 are not merged yet; a card branches from one dependency only",
+      "caption": "Merge one of them and Run opens"
+    },
+    {
+      "action": "screenshot",
+      "name": "run-blocked-by-unmerged"
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    }
+  ]
+}

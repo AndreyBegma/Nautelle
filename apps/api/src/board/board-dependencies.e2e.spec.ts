@@ -35,8 +35,20 @@ describe('card dependencies (e2e, #337)', () => {
     const listed = (await w.viewer.get(deps(c.number)))
       .body as CardDependenciesView;
     expect(listed.dependsOn).toEqual([
-      { number: a.number, label: `C-${a.number}`, column: 'todo', title: 'A' },
-      { number: b.number, label: `C-${b.number}`, column: 'todo', title: 'B' },
+      {
+        number: a.number,
+        label: `C-${a.number}`,
+        column: 'todo',
+        landed: false,
+        title: 'A',
+      },
+      {
+        number: b.number,
+        label: `C-${b.number}`,
+        column: 'todo',
+        landed: false,
+        title: 'B',
+      },
     ]);
 
     const board = (await w.viewer.get(`${w.path()}/board`)).body as BoardView;
@@ -99,7 +111,12 @@ describe('card dependencies (e2e, #337)', () => {
     expect(refused.status).toBe(409);
     expect(refused.body.error).toBe(BOARD_ERROR.dependencyOpen);
     expect(refused.body.dependencies).toEqual([
-      { number: a.number, label: `C-${a.number}`, column: 'todo' },
+      {
+        number: a.number,
+        label: `C-${a.number}`,
+        column: 'todo',
+        landed: false,
+      },
     ]);
     expect(refused.body.message).toContain(`C-${a.number}`);
 
@@ -118,7 +135,12 @@ describe('card dependencies (e2e, #337)', () => {
     const running = await w.runCard(b.number);
     expect(running.status).toBe(409);
     expect(running.body.dependencies).toEqual([
-      { number: a.number, label: `C-${a.number}`, column: 'in_progress' },
+      {
+        number: a.number,
+        label: `C-${a.number}`,
+        column: 'in_progress',
+        landed: false,
+      },
     ]);
 
     await w.operator.send('post', `${cardPath(a.number)}/finish`);

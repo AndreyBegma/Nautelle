@@ -9,6 +9,7 @@ import {
   installArgv,
   manualCommand,
   serviceRestart,
+  type UnitState,
 } from './install';
 
 /**
@@ -57,6 +58,8 @@ export interface UpdateDeps {
   install: (argv: readonly string[]) => Promise<number>;
   exec: Exec;
   exists: (path: string) => boolean;
+  /** A file's text, or null when it cannot be read. */
+  readText: (path: string) => string | null;
   stderr: (text: string) => void;
   paths: Pick<Paths, 'configDir' | 'serviceFile' | 'launchAgentFile'>;
   uid: number;
@@ -128,18 +131,62 @@ export const startUpdateCheck = (deps: UpdateDeps): UpdateCheck | null => {
     timeoutMs: deps.timeoutMs,
   });
 
+  const unitFile =
+    deps.os === 'darwin' ? deps.paths.launchAgentFile : deps.paths.serviceFile;
+
+  /**
+   * Whether the install left a binary that reports `version`: the one that
+   * ran when it is still there, else whatever `nautelle-runner` is on the
+   * PATH (the old path is gone when the manager keeps each version in its own
+   * directory).
+   */
+  const installed = async (version: string): Promise<boolean> => {
+    const result = await deps.exec(
+      deps.exists(binary) ? binary : PACKAGE_NAME,
+      ['version'],
+    );
+    return (
+      result?.code === 0 && result.stdout.trim().split(/\s+/)[0] === version
+    );
+  };
+
+  const runInstall = async (argv: readonly string[]): Promise<boolean> => {
+    const command = argv.join(' ');
+    try {
+      const code = await deps.install(argv);
+      if (code === 0) return true;
+      deps.stderr(`${command} exited with ${code}.\n`);
+    } catch (error) {
+      deps.stderr(`Could not run ${command}: ${errorMessage(error)}\n`);
+    }
+    return false;
+  };
+
+  /**
+   * Writes the unit again through the binary `installed()` verified (the old
+   * path is gone, so that is the one on the PATH); true when that exited 0 and
+   * the unit no longer names the missing binary.
+   */
+  const rewriteUnit = async (): Promise<boolean> => {
+    if ((await deps.exec(PACKAGE_NAME, ['install-service']))?.code !== 0) {
+      return false;
+    }
+    const text = deps.readText(unitFile);
+    return text !== null && !text.includes(binary);
+  };
+
   const restartNotice = async (version: string): Promise<void> => {
+    let unit: UnitState = 'intact';
+    if (deps.exists(unitFile) && !deps.exists(binary)) {
+      unit = (await rewriteUnit()) ? 'rewritten' : 'stale';
+    }
     const service = serviceRestart(
       deps.os,
       deps.uid,
       deps.paths.launchAgentFile,
-      !deps.exists(binary),
+      unit,
     );
-    const unit =
-      deps.os === 'darwin'
-        ? deps.paths.launchAgentFile
-        : deps.paths.serviceFile;
-    if (!service || !deps.exists(unit)) return;
+    if (!service || !deps.exists(unitFile)) return;
     const [probe, args] = service.probe;
     if ((await deps.exec(probe, args))?.code !== 0) return;
     deps.stderr(
@@ -182,6 +229,22 @@ export const startUpdateCheck = (deps: UpdateDeps): UpdateCheck | null => {
         }\n`,
       );
       return;
+    }
+    if (!(await installed(version))) {
+      // An early meta-package install can leave no binary behind: install the
+      // platform package on its own and check again.
+      deps.stderr(
+        `The install did not leave ${PACKAGE_NAME} ${version}; installing ${platform} directly.\n`,
+      );
+      const repaired =
+        (await runInstall(installArgv(install.manager, version, platform))) &&
+        (await installed(version));
+      if (!repaired) {
+        deps.stderr(
+          `The update to ${version} did not produce a working binary. Roll back with: ${installArgv(install.manager, deps.current).join(' ')}\n`,
+        );
+        return;
+      }
     }
     deps.stderr(`Updated ${PACKAGE_NAME} to ${version}.\n`);
     await restartNotice(version);

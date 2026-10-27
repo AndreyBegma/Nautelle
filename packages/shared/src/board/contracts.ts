@@ -423,19 +423,28 @@ export interface CardDependencyRef {
   label: string;
   /** Open while not `finished` or `completed` (#638). */
   column: BoardColumn;
+  /**
+   * C-417: its work is in the project base (merged into it, or accepted with
+   * no open PR). A card branches from at most one dependency that has not.
+   */
+  landed: boolean;
 }
 
 /**
  * #443: a To Do card with dependencies is `ready` once every one is
  * satisfied — in Finished or Completed (#638) — `waiting` while one is open.
+ * C-417: `blocked` when every one is satisfied but more than one has not
+ * landed; Run would be refused `dependencies_unmerged` (ADR-0065).
  */
 export interface CardReadiness {
-  state: 'ready' | 'waiting';
+  state: 'ready' | 'waiting' | 'blocked';
   /** Dependencies in Finished or Completed. */
   satisfied: number;
   total: number;
   /** The open ones, in number order: "Waits for C-84". */
   open: CardDependencyRef[];
+  /** C-417: the satisfied ones not landed, in number order; empty unless `blocked`. */
+  unmerged: CardDependencyRef[];
 }
 
 /** #337 D8: one dependency as the card sheet lists it. */
@@ -1129,6 +1138,14 @@ export const BOARD_ERROR = {
   labelLimit: 'label_limit',
   /** 422 (C-497): a path rule's pattern is refused (`labelPatternProblem`). */
   patternInvalid: 'pattern_invalid',
+  /** 409 (C-506): Create selected or Complete without cards on a card that is no analysis card. */
+  notAnalysis: 'not_analysis',
+  /** 409 (C-506): the `roundId` is not the round whose proposals are open. */
+  proposalsStale: 'proposals_stale',
+  /** 409 (C-506): a position is no `pending` proposal of the round — already decided or unknown. */
+  proposalsDecided: 'proposals_decided',
+  /** 422 (C-506): a `task` proposal while the project has no `task` card kind. */
+  kindUnavailable: 'kind_unavailable',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 

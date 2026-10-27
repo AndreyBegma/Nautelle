@@ -31,8 +31,12 @@ case an early install of the meta package left no binary, and the service failed
   explicitly with the same manager and verify again. Still failing → print that the update is incomplete and the
   rollback command (`<manager> … nautelle-runner@<current>`); never print "Updated".
 - D3. **Point the service at it.** When the unit (Linux) or launch agent (macOS) exists and its `ExecStart` /
-  `ProgramArguments` binary no longer exists, rewrite it with the new binary path (the one D1 ran, resolved with
-  `realpath`), then print only the restart command. ADR-0073's unit name is kept.
+  `ProgramArguments` binary no longer exists, rewrite it by running `install-service` on the binary D1 verified (when
+  the old path is gone, that is `nautelle-runner` on the PATH, so both steps use the same one), then read the unit
+  back: only when it no longer names the missing path print just the restart command, otherwise print the full
+  rewrite command. ADR-0073's unit name is kept. *Changed from the first draft (a new helper beside `serviceUnit`):
+  `install-service` already writes the unit and the plist with the PATH and arguments they need, and a second writer
+  would drift from it.*
 
 ## Acceptance criteria
 - [ ] `update.spec.ts`: an install after which `version` prints the old version runs the platform-package install

@@ -69,6 +69,7 @@ describe('seedDemo', () => {
     boardSettings: { upsert: jest.fn() },
     repositoryPushCheck: { upsert: jest.fn() },
     boardCard: { upsert: jest.fn().mockResolvedValue({ id: 'c1' }) },
+    boardCardDependency: { upsert: jest.fn() },
     run: { upsert: jest.fn() },
     boardCardRound: { upsert: jest.fn() },
     agentSession: { upsert: jest.fn() },
@@ -164,6 +165,8 @@ describe('seedDemo', () => {
     expect(
       rounds.filter((round) => round.create.phase === 'running'),
     ).toHaveLength(1);
+    // C-417: the last card waits on the two Finished cards with open PRs.
+    expect(db.boardCardDependency.upsert).toHaveBeenCalledTimes(2);
     const queued = db.boardRunQueueCard.upsert.mock.calls.map(([arg]) => arg);
     expect(queued).toHaveLength(2);
     for (const entry of queued) {

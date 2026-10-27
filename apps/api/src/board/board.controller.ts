@@ -9,6 +9,7 @@ import {
   type CardDependenciesView,
   type CardPullRequestView,
   type CollectBoardCardResponse,
+  type CreateCardProposalsResponse,
   type DismissAllResult,
   type SessionMessageView,
 } from '@nautelle/shared';
@@ -40,6 +41,7 @@ import { BoardBulk } from './board-bulk';
 import { BoardDependencies } from './board-dependencies.service';
 import { boardError, cardNotFound } from './board-error';
 import { BoardInboxService } from './board-inbox.service';
+import { BoardProposals } from './board-proposals.service';
 import { BoardRoundsService } from './board-rounds.service';
 import { BoardRunQueue } from './board-run-queue';
 import { BoardSessionMessages } from './board-session-message.service';
@@ -55,6 +57,7 @@ import {
   CardFeedbackDto,
   CreateBoardCardDto,
   CreateBoardStackDto,
+  CreateCardProposalsDto,
   MoveBoardCardDto,
   RunBoardCardDto,
   UpdateBoardCardDto,
@@ -100,6 +103,7 @@ export class BoardController {
     private readonly messages: BoardSessionMessages,
     private readonly stacks: BoardStacks,
     private readonly stackRuns: BoardRunQueue,
+    private readonly proposals: BoardProposals,
   ) {}
 
   // ─── Stacks (#480, ADR-0044) ───────────────────────────────────────────────
@@ -245,6 +249,42 @@ export class BoardController {
     @Body() dto: BulkBoardCardsDto,
   ): Promise<BulkBoardCardsResponse> {
     return this.bulk.run(access.projectId, dto, actorOf(access, user, ctx));
+  }
+
+  /** C-506: the ticked proposals of a finished analysis become cards; the analysis completes. */
+  @Post('board/cards/:number/proposals/create')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  createProposals(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Body() dto: CreateCardProposalsDto,
+  ): Promise<CreateCardProposalsResponse> {
+    return this.proposals.create(
+      access.projectId,
+      cardNumber(number),
+      dto,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  /** C-506: complete a finished analysis without making cards. */
+  @Post('board/cards/:number/proposals/dismiss')
+  @HttpCode(204)
+  @ProjectRole('operator')
+  dismissProposals(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+  ): Promise<void> {
+    return this.proposals.dismiss(
+      access.projectId,
+      cardNumber(number),
+      actorOf(access, user, ctx),
+    );
   }
 
   @Get('board/cards/:number')

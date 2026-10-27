@@ -1,4 +1,8 @@
-import { type BoardCardKind, captureFingerprint } from '@nautelle/shared';
+import {
+  type BoardCardKind,
+  captureFingerprint,
+  LABELS_PER_CARD_MAX,
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { BoardCard, Prisma } from '@prisma/client';
 import { CardAssessor } from '../assess/card-assessor';
@@ -15,11 +19,18 @@ export interface PlanCardDraft {
   kind: BoardCardKind;
   /** #592: the card's own origin when it is not `PlanCardsInput.planId`. */
   planId?: string;
+  /** C-506: the analysis card the draft was proposed by. */
+  originCardId?: string;
+  /** C-506: label names; those the project has are applied as the model's. */
+  labels?: readonly string[];
 }
 
 export interface PlanCardsInput {
   projectId: string;
-  planId: string;
+  /** Absent for the cards of an analysis (C-506), which have no plan. */
+  planId?: string;
+  /** C-506: where the cards land; To Do by default. */
+  column?: 'todo' | 'inbox';
   /** The plan's author: the cards are theirs. */
   authorId: string | null;
   /** In order: the first lands on top of To Do. */
@@ -51,6 +62,7 @@ export class BoardPlanCards {
         where: { projectId: input.projectId },
       }),
     );
+    const column = input.column ?? 'todo';
     const now = new Date();
     const cards: BoardCard[] = [];
     for (const [index, draft] of input.drafts.entries()) {
@@ -58,7 +70,7 @@ export class BoardPlanCards {
       const position = await this.work.place(
         tx,
         { id: '', projectId: input.projectId },
-        'todo',
+        column,
         index,
       );
       cards.push(
@@ -71,17 +83,19 @@ export class BoardPlanCards {
             body: draft.body,
             kind: draft.kind,
             kindSource: 'auto',
-            column: 'todo',
+            column,
             position,
             issueOnRun: settings.issueOnRun,
             specOnRun: settings.specOnRun,
             planId: draft.planId ?? input.planId,
+            originCardId: draft.originCardId,
             createdById: input.authorId,
             movedById: input.authorId,
             movedAt: now,
           },
         }),
       );
+      await this.label(tx, input.projectId, cards[cards.length - 1].id, draft);
     }
     const links = input.links ?? [];
     if (links.length > 0) {
@@ -94,6 +108,28 @@ export class BoardPlanCards {
       });
     }
     return cards;
+  }
+
+  /** C-506: the draft's label names the project has, written as the model's. */
+  private async label(
+    tx: Tx,
+    projectId: string,
+    cardId: string,
+    draft: PlanCardDraft,
+  ): Promise<void> {
+    if (!draft.labels || draft.labels.length === 0) return;
+    const known = await tx.projectLabel.findMany({
+      where: { projectId, name: { in: [...draft.labels] } },
+      select: { id: true },
+    });
+    if (known.length === 0) return;
+    await tx.boardCardLabel.createMany({
+      data: known.slice(0, LABELS_PER_CARD_MAX).map(({ id }) => ({
+        cardId,
+        labelId: id,
+        source: 'model' as const,
+      })),
+    });
   }
 
   /** After commit: `card.created` for each, the board's live event, the assessment (#322 D6). */
@@ -115,6 +151,7 @@ export class BoardPlanCards {
           issueOnRun: card.issueOnRun,
           specOnRun: card.specOnRun,
           planId: card.planId,
+          ...(card.originCardId ? { originCardId: card.originCardId } : {}),
           ...extra,
         },
         result: 'ok',

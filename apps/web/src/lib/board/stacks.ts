@@ -146,7 +146,7 @@ export const groupBlock = (card: BoardCardView): string | null =>
   card.stack
     ? `it is already in ${card.stack.label}`
     : isSuggestion(card)
-      ? 'it is a suggestion in Inbox'
+      ? 'it is a suggestion'
       : null;
 
 /** What Group into stack does with a selection: who joins, who is left out and why. */
