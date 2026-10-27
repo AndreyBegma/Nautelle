@@ -35,6 +35,7 @@ import {
   pendingAttachments,
   toCandidateView,
 } from './plan-candidates.service';
+import { PlanCloser } from './plan-closer';
 import { intakeRound, intakeSplit, toSplitView } from './plan-intake';
 import {
   blockingOpen,
@@ -48,7 +49,6 @@ import {
   userRef,
   userSelect,
 } from './plan-mapper';
-import { PlanCloser } from './plan-closer';
 import { PlanStore } from './plan-store';
 import { type PlanCaller, PlanTurnService } from './plan-turn.service';
 import { toTaskVersionView, versionTurns } from './plan-versions';

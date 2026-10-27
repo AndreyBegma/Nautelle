@@ -19,9 +19,9 @@ import {
   PlanCandidatesService,
   toCandidateView,
 } from './plan-candidates.service';
+import { PlanCloser } from './plan-closer';
 import { intakeSplit } from './plan-intake';
 import { questionsOf } from './plan-mapper';
-import { PlanCloser } from './plan-closer';
 import { findCycle } from './plan-send';
 import { PlanStore } from './plan-store';
 import { plannerError } from './planner-error';

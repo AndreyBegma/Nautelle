@@ -1,5 +1,5 @@
-import { Logger } from '@nestjs/common';
 import type { CreatePlanCardsResponse, PlanDetail } from '@nautelle/shared';
+import { Logger } from '@nestjs/common';
 import { block, decomposed, PlannerHarness, task } from './testing/planner-e2e';
 
 /** #337 D7, D11, D12: Create cards, and plans from before the Board planner. */
