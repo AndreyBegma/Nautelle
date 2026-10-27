@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "name": "A terminal card's tracked session filters",
+  "setup": [
+    {
+      "action": "include",
+      "fragment": "sign-in",
+      "with": {
+        "next": "/projects/demo-project/board/cards/12"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "action": "marker",
+      "title": "A card tracked from a terminal session"
+    },
+    {
+      "action": "waitFor",
+      "target": { "role": "heading", "name": "Tracked session", "exact": true },
+      "caption": "A terminal card has no rounds; its tracked session is where the saving comes from.",
+      "timeoutMs": 60000,
+      "zoom": true
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "marker",
+      "title": "The saving, filter by filter"
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "section[aria-label='Tracked session'] li:has-text('js/jest')"
+      },
+      "caption": "js/jest saved the most, so it comes first.",
+      "timeoutMs": 15000,
+      "zoom": true
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "section[aria-label='Tracked session'] li:has-text('ops/git')"
+      },
+      "caption": "Then ops/git, with its command count.",
+      "zoom": true
+    },
+    {
+      "action": "assertVisible",
+      "target": {
+        "css": "section[aria-label='Tracked session'] li:has-text('js/tsc')"
+      },
+      "caption": "The breakdown is the same one a round shows, now for the session.",
+      "zoom": true
+    },
+    {
+      "action": "screenshot",
+      "name": "tracked-session-filters"
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    }
+  ]
+}

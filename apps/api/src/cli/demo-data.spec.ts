@@ -11,6 +11,8 @@ import {
   DEMO_FAILED_RUNS,
   DEMO_PROJECT_ID,
   DEMO_TEAMMATE,
+  DEMO_TERMINAL_FILTERS,
+  DEMO_TERMINAL_SESSION_ID,
   DEMO_TOOL_CALLS,
   DemoDataError,
   demoDatabaseUrl,
@@ -71,6 +73,7 @@ describe('seedDemo', () => {
     run: { upsert: jest.fn() },
     boardCardRound: { upsert: jest.fn() },
     agentSession: { upsert: jest.fn() },
+    tokenSaverStat: { upsert: jest.fn() },
     actionRequest: { upsert: jest.fn() },
     notification: { findFirst: jest.fn(), create: jest.fn() },
     toolUseRule: { upsert: jest.fn() },
@@ -240,12 +243,36 @@ describe('seedDemo', () => {
     expect(failed).toEqual(['card', 'steward']);
   });
 
+  it("seeds the terminal card's session and its filtered commands (C-443)", async () => {
+    const db = prisma();
+    await seedDemo(db as never, 'demo@example.com');
+    const cards = db.boardCard.upsert.mock.calls.map(([arg]) => arg.create);
+    const terminal = cards.filter((card) => card.source === 'terminal');
+    expect(terminal).toHaveLength(1);
+    expect(terminal[0].trackedSessionId).toBe(DEMO_TERMINAL_SESSION_ID);
+    const stats = db.tokenSaverStat.upsert.mock.calls.map(
+      ([arg]) => arg.create,
+    );
+    expect(stats).toHaveLength(
+      DEMO_TERMINAL_FILTERS.reduce((total, f) => total + f.commands, 0),
+    );
+    for (const stat of stats) {
+      expect(stat).toMatchObject({
+        sessionId: DEMO_TERMINAL_SESSION_ID,
+        runKind: 'manual',
+        projectId: DEMO_PROJECT_ID,
+      });
+    }
+  });
+
   it('seeds an away session waiting on tool calls and a project rule (C-401)', async () => {
     const db = prisma();
     await seedDemo(db as never, 'demo@example.com');
     const [project] = db.project.upsert.mock.calls[0];
     expect(project.create.toolUseTimeoutMinutes).toBe(240);
-    expect(db.agentSession.upsert).toHaveBeenCalledTimes(1);
+    expect(db.agentSession.upsert).toHaveBeenCalledTimes(
+      1 + DEMO_CARDS.filter((card) => card.terminal).length,
+    );
     const requests = db.actionRequest.upsert.mock.calls
       .map(([args]) => args.create)
       .filter((request) => request.kind === 'tool_use');
