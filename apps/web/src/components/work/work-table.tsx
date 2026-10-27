@@ -31,6 +31,7 @@ import {
   groupWorkItems,
   type WorkDisplayRow,
 } from '../../lib/work/group';
+import { LabelStripe, LabelsSrText } from '../board/label-stripe';
 import { ScrollX } from '../scroll-x/scroll-x';
 
 /** A link that leaves the row's own action alone: the row opens the item. */
@@ -148,9 +149,29 @@ function SlotTitle({
   );
 }
 
+/** C-502: a card row's labels; a plan task, a fleet slot or a group has none. */
+export const labelsOf = (row: WorkDisplayRow) => {
+  const item = itemOf(row);
+  return item && item.source !== 'plan' ? (item.labels ?? []) : [];
+};
+
 function useColumns(toggle: (id: string) => void) {
   return useMemo(
     () => [
+      {
+        id: 'labels',
+        header: <span className="sr-only">Labels</span>,
+        width: '1rem',
+        cell: (row: WorkDisplayRow) => {
+          const labels = labelsOf(row);
+          return (
+            <>
+              <LabelStripe labels={labels} inline />
+              <LabelsSrText labels={labels} />
+            </>
+          );
+        },
+      },
       {
         id: 'project',
         header: 'Project',
@@ -328,8 +349,15 @@ function StackedRow({
   const projectId = group ? group.projectId : (item?.projectId ?? '');
   const projectName = group ? group.projectName : (item?.projectName ?? '');
   const updatedAt = group ? group.updatedAt : (item?.updatedAt ?? '');
+  const labels = labelsOf(row);
   return (
-    <li className="flex flex-col gap-1.5 border-t border-line px-3 py-3 first:border-t-0">
+    <li className="relative flex flex-col gap-1.5 border-t border-line px-3 py-3 first:border-t-0">
+      {labels.length > 0 ? (
+        <span className="pointer-events-none absolute top-3 left-0">
+          <LabelStripe labels={labels} inline />
+        </span>
+      ) : null}
+      <LabelsSrText labels={labels} />
       {row.type === 'group' ? (
         <GroupTitle row={row} onToggle={() => onToggle(row.group.id)} />
       ) : item ? (

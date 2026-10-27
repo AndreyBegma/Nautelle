@@ -11,14 +11,28 @@ export const STRIPE_SEGMENTS_MAX = 3;
  * the selected tint and the cursor outline still read on top of it. The names
  * are in the face's header for a screen reader (`LabelsSrText`).
  */
-export function LabelStripe({ labels }: { labels: readonly CardLabelView[] }) {
+export function LabelStripe({
+  labels,
+  inline = false,
+}: {
+  labels: readonly CardLabelView[];
+  /**
+   * C-502 D5: a row of the Work list has no padded face to hug, so the same
+   * segments sit in the row's first cell as a short bar instead.
+   */
+  inline?: boolean;
+}) {
   const shown = labels.slice(0, STRIPE_SEGMENTS_MAX);
   if (shown.length === 0) return null;
   return (
     <span
       aria-hidden="true"
       data-label-stripe={shown.length}
-      className="pointer-events-none absolute -inset-y-[13px] -left-[13px] flex w-1 flex-col gap-px overflow-hidden rounded-l-surface"
+      className={
+        inline
+          ? 'flex h-6 w-1 flex-col gap-px overflow-hidden rounded-full'
+          : 'pointer-events-none absolute -inset-y-[13px] -left-[13px] flex w-1 flex-col gap-px overflow-hidden rounded-l-surface'
+      }
     >
       {shown.map((label) => (
         <span

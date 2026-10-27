@@ -20,6 +20,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { decodeKeyset, encodeKeyset, type Keyset } from '../activity/keyset';
 import type { AuthUser } from '../auth';
+import { cardLabelsOf } from '../board/board-label-facts';
 import { PrismaService } from '../database/prisma.service';
 import { ProjectAccessService } from '../projects';
 import {
@@ -171,6 +172,10 @@ export class WorkQueryService {
       },
     });
     const last = cards.at(-1);
+    const labels = await cardLabelsOf(
+      this.prisma,
+      cards.map((c) => c.id),
+    );
     const rows = cards.map((card) => ({
       key: { at: card.updatedAt, id: card.id },
       item: {
@@ -190,6 +195,7 @@ export class WorkQueryService {
         prUrl: card.prUrl,
         updatedAt: card.updatedAt.toISOString(),
         href: workCardHref(card.projectId, card.number),
+        ...(labels.has(card.id) ? { labels: labels.get(card.id) } : {}),
         ...(card.source === 'fleet' && card.fleetIssue !== null
           ? {
               fleet: {

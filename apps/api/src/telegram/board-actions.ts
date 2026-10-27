@@ -266,6 +266,10 @@ export const cardText = (card: BoardCardDetail, service?: string): string => {
       ...(service ? [service] : []),
       `${card.label} ${card.title}`,
       `Kind: ${card.kind} · Column: ${COLUMN_TITLE[card.column]}`,
+      // C-502 D4: names only; colours stay in the web app.
+      ...(card.labels.length > 0
+        ? [`Labels: ${card.labels.map((l) => l.name).join(', ')}`]
+        : []),
       agent,
       ...pr,
       ...(summary ? ['', clip(summary, BODY_MAX)] : []),

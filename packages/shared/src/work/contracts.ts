@@ -1,4 +1,5 @@
 import type { CardFleetView } from '../board/contracts';
+import type { CardLabelView } from '../board/labels';
 import type {
   BoardCardKind,
   BoardColumn,
@@ -97,6 +98,8 @@ export interface WorkCardItem extends WorkItemBase {
   issueUrl: string | null;
   prNumber: number | null;
   prUrl: string | null;
+  /** C-502: the card's labels in label order; absent on a row without any. */
+  labels?: CardLabelView[];
 }
 
 /** A task of the current version of a readable plan. */

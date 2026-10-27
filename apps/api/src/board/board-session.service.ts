@@ -25,6 +25,7 @@ import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { BoardService } from './board.service';
 import { boardError } from './board-error';
+import { BoardLabels } from './board-labels.service';
 import {
   BoardTerminalService,
   type ManualSession,
@@ -83,6 +84,7 @@ export const localListCardOf = (card: BoardCardView): LocalBoardListCard => {
     dependsOn: (card.dependsOn ?? []).map((d) => d.number),
     taken: card.taken ?? null,
     queuedForSessionId: card.queuedForSessionId ?? null,
+    labels: card.labels.map((l) => ({ name: l.name, source: l.source })),
   };
 };
 
@@ -164,6 +166,7 @@ export class BoardSessionService {
     private readonly board: BoardService,
     private readonly terminal: BoardTerminalService,
     private readonly audit: AuditService,
+    private readonly labels: BoardLabels,
   ) {}
 
   /** `board.list`: board order; Completed newest first, at most 20. */
@@ -237,14 +240,18 @@ export class BoardSessionService {
     args: LocalMethodArgs<'card.create'>,
     actor: BoardActor,
   ): Promise<LocalMethodResult<'card.create'>> {
+    // C-502 D2, D3: labels by name are the person's choice, refused before
+    // the card exists.
+    const labelIds = await this.labels.idsByName(projectId, args.labels ?? []);
     if (args.candidate !== true) {
       const card = await this.board.create(
         projectId,
-        { title: args.title, body: args.body, kind: args.kind },
+        { title: args.title, body: args.body, kind: args.kind, labelIds },
         actor,
       );
       return { ...this.terminal.refOf(projectId, card.number), column: 'todo' };
     }
+    await this.labels.assertForCreate(projectId, labelIds);
     const settings = await this.board.settings(projectId);
     const title = args.title.trim();
     const now = new Date();
@@ -256,7 +263,7 @@ export class BoardSessionService {
         'inbox',
         0,
       );
-      return tx.boardCard.create({
+      const created = await tx.boardCard.create({
         data: {
           projectId,
           ...next,
@@ -275,6 +282,8 @@ export class BoardSessionService {
           movedAt: now,
         },
       });
+      await this.labels.writeOnCreate(tx, created.id, labelIds, actor.userId);
+      return created;
     });
     await this.audit.record({
       ...actor.ctx,

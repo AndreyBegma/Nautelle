@@ -14,6 +14,7 @@ import {
   ANALYSIS_REPORT_MAX,
   cardProposalsInputSchema,
 } from '../board/analysis';
+import { CARD_LABEL_SOURCES, LABELS_PER_CARD_MAX } from '../board/labels';
 import { DESIGN_COMMENT_MAX } from '../design/limits';
 import { taskDesignStatusSchema } from '../design/types';
 import {
@@ -80,6 +81,9 @@ export const LOCAL_BOARD_REFUSALS = [
   'stack_refused',
   'dependency_cycle',
   'invalid_dependency',
+  // C-502: `card_create` names a label the project has not, or too many.
+  'label_unknown',
+  'label_limit',
 ] as const;
 
 /**
@@ -665,6 +669,10 @@ export const localBoardListCardSchema = z.object({
   taken: localCardTakenSchema.nullable(),
   /** The manual session this card is queued for (#845 D2); `null` otherwise. */
   queuedForSessionId: z.string().min(1).nullable(),
+  /** C-502 D4: the card's labels in label order, with who set each. */
+  labels: z.array(
+    z.object({ name: z.string().min(1), source: z.enum(CARD_LABEL_SOURCES) }),
+  ),
 });
 export type LocalBoardListCard = z.infer<typeof localBoardListCardSchema>;
 
@@ -824,6 +832,14 @@ export const localCardCreateArgsSchema = z.strictObject({
   body: z.string().max(LOCAL_CARD_BODY_MAX).optional(),
   kind: z.enum(LOCAL_CARD_KINDS).optional(),
   candidate: z.boolean().optional(),
+  /**
+   * C-502 D2: names of the project's labels (kebab); a person's choice, so no
+   * model suggestion. An unknown name is refused `label_unknown`.
+   */
+  labels: z
+    .array(z.string().trim().min(1).max(32))
+    .max(LABELS_PER_CARD_MAX)
+    .optional(),
 });
 export const localCardCreateResultSchema = localCardTrackResultSchema.extend({
   column: boardColumnSchema,
